@@ -15,6 +15,7 @@ import (
 	"github.com/kukv/octoscope/internal/gh/cli"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"
+	"github.com/kukv/octoscope/internal/tui/icon"
 )
 
 // version is set by GoReleaser via -ldflags at release build time.
@@ -28,6 +29,9 @@ func main() {
 		"target repository as owner/name; defaults to the repository of the current directory")
 	lang := flag.String("lang", "",
 		"display language: en or ja; defaults to the operating system locale")
+	icons := flag.String("icons", "",
+		"glyph set: unicode (default), nerd for a Nerd Font patched font, or ascii; "+
+			"OCTOSCOPE_ICONS sets it permanently")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -38,6 +42,7 @@ func main() {
 
 	osLocale, _ := locale.GetLocale() // an error here just means "unknown"
 	i18n.SetLanguage(i18n.Resolve(*lang, osLocale))
+	icon.Use(icon.Resolve(*icons))
 
 	dir, err := os.Getwd()
 	if err != nil {

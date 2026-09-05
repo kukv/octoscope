@@ -67,7 +67,13 @@ Or point it at any repository:
 |---|---|
 | `--repo owner/name` | Target repository. Defaults to the repository of the current directory. |
 | `--lang en\|ja` | Display language. Defaults to the operating system locale. |
+| `--icons unicode\|nerd\|ascii` | Glyph set. Defaults to `unicode`; `OCTOSCOPE_ICONS` sets it permanently. |
 | `--version` | Print the version and exit. |
+
+Pass `--icons nerd` if you have a [Nerd Font](https://www.nerdfonts.com/)
+patched font installed, or `--icons ascii` if the Unicode symbols do not draw.
+There is no reliable way to detect a patched font — a terminal reports neither
+the font in use nor its coverage — so the default is the set that needs none.
 
 ### Keys
 

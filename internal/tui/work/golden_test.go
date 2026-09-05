@@ -10,6 +10,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/icon"
 )
 
 // goldenWidths are the three regimes the board degrades through: four columns
@@ -38,6 +39,19 @@ func goldenModel(width int) Model {
 	m, _ = m.Update(workMsg(overlongWork()))
 	m.fetchedAt = goldenFetchedAt
 	return m
+}
+
+// TestGoldenIconSets records the board once per glyph set. The board is what
+// the sets exist for, and a set that draws the wrong width shows up here as a
+// column that no longer lines up (spec 4.5).
+func TestGoldenIconSets(t *testing.T) {
+	for name, set := range map[string]icon.Set{"nerd": icon.Nerd, "ascii": icon.ASCII} {
+		t.Run(name, func(t *testing.T) {
+			icon.Use(set)
+			t.Cleanup(func() { icon.Use(icon.Unicode) })
+			golden.Assert(t, "work_icons_"+name, goldenModel(120).View())
+		})
+	}
 }
 
 func TestGolden(t *testing.T) {

@@ -10,6 +10,109 @@ import (
 	"github.com/kukv/octoscope/internal/tui/icon"
 )
 
+// allSets names every set, so the tests below cannot quietly stop covering
+// one when a set is added.
+var allSets = map[string]icon.Set{
+	"unicode": icon.Unicode,
+	"nerd":    icon.Nerd,
+	"ascii":   icon.ASCII,
+}
+
+// use switches the set and puts it back afterwards: the choice is
+// process-wide state (.claude/rules/testing.md).
+func use(t *testing.T, s icon.Set) {
+	t.Helper()
+	icon.Use(s)
+	t.Cleanup(func() { icon.Use(icon.Unicode) })
+}
+
+// markers is every glyph a set can draw, in one slice.
+func markers() []string {
+	var got []string
+	for _, draft := range []bool{false, true} {
+		for _, s := range []gh.ReviewState{
+			gh.ReviewNone, gh.ReviewRequired, gh.ReviewApproved, gh.ReviewChangesRequested,
+		} {
+			got = append(got, icon.Review(s, draft))
+		}
+	}
+	got = append(got, icon.Issue())
+	for _, s := range []gh.CheckState{
+		gh.CheckPending, gh.CheckRunning, gh.CheckSuccess, gh.CheckFailure,
+	} {
+		got = append(got, icon.Check(s))
+	}
+	done, rest := icon.ChecksBar(gh.Checks{Total: 2, Passed: 1})
+	return append(got, done, rest)
+}
+
+// TestEveryGlyphIsOneColumn is what keeps a set usable: the board pads its
+// columns by display width, and a glyph that measures two columns shifts
+// every card beside it. Nerd Font glyphs live in the private use area, where
+// width is not something to assume (spec 6.4).
+func TestEveryGlyphIsOneColumn(t *testing.T) {
+	for name, set := range allSets {
+		t.Run(name, func(t *testing.T) {
+			use(t, set)
+			for _, g := range markers() {
+				for _, r := range g {
+					if w := ansi.StringWidth(string(r)); w != 1 {
+						t.Errorf("%q is %d columns wide, want 1", string(r), w)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestEachSetDrawsItsOwnGlyphs is the assertion that would fail if a set were
+// declared but never reached: ASCII drawing "✓" means the fallback is not a
+// fallback at all.
+func TestEachSetDrawsItsOwnGlyphs(t *testing.T) {
+	seen := map[string]string{}
+	for name, set := range allSets {
+		use(t, set)
+		got := strings.Join(markers(), "")
+		if other, clash := seen[got]; clash {
+			t.Errorf("the %s set draws exactly what %s draws: %q", name, other, got)
+		}
+		seen[got] = name
+	}
+
+	use(t, icon.ASCII)
+	for _, g := range markers() {
+		for _, r := range g {
+			if r > 127 {
+				t.Errorf("the ASCII set draws %q, which is not ASCII", string(r))
+			}
+		}
+	}
+}
+
+func TestResolve(t *testing.T) {
+	tests := []struct {
+		name, flag, env string
+		want            icon.Set
+	}{
+		{"nothing given", "", "", icon.Unicode},
+		{"the flag wins", "ascii", "nerd", icon.ASCII},
+		{"the environment is used when the flag is absent", "", "nerd", icon.Nerd},
+		{"auto means the set that needs no font", "auto", "", icon.Unicode},
+		{"an auto flag still lets the environment decide", "auto", "ascii", icon.ASCII},
+		{"case and spacing do not matter", " Nerd ", "", icon.Nerd},
+		{"a typo falls back rather than breaking the board", "nerdfont", "", icon.Unicode},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(icon.EnvVar, tt.env)
+			if got := icon.Resolve(tt.flag); got != tt.want {
+				t.Errorf("Resolve(%q) with %s=%q = %v, want %v",
+					tt.flag, icon.EnvVar, tt.env, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReview(t *testing.T) {
 	tests := []struct {
 		name  string
