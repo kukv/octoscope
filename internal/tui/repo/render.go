@@ -68,10 +68,9 @@ func cursorPrefix(selected bool) string {
 }
 
 func prLine(pr gh.PR, now time.Time) string {
-	review := gh.ParseReviewDecision(pr.ReviewDecision)
 	return fmt.Sprintf("#%-5d %s  @%s  %s %s",
 		pr.Number, pr.Title, pr.Author.Login,
-		theme.Review(review, pr.IsDraft).Render(icon.Review(review, pr.IsDraft)),
+		theme.Review(pr.Review, pr.IsDraft).Render(icon.Review(pr.Review, pr.IsDraft)),
 		i18n.RelTime(now, pr.UpdatedAt))
 }
 

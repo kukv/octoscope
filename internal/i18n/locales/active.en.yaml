@@ -143,3 +143,21 @@ time:
   # by language, so it belongs in the catalog rather than in the code.
   datetime_layout:
     other: "Jan 2, 2006 15:04"
+
+state:
+  open:
+    other: "open"
+  closed:
+    other: "closed"
+  merged:
+    other: "merged"
+
+review:
+  none:
+    other: "no review needed"
+  required:
+    other: "review required"
+  approved:
+    other: "approved"
+  changes_requested:
+    other: "changes requested"

@@ -17,7 +17,7 @@ func wheelDown() tea.MouseWheelMsg {
 // scroll: a wheel test against a body that already fits proves nothing.
 func longPR() gh.PR {
 	return gh.PR{
-		Number: 1, Title: "a long one", State: "OPEN",
+		Number: 1, Title: "a long one", State: gh.StateOpen,
 		Body: strings.Repeat("a paragraph of the description\n\n", 40),
 	}
 }

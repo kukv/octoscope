@@ -35,7 +35,7 @@ func goldenPRs() []gh.PR {
 	return []gh.PR{
 		{
 			Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
-			UpdatedAt: goldenUpdatedAt, ReviewDecision: "APPROVED",
+			UpdatedAt: goldenUpdatedAt, Review: gh.ReviewApproved,
 		},
 		{
 			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},

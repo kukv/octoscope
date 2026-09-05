@@ -119,13 +119,13 @@ func prMarkdown(pr gh.PR) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# #%d %s\n\n", pr.Number, pr.Title)
 	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), pr.Author.Login)
-	state := pr.State
+	state := stateText(pr.State)
 	if pr.IsDraft {
 		state += i18n.T("md.draft_suffix")
 	}
 	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), state)
-	if pr.ReviewDecision != "" {
-		fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.review"), pr.ReviewDecision)
+	if pr.Review != gh.ReviewNone {
+		fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.review"), reviewText(pr.Review))
 	}
 	writeCommonMeta(&b, pr.Labels, pr.UpdatedAt)
 	writeBody(&b, pr.Body)
@@ -137,11 +137,38 @@ func issueMarkdown(issue gh.Issue) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# #%d %s\n\n", issue.Number, issue.Title)
 	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), issue.Author.Login)
-	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), issue.State)
+	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), stateText(issue.State))
 	writeCommonMeta(&b, issue.Labels, issue.UpdatedAt)
 	writeBody(&b, issue.Body)
 	writeComments(&b, issue.Comments)
 	return b.String()
+}
+
+// stateText and reviewText name a state in the reader's language. GitHub's
+// own spelling stopped at the access layer (.claude/rules/architecture.md),
+// and a state word is ours to translate (spec 6.1).
+func stateText(s gh.ItemState) string {
+	switch s {
+	case gh.StateOpen:
+		return i18n.T("state.open")
+	case gh.StateMerged:
+		return i18n.T("state.merged")
+	default:
+		return i18n.T("state.closed")
+	}
+}
+
+func reviewText(r gh.ReviewState) string {
+	switch r {
+	case gh.ReviewApproved:
+		return i18n.T("review.approved")
+	case gh.ReviewChangesRequested:
+		return i18n.T("review.changes_requested")
+	case gh.ReviewRequired:
+		return i18n.T("review.required")
+	default:
+		return i18n.T("review.none")
+	}
 }
 
 func writeCommonMeta(b *strings.Builder, labels []gh.Label, updatedAt time.Time) {

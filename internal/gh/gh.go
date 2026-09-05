@@ -5,6 +5,7 @@ package gh
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -26,32 +27,59 @@ type Comment struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// ItemState is whether a pull request or an issue is still open, translated
+// out of the strings GitHub uses so that no view switches on API spelling.
+type ItemState int
+
+const (
+	StateOpen ItemState = iota
+	StateClosed
+	StateMerged
+)
+
+// ParseItemState maps GitHub's state onto the domain value. GraphQL and REST
+// differ in case, so the comparison ignores it; anything unrecognised reads
+// as closed, which is the reading that offers no action.
+func ParseItemState(state string) ItemState {
+	switch strings.ToUpper(state) {
+	case "OPEN":
+		return StateOpen
+	case "MERGED":
+		return StateMerged
+	default:
+		return StateClosed
+	}
+}
+
+// PR and Issue carry no JSON tags: what a backend receives is that backend's
+// business, and both of them translate GitHub's own spelling into the values
+// above before handing anything over.
 type PR struct {
-	Number         int       `json:"number"`
-	Title          string    `json:"title"`
-	Author         Author    `json:"author"`
-	State          string    `json:"state"`
-	IsDraft        bool      `json:"isDraft"`
-	UpdatedAt      time.Time `json:"updatedAt"`
-	ReviewDecision string    `json:"reviewDecision"`
-	URL            string    `json:"url"`
-	Body           string    `json:"body"`
-	Comments       []Comment `json:"comments"`
-	Labels         []Label   `json:"labels"`
-	Assignees      []Author  `json:"assignees"`
+	Number    int
+	Title     string
+	Author    Author
+	State     ItemState
+	IsDraft   bool
+	UpdatedAt time.Time
+	Review    ReviewState
+	URL       string
+	Body      string
+	Comments  []Comment
+	Labels    []Label
+	Assignees []Author
 }
 
 type Issue struct {
-	Number    int       `json:"number"`
-	Title     string    `json:"title"`
-	Author    Author    `json:"author"`
-	State     string    `json:"state"`
-	UpdatedAt time.Time `json:"updatedAt"`
-	URL       string    `json:"url"`
-	Body      string    `json:"body"`
-	Comments  []Comment `json:"comments"`
-	Labels    []Label   `json:"labels"`
-	Assignees []Author  `json:"assignees"`
+	Number    int
+	Title     string
+	Author    Author
+	State     ItemState
+	UpdatedAt time.Time
+	URL       string
+	Body      string
+	Comments  []Comment
+	Labels    []Label
+	Assignees []Author
 }
 
 // ItemKind separates pull requests from issues in a mixed list.

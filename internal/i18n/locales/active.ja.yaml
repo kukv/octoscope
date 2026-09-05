@@ -138,3 +138,21 @@ time:
   # A Go reference-time layout, not a display string.
   datetime_layout:
     other: "2006年1月2日 15:04"
+
+state:
+  open:
+    other: "オープン"
+  closed:
+    other: "クローズ"
+  merged:
+    other: "マージ済み"
+
+review:
+  none:
+    other: "レビュー不要"
+  required:
+    other: "レビュー待ち"
+  approved:
+    other: "承認済み"
+  changes_requested:
+    other: "変更依頼"

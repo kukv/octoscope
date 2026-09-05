@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+
+	"github.com/kukv/octoscope/internal/gh"
 )
 
 const prListJSON = `[{"number":12,"title":"feat: add pane view","author":{"is_bot":false,"login":"kukv"},"state":"OPEN","isDraft":false,"updatedAt":"2026-07-11T10:00:00Z","reviewDecision":"APPROVED","url":"https://github.com/kukv/demo/pull/12"}]`
@@ -48,8 +50,10 @@ func TestListPRs(t *testing.T) {
 	if f.dir != "/repo" {
 		t.Errorf("dir = %q, want /repo", f.dir)
 	}
+	// The domain value, not the string GitHub sent: the translation is what
+	// this layer exists to do (.claude/rules/architecture.md).
 	if len(prs) != 1 || prs[0].Number != 12 || prs[0].Author.Login != "kukv" ||
-		prs[0].ReviewDecision != "APPROVED" {
+		prs[0].Review != gh.ReviewApproved || prs[0].State != gh.StateOpen {
 		t.Errorf("unexpected parse result: %+v", prs)
 	}
 }

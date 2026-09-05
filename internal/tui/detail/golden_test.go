@@ -30,8 +30,8 @@ var goldenAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 func goldenPR() gh.PR {
 	return gh.PR{
 		Number: 12, Title: "レンダリングのパイプラインを置き換える",
-		Author: gh.Author{Login: "kukv"}, State: "OPEN",
-		ReviewDecision: "APPROVED", UpdatedAt: goldenAt,
+		Author: gh.Author{Login: "kukv"}, State: gh.StateOpen,
+		Review: gh.ReviewApproved, UpdatedAt: goldenAt,
 		Body:   "This replaces the renderer.\n\n- one\n- two",
 		Labels: []gh.Label{{Name: "enhancement", Color: "a2eeef"}},
 		Comments: []gh.Comment{

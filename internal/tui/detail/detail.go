@@ -104,7 +104,7 @@ type Model struct {
 	spin    spinner.Model
 	body    viewport.Model
 	title   string
-	state   string
+	state   gh.ItemState
 
 	textarea  textarea.Model
 	composing bool
@@ -201,15 +201,20 @@ func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 }
 
 // stateAction reports whether the shown item can change state, and if so
-// whether the action is a close (true) or a reopen (false).
+// whether the action is a close (true) or a reopen (false). Nothing has been
+// fetched yet is not a state of its own: loading is, and every caller checks
+// it first.
 func (m Model) stateAction() (closing bool, ok bool) {
+	if m.loading {
+		return false, false
+	}
 	switch m.state {
-	case "OPEN":
+	case gh.StateOpen:
 		return true, true
-	case "CLOSED":
+	case gh.StateClosed:
 		return false, true
 	default:
-		return false, false // merged, or not fetched yet: no action
+		return false, false // merged: neither closing nor reopening applies
 	}
 }
 

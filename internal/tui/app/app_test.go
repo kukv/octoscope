@@ -401,7 +401,7 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 	for name, busy := range tests {
 		t.Run(name, func(t *testing.T) {
 			src := &fakeSource{
-				pr:     gh.PR{Number: 1, Title: "a pr", State: "OPEN"},
+				pr:     gh.PR{Number: 1, Title: "a pr", State: gh.StateOpen},
 				labels: []gh.Label{{Name: "bug", Color: "d73a4a"}},
 			}
 			m := newTestModelWith(src, Options{HasRepo: true})
@@ -478,7 +478,7 @@ func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 				Title: "add the work board",
 			}},
 		},
-		pr: gh.PR{Number: 41, Title: "add the work board", State: "OPEN"},
+		pr: gh.PR{Number: 41, Title: "add the work board", State: gh.StateOpen},
 	}
 	m := New(src, Options{HasRepo: true})
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -532,7 +532,7 @@ func overlongSource() *fakeSource {
 			Number: 1, Title: overlongTitle,
 			Author: gh.Author{Login: "a-contributor-with-a-very-long-handle"},
 		}},
-		pr: gh.PR{Number: 1, Title: overlongTitle, State: "OPEN"},
+		pr: gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen},
 	}
 }
 

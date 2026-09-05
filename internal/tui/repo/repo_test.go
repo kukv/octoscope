@@ -47,7 +47,7 @@ func samplePRs() []gh.PR {
 	return []gh.PR{
 		{
 			Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
-			UpdatedAt: time.Now(), ReviewDecision: "APPROVED",
+			UpdatedAt: time.Now(), Review: gh.ReviewApproved,
 		},
 		{
 			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},
@@ -416,9 +416,9 @@ func TestPRLineShowsReviewIconAndRelTime(t *testing.T) {
 		want []string
 	}{
 		{"draft", gh.PR{IsDraft: true, UpdatedAt: now.Add(-30 * time.Second)}, []string{"◌", "now"}},
-		{"approved", gh.PR{ReviewDecision: "APPROVED", UpdatedAt: now.Add(-5 * time.Minute)}, []string{"✓", "5m ago"}},
-		{"changes requested", gh.PR{ReviewDecision: "CHANGES_REQUESTED", UpdatedAt: now.Add(-3 * time.Hour)}, []string{"×", "3h ago"}},
-		{"review required", gh.PR{ReviewDecision: "REVIEW_REQUIRED", UpdatedAt: now.Add(-49 * time.Hour)}, []string{"•", "2d ago"}},
+		{"approved", gh.PR{Review: gh.ReviewApproved, UpdatedAt: now.Add(-5 * time.Minute)}, []string{"✓", "5m ago"}},
+		{"changes requested", gh.PR{Review: gh.ReviewChangesRequested, UpdatedAt: now.Add(-3 * time.Hour)}, []string{"×", "3h ago"}},
+		{"review required", gh.PR{Review: gh.ReviewRequired, UpdatedAt: now.Add(-49 * time.Hour)}, []string{"•", "2d ago"}},
 		{"none", gh.PR{UpdatedAt: now}, []string{"•", "now"}},
 	}
 	for _, c := range cases {
