@@ -116,6 +116,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.opts.HasRepo = true
+		// broadcast skips the list until this point, so it never saw the
+		// WindowSizeMsg that told the others how wide they are: an unsized
+		// list clips nothing and runs off the terminal.
+		m.repo, _ = m.repo.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 		return m, m.repo.Init()
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)

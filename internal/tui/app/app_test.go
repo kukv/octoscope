@@ -210,6 +210,31 @@ func TestTheReposTabAppearsWhenTheRepositoryIsResolved(t *testing.T) {
 	}
 }
 
+// TestALateRepositoryStillGetsTheTerminalWidth is the case the asynchronous
+// lookup created: the list is not part of the broadcast until the answer
+// arrives, so it never saw the size everything else was given. An unsized
+// list clips nothing, and every long title runs off the terminal until the
+// user happens to resize the window.
+func TestALateRepositoryStillGetsTheTerminalWidth(t *testing.T) {
+	const width = 120
+	src := &fakeSource{prs: []gh.PR{{
+		Number: 1,
+		Title: "レンダリングのパイプラインをまるごと置き換える " +
+			"refactor with an English clause long enough to run off any screen",
+		Author: gh.Author{Login: "a-contributor-with-a-very-long-handle"},
+	}}}
+
+	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+	m = press(m, "2")
+
+	for _, line := range strings.Split(content(m), "\n") {
+		if w := ansi.StringWidth(line); w > width {
+			t.Errorf("the list is %d columns wide: %q", w, line)
+		}
+	}
+}
+
 func TestNoRepositoryLeavesTheReposTabOff(t *testing.T) {
 	m := newTestModel(Options{})
 	next, cmd := m.Update(repoResolvedMsg{found: false})
