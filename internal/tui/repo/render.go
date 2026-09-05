@@ -20,15 +20,15 @@ func (m Model) View() string {
 	}
 	b.WriteString(theme.Title().Render(title) + "\n\n")
 
-	prTab, issueTab := i18n.T("list.tab_prs"), i18n.T("list.tab_issues")
-	if m.tab == tabPRs {
-		prTab = theme.ActiveTab().Render(prTab)
-		issueTab = theme.Dim().Render(issueTab)
-	} else {
-		issueTab = theme.ActiveTab().Render(issueTab)
-		prTab = theme.Dim().Render(prTab)
+	labels := subTabLabels()
+	for i, label := range labels {
+		if tabID(i) == m.tab {
+			labels[i] = theme.ActiveTab().Render(label)
+		} else {
+			labels[i] = theme.Dim().Render(label)
+		}
 	}
-	b.WriteString(prTab + "  " + issueTab + "\n\n")
+	b.WriteString(strings.Join(labels, subTabGap) + "\n\n")
 
 	switch {
 	case m.loading[m.tab]:
@@ -51,6 +51,13 @@ func (m Model) View() string {
 
 	b.WriteString("\n" + theme.Dim().Render(i18n.T("footer.list")))
 	return layout.ClipLines(b.String(), m.width)
+}
+
+// subTabLabels names the sub-tabs in display order. The hit-test walks the
+// same list the row is drawn from, so a rename cannot move one without moving
+// the other.
+func subTabLabels() []string {
+	return []string{i18n.T("list.tab_prs"), i18n.T("list.tab_issues")}
 }
 
 func cursorPrefix(selected bool) string {

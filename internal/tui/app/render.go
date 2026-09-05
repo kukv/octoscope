@@ -22,6 +22,9 @@ func (m Model) View() tea.View {
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
+	// Nothing else turns the mouse on: without this the terminal reports no
+	// clicks and no wheel at all (spec 4).
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -32,14 +35,21 @@ func (m Model) activeTab() string {
 	return m.work.View()
 }
 
-// tabRow labels each tab with the key that reaches it. Without a target
-// repository the Repos tab is not offered at all (spec 3.4).
-func (m Model) tabRow() string {
+// tabLabels names the tabs on offer, in display order. Without a target
+// repository the Repos tab is not offered at all (spec 3.4). Both the tab row
+// and the mouse hit-test read this, so they cannot disagree about where a
+// label sits.
+func (m Model) tabLabels() []string {
 	labels := []string{"1 " + i18n.T("tab.work")}
 	if m.opts.HasRepo {
 		labels = append(labels, "2 "+i18n.T("tab.repos"))
 	}
+	return labels
+}
 
+// tabRow labels each tab with the key that reaches it.
+func (m Model) tabRow() string {
+	labels := m.tabLabels()
 	for i, label := range labels {
 		if tabID(i) == m.tab {
 			labels[i] = theme.ActiveTab().Render(label)
@@ -47,7 +57,7 @@ func (m Model) tabRow() string {
 			labels[i] = theme.Dim().Render(label)
 		}
 	}
-	return strings.Join(labels, "  ")
+	return strings.Join(labels, tabGap)
 }
 
 // errorView shows the failure that stopped the run. The heading and the key

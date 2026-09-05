@@ -117,6 +117,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{err} }
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
 	}
 	return m, nil
 }

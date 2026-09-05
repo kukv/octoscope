@@ -124,9 +124,18 @@ func New(src Source, ref gh.ItemRef) Model {
 		ref:      ref,
 		loading:  true,
 		spin:     s,
-		body:     viewport.New(viewport.WithWidth(80), viewport.WithHeight(20)),
+		body:     newBody(),
 		textarea: ta,
 	}
+}
+
+// newBody is the scrolling body pane. The wheel has to be turned on for the
+// viewport to act on it; the root model is what asks the terminal to report
+// mouse events at all.
+func newBody() viewport.Model {
+	v := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	v.MouseWheelEnabled = true
+	return v
 }
 
 func (m Model) Init() tea.Cmd {
@@ -348,6 +357,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{err} }
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseWheelMsg:
+		// The body is the only thing here that scrolls. The composer, the
+		// confirmation and the picker are drawn over it, and a wheel that
+		// moved the text underneath them would be scrolling what nobody can
+		// see.
+		if m.composing || m.confirming || m.picking || m.loading {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.body, cmd = m.body.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }

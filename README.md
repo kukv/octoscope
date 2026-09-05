@@ -91,6 +91,15 @@ the font in use nor its coverage — so the default is the set that needs none.
 | `esc` | — | back to list |
 | `q` | quit | back to list |
 
+### Mouse
+
+| Action | Effect |
+|---|---|
+| Click a tab | Switch to it |
+| Click a card or row | Select it |
+| Click the selected card or row | Open its detail |
+| Wheel | Move the cursor in the column under the pointer; scroll the body in the detail view |
+
 ## Localization
 
 octoscope speaks English and Japanese. The language is chosen from `--lang`

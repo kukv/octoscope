@@ -83,6 +83,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.resize(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:

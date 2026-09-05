@@ -45,7 +45,7 @@ func (m Model) View() string {
 
 	var lines []string
 	sections := m.visibleSections()
-	if len(sections) < m.columns() {
+	if m.boardTop() > 0 {
 		position := i18n.Tf("work.column_position", map[string]any{
 			"Index": m.col + 1,
 			"Total": m.columns(),
@@ -59,6 +59,24 @@ func (m Model) View() string {
 	lines = append(lines, "", theme.Dim().Render(clip(i18n.T("footer.work"), m.width)))
 	return strings.Join(lines, "\n")
 }
+
+// boardTop is the line the board starts on. Paging between single columns
+// puts a "column 2/4" note and a blank line above it; four columns start at
+// the top. The mouse hit-test reads the same function View does, so the two
+// cannot drift apart.
+func (m Model) boardTop() int {
+	if len(m.visibleSections()) < m.columns() {
+		return 2
+	}
+	return 0
+}
+
+// cardRowsTop is how far into a column its first card sits: the heading and
+// the rule under it.
+const cardRowsTop = 2
+
+// cardLineCount is how many lines one card occupies (spec 4.1).
+const cardLineCount = 2
 
 // board lays the columns side by side. Every cell is padded to the column
 // width first, so the columns stay aligned however many cards each one holds.

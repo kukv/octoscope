@@ -172,6 +172,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{err} }
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
 	}
 	return m, nil
 }
@@ -180,15 +184,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		if m.tab == tabPRs {
-			m.tab = tabIssues
-		} else {
-			m.tab = tabPRs
+			return m.showTab(tabIssues, true)
 		}
-		if !m.loaded[m.tab] {
-			m.loading[m.tab] = true
-			return m, fetchList(m.src, m.tab)
-		}
-		return m, nil
+		return m.showTab(tabPRs, true)
 	case "j", "down":
 		if n := m.itemCount(); n > 0 && m.cursors[m.tab] < n-1 {
 			m.cursors[m.tab]++
