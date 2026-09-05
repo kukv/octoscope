@@ -2,6 +2,7 @@ package work
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -183,8 +184,17 @@ func checksBar(c gh.Checks) string {
 	return theme.Check(c.State).Render(done) + theme.Dim().Render(rest)
 }
 
-// drawer names the selected card in full and spells out its checks, which the
-// card itself only has room to draw as a bar.
+// The drawer's budgets. Both are fixed rather than a share of the terminal
+// because the drawer is drawn below the board: it has to stay the same height
+// whatever the column with the most cards happens to hold (spec 4.1).
+const (
+	drawerChecks = 5
+	drawerBody   = 3
+)
+
+// drawer shows the selected card in full: its labels, the beginning of its
+// body and its checks one by one, so that the card can be read without
+// pressing enter (spec 4.1).
 func (m Model) drawer() []string {
 	ref, ok := m.SelectedRef()
 	if !ok {
@@ -194,20 +204,74 @@ func (m Model) drawer() []string {
 
 	lines := []string{
 		strings.Repeat("─", m.width),
-		clip(fmt.Sprintf("%s#%d %s", ref.Repo, ref.Number, it.Title), m.width),
+		clip(theme.Title().Render(fmt.Sprintf("%s#%d %s", ref.Repo, ref.Number, it.Title)), m.width),
 	}
-	// Issues have no checks at all, so they get no checks line either.
-	if ref.Kind == gh.ItemIssue {
-		return lines
+	if badge := badges(it.Labels, m.width); badge != "" {
+		lines = append(lines, clip(strings.TrimPrefix(badge, " "), m.width))
+	}
+	lines = append(lines, m.bodyLines(it.Body)...)
+	// Issues have no checks at all, so they get no checks list either.
+	if ref.Kind == gh.ItemPR {
+		lines = append(lines, m.checkLines(it.Checks)...)
+	}
+	return lines
+}
+
+// bodyLines is the beginning of the item's body, wrapped to the terminal and
+// cut to a fixed number of lines. GitHub bodies run to any length; the drawer
+// is a preview, and enter opens the whole thing.
+func (m Model) bodyLines(body string) []string {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return nil
+	}
+	wrapped := strings.Split(ansi.Wrap(body, m.width, ""), "\n")
+	if len(wrapped) > drawerBody {
+		wrapped = wrapped[:drawerBody]
+		wrapped[drawerBody-1] = clip(wrapped[drawerBody-1]+" …", m.width)
+	}
+	for i, line := range wrapped {
+		wrapped[i] = theme.Dim().Render(line)
+	}
+	return wrapped
+}
+
+// checkLines lists the checks by name, each with its own outcome. The card
+// only has room for the bar, which says how many passed but not which.
+func (m Model) checkLines(c gh.Checks) []string {
+	if c.Total == 0 {
+		return []string{theme.Dim().Render(clip(i18n.T("work.no_checks"), m.width))}
 	}
 
-	summary := i18n.T("work.no_checks")
-	if c := it.Checks; c.Total > 0 {
-		summary = i18n.Tf("work.checks_summary", map[string]any{
-			"Passed": c.Passed, "Total": c.Total, "Failed": c.Failed, "Running": c.Running,
-		})
+	summary := i18n.Tf("work.checks_summary", map[string]any{
+		"Passed": c.Passed, "Total": c.Total, "Failed": c.Failed, "Running": c.Running,
+	})
+	lines := []string{theme.Dim().Render(clip(summary, m.width))}
+
+	// A failure is the reason to look at this list, so failures come first.
+	runs := slices.SortedStableFunc(slices.Values(c.Runs), func(a, b gh.CheckRun) int {
+		return checkOrder(a.State) - checkOrder(b.State)
+	})
+	for _, run := range runs[:min(len(runs), drawerChecks)] {
+		lines = append(lines, clip(
+			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, m.width))
 	}
-	return append(lines, theme.Dim().Render(clip(summary, m.width)))
+	if rest := len(runs) - drawerChecks; rest > 0 {
+		lines = append(lines, theme.Dim().Render(clip(i18n.Tn("work.checks_more", rest), m.width)))
+	}
+	return lines
+}
+
+// checkOrder ranks a check by how much it wants attention.
+func checkOrder(s gh.CheckState) int {
+	switch s {
+	case gh.CheckFailure:
+		return 0
+	case gh.CheckRunning, gh.CheckPending:
+		return 1
+	default:
+		return 2
+	}
 }
 
 // visibleSections is the width degradation: too narrow for four columns and

@@ -78,6 +78,58 @@ func TestTheDrawerOnlyReportsChecksForPullRequests(t *testing.T) {
 	}
 }
 
+// TestTheDrawerShowsTheBodyAndEachCheck pins spec §4.1: the drawer is what
+// lets a card be read without pressing enter, so it carries the body and the
+// checks one by one — not a summary line.
+func TestTheDrawerShowsTheBodyAndEachCheck(t *testing.T) {
+	out := ansi.Strip(loaded().View())
+
+	if !strings.Contains(out, "The renderer dropped every escape.") {
+		t.Errorf("the drawer does not show the body:\n%s", out)
+	}
+	for _, name := range []string{"build", "lint", "test"} {
+		if !strings.Contains(out, name) {
+			t.Errorf("the drawer does not name the %q check:\n%s", name, out)
+		}
+	}
+}
+
+// TestFailingChecksComeFirst is why the drawer sorts: a failure is the reason
+// to look at the list at all, and the budget cuts the tail off.
+func TestFailingChecksComeFirst(t *testing.T) {
+	m := loaded()
+	lines := m.checkLines(gh.Checks{
+		Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
+		Runs: []gh.CheckRun{
+			{Name: "build", State: gh.CheckSuccess},
+			{Name: "lint", State: gh.CheckRunning},
+			{Name: "test", State: gh.CheckFailure},
+		},
+	})
+	got := ansi.Strip(strings.Join(lines, "\n"))
+	if strings.Index(got, "test") > strings.Index(got, "build") {
+		t.Errorf("the failing check is listed after a passing one:\n%s", got)
+	}
+}
+
+// TestALongChecksListIsCutWithACount keeps the drawer a fixed height: it is
+// drawn under the board, and a repository with thirty checks must not push
+// the footer off the screen.
+func TestALongChecksListIsCutWithACount(t *testing.T) {
+	c := gh.Checks{Total: 12, Passed: 12, State: gh.CheckSuccess}
+	for i := range 12 {
+		c.Runs = append(c.Runs, gh.CheckRun{Name: fmt.Sprintf("job-%d", i), State: gh.CheckSuccess})
+	}
+
+	lines := loaded().checkLines(c)
+	if want := 1 + drawerChecks + 1; len(lines) != want { // summary, the checks, the count
+		t.Errorf("the list is %d lines, want %d:\n%s", len(lines), want, strings.Join(lines, "\n"))
+	}
+	if got := ansi.Strip(lines[len(lines)-1]); !strings.Contains(got, "7") {
+		t.Errorf("the last line does not count what was left out: %q", got)
+	}
+}
+
 // TestACardIsTwoLines pins spec §4.1: the title and the state marker on the
 // first line, the repository, the checks bar and the elapsed time on the
 // second. Three lines per card is what Phase 1 shipped.

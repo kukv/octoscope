@@ -109,20 +109,29 @@ const (
 	CheckFailure
 )
 
+// CheckRun is one check behind the roll-up, named as GitHub names it.
+type CheckRun struct {
+	Name  string
+	State CheckState
+}
+
 // Checks counts the check runs behind CheckState so a progress bar can be
-// drawn without a second request.
+// drawn without a second request, and keeps them so the drawer can list them
+// without one either.
 type Checks struct {
 	Total   int
 	Passed  int
 	Failed  int
 	Running int
 	State   CheckState
+	Runs    []CheckRun
 }
 
 // WorkItem is one card on the Work board.
 type WorkItem struct {
 	Ref       ItemRef
 	Title     string
+	Body      string
 	Author    string
 	IsDraft   bool
 	Labels    []Label

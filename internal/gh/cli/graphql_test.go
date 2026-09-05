@@ -169,7 +169,7 @@ func TestChecksNoCommitsYieldsCheckNone(t *testing.T) {
 	if len(rr) != 1 {
 		t.Fatalf("review requested holds %d items, want 1", len(rr))
 	}
-	if got := rr[0].Checks; got != (gh.Checks{State: gh.CheckNone}) {
+	if got := rr[0].Checks; !reflect.DeepEqual(got, gh.Checks{State: gh.CheckNone}) {
 		t.Errorf("checks = %+v, want zero counts with CheckNone", got)
 	}
 }
@@ -197,6 +197,51 @@ func TestCheckOutcome(t *testing.T) {
 				t.Errorf("checkOutcome(%+v) = %v, want %v", tt.node, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestEachCheckKeepsItsOwnName covers the field the two rollup shapes spell
+// differently: a CheckRun calls its name "name", a StatusContext calls it
+// "context". Reading only one of them leaves half the drawer's list blank.
+func TestEachCheckKeepsItsOwnName(t *testing.T) {
+	t.Parallel()
+
+	const namedJSON = `{"data":{
+	  "reviewRequested":{"nodes":[
+	    {"__typename":"PullRequest","number":1,"title":"named checks",
+	     "url":"https://github.com/kukv/octoscope/pull/1","isDraft":false,
+	     "bodyText":"the body","updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"",
+	     "author":{"login":"someone"},
+	     "repository":{"nameWithOwner":"kukv/octoscope"},
+	     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+	        {"__typename":"CheckRun","name":"build","conclusion":"SUCCESS","status":"COMPLETED"},
+	        {"__typename":"StatusContext","context":"ci/legacy","state":"FAILURE"}
+	     ]}}}}]}}
+	  ]},
+	  "yourPRs":{"nodes":[]},
+	  "assigned":{"nodes":[]},
+	  "mentioned":{"nodes":[]}
+	}}`
+
+	c := New("/tmp", "")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		return []byte(namedJSON), nil
+	}
+
+	w, err := c.ListWork(context.Background())
+	if err != nil {
+		t.Fatalf("ListWork: %v", err)
+	}
+	item := w[gh.SectionReviewRequested][0]
+	want := []gh.CheckRun{
+		{Name: "build", State: gh.CheckSuccess},
+		{Name: "ci/legacy", State: gh.CheckFailure},
+	}
+	if !reflect.DeepEqual(item.Checks.Runs, want) {
+		t.Errorf("runs = %+v, want %+v", item.Checks.Runs, want)
+	}
+	if item.Body != "the body" {
+		t.Errorf("body = %q, want the body the drawer shows", item.Body)
 	}
 }
 

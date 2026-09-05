@@ -38,6 +38,7 @@ type searchNode struct {
 	Title          string    `json:"title"`
 	URL            string    `json:"url"`
 	IsDraft        bool      `json:"isDraft"`
+	BodyText       string    `json:"bodyText"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 	ReviewDecision string    `json:"reviewDecision"`
 	Author         struct {
@@ -64,9 +65,20 @@ type searchNode struct {
 
 type checkNode struct {
 	Typename   string `json:"__typename"`
+	Name       string `json:"name"`
+	Context    string `json:"context"`
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
 	State      string `json:"state"`
+}
+
+// name is what the check calls itself. The two shapes spell the field
+// differently, so the choice cannot be made by the JSON tags alone.
+func (n checkNode) name() string {
+	if n.Typename == "StatusContext" {
+		return n.Context
+	}
+	return n.Name
 }
 
 // ListWork fetches every column of the Work board in one GraphQL request.
@@ -102,6 +114,7 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 			Number: n.Number,
 		},
 		Title:     n.Title,
+		Body:      n.BodyText,
 		Author:    n.Author.Login,
 		Labels:    n.Labels.Nodes,
 		UpdatedAt: n.UpdatedAt,
@@ -129,7 +142,9 @@ func (n searchNode) checks() gh.Checks {
 		}
 		for _, node := range rollup.Contexts.Nodes {
 			c.Total++
-			switch checkOutcome(node) {
+			state := checkOutcome(node)
+			c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state})
+			switch state {
 			case gh.CheckSuccess:
 				c.Passed++
 			case gh.CheckFailure:

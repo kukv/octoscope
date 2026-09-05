@@ -85,6 +85,9 @@ work:
     other: "{{.Passed}}/{{.Total}} checks passed, {{.Failed}} failed, {{.Running}} running"
   no_checks:
     other: "no checks"
+  checks_more:
+    one: "and {{.Count}} more"
+    other: "and {{.Count}} more"
   column_position:
     other: "column {{.Index}}/{{.Total}}"
 
