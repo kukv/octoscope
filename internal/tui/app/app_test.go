@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
 
@@ -173,8 +175,9 @@ func TestReposTabIsUnreachableWithoutARepository(t *testing.T) {
 // and restart it.
 func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 	m := New(&fakeSource{}, Options{HasRepo: true})
-	if cmd := m.Init(); cmd != nil {
-		t.Error("Init returned a command; the fetches belong to the first WindowSizeMsg")
+	// Init asks the terminal for its background colour; that is all it does.
+	if m.Init() == nil {
+		t.Fatal("Init did not ask the terminal for its background colour")
 	}
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if cmd == nil {
@@ -593,5 +596,22 @@ func TestNoUnresolvedIDsInTheRootViews(t *testing.T) {
 				i18n.AssertNoUnresolvedIDs(t, view)
 			})
 		}
+	}
+}
+
+// TestTheTerminalBackgroundReachesThePalette covers the one thing the root
+// does with a colour: the palette cannot assume a background, and this is the
+// only message that reports the real one.
+func TestTheTerminalBackgroundReachesThePalette(t *testing.T) {
+	t.Cleanup(func() { theme.SetDark(true) })
+
+	m := newTestModel(Options{})
+	onDark := theme.Dim().Render("x")
+
+	if _, cmd := m.Update(tea.BackgroundColorMsg{Color: lipgloss.Color("#ffffff")}); cmd != nil {
+		t.Error("learning the background started work")
+	}
+	if theme.Dim().Render("x") == onDark {
+		t.Error("a light terminal is still drawn with the dark palette")
 	}
 }

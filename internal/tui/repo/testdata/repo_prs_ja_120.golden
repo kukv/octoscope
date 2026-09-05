@@ -1,9 +1,9 @@
 [1moctoscope[m
 
-[1;4;4mプ[m[1;4;4mル[m[1;4;4mリ[m[1;4;4mク[m[1;4;4mエ[m[1;4;4mス[m[1;4;4mト[m  [2mIssue[m
+[1;4;38;2;88;166;255;4mプ[m[1;4;38;2;88;166;255;4mル[m[1;4;38;2;88;166;255;4mリ[m[1;4;38;2;88;166;255;4mク[m[1;4;38;2;88;166;255;4mエ[m[1;4;38;2;88;166;255;4mス[m[1;4;38;2;88;166;255;4mト[m  [38;2;139;148;158mIssue[m
 
-▸ #1     first pr  @kukv  ✓ 3 時間前
-  #2     second pr  @bob  ◌ 3 時間前
-  #9     レンダリングのパイプラインをまるごと置き換える refactor that nobody asked for  @a-contributor-with-a-very-long…
+▸ #1     first pr  @kukv  [38;2;63;185;80m✓[m 3 時間前
+  #2     second pr  @bob  [38;2;139;148;158m◌[m 3 時間前
+  #9     レンダリングのパイプラインをまるごと置き換える refactor that nobody asked for  @a-contributor-with-a-very-long…[38;2;139;148;158m[m
 
-[2mj/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  q:終了[m
+[38;2;139;148;158mj/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  q:終了[m

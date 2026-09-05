@@ -5,17 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/layout"
-)
-
-var (
-	titleStyle = lipgloss.NewStyle().Bold(true)
-	dimStyle   = lipgloss.NewStyle().Faint(true)
+	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
 func (m Model) View() string {
@@ -31,8 +26,8 @@ func (m Model) View() string {
 	if m.loading || m.pickerLoading {
 		return layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
 	}
-	header := titleStyle.Render(m.title)
-	footer := dimStyle.Render(i18n.T("footer.detail_prefix") + m.stateFooterKey() + i18n.T("footer.detail_suffix"))
+	header := theme.Title().Render(m.title)
+	footer := theme.Dim().Render(i18n.T("footer.detail_prefix") + m.stateFooterKey() + i18n.T("footer.detail_suffix"))
 	body := layout.ClipLines(header, m.width) + "\n" + m.body.View() + "\n"
 	if m.actionErr != "" {
 		body += wrapErr(m.actionErr, m.width) + "\n"
@@ -56,7 +51,7 @@ func (m Model) pickerView() string {
 	if m.applying {
 		return body + "\n" + layout.ClipLines(m.spin.View()+" "+i18n.T("picker.applying"), m.width) + "\n"
 	}
-	return body + "\n" + layout.ClipLines(dimStyle.Render(i18n.T("footer.picker")), m.width)
+	return body + "\n" + layout.ClipLines(theme.Dim().Render(i18n.T("footer.picker")), m.width)
 }
 
 // stateFooterKey returns the state-aware footer hint (with trailing spaces),
@@ -73,7 +68,7 @@ func (m Model) stateFooterKey() string {
 }
 
 func (m Model) confirmView() string {
-	header := titleStyle.Render(m.title)
+	header := theme.Title().Render(m.title)
 	closing, _ := m.stateAction()
 	var id string
 	switch {
@@ -92,14 +87,14 @@ func (m Model) confirmView() string {
 	if m.working {
 		b.WriteString(m.spin.View() + " " + i18n.T("confirm.working") + "\n")
 	} else {
-		b.WriteString(dimStyle.Render(i18n.T("confirm.yes_no")))
+		b.WriteString(theme.Dim().Render(i18n.T("confirm.yes_no")))
 	}
 	return layout.ClipLines(b.String(), m.width)
 }
 
 func (m Model) composeView() string {
 	var b strings.Builder
-	title := titleStyle.Render(i18n.Tf("compose.title", map[string]any{"Title": m.title}))
+	title := theme.Title().Render(i18n.Tf("compose.title", map[string]any{"Title": m.title}))
 	b.WriteString(layout.ClipLines(title, m.width) + "\n\n")
 	b.WriteString(m.textarea.View() + "\n\n")
 	if m.postErr != "" {
@@ -108,7 +103,7 @@ func (m Model) composeView() string {
 	if m.posting {
 		b.WriteString(layout.ClipLines(m.spin.View()+" "+i18n.T("compose.posting"), m.width) + "\n")
 	} else {
-		b.WriteString(layout.ClipLines(dimStyle.Render(i18n.T("footer.compose")), m.width))
+		b.WriteString(layout.ClipLines(theme.Dim().Render(i18n.T("footer.compose")), m.width))
 	}
 	return b.String()
 }

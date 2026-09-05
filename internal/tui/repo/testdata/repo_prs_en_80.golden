@@ -1,9 +1,9 @@
 [1moctoscope[m
 
-[1;4;4mP[m[1;4;4mu[m[1;4;4ml[m[1;4;4ml[m[4m [m[1;4;4mR[m[1;4;4me[m[1;4;4mq[m[1;4;4mu[m[1;4;4me[m[1;4;4ms[m[1;4;4mt[m[1;4;4ms[m  [2mIssues[m
+[1;4;38;2;88;166;255;4mP[m[1;4;38;2;88;166;255;4mu[m[1;4;38;2;88;166;255;4ml[m[1;4;38;2;88;166;255;4ml[m[38;2;88;166;255;4m [m[1;4;38;2;88;166;255;4mR[m[1;4;38;2;88;166;255;4me[m[1;4;38;2;88;166;255;4mq[m[1;4;38;2;88;166;255;4mu[m[1;4;38;2;88;166;255;4me[m[1;4;38;2;88;166;255;4ms[m[1;4;38;2;88;166;255;4mt[m[1;4;38;2;88;166;255;4ms[m  [38;2;139;148;158mIssues[m
 
-▸ #1     first pr  @kukv  ✓ 3h ago
-  #2     second pr  @bob  ◌ 3h ago
-  #9     レンダリングのパイプラインをまるごと置き換える refactor that nobody as…
+▸ #1     first pr  @kukv  [38;2;63;185;80m✓[m 3h ago
+  #2     second pr  @bob  [38;2;139;148;158m◌[m 3h ago
+  #9     レンダリングのパイプラインをまるごと置き換える refactor that nobody as…[38;2;139;148;158m[m
 
-[2mj/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  q:quit[m
+[38;2;139;148;158mj/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  q:quit[m

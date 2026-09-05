@@ -11,6 +11,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
 
@@ -66,12 +67,18 @@ func New(src Source, opts Options) Model {
 	}
 }
 
-// Init starts nothing: the first fetch runs from the first tea.WindowSizeMsg,
-// which Bubble Tea sends at start-up. See the started field.
-func (m Model) Init() tea.Cmd { return nil }
+// Init asks the terminal for its background colour and nothing else: the
+// first fetch runs from the first tea.WindowSizeMsg, which Bubble Tea sends at
+// start-up. See the started field.
+func (m Model) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.BackgroundColorMsg:
+		// The palette cannot assume a background, and this is the only place
+		// that learns the real one (.claude/rules/tui.md).
+		theme.SetDark(msg.IsDark())
+		return m, nil
 	case tea.WindowSizeMsg:
 		return m.resize(msg)
 	case tea.KeyPressMsg:

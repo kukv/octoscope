@@ -4,16 +4,10 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/i18n"
-)
-
-var (
-	titleStyle     = lipgloss.NewStyle().Bold(true)
-	activeTabStyle = lipgloss.NewStyle().Bold(true).Underline(true)
-	dimStyle       = lipgloss.NewStyle().Faint(true)
+	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
 func (m Model) View() tea.View {
@@ -48,9 +42,9 @@ func (m Model) tabRow() string {
 
 	for i, label := range labels {
 		if tabID(i) == m.tab {
-			labels[i] = activeTabStyle.Render(label)
+			labels[i] = theme.ActiveTab().Render(label)
 		} else {
-			labels[i] = dimStyle.Render(label)
+			labels[i] = theme.Dim().Render(label)
 		}
 	}
 	return strings.Join(labels, "  ")
@@ -61,9 +55,9 @@ func (m Model) tabRow() string {
 // gh or GitHub and can be any length, so it is wrapped rather than cut short
 // (.claude/rules/errors.md).
 func (m Model) errorView() string {
-	return titleStyle.Render(i18n.T("app.error_title")) + "\n\n" +
+	return theme.Title().Render(i18n.T("app.error_title")) + "\n\n" +
 		wrap(m.errText, m.width) + "\n\n" +
-		dimStyle.Render(i18n.T("footer.error"))
+		theme.Dim().Render(i18n.T("footer.error"))
 }
 
 // wrap folds s to w display columns, breaking a word that has to be broken.

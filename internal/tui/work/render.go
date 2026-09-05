@@ -5,18 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
-)
-
-var (
-	headingStyle = lipgloss.NewStyle().Bold(true)
-	dimStyle     = lipgloss.NewStyle().Faint(true)
-	cursorStyle  = lipgloss.NewStyle().Bold(true)
+	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
 const (
@@ -55,13 +49,13 @@ func (m Model) View() string {
 			"Index": m.col + 1,
 			"Total": m.columns(),
 		})
-		lines = append(lines, dimStyle.Render(clip(position, m.width)), "")
+		lines = append(lines, theme.Dim().Render(clip(position, m.width)), "")
 	}
 	lines = append(lines, m.board(sections)...)
 	if m.width >= drawerMinColumns {
 		lines = append(lines, m.drawer()...)
 	}
-	lines = append(lines, "", dimStyle.Render(clip(i18n.T("footer.work"), m.width)))
+	lines = append(lines, "", theme.Dim().Render(clip(i18n.T("footer.work"), m.width)))
 	return strings.Join(lines, "\n")
 }
 
@@ -97,12 +91,12 @@ func (m Model) columnLines(s gh.WorkSection, w int) []string {
 	// same column as the card titles below it. The rule is not: it marks how
 	// far the column reaches, which is the whole of its width.
 	lines := []string{
-		headingStyle.Render(fit(gutter+i18n.T(sectionTitleIDs[s]), w)),
+		theme.Heading().Render(fit(gutter+i18n.T(sectionTitleIDs[s]), w)),
 		fit(strings.Repeat("─", w), w),
 	}
 	items := m.work[s]
 	if len(items) == 0 {
-		return append(lines, dimStyle.Render(fit(gutter+i18n.T("work.empty_column"), w)))
+		return append(lines, theme.Dim().Render(fit(gutter+i18n.T("work.empty_column"), w)))
 	}
 	for i, it := range items {
 		lines = append(lines, cardLines(it, w, s == m.section() && i == m.row, m.fetchedAt)...)
@@ -122,7 +116,7 @@ func cardLines(it gh.WorkItem, w int, selected bool, now time.Time) []string {
 	}
 	title := fit(marker+head, w)
 	if selected {
-		title = cursorStyle.Render(title)
+		title = theme.Cursor().Render(title)
 	}
 
 	status := gutter
@@ -133,8 +127,8 @@ func cardLines(it gh.WorkItem, w int, selected bool, now time.Time) []string {
 
 	return []string{
 		title,
-		dimStyle.Render(fit(gutter+it.Ref.Repo, w)),
-		dimStyle.Render(fit(status, w)),
+		theme.Dim().Render(fit(gutter+it.Ref.Repo, w)),
+		theme.Dim().Render(fit(status, w)),
 	}
 }
 
@@ -162,7 +156,7 @@ func (m Model) drawer() []string {
 			"Passed": c.Passed, "Total": c.Total, "Failed": c.Failed, "Running": c.Running,
 		})
 	}
-	return append(lines, dimStyle.Render(clip(summary, m.width)))
+	return append(lines, theme.Dim().Render(clip(summary, m.width)))
 }
 
 // visibleSections is the width degradation: too narrow for four columns and

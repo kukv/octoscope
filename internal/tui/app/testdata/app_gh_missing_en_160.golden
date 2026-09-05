@@ -2,4 +2,4 @@
 
 gh CLI not found; install it and run: gh auth login
 
-[2mq:quit[m
+[38;2;139;148;158mq:quit[m

@@ -1,16 +1,16 @@
 [1m  Review requested                    [m  [1m  Your PRs                            [m  [1m  Assigned                            [m  [1m  Mentioned                           [m
 ──────────────────────────────────────  ──────────────────────────────────────  ──────────────────────────────────────  ──────────────────────────────────────
-[1m▸ • fix the thing                     [m  [2m  (nothing here)                      [m    #7 an issue                           [2m  (nothing here)                      [m
-[2m  kukv/octoscope                      [m                                          [2m  kukv/octoscope                      [m
-[2m  ▰▰▱▱▱▱▱ 3h ago                      [m                                          [2m  3h ago                              [m
+[1;38;2;88;166;255m▸ • fix the thing                     [m  [38;2;139;148;158m  (nothing here)                      [m    #7 an issue                           [38;2;139;148;158m  (nothing here)                      [m
+[38;2;139;148;158m  kukv/octoscope                      [m                                          [38;2;139;148;158m  kukv/octoscope                      [m
+[38;2;139;148;158m  ▰▰▱▱▱▱▱ 3h ago                      [m                                          [38;2;139;148;158m  3h ago                              [m
   • bump deps
-[2m  kukv/koto                           [m
-[2m  3h ago                              [m
+[38;2;139;148;158m  kukv/koto                           [m
+[38;2;139;148;158m  3h ago                              [m
   • レンダリングのパイプラインをまる…
-[2m  kukv/a-repository-with-a-name-nobod…[m
-[2m  ▰▰▱▱▱▱▱ 3h ago                      [m
+[38;2;139;148;158m  kukv/a-repository-with-a-name-nobod…[m
+[38;2;139;148;158m  ▰▰▱▱▱▱▱ 3h ago                      [m
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 kukv/octoscope#12 fix the thing
-[2m1/3 checks passed, 1 failed, 1 running[m
+[38;2;139;148;158m1/3 checks passed, 1 failed, 1 running[m
 
-[2mh/l:column  j/k:move  enter:detail  r:refresh  q:quit[m
+[38;2;139;148;158mh/l:column  j/k:move  enter:detail  r:refresh  q:quit[m
