@@ -125,6 +125,7 @@ type WorkItem struct {
 	Title     string
 	Author    string
 	IsDraft   bool
+	Labels    []Label
 	Review    ReviewState
 	Checks    Checks
 	UpdatedAt time.Time

@@ -46,6 +46,9 @@ type searchNode struct {
 	Repository struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
+	Labels struct {
+		Nodes []gh.Label `json:"nodes"`
+	} `json:"labels"`
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
@@ -100,6 +103,7 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 		},
 		Title:     n.Title,
 		Author:    n.Author.Login,
+		Labels:    n.Labels.Nodes,
 		UpdatedAt: n.UpdatedAt,
 		URL:       n.URL,
 	}

@@ -31,6 +31,9 @@ fragment WorkItem on SearchResultItem {
     author {
       login
     }
+    labels(first: 10) {
+      nodes { ...LabelFields }
+    }
     repository {
       nameWithOwner
     }
@@ -54,10 +57,20 @@ fragment WorkItem on SearchResultItem {
     author {
       login
     }
+    labels(first: 10) {
+      nodes { ...LabelFields }
+    }
     repository {
       nameWithOwner
     }
   }
+}
+
+# color is the six hex digits GitHub stores for the label, with no leading
+# "#": the badge reproduces it as a background.
+fragment LabelFields on Label {
+  name
+  color
 }
 
 # CheckRun reports status and conclusion; the older StatusContext reports a

@@ -107,6 +107,39 @@ func TestACardIsTwoLines(t *testing.T) {
 	}
 }
 
+// TestLabelsAreDrawnAsFilledBadges guards spec §4.5: GitHub's own label
+// colour, filled, not just the name in plain text.
+func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
+	it := sampleWork()[gh.SectionReviewRequested][0] // carries "bug" and "ci"
+
+	line := cardTitle(it, 60, false)
+	for _, l := range it.Labels {
+		if !strings.Contains(ansi.Strip(line), l.Name) {
+			t.Errorf("the label %q is not on the card: %q", l.Name, ansi.Strip(line))
+		}
+	}
+	if !strings.Contains(line, "48;2;215;58;74") {
+		t.Errorf("the bug label is not filled with the colour GitHub gave it: %q", line)
+	}
+}
+
+// TestABadgeIsDroppedRatherThanCut is the rule that keeps a narrow column
+// readable: half a coloured label says nothing, and the title is worth more.
+func TestABadgeIsDroppedRatherThanCut(t *testing.T) {
+	it := sampleWork()[gh.SectionReviewRequested][0]
+
+	for _, w := range []int{18, 22, 26} {
+		line := cardTitle(it, w, false)
+		if got := ansi.StringWidth(line); got != w {
+			t.Errorf("width %d: the card is %d columns: %q", w, got, ansi.Strip(line))
+		}
+		if strings.Contains(ansi.Strip(line), "…") && strings.Contains(line, "48;2;") {
+			t.Errorf("width %d: a badge was drawn onto a title that had to be cut: %q",
+				w, ansi.Strip(line))
+		}
+	}
+}
+
 // TestTheChecksBarIsColouredByOutcome is why icon.ChecksBar hands back its two
 // halves apart: a bar drawn in one colour says nothing about whether the
 // checks are passing.

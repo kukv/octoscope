@@ -120,7 +120,30 @@ func cardTitle(it gh.WorkItem, w int, selected bool) string {
 		marker = theme.Cursor().Render("▸ ")
 		title = theme.Cursor().Render(title)
 	}
-	return fit(marker+stateMarker(it)+" "+title, w)
+	head := marker + stateMarker(it) + " " + title
+	// Badges are added only while the whole title still fits: a label is worth
+	// less than the title it would push off the card.
+	if room := w - ansi.StringWidth(head); room > 0 {
+		head += badges(it.Labels, room)
+	}
+	return fit(head, w)
+}
+
+// badges draws the labels that fit in room columns, in the colours GitHub
+// gave them (spec §4.5). A label that would be cut in half is left out
+// altogether rather than shown as a coloured fragment.
+func badges(labels []gh.Label, room int) string {
+	var b strings.Builder
+	for _, l := range labels {
+		text := " " + l.Name + " "
+		cost := ansi.StringWidth(text) + 1 // the space that separates badges
+		if cost > room {
+			break
+		}
+		b.WriteString(" " + theme.Badge(l.Color).Render(text))
+		room -= cost
+	}
+	return b.String()
 }
 
 func stateMarker(it gh.WorkItem) string {
