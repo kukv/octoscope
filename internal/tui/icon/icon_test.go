@@ -64,17 +64,20 @@ func TestChecksBar(t *testing.T) {
 		{"partial", gh.Checks{Total: 4, Passed: 2}, false, -1},
 	}
 	for _, tt := range tests {
-		got := icon.ChecksBar(tt.checks)
+		done, rest := icon.ChecksBar(tt.checks)
 		if tt.wantEmpty {
-			if got != "" {
-				t.Errorf("%s: got %q, want empty", tt.name, got)
+			if done != "" || rest != "" {
+				t.Errorf("%s: got %q and %q, want both empty", tt.name, done, rest)
 			}
 			continue
 		}
-		if w := ansi.StringWidth(got); w != icon.BarWidth {
+		if w := ansi.StringWidth(done + rest); w != icon.BarWidth {
 			t.Errorf("%s: width = %d, want %d", tt.name, w, icon.BarWidth)
 		}
-		filled := strings.Count(got, "▰")
+		if strings.ContainsAny(rest, "▰") {
+			t.Errorf("%s: the unfinished half carries a filled cell: %q", tt.name, rest)
+		}
+		filled := strings.Count(done, "▰")
 		if tt.wantFill >= 0 && filled != tt.wantFill {
 			t.Errorf("%s: filled = %d, want %d", tt.name, filled, tt.wantFill)
 		}

@@ -104,32 +104,60 @@ func (m Model) columnLines(s gh.WorkSection, w int) []string {
 	return lines
 }
 
-// cardLines draws one card: what it is, where it lives, and how it is doing.
+// cardLines draws one card in two lines: what it is on the first, where it
+// lives and how it is doing on the second (spec 4.1).
 func cardLines(it gh.WorkItem, w int, selected bool, now time.Time) []string {
+	return []string{cardTitle(it, w, selected), cardMeta(it, w, now)}
+}
+
+// cardTitle is the cursor gutter, the state marker and the title. The pieces
+// are styled one at a time rather than as a whole line: a style applied over
+// a coloured marker would end at that marker's own reset.
+func cardTitle(it gh.WorkItem, w int, selected bool) string {
 	marker := gutter
+	title := it.Title
 	if selected {
-		marker = "▸ "
-	}
-	head := fmt.Sprintf("#%d %s", it.Ref.Number, it.Title)
-	if it.Ref.Kind == gh.ItemPR {
-		head = icon.Review(it.Review, it.IsDraft) + " " + it.Title
-	}
-	title := fit(marker+head, w)
-	if selected {
+		marker = theme.Cursor().Render("▸ ")
 		title = theme.Cursor().Render(title)
 	}
+	return fit(marker+stateMarker(it)+" "+title, w)
+}
 
-	status := gutter
-	if bar := icon.ChecksBar(it.Checks); bar != "" {
-		status += bar + " "
+func stateMarker(it gh.WorkItem) string {
+	if it.Ref.Kind == gh.ItemIssue {
+		return theme.Dim().Render(icon.Issue())
 	}
-	status += i18n.RelTime(now, it.UpdatedAt)
+	return theme.Review(it.Review, it.IsDraft).Render(icon.Review(it.Review, it.IsDraft))
+}
 
-	return []string{
-		title,
-		theme.Dim().Render(fit(gutter+it.Ref.Repo, w)),
-		theme.Dim().Render(fit(status, w)),
+// cardMeta is the second line: the repository on the left, the checks bar and
+// the elapsed time on the right. A column is about thirty columns wide, and
+// fewer than twenty at eighty, so the right-hand pair is anchored and the
+// repository takes whatever is left.
+func cardMeta(it gh.WorkItem, w int, now time.Time) string {
+	right := theme.Dim().Render(i18n.RelTime(now, it.UpdatedAt))
+	if bar := checksBar(it.Checks); bar != "" {
+		right = bar + " " + right
 	}
+
+	// One space keeps the repository off the bar even when both are full.
+	room := w - len(gutter) - ansi.StringWidth(right) - 1
+	if room <= 0 {
+		return fit(gutter+right, w)
+	}
+	repo := theme.Dim().Render(clip(it.Ref.Repo, room))
+	pad := w - len(gutter) - ansi.StringWidth(repo) - ansi.StringWidth(right)
+	return gutter + repo + strings.Repeat(" ", max(pad, 0)) + right
+}
+
+// checksBar colours the two halves of the bar apart: what has passed takes the
+// colour of the roll-up, what has not stays muted.
+func checksBar(c gh.Checks) string {
+	done, rest := icon.ChecksBar(c)
+	if done == "" && rest == "" {
+		return ""
+	}
+	return theme.Check(c.State).Render(done) + theme.Dim().Render(rest)
 }
 
 // drawer names the selected card in full and spells out its checks, which the

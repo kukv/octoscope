@@ -78,6 +78,49 @@ func TestTheDrawerOnlyReportsChecksForPullRequests(t *testing.T) {
 	}
 }
 
+// TestACardIsTwoLines pins spec §4.1: the title and the state marker on the
+// first line, the repository, the checks bar and the elapsed time on the
+// second. Three lines per card is what Phase 1 shipped.
+func TestACardIsTwoLines(t *testing.T) {
+	const w = 40 // wide enough that the repository is not truncated away
+	now := time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
+	it := sampleWork()[gh.SectionReviewRequested][0] // a PR with failing checks
+
+	lines := cardLines(it, w, false, now)
+	if len(lines) != 2 {
+		t.Fatalf("a card is %d lines, want 2:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	for i, line := range lines {
+		if got := ansi.StringWidth(line); got != w {
+			t.Errorf("line %d is %d columns, want %d: %q", i+1, got, w, ansi.Strip(line))
+		}
+	}
+
+	title, meta := ansi.Strip(lines[0]), ansi.Strip(lines[1])
+	if !strings.Contains(title, it.Title) {
+		t.Errorf("the first line does not carry the title: %q", title)
+	}
+	for _, want := range []string{it.Ref.Repo, "▰", "3h ago"} {
+		if !strings.Contains(meta, want) {
+			t.Errorf("the second line is missing %q: %q", want, meta)
+		}
+	}
+}
+
+// TestTheChecksBarIsColouredByOutcome is why icon.ChecksBar hands back its two
+// halves apart: a bar drawn in one colour says nothing about whether the
+// checks are passing.
+func TestTheChecksBarIsColouredByOutcome(t *testing.T) {
+	failing := checksBar(gh.Checks{Total: 4, Passed: 2, Failed: 2, State: gh.CheckFailure})
+	passing := checksBar(gh.Checks{Total: 4, Passed: 4, State: gh.CheckSuccess})
+	if failing == passing {
+		t.Errorf("a failing bar looks like a passing one: %q", failing)
+	}
+	if got := checksBar(gh.Checks{}); got != "" {
+		t.Errorf("a card with no checks still draws a bar: %q", got)
+	}
+}
+
 func TestEmptyColumnSaysSo(t *testing.T) {
 	if out := loaded().View(); !strings.Contains(out, i18n.T("work.empty_column")) {
 		t.Errorf("no empty-column marker for Your PRs:\n%s", out)
