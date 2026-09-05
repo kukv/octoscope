@@ -92,6 +92,12 @@ func TestTheDrawerShowsTheBodyAndEachCheck(t *testing.T) {
 			t.Errorf("the drawer does not name the %q check:\n%s", name, out)
 		}
 	}
+	// The fixture's body uses CRLF, as a body written on Windows does. A
+	// carriage return left in a drawn line sends the terminal's cursor back to
+	// the start of it and shifts everything after it.
+	if strings.Contains(out, "\r") {
+		t.Errorf("a carriage return survived into the drawn board: %q", out)
+	}
 }
 
 // TestFailingChecksComeFirst is why the drawer sorts: a failure is the reason

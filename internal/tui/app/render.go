@@ -55,7 +55,7 @@ func (m Model) tabRow() string {
 // gh or GitHub and can be any length, so it is wrapped rather than cut short
 // (.claude/rules/errors.md).
 func (m Model) errorView() string {
-	return theme.Title().Render(i18n.T("app.error_title")) + "\n\n" +
+	return theme.Error().Bold(true).Render(i18n.T("app.error_title")) + "\n\n" +
 		wrap(m.errText, m.width) + "\n\n" +
 		theme.Dim().Render(i18n.T("footer.error"))
 }

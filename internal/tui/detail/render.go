@@ -39,7 +39,7 @@ func (m Model) View() string {
 // titles around it, this text is the whole of what the user has to go on, so
 // it is wrapped rather than cut short (.claude/rules/errors.md).
 func wrapErr(text string, w int) string {
-	s := i18n.T("common.error_prefix") + text
+	s := theme.Error().Render(i18n.T("common.error_prefix")) + text
 	if w <= 0 {
 		return s
 	}

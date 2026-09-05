@@ -32,7 +32,9 @@ func sampleWork() gh.Work {
 		{
 			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 12},
 			Title: "fix the thing", UpdatedAt: now,
-			Body:   "The renderer dropped every escape.\n\nThis puts them back.",
+			// CRLF on purpose: GitHub returns whatever line endings the author
+			// used, and a carriage return left in a drawn line shifts it.
+			Body:   "The renderer dropped every escape.\r\n\r\nThis puts them back.",
 			Labels: []gh.Label{{Name: "bug", Color: "d73a4a"}, {Name: "ci", Color: "d4c5f9"}},
 			Checks: gh.Checks{
 				Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,

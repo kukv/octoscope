@@ -221,7 +221,10 @@ func (m Model) drawer() []string {
 // cut to a fixed number of lines. GitHub bodies run to any length; the drawer
 // is a preview, and enter opens the whole thing.
 func (m Model) bodyLines(body string) []string {
-	body = strings.TrimSpace(body)
+	// A GitHub body carries the line endings whoever wrote it used. A stray
+	// carriage return inside a drawn line moves the terminal's cursor back to
+	// the start of it, which shifts everything after it sideways.
+	body = strings.TrimSpace(strings.ReplaceAll(body, "\r", ""))
 	if body == "" {
 		return nil
 	}
