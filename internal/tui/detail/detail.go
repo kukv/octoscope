@@ -65,9 +65,19 @@ type ClosedMsg struct{}
 type ErrorMsg struct{ Err error }
 
 type (
-	prMsg    gh.PR
-	issueMsg gh.Issue
-	errMsg   struct {
+	// Every answer to a fetch carries the item it is about. The detail view
+	// is rebuilt for each item the user opens, but the request for the last
+	// one is still running: without the ref, its answer would land here and
+	// show the wrong item for as long as the current fetch takes.
+	prMsg struct {
+		ref gh.ItemRef
+		pr  gh.PR
+	}
+	issueMsg struct {
+		ref   gh.ItemRef
+		issue gh.Issue
+	}
+	errMsg struct {
 		ref gh.ItemRef
 		err error
 	}
@@ -150,13 +160,13 @@ func fetch(src Source, ref gh.ItemRef) tea.Cmd {
 			if err != nil {
 				return errMsg{ref, err}
 			}
-			return prMsg(pr)
+			return prMsg{ref, pr}
 		}
 		issue, err := src.GetIssue(ctx, ref.Repo, ref.Number)
 		if err != nil {
 			return errMsg{ref, err}
 		}
-		return issueMsg(issue)
+		return issueMsg{ref, issue}
 	}
 }
 
@@ -277,22 +287,30 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
 	case prMsg:
+		if msg.ref != m.ref {
+			return m, nil // an answer for an item the user has already left
+		}
+		pr := msg.pr
 		m.loading = false
-		m.state = msg.State
+		m.state = pr.State
 		m.actionErr = ""
-		m.labels = labelNames(msg.Labels)
-		m.assignees = authorLogins(msg.Assignees)
-		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": msg.Number, "Title": msg.Title})
-		m.setContent(prMarkdown(gh.PR(msg)))
+		m.labels = labelNames(pr.Labels)
+		m.assignees = authorLogins(pr.Assignees)
+		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": pr.Number, "Title": pr.Title})
+		m.setContent(prMarkdown(pr))
 		return m, nil
 	case issueMsg:
+		if msg.ref != m.ref {
+			return m, nil // an answer for an item the user has already left
+		}
+		issue := msg.issue
 		m.loading = false
-		m.state = msg.State
+		m.state = issue.State
 		m.actionErr = ""
-		m.labels = labelNames(msg.Labels)
-		m.assignees = authorLogins(msg.Assignees)
-		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": msg.Number, "Title": msg.Title})
-		m.setContent(issueMarkdown(gh.Issue(msg)))
+		m.labels = labelNames(issue.Labels)
+		m.assignees = authorLogins(issue.Assignees)
+		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": issue.Number, "Title": issue.Title})
+		m.setContent(issueMarkdown(issue))
 		return m, nil
 	case commentPostedMsg:
 		m.composing = false
@@ -346,9 +364,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case errMsg:
-		// A failure for an item the user has already left behind: the parent
-		// builds a fresh model per item, so an answer for another ref belongs
-		// to a request nobody is waiting for any more.
 		if msg.ref != m.ref {
 			return m, nil
 		}

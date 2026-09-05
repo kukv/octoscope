@@ -2,11 +2,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/jeandeaual/go-locale"
 
@@ -20,9 +18,6 @@ import (
 
 // version is set by GoReleaser via -ldflags at release build time.
 var version = "dev"
-
-// repoLookupTimeout bounds the one gh call main makes before the UI starts.
-const repoLookupTimeout = 5 * time.Second
 
 func main() {
 	repoFlag := flag.String("repo", "",
@@ -50,25 +45,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Whether the current directory has a repository is settled by the UI,
+	// not here: answering it costs a gh subprocess, and waiting for one before
+	// the first frame left the terminal blank for as long as it took.
 	client := cli.New(dir, *repoFlag)
-	p := tea.NewProgram(app.New(client, app.Options{
-		HasRepo: hasRepo(client, *repoFlag),
-	}))
+	p := tea.NewProgram(app.New(client, app.Options{HasRepo: *repoFlag != ""}))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-// hasRepo reports whether a target repository is known. An explicit --repo
-// settles it; otherwise we ask gh, which resolves the git remote of the
-// working directory and fails when there is none.
-func hasRepo(c *cli.Client, flagRepo string) bool {
-	if flagRepo != "" {
-		return true
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), repoLookupTimeout)
-	defer cancel()
-	_, err := c.RepoName(ctx)
-	return err == nil
 }

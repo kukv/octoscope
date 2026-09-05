@@ -3,7 +3,9 @@
 package app
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -25,10 +27,34 @@ type Source interface {
 
 // Options carries what main determined before the UI started.
 type Options struct {
-	// HasRepo reports whether a target repository is known, from --repo or
-	// from the git remote of the working directory. Without one the Repos tab
-	// has nothing to show and is not offered (spec 3.4).
+	// HasRepo reports whether --repo named a target repository. Without the
+	// flag the answer is not known yet: asking the GitHub layer to resolve
+	// the working directory is a subprocess, and doing it before the UI
+	// started left the terminal blank for as long as it took. The root asks
+	// as soon as it has a size, and the Repos tab appears when the answer
+	// arrives (spec 3.4).
 	HasRepo bool
+}
+
+// repoLookupTimeout bounds the one call that decides whether the Repos tab
+// exists. It is generous: the tab appearing late is a smaller problem than
+// its never appearing on a slow network.
+const repoLookupTimeout = 5 * time.Second
+
+// repoResolvedMsg carries the answer to that lookup.
+type repoResolvedMsg struct{ found bool }
+
+// resolveRepo asks the GitHub layer to name the working directory's
+// repository. Any failure means "there is none": a directory that is not a
+// repository, one with nowhere to fetch from, and a network error all arrive
+// the same way, and none of them gives the Repos tab anything to show.
+func resolveRepo(src Source) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), repoLookupTimeout)
+		defer cancel()
+		name, err := src.RepoName(ctx)
+		return repoResolvedMsg{found: err == nil && name != ""}
+	}
 }
 
 type tabID int
@@ -85,6 +111,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
+	case repoResolvedMsg:
+		if !msg.found {
+			return m, nil
+		}
+		m.opts.HasRepo = true
+		return m, m.repo.Init()
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
@@ -145,6 +177,8 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, fetch)
 		if m.opts.HasRepo {
 			cmds = append(cmds, m.repo.Init())
+		} else {
+			cmds = append(cmds, resolveRepo(m.src))
 		}
 	}
 	return m, tea.Batch(cmds...)

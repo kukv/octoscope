@@ -666,3 +666,25 @@ func TestSpinnerTickAdvancesTheFrame(t *testing.T) {
 		t.Errorf("the spinner frame did not advance: still %q", before)
 	}
 }
+
+// TestAnAnswerForAnotherItemIsDropped covers what happens when the user opens
+// one item, leaves it and opens another quickly: the first request is still
+// running, and its answer must not put the wrong item on the screen.
+func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
+	other := gh.ItemRef{Kind: gh.ItemPR, Number: 99}
+	m := New(&fakeSource{}, prRef())
+
+	next, _ := m.Update(prMsg{other, gh.PR{Number: 99, Title: "the previous one"}})
+	if !next.loading {
+		t.Error("an answer for another item ended the wait for this one")
+	}
+	if next.title != "" {
+		t.Errorf("the view took the other item's title: %q", next.title)
+	}
+
+	issue := New(&fakeSource{}, issueRef())
+	next, _ = issue.Update(issueMsg{other, gh.Issue{Number: 99, Title: "the previous one"}})
+	if !next.loading || next.title != "" {
+		t.Errorf("an issue answer for another item was accepted: %q", next.title)
+	}
+}

@@ -188,6 +188,53 @@ func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 	}
 }
 
+// TestTheReposTabAppearsWhenTheRepositoryIsResolved covers what replaced the
+// blocking lookup main used to do before the UI started: the tab is not
+// offered until the answer arrives, and arriving is what starts its fetches.
+func TestTheReposTabAppearsWhenTheRepositoryIsResolved(t *testing.T) {
+	m := newTestModel(Options{}) // no --repo: the answer is not known yet
+	if strings.Contains(content(m), i18n.T("tab.repos")) {
+		t.Error("the Repos tab is offered before the repository is known")
+	}
+
+	next, cmd := m.Update(repoResolvedMsg{found: true})
+	m = next.(Model)
+	if !strings.Contains(content(m), i18n.T("tab.repos")) {
+		t.Error("the Repos tab did not appear once the repository was known")
+	}
+	if cmd == nil {
+		t.Error("the repository list was never asked to fetch anything")
+	}
+	if press(m, "2").tab != tabRepos {
+		t.Error("the Repos tab cannot be reached even though it is offered")
+	}
+}
+
+func TestNoRepositoryLeavesTheReposTabOff(t *testing.T) {
+	m := newTestModel(Options{})
+	next, cmd := m.Update(repoResolvedMsg{found: false})
+	if cmd != nil {
+		t.Error("a directory with no repository still started a fetch")
+	}
+	if strings.Contains(content(next.(Model)), i18n.T("tab.repos")) {
+		t.Error("the Repos tab is offered for a directory with no repository")
+	}
+}
+
+// TestTheFirstSizeAsksWhetherThereIsARepository is the other half: without
+// this, the answer never arrives and the tab never appears.
+func TestTheFirstSizeAsksWhetherThereIsARepository(t *testing.T) {
+	m := New(&fakeSource{}, Options{})
+	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	if cmd == nil {
+		t.Fatal("the first size started nothing")
+	}
+	resolved := resolve(t, next.(Model), cmd)
+	if !resolved.opts.HasRepo {
+		t.Error("the lookup ran but its answer did not reach the model")
+	}
+}
+
 func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 	m := newTestModel(Options{HasRepo: true})
 	next, _ := m.Update(work.OpenDetailMsg{
