@@ -119,6 +119,55 @@ func TestAClickIsNotBroadcast(t *testing.T) {
 	}
 }
 
+// TestTheWheelReachesTheActiveTab covers the other half of the translation:
+// the wheel is forwarded with the same row shift a click gets.
+func TestTheWheelReachesTheActiveTab(t *testing.T) {
+	src := &fakeSource{work: gh.Work{gh.SectionReviewRequested: {
+		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "a card"},
+		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 2}, Title: "another card"},
+	}}}
+	m := loadedApp(t, src, Options{})
+
+	_, y := tokenAt(t, m, "a card")
+	next, _ := m.Update(tea.MouseWheelMsg{X: 2, Y: y, Button: tea.MouseWheelDown})
+	if ref, _ := next.(Model).work.SelectedRef(); ref.Number != 2 {
+		t.Errorf("the wheel selected #%d, want #2", ref.Number)
+	}
+}
+
+// TestADragOrAReleaseIsDropped keeps every child from carrying a case for a
+// message none of them acts on.
+func TestADragOrAReleaseIsDropped(t *testing.T) {
+	src := &fakeSource{work: gh.Work{gh.SectionReviewRequested: {
+		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "a card"},
+		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 2}, Title: "another card"},
+	}}}
+	m := loadedApp(t, src, Options{})
+	x, y := tokenAt(t, m, "another card")
+
+	for name, msg := range map[string]tea.MouseMsg{
+		"a release": tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft},
+		"a drag":    tea.MouseMotionMsg{X: x, Y: y, Button: tea.MouseLeft},
+	} {
+		next, cmd := m.Update(msg)
+		if ref, _ := next.(Model).work.SelectedRef(); ref.Number != 1 {
+			t.Errorf("%s moved the cursor to #%d", name, ref.Number)
+		}
+		if cmd != nil {
+			t.Errorf("%s produced a command", name)
+		}
+	}
+}
+
+// TestAClickAboveTheBoardIsDropped covers the blank line between the tab row
+// and the tab: it belongs to neither.
+func TestAClickAboveTheBoardIsDropped(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	if _, cmd := m.Update(click(0, 1)); cmd != nil {
+		t.Error("a click on the blank line under the tab row produced a command")
+	}
+}
+
 // TestTheErrorScreenIgnoresTheMouse matches what it does with keys: only q
 // and esc get through, and neither is a click.
 func TestTheErrorScreenIgnoresTheMouse(t *testing.T) {
