@@ -45,12 +45,12 @@ func (m Model) View() string {
 	case m.tab == tabIssues && len(m.issues) == 0:
 		b.WriteString(dimStyle.Render(i18n.T("list.no_open_issues")) + "\n")
 	case m.tab == tabPRs:
-		now := time.Now()
+		now := m.fetchedAt[tabPRs]
 		for i, pr := range m.prs {
 			b.WriteString(cursorPrefix(i == m.cursors[tabPRs]) + prLine(pr, now) + "\n")
 		}
 	default:
-		now := time.Now()
+		now := m.fetchedAt[tabIssues]
 		for i, issue := range m.issues {
 			b.WriteString(cursorPrefix(i == m.cursors[tabIssues]) + issueLine(issue, now) + "\n")
 		}

@@ -3,6 +3,7 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -73,6 +74,11 @@ type Model struct {
 	issues  []gh.Issue
 	loaded  [2]bool
 	loading [2]bool
+
+	// fetchedAt is when the shown list arrived. The rows carry relative
+	// times, and View must render the same string from the same state, so
+	// the clock is read here in Update rather than on every draw.
+	fetchedAt [2]time.Time
 }
 
 func New(src Source) Model {
@@ -145,6 +151,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case prListMsg:
 		m.prs = []gh.PR(msg)
 		m.loaded[tabPRs] = true
+		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
 		}
@@ -153,6 +160,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case issueListMsg:
 		m.issues = []gh.Issue(msg)
 		m.loaded[tabIssues] = true
+		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
 		}

@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check lint tidy-check test check release-check
+.PHONY: fmt fmt-check lint tidy-check test golden check release-check
 
 # Auto-format the code (gofumpt + goimports via golangci-lint).
 fmt:
@@ -20,6 +20,11 @@ tidy-check:
 # Run tests with the race detector and coverage (mirrors the CI test step).
 test:
 	gotestsum --format testdox -- -race -coverprofile=coverage.out -covermode=atomic ./...
+
+# Re-record the golden files of every view. Read the diff before committing
+# it: seeing what changed on the screen is the point of the recordings.
+golden:
+	OCTOSCOPE_UPDATE_GOLDEN=1 go test ./...
 
 # Run everything the CI checks, locally.
 check: tidy-check lint fmt-check test

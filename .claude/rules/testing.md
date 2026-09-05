@@ -37,6 +37,21 @@ c.run = func(_ string, args ...string) ([]byte, error) {
 特に危ないのは、検証対象と同じ出所からデータを取ってくる形。
 例えばカタログの ID 一覧を回してカタログを引くテストは、構造上ほぼ失敗しない。
 
+## 画面は golden に録る
+
+各ビューの `View()` は **en / ja × 80 / 120 / 160 桁**で `testdata/*.golden` に録る。
+比較は `internal/golden` の `golden.Assert`。
+
+```bash
+make golden   # 録り直す。diff を目で見てからコミットする
+```
+
+**ANSI エスケープを落とさずに録る。** 色やボールドが消えた／付いた変更が
+diff に出ないと、この仕組みは何も守らない。
+
+golden はテストであると同時に、TTY の無い環境で**画面を見るための唯一の手段**でもある。
+`cat -v testdata/work_ja_80.golden` で桁ずれを目視できる。
+
 ## テーブル駆動
 
 同じ検証を複数の入力で繰り返すならテーブルにする。

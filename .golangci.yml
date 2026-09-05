@@ -90,6 +90,14 @@ linters:
               desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a leaf must not depend on the views that use it
+        # The golden recorder is a test helper: it takes a string and a name,
+        # and must not know which view produced them.
+        golden:
+          files:
+            - "**/internal/golden/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal
+              desc: the golden recorder compares strings and knows nothing of ours
   exclusions:
     rules:
       - linters:
