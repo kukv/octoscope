@@ -82,12 +82,22 @@ type ReviewTarget struct {
 `review.Target` は `PendingComments int` を持ち続ける（画面に件数を出すためのもので、
 送信先の決定には使わない）。
 
-### D4. 作業順 3（rules）は作業順 4 の**あと**に置く
+### D4. 作業順 3（rules）は**完了済み**。実装より先に入れた
 
-設計書 §5 は「実装したら**同じ PR で** rules を更新する」と書いており、PR 内の順序は
-定めていない。`architecture.md` に「interface は 6 メソッドまで」と先に書くと、
-`detail` がそれを破っている状態が作業順 4 の完了まで残る。**同じ PR の中で、
-コードを直してから規約を書く。**
+**2026-09-07 に利用者の指示で覆した判断。** 当初は「`architecture.md` に
+『interface は 6 メソッドまで』と先に書くと、`detail` がそれを破っている状態が
+作業順 4 の完了まで残る」という理由で、コードを直してから規約を書く順にしていた。
+
+利用者の判断は逆で、**規約が spec に沿っていない状態で実装を始めるほうが危険**
+というもの。規約を読み込むセッションが誤った方向に進みかねない。
+
+そこで作業順 3 を先に済ませ、**規約が現状のコードを追い越している箇所には
+「今これを破っている / どのタスクで直す / 新しいコードでこれを言い訳にしない」を
+明記した**。該当は 3 箇所（interface 6 メソッド / UI の mode は enum /
+コードに spec 参照を書かない）。
+
+**この計画の Task 8 は実施済み。** 残りは Task 1〜7 と Task 9。
+Task 9 の完了条件チェックから「条件 8（rules と depguard）」は落としてよい。
 
 ### D5. 作業順 2 — connection ごとの結論
 
@@ -2025,7 +2035,13 @@ git commit -m "refactor: put the views on internal/usecase and drop the PR/Issue
 
 ---
 
-## Task 8: 規約 10 項目と depguard（作業順 3）
+## Task 8: 規約 10 項目と depguard（作業順 3）— **完了済み。実施しない**
+
+> **2026-09-07 に実装より先に済ませた**（D4 参照）。このタスクの内容は
+> `.claude/rules/*.md`、`.golangci.yml`、設計書に反映済みで、depguard の 5 ルール
+> （既存 2 + 新規 3）が実際に落とすことをプローブで確認してある。
+>
+> **以下は実施済みの記録として残す。もう一度やらない。**
 
 **Files:**
 - Modify: `.golangci.yml`
@@ -2328,6 +2344,133 @@ git commit -m "docs: record the usecase decision in the rules and guard it with 
 
 ---
 
+## Task 8.5: rules の暫定注記（`TRANSIENT`）を消す
+
+**Files:**
+- Modify: `.claude/rules/architecture.md`
+- Modify: `.golangci.yml`
+
+**Interfaces:** なし
+
+規約を実装より先に入れたため、`.claude/rules/` と `.golangci.yml` に
+「今これを破っている / いつ直す」という**暫定の注記**が残っている
+（2026-09-07 に数えて 9 箇所。以後 rules を触れば増減するので、**件数は
+数えてから使う** — Step 1）。
+コードが追いついた時点で消さないと、規約が現状と食い違ったまま残り、
+次のセッションがどちらを信じればいいか分からなくなる。
+
+見つけ方は機械的にしてある。
+
+```bash
+grep -rn 'TRANSIENT' .claude/rules .golangci.yml
+```
+
+各マーカーは `TRANSIENT(Part1 Task N)` / `TRANSIENT(Part2 作業順 N)` の形で、
+**どの作業が完了したら消せるか**を持っている。
+
+**Part 1 で消すもの（7 箇所 = `Task 5` が 4、`Task 7` が 3）**
+
+| マーカー | 場所 | 消す条件 | 消し方 |
+|---|---|---|---|
+| `Part1 Task 5` | `architecture.md`「`usecase.Item` を画面の写しにしない」 | `usecase.Item` がある | 注記のブロックごと削除 |
+| `Part1 Task 5` | `architecture.md` 同節の箇条書き | 同上 | 「その全部を持つ**ように作る**」→「その全部を**持っている**」に直し、マーカーを削除 |
+| `Part1 Task 5` | `architecture.md`「層を足す前に」 | 同上 | 「（パッケージ自体はまだ無い）」だけ削除。**2026-09-07 の日付は判断した日の記録なので残す** |
+| `Part1 Task 5` | `.golangci.yml` `usecase-layer` | 同上 | `TRANSIENT` 行と続く 3 行のコメントを削除。ルール本体は残す |
+| `Part1 Task 7` | `architecture.md`「依存の向き」 | `internal/usecase` があり TUI が載っている | 注記のブロックごと削除 |
+| `Part1 Task 7` | `architecture.md`「interface は小さく保つ」 | `detail` の全宣言が 6 メソッド以下 | 注記のブロックごと削除 |
+| `Part1 Task 7` | `architecture.md`「複数の API 呼び出しは〜」 | 順序と振り分けが `usecase` にある | 注記のブロックごと削除 |
+
+**Part 2 に持ち越すもの（2 箇所）— このタスクでは消さない**
+
+| マーカー | 場所 | 消す条件 |
+|---|---|---|
+| `Part2 作業順 6` | `tui.md`「UI の状態は enum」 | `detail` / `diff` の bool が enum に畳まれている |
+| `Part2 作業順 8` | `go-style.md`「コメント」 | 非テストコードの `spec N` / `Task N` 参照が 0 箇所 |
+
+- [ ] **Step 1: 残っているマーカーを数える**
+
+**この計画に書いた件数を信じない。数えてから始める。**
+下は 2026-09-07 に数えた値で、その後 rules を触れば変わる。
+
+```bash
+grep -rho 'TRANSIENT([^)]*)' .claude/rules .golangci.yml | sort | uniq -c
+```
+
+Expected（2026-09-07 時点）:
+
+```
+      4 TRANSIENT(Part1 Task 5)
+      3 TRANSIENT(Part1 Task 7)
+      1 TRANSIENT(Part2 作業順 6)
+      1 TRANSIENT(Part2 作業順 8)
+```
+
+数が違ったら、上の表と突き合わせて**表のほうを直してから**先に進む。
+
+- [ ] **Step 2: Task 5 の 4 箇所を消す**
+
+上の表の `Part1 Task 5` の行を、「消し方」のとおりに処理する。
+**注記だけを消し、規約本文には触れない。**
+
+- [ ] **Step 3: Task 7 の 3 箇所を消す**
+
+`Part1 Task 7` の 3 行。いずれも `<!-- TRANSIENT ... -->` の行と、
+続く `>` で始まるブロック全体を削除する。
+
+- [ ] **Step 4: 消した注記が嘘になっていないか、実際に確かめる**
+
+注記を消すということは「もう破っていない」と言うことなので、根拠を見る。
+
+```bash
+# detail の宣言が 6 メソッド以下か
+sed -n '/^type .*interface {/,/^}/p' internal/tui/detail/detail.go
+
+# tea.Cmd の中に 2 つ以上の API 呼び出しが残っていないか
+grep -n 'StartReview\|SubmitNewReview' internal/tui/ -r
+
+# 種別の振り分けが View に残っていないか
+grep -rn 'ItemPR' internal/tui/ | grep -v '_test.go'
+```
+
+`ItemPR` は「PR のときだけ `d` を出す」のような**表示の判断**には残ってよい。
+残ってはいけないのは「PR なら `GetPR`、Issue なら `GetIssue`」という
+**呼び分け**である。区別がつかない行が出てきたら止めて相談する。
+
+- [ ] **Step 5: `Part1` が消え、`Part2` が残っていることを両方確認**
+
+**片方だけでは足りない。** `Part1` の不在だけを見ると、`Part2` の 2 つを
+巻き添えで消しても通ってしまう。その 2 つは Part 2 への引き継ぎそのもので、
+消えれば作業順 6 と 8 のあとに規約を直す約束が黙って失われる。
+
+```bash
+grep -rho 'TRANSIENT([^)]*)' .claude/rules .golangci.yml | sort | uniq -c
+```
+
+Expected: **`Part1` の行が 1 つも無く、下の 2 行だけが残る。**
+
+```
+      1 TRANSIENT(Part2 作業順 6)
+      1 TRANSIENT(Part2 作業順 8)
+```
+
+`Part2` の行が減っていたら、消しすぎている。Step 2〜3 で触った差分を見て戻す。
+
+```bash
+git diff -- .claude/rules .golangci.yml | grep '^-.*TRANSIENT'
+```
+
+ここに `Part2` のものが出てきたら、それは消してはいけなかったものである。
+
+- [ ] **Step 6: `make check` とコミット**
+
+```bash
+make check
+git add .claude/rules .golangci.yml
+git commit -m "docs: drop the rules' notes about what the code had not caught up to yet"
+```
+
+---
+
 ## Task 9: チェックポイント — 実機で全機能を確認して承認を取る
 
 **Files:** なし（確認のみ）
@@ -2376,6 +2519,17 @@ Task 7 Step 10 の一覧を、`--lang en` / `--lang ja` の両方、80 桁と 16
 Part 1 の diff を要約して報告し、Part 2（作業順 6〜9）に進んでよいか確認する。
 **承認なしに Part 2 の計画を書き始めない。**
 
+Part 2 の計画には次を必ず入れる。**書き忘れると規約が現状と食い違ったまま残る。**
+
+```bash
+grep -rn 'TRANSIENT' .claude/rules .golangci.yml
+```
+
+- `tui.md`「UI の状態は enum」の注記 — 作業順 6（bool → enum）の完了時に消す
+- `go-style.md`「コメント」の注記 — 作業順 8（spec 参照の削除）の完了時に消す
+
+Part 2 の完了条件に「`grep -rn 'TRANSIENT' .claude/rules .golangci.yml` が 0 件」を入れる。
+
 ---
 
 ## Self-Review
@@ -2395,6 +2549,7 @@ Part 1 の diff を要約して報告し、Part 2（作業順 6〜9）に進ん�
 | 9 | `testing.md` シナリオテスト | Task 8 Step 9（規約のみ。**実装は Part 2 の作業順 9**） |
 | 10 | depguard | Task 8 Step 1 |
 | **11** | **（設計書に無い追加）`usecase.Item` を画面の写しにしない** | **Task 8 Step 5.5** |
+| **12** | **（設計書に無い追加）規約に残した暫定注記を、コードが追いついたら消す** | **Task 8.5 / Part 2** |
 
 11 は設計書 §5 に無い。UI だけの修正が `internal/usecase` に波及しない状態を
 保つための歯止めで、`Item` が唯一その経路になり得るため足した。
@@ -2420,6 +2575,7 @@ Part 1 の diff を要約して報告し、Part 2（作業順 6〜9）に進ん�
 | 5 spec 参照 0 箇所 | **Part 2**（作業順 8。規約は Task 8 で先に書く） |
 | 6 実物 testdata | Task 4 |
 | 7 シナリオテスト 3 本 | **Part 2**（作業順 9） |
-| 8 rules 10 項目 + depguard | Task 8 |
+| 8 rules 10 項目 + depguard | Task 8（**完了済み**） |
+| **9（追加）`TRANSIENT` の注記が 0 件** | `Part1` のものは Task 8.5、`Part2` のものは **Part 2** |
 
 **未確定として実装者に判断を委ねた箇所: 無い。** TBD / 後で決める、は 1 つも残していない。

@@ -14,7 +14,8 @@ case "$rel" in
   *) exit 0 ;;
 esac
 
-if [ -f "$transcript" ] && grep -q 'docs/superpowers/\(specs\|plans\)/[^"]*\.md' "$transcript"; then
+if [ -f "$transcript" ] &&
+  grep -qE 'docs/superpowers/(specs|plans)/[A-Za-z0-9._-]+\.md' "$transcript"; then
   exit 0
 fi
 
