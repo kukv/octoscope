@@ -15,6 +15,21 @@ import (
 //go:embed review.graphql
 var reviewContextQuery string
 
+//go:embed start_review.graphql
+var startReviewMutation string
+
+//go:embed add_thread.graphql
+var addThreadMutation string
+
+//go:embed submit_review.graphql
+var submitReviewMutation string
+
+//go:embed review_at_once.graphql
+var reviewAtOnceMutation string
+
+//go:embed discard_review.graphql
+var discardReviewMutation string
+
 // repoArgs names the repository for a GraphQL call.
 //
 // GraphQL's repository() takes owner and name separately, unlike `gh pr`
@@ -186,4 +201,103 @@ func (n threadNode) toDomain() gh.ReviewThread {
 		})
 	}
 	return t
+}
+
+// The four mutations take no context. They are changes, not fetches: a
+// comment that has been sent has been sent, so there is nothing to abandon
+// half-way. The existing AddPRComment and ClosePR take none for the same
+// reason (.claude/rules/go-style.md).
+
+// StartReview opens an unsubmitted review on the pull request and returns its
+// node id. A pending review is visible only to its author, so this is the id
+// the rest of the session adds comments to.
+func (c *Client) StartReview(pullRequestID string) (string, error) {
+	out, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+startReviewMutation,
+		"-f", "pullRequestId="+pullRequestID,
+	)
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		Data struct {
+			AddPullRequestReview struct {
+				PullRequestReview struct {
+					ID string `json:"id"`
+				} `json:"pullRequestReview"`
+			} `json:"addPullRequestReview"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return "", fmt.Errorf("parse start review: %w", err)
+	}
+	return resp.Data.AddPullRequestReview.PullRequestReview.ID, nil
+}
+
+// apiSide spells a side the way the GraphQL DiffSide enum does. It is the one
+// place that knows those words (.claude/rules/architecture.md).
+func apiSide(s gh.DiffSide) string {
+	if s == gh.SideLeft {
+		return "LEFT"
+	}
+	return "RIGHT"
+}
+
+// apiEvent spells an event the way PullRequestReviewEvent does.
+func apiEvent(e gh.ReviewEvent) string {
+	switch e {
+	case gh.EventApprove:
+		return "APPROVE"
+	case gh.EventRequestChanges:
+		return "REQUEST_CHANGES"
+	default:
+		return "COMMENT"
+	}
+}
+
+// AddReviewThread attaches one line comment to an unsubmitted review.
+func (c *Client) AddReviewThread(reviewID string, comment gh.PendingComment) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+addThreadMutation,
+		"-f", "reviewId="+reviewID,
+		"-f", "path="+comment.Path,
+		"-F", "line="+strconv.Itoa(comment.Line),
+		"-f", "side="+apiSide(comment.Side),
+		"-f", "body="+comment.Body,
+	)
+	return err
+}
+
+// SubmitReview sends the unsubmitted review, with every comment on it.
+func (c *Client) SubmitReview(reviewID string, event gh.ReviewEvent, body string) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+submitReviewMutation,
+		"-f", "reviewId="+reviewID,
+		"-f", "event="+apiEvent(event),
+		"-f", "body="+body,
+	)
+	return err
+}
+
+// SubmitNewReview submits a review that has no unsubmitted comments waiting.
+// addPullRequestReview takes an event, so creating and submitting is one
+// call. Approving a diff you had nothing to say about is the commonest review
+// there is, and it should not have to leave a pending review behind first.
+func (c *Client) SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+reviewAtOnceMutation,
+		"-f", "pullRequestId="+pullRequestID,
+		"-f", "event="+apiEvent(event),
+		"-f", "body="+body,
+	)
+	return err
+}
+
+// DiscardReview throws the unsubmitted review away, comments and all.
+func (c *Client) DiscardReview(reviewID string) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+discardReviewMutation,
+		"-f", "reviewId="+reviewID,
+	)
+	return err
 }
