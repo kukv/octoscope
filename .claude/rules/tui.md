@@ -35,6 +35,42 @@ tea "charm.land/bubbletea/v2"
 サブモデルが必要とするデータ取得の interface は、**そのサブモデルのファイルで宣言する**
 （`.claude/rules/architecture.md`）。
 
+## UI の状態は enum
+
+**並行する bool でモードを表現しない。**
+
+`composing` / `confirming` / `picking` / `submitting` を並べると、名目上の状態数が
+2^n になり、そのうち正しいのは数個しかない。`Update` と `View` と `handleKey` が
+それぞれ違う組み合わせを暗黙に前提にしてしまう。
+
+今どのオーバーレイが出ているか（mode）と、その mode での通信状態（phase）の
+2 つの enum に畳む。
+
+```go
+type mode uint8
+const (
+    modeView mode = iota // 本文だけ
+    modeCompose          // コメント入力
+    modeConfirm          // close / reopen の確認
+    modePick             // ラベル / アサイニーのピッカー
+    modeSubmit           // レビュー提出ポップアップ
+)
+
+type phase uint8
+const (
+    phaseIdle    phase = iota
+    phaseLoading // その mode に入るための取得中
+    phaseWorking // 送信中
+)
+```
+
+エラー文字列も mode ごとに分けて持たない。どこに描くかは mode が決める。
+
+> **2026-09-07 時点で `detail` と `diff` がこれを破っている。**
+> `detail.Model` は bool 10 個 + エラー文字列 3 本を持つ。畳む作業は
+> Phase 2 立て直しの作業順 6（Part 2 の実装計画で扱う）。
+> **新しく書くビューでこれを言い訳にしない。**
+
 ## 表示幅
 
 **日本語は 1 文字が 2 桁を占める。** 桁数を数えるときは必ず

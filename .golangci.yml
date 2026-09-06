@@ -14,13 +14,34 @@ linters:
   settings:
     depguard:
       rules:
-        # The GitHub access layer must not know about the UI.
+        # The GitHub access layer must not know about the UI, nor about the
+        # layer that orchestrates it.
         gh-layer:
           files:
             - "**/internal/gh/**"
           deny:
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: the GitHub layer must not depend on the UI
+            - pkg: github.com/kukv/octoscope/internal/usecase
+              desc: the GitHub layer must not depend on the layer above it
+        # The views talk to internal/usecase, not to the backend behind it.
+        # cmd/octoscope is the one place that names a backend.
+        tui-layer:
+          files:
+            - "**/internal/tui/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/gh/cli
+              desc: views go through internal/usecase; only cmd/octoscope names a backend
+        # usecase sits below the UI: it decides which GitHub calls an
+        # operation takes, and knows nothing of screens or messages.
+        usecase-layer:
+          files:
+            - "**/internal/usecase/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/tui
+              desc: internal/usecase must not depend on the UI
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: internal/usecase must not translate; the UI does
         # Messages are a leaf: they depend on nothing of ours.
         i18n-layer:
           files:
@@ -31,6 +52,8 @@ linters:
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: internal/i18n must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/config
+              desc: internal/i18n must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/usecase
               desc: internal/i18n must not depend on other internal packages
         # Opening a URL is a leaf: it depends on nothing of ours.
         browser-layer:
@@ -44,6 +67,8 @@ linters:
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: internal/browser must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/config
+              desc: internal/browser must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/usecase
               desc: internal/browser must not depend on other internal packages
         # Views are siblings: a view must not reach into another view's model,
         # and no child may import its parent.

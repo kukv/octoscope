@@ -25,6 +25,50 @@ c.run = func(_ string, args ...string) ([]byte, error) {
 }
 ```
 
+## 外部レスポンスは実物を録る
+
+**パーステストの入力は手書きの JSON ではなく、実際に録ったレスポンスを使う。**
+手書きだと「GitHub が実際にはそう返さない形」でも通ってしまい、
+返し方が変わったときに気づけない。
+
+録り方と、録った日・対象リポジトリを testdata の `README.md` に残す。
+秘密情報は含めない（自分の公開リポジトリを使う）。`@me` を含む検索のように、
+録ると他人のリポジトリの内容まで入るものは `jq` で絞る。
+
+**テストを通すために録ったファイルを編集しない。** 落ちたら、まず実装を疑う。
+秘密情報の除去は編集ではない。この 2 つを混同しない。
+
+## 外部 API に渡す引数は「仕様」を検証する
+
+**実装が組み立てた引数をコピーした期待値を書かない。**
+
+```go
+// これは実装の鏡でしかなく、実装が間違っていても落ちない
+wantArgs := []string{"pr", "list", "--json", prListFields}
+```
+
+「なぜその引数が要るのか」がテスト名から分かる形にする。
+
+```go
+// gh pr list defaults to 30 items. The Repos tab must not silently truncate
+// a repository with more open pull requests than that.
+func TestPRListAsksForMoreThanTheDefaultThirty(t *testing.T) {
+    // args に --limit が含まれ、値が 30 より大きいことを確認する
+}
+```
+
+## 画面をまたぐ操作はキー入力だけで通す
+
+複数のビューにまたがる操作は、`internal/tui/app` にキー入力だけのシナリオテストを
+置いて担保する。**tty は要らない。** `Update` に `tea.KeyPressMsg` を順に渡し、
+`View()` の出力を見る。
+
+```
+Work で j → enter → 詳細 → d → diff → j → c → 入力 → ctrl+s → スレッドが出る
+Repos で tab → j → enter → 詳細 → x → y → 状態が変わる
+詳細で l → space → enter → ラベルが変わる
+```
+
 ## 何を検証するか
 
 - **GitHub アクセス層**: 組み立てたコマンド引数と、レスポンスのパース結果

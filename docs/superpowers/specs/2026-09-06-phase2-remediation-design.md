@@ -213,7 +213,12 @@ wantArgs := []string{"pr", "list", "--json", prListFields}
 | `internal/gh/cli/*.graphql` | `first:` が 8 箇所。`pageInfo` / `hasNextPage` が 1 つも無い | `reviewThreads(first:100)`、`labels(first:10)` が大きい PR で黙って切れる |
 | `cli/diff.go:145,163` | `64*1024` / `8*1024*1024` が名前無しで 2 箇所に重複 | 8MiB 超の diff が読めない |
 | `cli/diff.go:270` | `fields[:min(3, len(fields))]` の 3 が裸 | hunk ヘッダの解析が読めない |
-| `cli/review.go:141` | `pr.Reviews.Nodes[0]` | `first: 1` に暗黙に依存 |
+| ~~`cli/review.go:141`~~ | ~~`pr.Reviews.Nodes[0]`~~ | **取り消し。下記参照** |
+
+**取り消し（2026-09-07）:** `cli/review.go:141` の `pr.Reviews.Nodes[0]` は潜在バグでは
+なかった。GitHub は 1 ユーザー 1 PR につき unsubmitted review を 1 つしか持てない
+（GraphQL / REST 共通の制約、実測で確認）。`reviews(states:[PENDING], first: 1)` は
+打ち切りではなく、`Nodes[0]` が取りこぼすものは存在しない。
 
 ### 3.3 実バグ: `o`（ブラウザで開く）が WSL で動かない
 
@@ -567,7 +572,13 @@ Bubble Tea を起動せずに検証する。
 
 1. 実機で全機能を 1 つずつ確認し、動かないものが無い
 2. `make check` が通る
-3. `detail.Source` が 6 メソッド以下
+3. `detail` が宣言する interface が、1 つあたり 6 メソッド以下
+   （embed した interface のメソッドは数えない）
+
+   > 2026-09-07 訂正。元は「`detail.Source` が 6 メソッド以下」だったが、
+   > `detail.Source` は `detail.New` と `app.Source` が要求する**合成 interface** で
+   > あり、4.3 が「候補取得(2)とレビュー提出(2)は今までどおり別 interface」と
+   > している以上、合成の合計は 6 にならない。数え方を宣言単位に定めた。
 4. `internal/tui` に bool の mode フラグが無い
 5. 非テストコードに実装計画・spec への参照が 0 箇所
 6. `internal/gh/cli` のパーステストが実物の testdata を使っている
