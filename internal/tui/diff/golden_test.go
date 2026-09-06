@@ -13,6 +13,7 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/icon"
 )
 
 // goldenWidths are the widths a screen most commonly opens at.
@@ -160,6 +161,21 @@ func discardingModel(width int) Model {
 	m := goldenModel(width)
 	m.review.PendingID = "PRR_1"
 	return press(m, "X")
+}
+
+// TestGoldenIconSets records a view with both an open thread and a folded
+// one, once per glyph set: the marker and the comment bar are the two
+// literals this glyph pair covers, and a set that draws them the wrong width
+// shows up here as the thread column no longer lining up (spec 4.5).
+func TestGoldenIconSets(t *testing.T) {
+	m := withThreads(t, 120, 40)
+	for name, set := range map[string]icon.Set{"nerd": icon.Nerd, "ascii": icon.ASCII} {
+		t.Run(name, func(t *testing.T) {
+			icon.Use(set)
+			t.Cleanup(func() { icon.Use(icon.Unicode) })
+			golden.Assert(t, "diff_icons_"+name, m.View())
+		})
+	}
 }
 
 func TestNoLineIsWiderThanTheTerminal(t *testing.T) {

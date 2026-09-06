@@ -9,6 +9,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
@@ -380,7 +381,7 @@ func (m Model) diffLine(r row, selected bool, width int) string {
 	case rowThread:
 		return m.threadLine(r, width)
 	case rowCollapsed:
-		return theme.Dim().Render(clip("▸ "+r.text, width))
+		return theme.Dim().Render(clip(icon.Collapsed()+" "+r.text, width))
 	default:
 		return m.diffTextLine(r.line, width)
 	}
@@ -403,7 +404,7 @@ func (m Model) plainText(r row) string {
 	case rowThread:
 		return m.threadText(r)
 	case rowCollapsed:
-		return "▸ " + r.text
+		return icon.Collapsed() + " " + r.text
 	default:
 		return r.text
 	}
@@ -415,7 +416,7 @@ func (m Model) threadText(r row) string {
 	if r.comment.Pending {
 		body += " (" + i18n.T("diff.unsent") + ")"
 	}
-	return "▌ " + body
+	return icon.CommentBar() + " " + body
 }
 
 // diffTextLine draws the gutter (two line numbers and the +/- marker) and
