@@ -3,7 +3,9 @@
 package app
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
 
@@ -24,10 +27,51 @@ type Source interface {
 
 // Options carries what main determined before the UI started.
 type Options struct {
-	// HasRepo reports whether a target repository is known, from --repo or
-	// from the git remote of the working directory. Without one the Repos tab
-	// has nothing to show and is not offered (spec 3.4).
+	// HasRepo reports whether --repo named a target repository. Without the
+	// flag the answer is not known yet: asking the GitHub layer to resolve
+	// the working directory is a subprocess, and doing it before the UI
+	// started left the terminal blank for as long as it took. The root asks
+	// as soon as it has a size, and the Repos tab appears when the answer
+	// arrives (spec 3.4).
 	HasRepo bool
+}
+
+// repoLookupTimeout bounds the one call that decides whether the Repos tab
+// exists. It is generous: the tab appearing late is a smaller problem than
+// its never appearing on a slow network. `gh repo view` reaches the API, and
+// a cold one has been measured at over six seconds.
+const repoLookupTimeout = 20 * time.Second
+
+// repoResolvedMsg carries the answer to that lookup. timedOut is kept apart
+// from found because the two look identical on screen — no Repos tab — and
+// only one of them is the truth about the directory.
+type repoResolvedMsg struct {
+	found    bool
+	timedOut bool
+}
+
+// resolveRepo asks the GitHub layer to name the working directory's
+// repository. A failure means "there is none" — a directory that is not a
+// repository and one with nowhere to fetch from give the Repos tab nothing to
+// show either — except a timeout, which is reported: silently dropping the tab
+// because the network was slow reads as a bug in whatever else was changed.
+func resolveRepo(src Source) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), repoLookupTimeout)
+		defer cancel()
+		name, err := src.RepoName(ctx)
+		return resolved(ctx, name, err)
+	}
+}
+
+// resolved reads one lookup's outcome. exec reports a killed subprocess as
+// "signal: killed" rather than wrapping the deadline, so whether time ran out
+// is a question for the context, not for the error.
+func resolved(ctx context.Context, name string, err error) repoResolvedMsg {
+	return repoResolvedMsg{
+		found:    err == nil && name != "",
+		timedOut: err != nil && ctx.Err() != nil,
+	}
 }
 
 type tabID int
@@ -44,6 +88,11 @@ type Model struct {
 	width, height int
 	tab           tabID
 
+	// now is when the last message arrived. The tab row reports how old the
+	// board's data is, and View may not read a clock of its own
+	// (.claude/rules/tui.md), so the clock is read here.
+	now time.Time
+
 	work   work.Model
 	repo   repo.Model
 	detail detail.Model
@@ -55,6 +104,10 @@ type Model struct {
 
 	showingDetail bool
 	errText       string
+
+	// repoLookupTimedOut says the Repos tab is missing because the lookup ran
+	// out of time, not because there is no repository here.
+	repoLookupTimedOut bool
 }
 
 func New(src Source, opts Options) Model {
@@ -66,16 +119,39 @@ func New(src Source, opts Options) Model {
 	}
 }
 
-// Init starts nothing: the first fetch runs from the first tea.WindowSizeMsg,
-// which Bubble Tea sends at start-up. See the started field.
-func (m Model) Init() tea.Cmd { return nil }
+// Init asks the terminal for its background colour and nothing else: the
+// first fetch runs from the first tea.WindowSizeMsg, which Bubble Tea sends at
+// start-up. See the started field.
+func (m Model) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.now = time.Now()
 	switch msg := msg.(type) {
+	case tea.BackgroundColorMsg:
+		// The palette cannot assume a background, and this is the only place
+		// that learns the real one (.claude/rules/tui.md).
+		theme.SetDark(msg.IsDark())
+		return m, nil
 	case tea.WindowSizeMsg:
 		return m.resize(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+	case repoResolvedMsg:
+		if !msg.found {
+			m.repoLookupTimedOut = msg.timedOut
+			return m, nil
+		}
+		m.opts.HasRepo = true
+		// broadcast skips the list until this point, so it never saw the
+		// WindowSizeMsg that told the others how wide they are: an unsized
+		// list clips nothing and runs off the terminal.
+		m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
+			Width:  m.width,
+			Height: max(m.height-tabRowHeight, 1),
+		})
+		return m, m.repo.Init()
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
@@ -125,9 +201,21 @@ func (m Model) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width, m.height = msg.Width, msg.Height
 
-	next, cmd := m.broadcast(msg)
+	// A tab is told how much room is left under the tab row, not how big the
+	// terminal is: it lays its own contents out to fit, and a tab that
+	// measured the whole screen would push the last of them off the bottom.
+	// The detail view is drawn from the top and gets the whole thing.
+	next, cmd := m.broadcast(tea.WindowSizeMsg{
+		Width:  msg.Width,
+		Height: max(msg.Height-tabRowHeight, 1),
+	})
 	m = next.(Model)
 	cmds := []tea.Cmd{cmd}
+	if m.showingDetail {
+		var detailCmd tea.Cmd
+		m.detail, detailCmd = m.detail.Update(msg)
+		cmds = append(cmds, detailCmd)
+	}
 
 	if !m.started {
 		m.started = true
@@ -136,6 +224,8 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, fetch)
 		if m.opts.HasRepo {
 			cmds = append(cmds, m.repo.Init())
+		} else {
+			cmds = append(cmds, resolveRepo(m.src))
 		}
 	}
 	return m, tea.Batch(cmds...)

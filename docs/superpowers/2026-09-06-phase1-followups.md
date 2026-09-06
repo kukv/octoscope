@@ -2,10 +2,18 @@
 
 Phase 1（PR #46 / #47 / #49 / #51、いずれも main にマージ済み）で
 **満たせていない spec 要件**と、意図的に後回しにした宿題をまとめる。
-次のセッションはこのファイルから始めてよい。
 
 spec は `docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md`。
 実装計画は `docs/superpowers/plans/2026-09-06-octoscope-phase1.md`。
+
+**状況（2026-09-06 追記）:** 1〜7 とその他の宿題は対応済み。
+**8（実端末での目視確認）だけが未了で、これは環境に TTY が無いため人手が要る。**
+
+**追記（同日・2 巡目）:** 1〜7 を終えた画面を実際に起動して見たところ、
+**spec が参照している Artifact のモックアップに全く沿っていなかった。**
+1〜7 は「不足していた要素を足す」対応であり、モックアップの
+**レイアウトそのもの**を作り直してはいなかったためである。
+2 巡目でそこを合わせた。内容は末尾の「Artifact に合わせる（2 巡目）」にある。
 
 ## なぜこれが起きたか
 
@@ -14,124 +22,160 @@ spec は `docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md`。
 **色・グリフ・カードの行数を検証しているテストが 1 つも無かった**ため、
 spec §4.5 の「装飾の強度は最大限」が丸ごと未達のまま通ってしまった。
 
-TTY が無くても、テストの中で `View()` を `fmt.Println` すれば見える。
-以下の 1 番を最初にやること。
+TTY が無くても、テストの中で `View()` を出力すれば見える。1 番がそれである。
 
 ---
 
-## 1. 描画ハーネス（最優先）
+## 1. 描画ハーネス — 済
 
-各ビューの `View()` を **en / ja × 80 / 120 / 160 桁**で出力する golden test を作る。
+`internal/golden` と各ビューの `golden_test.go` / `testdata/*.golden`。
+en / ja × 80 / 120 / 160 桁で `View()` を録る。ANSI エスケープは落とさない。
 
-- 置き場所: `internal/tui/<view>/golden_test.go` と `testdata/*.golden`
-- 目的は 2 つ。桁ずれの検出と、**人間が差分を目で見られること**
-- ANSI エスケープを落とさずに保存する。色が消えた／付いた変更が diff に出ないと意味がない
-- `go test ./... -update` で golden を更新できるようにする
-
-**これが入るまで、TUI の変更を「完了」と言わない。**
-
-参考: 現状を手で描画したときの出力（120 桁）。装飾は bold と faint だけで、
-色は 1 箇所も使われていない。
-
-```
-  Review requested              Your PRs                      Assigned                      Mentioned
-────────────────────────────  ────────────────────────────  ────────────────────────────  ────────────────────────────
-▸ • chore(deps): update act…    × refactor: split the UI …    #7 Nerd Font のフォールバ…    (nothing here)
-  kukv/ktor-typed-routing       kukv/octoscope                kukv/octoscope
-  ▰▰▰▰▰▱▱ 3h ago                ▰▰▰▰▱▱▱ 3h ago                3h ago
+```bash
+make golden                              # 録り直す
+cat -v internal/tui/work/testdata/work_ja_80.golden   # 目で見る
 ```
 
-## 2. 色（spec §4.5 違反）
+規約は `.claude/rules/testing.md` の「画面は golden に録る」に入れた。
 
-`lipgloss` を依存に入れておきながら `AdaptiveColor` の使用箇所がゼロ。
+この過程で `repo.View()` が `time.Now()` を読んでいた（`View` は副作用を
+持たない、の違反）のを Update 側へ移した。
 
-- `internal/tui/theme` を作り、状態色を 1 箇所に集める
-  （approved / changes requested / review required / draft / check success /
-  check failure / check running）
-- ターミナルの背景色は前提にできないので `AdaptiveColor` を使う
-  （`.claude/rules/tui.md`）
-- 現状のスタイルは `internal/tui/work/render.go` の
-  `headingStyle` / `dimStyle` / `cursorStyle` の 3 つだけ。ここを置き換える
+## 2. 色 — 済
 
-## 3. Nerd Font グリフと ASCII フォールバック（spec §4.5 違反）
+`internal/tui/theme` に集約。ビューは `theme.Dim()` のような役割名で引き、
+16 進の色をビューに書かない。
 
-spec は「Nerd Font が利用できる環境ではグリフを使い、利用できない場合は
-ASCII 代替へ自動的にフォールバックする」と書いている。
+**v2 に `lipgloss.AdaptiveColor` は無い。** `lipgloss.LightDark(isDark)` を使い、
+`isDark` は `tea.RequestBackgroundColor` → `tea.BackgroundColorMsg` で得て
+`theme.SetDark` に渡す。`.claude/rules/tui.md` もそのとおりに直した。
 
-`internal/tui/icon/icon.go` の冒頭に
-「Phase 1 は Unicode 記号のみ、Nerd Font は後」というコメントを入れて
-**実装側が勝手にスコープを外した**。spec に Phase 送りの根拠は無い。
+## 3. Nerd Font グリフと ASCII フォールバック — 済
 
-- 検出方法を決める（環境変数 / 設定ファイル `§5` / `--icons` フラグ）
-- グリフ表と ASCII 表を並べ、`icon` パッケージが選ぶ
-- 決めた検出方法を spec §4.5 に追記する
+`unicode`（既定）/ `nerd` / `ascii` の 3 セット。`--icons` と `OCTOSCOPE_ICONS`。
 
-## 4. カードを 2 行にする（spec §4.1 違反）
+**自動判定はしない。** 端末は使用中のフォントも収録範囲も報告しないため、
+検出する信頼できる手段が無い。推測して外すと盤面が豆腐になる。
+根拠は spec §4.5 に追記した。
 
-spec: 「各カードは 2 行で、1 行目にタイトルと状態アイコン、2 行目に
-リポジトリ名・checks の進捗バー・経過時間を置く」
+Nerd Font のグリフは私用領域にあり幅を前提にできないので、
+`TestEveryGlyphIsOneColumn` が全セットを 1 桁に縛っている。
 
-実装は 3 行（タイトル / リポジトリ名 / バー + 経過時間）。
-`internal/tui/work/render.go` の `cardLines`。
+## 4. カードを 2 行に — 済
 
-## 5. ラベルの塗りつぶしバッジ（spec §4.5 違反）
+80 桁では 1 列 18 桁しかないため、2 行目は bar と経過時間を右に固定し、
+リポジトリ名に残りを与える（残りが無ければリポジトリ名は出ない）。
+（2 巡目で、100 桁以上では枠つきの 4 行になった。2 行はその下の幅での形。）
 
-Work カードにラベルが出ていない。`ListWork` の GraphQL
-（`internal/gh/cli/work.graphql`）がラベルを取っていないので、
-クエリと `searchNode` の両方に足す必要がある。
+## 5. ラベルの塗りつぶしバッジ — 済
 
-GitHub のラベル色は 16 進の実色で返るので、それを背景色として再現する。
-前景色は背景の輝度から白／黒を選ぶ。
+`work.graphql` に `LabelFields` フラグメントを PR / Issue 両方へ。
+`theme.Badge` が背景の輝度から白／黒の文字色を選ぶ。
+タイトルが切り詰められる幅ではバッジを出さない。
 
-**注意:** `work.graphql` にフィールドを足したら
-`searchNode` にも対応する JSON タグを足すこと。
-`TestTheQueryAsksForEveryFieldWeParse` が両方向を縛っている。
+## 6. ドロワーに本文と checks 一覧 — 済
 
-## 6. ドロワーに本文と checks 一覧（spec §4.1 違反）
+`bodyText` と各 check の名前（CheckRun は `name`、StatusContext は `context`）。
+失敗した check を先頭に並べる。
+ドロワーは盤面の下に描くので、高さは端末サイズに関係なく固定にしてある。
+（2 巡目で 2 面になり、打ち切りは本文 5 行 / checks 3 件になった。）
 
-spec: 「画面下部のドロワーに選択中カードの**本文**と checks **一覧**が出るため、
-`enter` を押さずに中身を読める」
+## 7. マウス操作 — 済
 
-実装は本文なし、checks も一覧ではなく要約 1 行
-（`internal/tui/work/render.go` の `drawer`）。
+spec に **§4.0 マウス操作**を追加した。要点:
 
-GraphQL に `bodyText` と各 context の `name` を足す必要がある。
+- `View.MouseMode = tea.MouseModeCellMotion`（v2 に `tea.WithMouseCellMotion` は無い）
+- 1 回目のクリックで選択、選択中をもう 1 回で詳細。**ダブルクリックは使わない**
+  （Bubble Tea が報告しないため、自前で測ると `Update` に時計が入る）
+- マウスはブロードキャストせず、表示中のタブ 1 つにだけ配る
+- 当たり判定は描画と同じ関数を読む。テストは「実際に描かれた位置」を
+  探してそこをクリックする
 
-## 7. マウス操作（spec に記述なし）
+## 8. 実端末での目視確認 — **未了（人手が要る）**
 
-spec にマウスの記述が無いため実装していないが、TUI として当然期待される。
-`tea.WithMouseCellMotion` すら渡していないので、ホイールスクロールもできない。
-
-- カードのクリックで選択、ダブルクリックで詳細
-- ホイールで列内スクロール、ドロワー内スクロール
-- タブのクリックで切り替え
-- **spec §4 にマウス操作を追記して合意を残す**こと
-
-## 8. 実端末での目視確認
-
-上記が入ったら、実際に起動して見る。`.claude/rules/tui.md` の「確認」。
+この環境には TTY が無い。golden は桁ずれと色の変化を捉えるが、
+実端末での見え方そのものは代替できない。
 
 ```bash
 go run ./cmd/octoscope
-go run ./cmd/octoscope --lang ja   # 全角で桁がずれていないか
+go run ./cmd/octoscope --lang ja      # 全角で桁がずれていないか
+go run ./cmd/octoscope --icons nerd   # パッチ済みフォントがある環境で
+go run ./cmd/octoscope --icons ascii
 ```
 
-80 桁でも崩れないこと、100 桁未満でドロワーが消えること、
-60 桁未満で 1 列ページングになることを確認する。
+確認する境界:
+
+- **80 桁**で崩れないこと
+- **100 桁未満**でドロワーが消えること
+- **60 桁未満**で 1 列ページングになること
+- マウスのクリック位置と選択が実際に一致すること（golden では
+  「描かれた位置」までしか確かめられない）
+
+**`--icons nerd` で Repos タブが出ない、という報告があった。** 調べた結果
+**icons とは無関係**で、上のリポジトリ判定のタイムアウトだった（`--icons` の
+経路は `HasRepo` に一切触れていない）。ただし Nerd Font のグリフは私用領域に
+あり、端末によっては全角で描かれる。桁ずれが出るならそれが原因なので、
+その場合は改めて報告してほしい。
+
+（`work.View()` が `m.height` を見ておらず盤面がフッターを押し出す問題は、
+2 巡目の高さ予算で解消した。）
 
 ---
 
-## その他の宿題（spec 違反ではない）
+## その他の宿題 — 済
 
-- **`hasRepo` が起動時に最大 5 秒ブロックする** — `cmd/octoscope/main.go`。
-  `gh` に git remote を解決させる同期呼び出しを UI 起動前に行っている。
-  Work タブから開始して非同期に埋める形にできる
-- **`gh.PR.State` / `gh.PR.ReviewDecision` が GitHub の生文字列のまま** —
-  `internal/gh/gh.go`。`.claude/rules/architecture.md` の
-  「GitHub API 固有の値はパッケージの外に出さない」に反する。
-  `WorkItem` 側は `ReviewState` / `CheckState` に変換済みなので、
-  `PR` / `Issue` も同じ形に揃える（Phase 2 送りにしていた）
-- **古い `prMsg` / `issueMsg` のクロストーク** — `internal/tui/detail/`。
-  `errMsg` には `gh.ItemRef` を持たせて古いものを捨てるようにしたが、
-  成功側の 2 つは同じ手当てをしていない。詳細を素早く開き直すと、
-  前のアイテムの内容が一瞬出る可能性がある
+- **`hasRepo` の起動時ブロック** — ルートモデルが最初のサイズを受け取った
+  時点で非同期に問い合わせ、`repoResolvedMsg` が返ってから Repos タブを出す。
+  **2 巡目で追記:** この問い合わせ（`gh repo view`）は API を叩くので遅い。
+  実測で cold 6.17 秒に対して締め切りが 5 秒しかなく、しかも失敗を全部
+  「ここはリポジトリではない」と読んでいたため、**Repos タブが理由も出さずに
+  消える**ことがあった。締め切りを 20 秒に伸ばし、時間切れは答えと区別して
+  タブ行に出す。`exec` は殺したプロセスを `signal: killed` と報告して締め切りを
+  包まないので、判定は `ctx.Err()` で行う
+- **`gh.PR.State` / `ReviewDecision` が生文字列** — `gh.ItemState` /
+  `gh.ReviewState` に変換。`internal/gh/cli` に DTO を置き、
+  `gh.PR` / `gh.Issue` からは JSON タグを外した。
+  状態語は両カタログに入れた（`state.*` / `review.*`）
+- **`prMsg` / `issueMsg` のクロストーク** — `errMsg` と同じく `ref` を持たせ、
+  自分宛でない応答を捨てるようにした
+
+---
+
+## Artifact に合わせる（2 巡目）
+
+spec §4 が参照しているモックアップが設計の正であり、文章はその要約でしかない。
+1 巡目の画面と突き合わせて、**構造として違っていた 9 点**を直した。
+
+| モックアップ | 1 巡目 | 2 巡目 |
+|---|---|---|
+| 画面に収まる | 列が伸びてドロワーとキーバーが画面外へ | 盤面に高さ予算。列内をスクロールし、ドロワーとキーバーは常に見える |
+| カードは枠つき | ただの行 | `lipgloss.RoundedBorder()` の箱（4 行） |
+| 列は縦罫で分ける | 見出しの下に横罫 | 列間に `│`。中身が尽きた行から下は引かない |
+| 見出しに件数 | 名前だけ | `Review Requested 3` |
+| `#12 タイトル` | 番号が落ちていた | 復活 |
+| メタ行は左から流す | 右寄せ・`owner/name` フル | `koto` + bar かレビュー語 + ラベル |
+| ドロワーは 2 面 | 縦積み | 左に本文、右に checks。ブランチ名と `+218 −31` も |
+| タブ行の右に集計 | 無し | `3 attention · 1 failing · updated 2m ago` |
+| Repos 右ペインは表 | 1 行 1 printf、桁が揃わない | 固定幅の列、サブタブに件数、下に選択中の要約 |
+
+**意図的にモックアップから外した点が 1 つある。** カードの箱は **100 桁未満で
+やめる**。18 桁の列に枠を描くと本文が 14 桁になり、タイトルがほぼ消えるため。
+spec §4.6 の劣化の段に書き足した。
+
+spec 側も §4.1 / §4.2 / §4.6 を、作った設計そのものに書き直した。
+
+### 2 巡目で範囲外にしたもの
+
+- **Repos のサイドバーと追加ダイアログ、Search タブ** — Phase 4
+- **変更量のスパークライン** — 利用者の選択で見送り
+- **`d` / `v` / `m` キー** — Phase 2 / 3
+- **リポジトリ名の副題（`· Go · MIT`）** — 取得に別のサブプロセスが要る
+- **check の所要時間** — 現在のクエリが取っていない
+
+### 次にやること
+
+- **Repos を Artifact どおりに** — 左のリポジトリ一覧サイドバーと追加
+  ダイアログ（spec §4.2）。今回は右ペインだけ。別 PR で対応する
+- **`RepoName` を 2 回呼んでいる** — ルートの判定（`resolveRepo`）と
+  Repos ビューのヘッダ（`fetchRepoName`）が別々に叩いている。
+  判定の答えに名前を載せればサブプロセスが 1 つ減る

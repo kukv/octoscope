@@ -65,9 +65,19 @@ type ClosedMsg struct{}
 type ErrorMsg struct{ Err error }
 
 type (
-	prMsg    gh.PR
-	issueMsg gh.Issue
-	errMsg   struct {
+	// Every answer to a fetch carries the item it is about. The detail view
+	// is rebuilt for each item the user opens, but the request for the last
+	// one is still running: without the ref, its answer would land here and
+	// show the wrong item for as long as the current fetch takes.
+	prMsg struct {
+		ref gh.ItemRef
+		pr  gh.PR
+	}
+	issueMsg struct {
+		ref   gh.ItemRef
+		issue gh.Issue
+	}
+	errMsg struct {
 		ref gh.ItemRef
 		err error
 	}
@@ -94,7 +104,7 @@ type Model struct {
 	spin    spinner.Model
 	body    viewport.Model
 	title   string
-	state   string
+	state   gh.ItemState
 
 	textarea  textarea.Model
 	composing bool
@@ -124,9 +134,18 @@ func New(src Source, ref gh.ItemRef) Model {
 		ref:      ref,
 		loading:  true,
 		spin:     s,
-		body:     viewport.New(viewport.WithWidth(80), viewport.WithHeight(20)),
+		body:     newBody(),
 		textarea: ta,
 	}
+}
+
+// newBody is the scrolling body pane. The wheel has to be turned on for the
+// viewport to act on it; the root model is what asks the terminal to report
+// mouse events at all.
+func newBody() viewport.Model {
+	v := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	v.MouseWheelEnabled = true
+	return v
 }
 
 func (m Model) Init() tea.Cmd {
@@ -141,13 +160,13 @@ func fetch(src Source, ref gh.ItemRef) tea.Cmd {
 			if err != nil {
 				return errMsg{ref, err}
 			}
-			return prMsg(pr)
+			return prMsg{ref, pr}
 		}
 		issue, err := src.GetIssue(ctx, ref.Repo, ref.Number)
 		if err != nil {
 			return errMsg{ref, err}
 		}
-		return issueMsg(issue)
+		return issueMsg{ref, issue}
 	}
 }
 
@@ -182,15 +201,20 @@ func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 }
 
 // stateAction reports whether the shown item can change state, and if so
-// whether the action is a close (true) or a reopen (false).
+// whether the action is a close (true) or a reopen (false). Nothing has been
+// fetched yet is not a state of its own: loading is, and every caller checks
+// it first.
 func (m Model) stateAction() (closing bool, ok bool) {
+	if m.loading {
+		return false, false
+	}
 	switch m.state {
-	case "OPEN":
+	case gh.StateOpen:
 		return true, true
-	case "CLOSED":
+	case gh.StateClosed:
 		return false, true
 	default:
-		return false, false // merged, or not fetched yet: no action
+		return false, false // merged: neither closing nor reopening applies
 	}
 }
 
@@ -268,22 +292,30 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
 	case prMsg:
+		if msg.ref != m.ref {
+			return m, nil // an answer for an item the user has already left
+		}
+		pr := msg.pr
 		m.loading = false
-		m.state = msg.State
+		m.state = pr.State
 		m.actionErr = ""
-		m.labels = labelNames(msg.Labels)
-		m.assignees = authorLogins(msg.Assignees)
-		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": msg.Number, "Title": msg.Title})
-		m.setContent(prMarkdown(gh.PR(msg)))
+		m.labels = labelNames(pr.Labels)
+		m.assignees = authorLogins(pr.Assignees)
+		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": pr.Number, "Title": pr.Title})
+		m.setContent(prMarkdown(pr))
 		return m, nil
 	case issueMsg:
+		if msg.ref != m.ref {
+			return m, nil // an answer for an item the user has already left
+		}
+		issue := msg.issue
 		m.loading = false
-		m.state = msg.State
+		m.state = issue.State
 		m.actionErr = ""
-		m.labels = labelNames(msg.Labels)
-		m.assignees = authorLogins(msg.Assignees)
-		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": msg.Number, "Title": msg.Title})
-		m.setContent(issueMarkdown(gh.Issue(msg)))
+		m.labels = labelNames(issue.Labels)
+		m.assignees = authorLogins(issue.Assignees)
+		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": issue.Number, "Title": issue.Title})
+		m.setContent(issueMarkdown(issue))
 		return m, nil
 	case commentPostedMsg:
 		m.composing = false
@@ -337,9 +369,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case errMsg:
-		// A failure for an item the user has already left behind: the parent
-		// builds a fresh model per item, so an answer for another ref belongs
-		// to a request nobody is waiting for any more.
 		if msg.ref != m.ref {
 			return m, nil
 		}
@@ -348,6 +377,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{err} }
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseWheelMsg:
+		// The body is the only thing here that scrolls. The composer, the
+		// confirmation and the picker are drawn over it, and a wheel that
+		// moved the text underneath them would be scrolling what nobody can
+		// see.
+		if m.composing || m.confirming || m.picking || m.loading {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.body, cmd = m.body.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }

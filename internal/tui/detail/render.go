@@ -5,17 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/layout"
-)
-
-var (
-	titleStyle = lipgloss.NewStyle().Bold(true)
-	dimStyle   = lipgloss.NewStyle().Faint(true)
+	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
 func (m Model) View() string {
@@ -31,8 +26,8 @@ func (m Model) View() string {
 	if m.loading || m.pickerLoading {
 		return layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
 	}
-	header := titleStyle.Render(m.title)
-	footer := dimStyle.Render(i18n.T("footer.detail_prefix") + m.stateFooterKey() + i18n.T("footer.detail_suffix"))
+	header := theme.Title().Render(m.title)
+	footer := theme.Dim().Render(i18n.T("footer.detail_prefix") + m.stateFooterKey() + i18n.T("footer.detail_suffix"))
 	body := layout.ClipLines(header, m.width) + "\n" + m.body.View() + "\n"
 	if m.actionErr != "" {
 		body += wrapErr(m.actionErr, m.width) + "\n"
@@ -44,7 +39,7 @@ func (m Model) View() string {
 // titles around it, this text is the whole of what the user has to go on, so
 // it is wrapped rather than cut short (.claude/rules/errors.md).
 func wrapErr(text string, w int) string {
-	s := i18n.T("common.error_prefix") + text
+	s := theme.Error().Render(i18n.T("common.error_prefix")) + text
 	if w <= 0 {
 		return s
 	}
@@ -56,7 +51,7 @@ func (m Model) pickerView() string {
 	if m.applying {
 		return body + "\n" + layout.ClipLines(m.spin.View()+" "+i18n.T("picker.applying"), m.width) + "\n"
 	}
-	return body + "\n" + layout.ClipLines(dimStyle.Render(i18n.T("footer.picker")), m.width)
+	return body + "\n" + layout.ClipLines(theme.Dim().Render(i18n.T("footer.picker")), m.width)
 }
 
 // stateFooterKey returns the state-aware footer hint (with trailing spaces),
@@ -73,7 +68,7 @@ func (m Model) stateFooterKey() string {
 }
 
 func (m Model) confirmView() string {
-	header := titleStyle.Render(m.title)
+	header := theme.Title().Render(m.title)
 	closing, _ := m.stateAction()
 	var id string
 	switch {
@@ -92,14 +87,14 @@ func (m Model) confirmView() string {
 	if m.working {
 		b.WriteString(m.spin.View() + " " + i18n.T("confirm.working") + "\n")
 	} else {
-		b.WriteString(dimStyle.Render(i18n.T("confirm.yes_no")))
+		b.WriteString(theme.Dim().Render(i18n.T("confirm.yes_no")))
 	}
 	return layout.ClipLines(b.String(), m.width)
 }
 
 func (m Model) composeView() string {
 	var b strings.Builder
-	title := titleStyle.Render(i18n.Tf("compose.title", map[string]any{"Title": m.title}))
+	title := theme.Title().Render(i18n.Tf("compose.title", map[string]any{"Title": m.title}))
 	b.WriteString(layout.ClipLines(title, m.width) + "\n\n")
 	b.WriteString(m.textarea.View() + "\n\n")
 	if m.postErr != "" {
@@ -108,7 +103,7 @@ func (m Model) composeView() string {
 	if m.posting {
 		b.WriteString(layout.ClipLines(m.spin.View()+" "+i18n.T("compose.posting"), m.width) + "\n")
 	} else {
-		b.WriteString(layout.ClipLines(dimStyle.Render(i18n.T("footer.compose")), m.width))
+		b.WriteString(layout.ClipLines(theme.Dim().Render(i18n.T("footer.compose")), m.width))
 	}
 	return b.String()
 }
@@ -124,13 +119,13 @@ func prMarkdown(pr gh.PR) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# #%d %s\n\n", pr.Number, pr.Title)
 	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), pr.Author.Login)
-	state := pr.State
+	state := stateText(pr.State)
 	if pr.IsDraft {
 		state += i18n.T("md.draft_suffix")
 	}
 	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), state)
-	if pr.ReviewDecision != "" {
-		fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.review"), pr.ReviewDecision)
+	if pr.Review != gh.ReviewNone {
+		fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.review"), reviewText(pr.Review))
 	}
 	writeCommonMeta(&b, pr.Labels, pr.UpdatedAt)
 	writeBody(&b, pr.Body)
@@ -142,11 +137,38 @@ func issueMarkdown(issue gh.Issue) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# #%d %s\n\n", issue.Number, issue.Title)
 	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), issue.Author.Login)
-	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), issue.State)
+	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), stateText(issue.State))
 	writeCommonMeta(&b, issue.Labels, issue.UpdatedAt)
 	writeBody(&b, issue.Body)
 	writeComments(&b, issue.Comments)
 	return b.String()
+}
+
+// stateText and reviewText name a state in the reader's language. GitHub's
+// own spelling stopped at the access layer (.claude/rules/architecture.md),
+// and a state word is ours to translate (spec 6.1).
+func stateText(s gh.ItemState) string {
+	switch s {
+	case gh.StateOpen:
+		return i18n.T("state.open")
+	case gh.StateMerged:
+		return i18n.T("state.merged")
+	default:
+		return i18n.T("state.closed")
+	}
+}
+
+func reviewText(r gh.ReviewState) string {
+	switch r {
+	case gh.ReviewApproved:
+		return i18n.T("review.approved")
+	case gh.ReviewChangesRequested:
+		return i18n.T("review.changes_requested")
+	case gh.ReviewRequired:
+		return i18n.T("review.required")
+	default:
+		return i18n.T("review.none")
+	}
 }
 
 func writeCommonMeta(b *strings.Builder, labels []gh.Label, updatedAt time.Time) {

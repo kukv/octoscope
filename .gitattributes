@@ -1,0 +1,3 @@
+# Golden recordings are compared byte for byte and hold ANSI escapes. Line
+# endings must survive a checkout on Windows unchanged.
+*.golden -text

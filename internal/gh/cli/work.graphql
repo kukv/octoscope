@@ -27,9 +27,17 @@ fragment WorkItem on SearchResultItem {
     url
     isDraft
     updatedAt
+    bodyText
     reviewDecision
+    headRefName
+    baseRefName
+    additions
+    deletions
     author {
       login
+    }
+    labels(first: 10) {
+      nodes { ...LabelFields }
     }
     repository {
       nameWithOwner
@@ -51,8 +59,12 @@ fragment WorkItem on SearchResultItem {
     title
     url
     updatedAt
+    bodyText
     author {
       login
+    }
+    labels(first: 10) {
+      nodes { ...LabelFields }
     }
     repository {
       nameWithOwner
@@ -60,15 +72,25 @@ fragment WorkItem on SearchResultItem {
   }
 }
 
-# CheckRun reports status and conclusion; the older StatusContext reports a
-# single state, so both shapes have to be asked for.
+# color is the six hex digits GitHub stores for the label, with no leading
+# "#": the badge reproduces it as a background.
+fragment LabelFields on Label {
+  name
+  color
+}
+
+# CheckRun reports status and conclusion and calls its name "name"; the older
+# StatusContext reports a single state and calls its name "context". Both
+# shapes have to be asked for.
 fragment CheckContext on StatusCheckRollupContext {
   __typename
   ... on CheckRun {
+    name
     status
     conclusion
   }
   ... on StatusContext {
+    context
     state
   }
 }

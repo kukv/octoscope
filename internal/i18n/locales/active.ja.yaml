@@ -21,6 +21,8 @@ tab:
     other: "Work"
   repos:
     other: "Repos"
+  repo_lookup_timeout:
+    other: "リポジトリの判定がタイムアウトしました"
 
 list:
   tab_prs:
@@ -83,8 +85,12 @@ work:
     other: "（なし）"
   checks_summary:
     other: "checks {{.Total}} 件中 {{.Passed}} 件成功 / {{.Failed}} 件失敗 / {{.Running}} 件実行中"
+  draft:
+    other: "draft"
   no_checks:
     other: "checks なし"
+  checks_more:
+    other: "ほか {{.Count}} 件"
   column_position:
     other: "{{.Index}}/{{.Total}} 列目"
 
@@ -136,3 +142,29 @@ time:
   # A Go reference-time layout, not a display string.
   datetime_layout:
     other: "2006年1月2日 15:04"
+
+state:
+  open:
+    other: "オープン"
+  closed:
+    other: "クローズ"
+  merged:
+    other: "マージ済み"
+
+review:
+  none:
+    other: "レビュー不要"
+  required:
+    other: "レビュー待ち"
+  approved:
+    other: "承認済み"
+  changes_requested:
+    other: "変更依頼"
+
+summary:
+  attention:
+    other: "要対応 {{.Count}}"
+  failing:
+    other: "CI 失敗 {{.Count}}"
+  updated:
+    other: "更新 {{.Ago}}"

@@ -21,6 +21,8 @@ tab:
     other: "Work"
   repos:
     other: "Repos"
+  repo_lookup_timeout:
+    other: "repository lookup timed out"
 
 list:
   tab_prs:
@@ -83,8 +85,13 @@ work:
     other: "(nothing here)"
   checks_summary:
     other: "{{.Passed}}/{{.Total}} checks passed, {{.Failed}} failed, {{.Running}} running"
+  draft:
+    other: "draft"
   no_checks:
     other: "no checks"
+  checks_more:
+    one: "and {{.Count}} more"
+    other: "and {{.Count}} more"
   column_position:
     other: "column {{.Index}}/{{.Total}}"
 
@@ -140,3 +147,31 @@ time:
   # by language, so it belongs in the catalog rather than in the code.
   datetime_layout:
     other: "Jan 2, 2006 15:04"
+
+state:
+  open:
+    other: "open"
+  closed:
+    other: "closed"
+  merged:
+    other: "merged"
+
+review:
+  none:
+    other: "no review needed"
+  required:
+    other: "review required"
+  approved:
+    other: "approved"
+  changes_requested:
+    other: "changes requested"
+
+summary:
+  attention:
+    one: "{{.Count}} waiting on you"
+    other: "{{.Count}} waiting on you"
+  failing:
+    one: "{{.Count}} CI failure"
+    other: "{{.Count}} CI failures"
+  updated:
+    other: "updated {{.Ago}}"

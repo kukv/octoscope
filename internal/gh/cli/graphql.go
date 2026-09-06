@@ -38,14 +38,22 @@ type searchNode struct {
 	Title          string    `json:"title"`
 	URL            string    `json:"url"`
 	IsDraft        bool      `json:"isDraft"`
+	BodyText       string    `json:"bodyText"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 	ReviewDecision string    `json:"reviewDecision"`
+	HeadRefName    string    `json:"headRefName"`
+	BaseRefName    string    `json:"baseRefName"`
+	Additions      int       `json:"additions"`
+	Deletions      int       `json:"deletions"`
 	Author         struct {
 		Login string `json:"login"`
 	} `json:"author"`
 	Repository struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
+	Labels struct {
+		Nodes []gh.Label `json:"nodes"`
+	} `json:"labels"`
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
@@ -61,9 +69,20 @@ type searchNode struct {
 
 type checkNode struct {
 	Typename   string `json:"__typename"`
+	Name       string `json:"name"`
+	Context    string `json:"context"`
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
 	State      string `json:"state"`
+}
+
+// name is what the check calls itself. The two shapes spell the field
+// differently, so the choice cannot be made by the JSON tags alone.
+func (n checkNode) name() string {
+	if n.Typename == "StatusContext" {
+		return n.Context
+	}
+	return n.Name
 }
 
 // ListWork fetches every column of the Work board in one GraphQL request.
@@ -99,7 +118,9 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 			Number: n.Number,
 		},
 		Title:     n.Title,
+		Body:      n.BodyText,
 		Author:    n.Author.Login,
+		Labels:    n.Labels.Nodes,
 		UpdatedAt: n.UpdatedAt,
 		URL:       n.URL,
 	}
@@ -109,30 +130,42 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 	item.Ref.Kind = gh.ItemPR
 	item.IsDraft = n.IsDraft
 	item.Review = gh.ParseReviewDecision(n.ReviewDecision)
+	item.Head = n.HeadRefName
+	item.Base = n.BaseRefName
+	item.Additions = n.Additions
+	item.Deletions = n.Deletions
 	item.Checks = n.checks()
 	return item
 }
 
-// checks counts every check-run context once: each context increments Total
-// and exactly one of Passed, Failed, or Running, so Passed+Failed+Running
-// always equals Total.
+// checks reads the roll-up out of the commit the search returned.
 func (n searchNode) checks() gh.Checks {
-	var c gh.Checks
+	var nodes []checkNode
 	for _, commit := range n.Commits.Nodes {
-		rollup := commit.Commit.StatusCheckRollup
-		if rollup == nil {
-			continue
+		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
+			nodes = append(nodes, rollup.Contexts.Nodes...)
 		}
-		for _, node := range rollup.Contexts.Nodes {
-			c.Total++
-			switch checkOutcome(node) {
-			case gh.CheckSuccess:
-				c.Passed++
-			case gh.CheckFailure:
-				c.Failed++
-			default:
-				c.Running++
-			}
+	}
+	return rollup(nodes)
+}
+
+// rollup counts every check-run context once: each context increments Total
+// and exactly one of Passed, Failed, or Running, so Passed+Failed+Running
+// always equals Total. It is a free function because `gh pr list` returns the
+// same contexts in a flat array, without the commit around them.
+func rollup(nodes []checkNode) gh.Checks {
+	var c gh.Checks
+	for _, node := range nodes {
+		c.Total++
+		state := checkOutcome(node)
+		c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state})
+		switch state {
+		case gh.CheckSuccess:
+			c.Passed++
+		case gh.CheckFailure:
+			c.Failed++
+		default:
+			c.Running++
 		}
 	}
 	switch {

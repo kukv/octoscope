@@ -17,7 +17,7 @@ import (
 func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
 	pr := gh.PR{
 		Number: 12, Title: "feat: pane", Author: gh.Author{Login: "kukv"},
-		State: "OPEN", IsDraft: true, ReviewDecision: "REVIEW_REQUIRED",
+		State: gh.StateOpen, IsDraft: true, Review: gh.ReviewRequired,
 		Labels: []gh.Label{{Name: "Kind: Feature"}},
 		Body:   "body text",
 		Comments: []gh.Comment{
@@ -28,9 +28,12 @@ func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
 		},
 	}
 	md := prMarkdown(pr)
+	// The state and the review are named in the reader's language: GitHub's
+	// own spelling stopped at the access layer.
 	for _, want := range []string{
-		"#12", "feat: pane", "@kukv", "OPEN (draft)",
-		"REVIEW_REQUIRED", "Kind: Feature", "body text", "@bob", "comment text",
+		"#12", "feat: pane", "@kukv",
+		i18n.T("state.open") + i18n.T("md.draft_suffix"),
+		i18n.T("review.required"), "Kind: Feature", "body text", "@bob", "comment text",
 	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("markdown missing %q:\n%s", want, md)
@@ -87,10 +90,10 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	t.Helper()
 	size := tea.WindowSizeMsg{Width: width, Height: 40}
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: overlongTitle, State: "OPEN", Body: overlongBody},
+		pr:     gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen, Body: overlongBody},
 		labels: []gh.Label{{Name: overlongLabel, Color: "ff0000"}},
 	}
-	closed := &fakeSource{pr: gh.PR{Number: 2, Title: overlongTitle, State: "CLOSED"}}
+	closed := &fakeSource{pr: gh.PR{Number: 2, Title: overlongTitle, State: gh.StateClosed}}
 
 	sized := func(m Model) Model {
 		m, _ = m.Update(size)

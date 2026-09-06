@@ -40,6 +40,30 @@ func TestWorkIndexesBySection(t *testing.T) {
 	}
 }
 
+func TestParseItemState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		state string
+		want  gh.ItemState
+	}{
+		{"OPEN", gh.StateOpen},
+		{"CLOSED", gh.StateClosed},
+		{"MERGED", gh.StateMerged},
+		// gh's REST output lower-cases what GraphQL sends in capitals.
+		{"open", gh.StateOpen},
+		{"merged", gh.StateMerged},
+		{"", gh.StateClosed},
+		{"SOMETHING_NEW", gh.StateClosed},
+	}
+
+	for _, tt := range tests {
+		if got := gh.ParseItemState(tt.state); got != tt.want {
+			t.Errorf("%q: got %v, want %v", tt.state, got, tt.want)
+		}
+	}
+}
+
 func TestParseReviewDecision(t *testing.T) {
 	t.Parallel()
 

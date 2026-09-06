@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
 
@@ -173,8 +175,9 @@ func TestReposTabIsUnreachableWithoutARepository(t *testing.T) {
 // and restart it.
 func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 	m := New(&fakeSource{}, Options{HasRepo: true})
-	if cmd := m.Init(); cmd != nil {
-		t.Error("Init returned a command; the fetches belong to the first WindowSizeMsg")
+	// Init asks the terminal for its background colour; that is all it does.
+	if m.Init() == nil {
+		t.Fatal("Init did not ask the terminal for its background colour")
 	}
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if cmd == nil {
@@ -182,6 +185,78 @@ func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 	}
 	if _, cmd = next.(Model).Update(tea.WindowSizeMsg{Width: 80, Height: 24}); cmd != nil {
 		t.Error("a resize started the fetches again")
+	}
+}
+
+// TestTheReposTabAppearsWhenTheRepositoryIsResolved covers what replaced the
+// blocking lookup main used to do before the UI started: the tab is not
+// offered until the answer arrives, and arriving is what starts its fetches.
+func TestTheReposTabAppearsWhenTheRepositoryIsResolved(t *testing.T) {
+	m := newTestModel(Options{}) // no --repo: the answer is not known yet
+	if strings.Contains(content(m), i18n.T("tab.repos")) {
+		t.Error("the Repos tab is offered before the repository is known")
+	}
+
+	next, cmd := m.Update(repoResolvedMsg{found: true})
+	m = next.(Model)
+	if !strings.Contains(content(m), i18n.T("tab.repos")) {
+		t.Error("the Repos tab did not appear once the repository was known")
+	}
+	if cmd == nil {
+		t.Error("the repository list was never asked to fetch anything")
+	}
+	if press(m, "2").tab != tabRepos {
+		t.Error("the Repos tab cannot be reached even though it is offered")
+	}
+}
+
+// TestALateRepositoryStillGetsTheTerminalWidth is the case the asynchronous
+// lookup created: the list is not part of the broadcast until the answer
+// arrives, so it never saw the size everything else was given. An unsized
+// list clips nothing, and every long title runs off the terminal until the
+// user happens to resize the window.
+func TestALateRepositoryStillGetsTheTerminalWidth(t *testing.T) {
+	const width = 120
+	src := &fakeSource{prs: []gh.PR{{
+		Number: 1,
+		Title: "レンダリングのパイプラインをまるごと置き換える " +
+			"refactor with an English clause long enough to run off any screen",
+		Author: gh.Author{Login: "a-contributor-with-a-very-long-handle"},
+	}}}
+
+	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+	m = press(m, "2")
+
+	for _, line := range strings.Split(content(m), "\n") {
+		if w := ansi.StringWidth(line); w > width {
+			t.Errorf("the list is %d columns wide: %q", w, line)
+		}
+	}
+}
+
+func TestNoRepositoryLeavesTheReposTabOff(t *testing.T) {
+	m := newTestModel(Options{})
+	next, cmd := m.Update(repoResolvedMsg{found: false})
+	if cmd != nil {
+		t.Error("a directory with no repository still started a fetch")
+	}
+	if strings.Contains(content(next.(Model)), i18n.T("tab.repos")) {
+		t.Error("the Repos tab is offered for a directory with no repository")
+	}
+}
+
+// TestTheFirstSizeAsksWhetherThereIsARepository is the other half: without
+// this, the answer never arrives and the tab never appears.
+func TestTheFirstSizeAsksWhetherThereIsARepository(t *testing.T) {
+	m := New(&fakeSource{}, Options{})
+	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	if cmd == nil {
+		t.Fatal("the first size started nothing")
+	}
+	resolved := resolve(t, next.(Model), cmd)
+	if !resolved.opts.HasRepo {
+		t.Error("the lookup ran but its answer did not reach the model")
 	}
 }
 
@@ -351,7 +426,7 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 	for name, busy := range tests {
 		t.Run(name, func(t *testing.T) {
 			src := &fakeSource{
-				pr:     gh.PR{Number: 1, Title: "a pr", State: "OPEN"},
+				pr:     gh.PR{Number: 1, Title: "a pr", State: gh.StateOpen},
 				labels: []gh.Label{{Name: "bug", Color: "d73a4a"}},
 			}
 			m := newTestModelWith(src, Options{HasRepo: true})
@@ -428,7 +503,7 @@ func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 				Title: "add the work board",
 			}},
 		},
-		pr: gh.PR{Number: 41, Title: "add the work board", State: "OPEN"},
+		pr: gh.PR{Number: 41, Title: "add the work board", State: gh.StateOpen},
 	}
 	m := New(src, Options{HasRepo: true})
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -482,7 +557,7 @@ func overlongSource() *fakeSource {
 			Number: 1, Title: overlongTitle,
 			Author: gh.Author{Login: "a-contributor-with-a-very-long-handle"},
 		}},
-		pr: gh.PR{Number: 1, Title: overlongTitle, State: "OPEN"},
+		pr: gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen},
 	}
 }
 
@@ -592,6 +667,73 @@ func TestNoUnresolvedIDsInTheRootViews(t *testing.T) {
 			t.Run(lang.String()+"/"+name, func(t *testing.T) {
 				i18n.AssertNoUnresolvedIDs(t, view)
 			})
+		}
+	}
+}
+
+// TestTheTerminalBackgroundReachesThePalette covers the one thing the root
+// does with a colour: the palette cannot assume a background, and this is the
+// only message that reports the real one.
+func TestTheTerminalBackgroundReachesThePalette(t *testing.T) {
+	t.Cleanup(func() { theme.SetDark(true) })
+
+	m := newTestModel(Options{})
+	onDark := theme.Dim().Render("x")
+
+	if _, cmd := m.Update(tea.BackgroundColorMsg{Color: lipgloss.Color("#ffffff")}); cmd != nil {
+		t.Error("learning the background started work")
+	}
+	if theme.Dim().Render("x") == onDark {
+		t.Error("a light terminal is still drawn with the dark palette")
+	}
+}
+
+// TestASlowLookupSaysSoInsteadOfDroppingTheTab is the difference between the
+// two ways the Repos tab can be missing. `gh repo view` reaches the API and a
+// cold one has been measured at over six seconds; treating that the same as
+// "this directory is not a repository" makes the tab vanish for a reason the
+// screen never gives, and the disappearance gets blamed on whatever else
+// changed that day.
+func TestASlowLookupSaysSoInsteadOfDroppingTheTab(t *testing.T) {
+	m := newTestModel(Options{})
+
+	quiet, _ := m.Update(repoResolvedMsg{found: false})
+	if got := content(quiet.(Model)); strings.Contains(got, i18n.T("tab.repo_lookup_timeout")) {
+		t.Errorf("a directory with no repository is reported as a timeout: %q", got)
+	}
+
+	slow, _ := m.Update(repoResolvedMsg{found: false, timedOut: true})
+	if got := content(slow.(Model)); !strings.Contains(got, i18n.T("tab.repo_lookup_timeout")) {
+		t.Errorf("a lookup that timed out says nothing: %q", got)
+	}
+}
+
+// TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered covers the seam
+// the test above cannot: exec reports a killed subprocess as "signal: killed",
+// so a check for context.DeadlineExceeded on the returned error never fires.
+func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
+	expired, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cases := map[string]struct {
+		ctx  context.Context
+		name string
+		err  error
+		want repoResolvedMsg
+	}{
+		"a repository": {context.Background(), "kukv/octoscope", nil, repoResolvedMsg{found: true}},
+		"none here": {
+			context.Background(), "", errors.New("no repository in this directory"),
+			repoResolvedMsg{},
+		},
+		"out of time": {
+			expired, "", errors.New("signal: killed"),
+			repoResolvedMsg{timedOut: true},
+		},
+	}
+	for name, c := range cases {
+		if got := resolved(c.ctx, c.name, c.err); got != c.want {
+			t.Errorf("%s: resolved = %+v, want %+v", name, got, c.want)
 		}
 	}
 }

@@ -5,6 +5,7 @@ package gh
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -26,32 +27,66 @@ type Comment struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// ItemState is whether a pull request or an issue is still open, translated
+// out of the strings GitHub uses so that no view switches on API spelling.
+type ItemState int
+
+const (
+	StateOpen ItemState = iota
+	StateClosed
+	StateMerged
+)
+
+// ParseItemState maps GitHub's state onto the domain value. GraphQL and REST
+// differ in case, so the comparison ignores it; anything unrecognised reads
+// as closed, which is the reading that offers no action.
+func ParseItemState(state string) ItemState {
+	switch strings.ToUpper(state) {
+	case "OPEN":
+		return StateOpen
+	case "MERGED":
+		return StateMerged
+	default:
+		return StateClosed
+	}
+}
+
+// PR and Issue carry no JSON tags: what a backend receives is that backend's
+// business, and both of them translate GitHub's own spelling into the values
+// above before handing anything over.
 type PR struct {
-	Number         int       `json:"number"`
-	Title          string    `json:"title"`
-	Author         Author    `json:"author"`
-	State          string    `json:"state"`
-	IsDraft        bool      `json:"isDraft"`
-	UpdatedAt      time.Time `json:"updatedAt"`
-	ReviewDecision string    `json:"reviewDecision"`
-	URL            string    `json:"url"`
-	Body           string    `json:"body"`
-	Comments       []Comment `json:"comments"`
-	Labels         []Label   `json:"labels"`
-	Assignees      []Author  `json:"assignees"`
+	Number    int
+	Title     string
+	Author    Author
+	State     ItemState
+	IsDraft   bool
+	UpdatedAt time.Time
+	Review    ReviewState
+	URL       string
+	Body      string
+	Comments  []Comment
+	Labels    []Label
+	Assignees []Author
+	Checks    Checks
+	// Head and Base are the branches the pull request moves between, and
+	// Additions and Deletions the size of the change.
+	Head      string
+	Base      string
+	Additions int
+	Deletions int
 }
 
 type Issue struct {
-	Number    int       `json:"number"`
-	Title     string    `json:"title"`
-	Author    Author    `json:"author"`
-	State     string    `json:"state"`
-	UpdatedAt time.Time `json:"updatedAt"`
-	URL       string    `json:"url"`
-	Body      string    `json:"body"`
-	Comments  []Comment `json:"comments"`
-	Labels    []Label   `json:"labels"`
-	Assignees []Author  `json:"assignees"`
+	Number    int
+	Title     string
+	Author    Author
+	State     ItemState
+	UpdatedAt time.Time
+	URL       string
+	Body      string
+	Comments  []Comment
+	Labels    []Label
+	Assignees []Author
 }
 
 // ItemKind separates pull requests from issues in a mixed list.
@@ -109,23 +144,40 @@ const (
 	CheckFailure
 )
 
+// CheckRun is one check behind the roll-up, named as GitHub names it.
+type CheckRun struct {
+	Name  string
+	State CheckState
+}
+
 // Checks counts the check runs behind CheckState so a progress bar can be
-// drawn without a second request.
+// drawn without a second request, and keeps them so the drawer can list them
+// without one either.
 type Checks struct {
 	Total   int
 	Passed  int
 	Failed  int
 	Running int
 	State   CheckState
+	Runs    []CheckRun
 }
 
 // WorkItem is one card on the Work board.
 type WorkItem struct {
-	Ref       ItemRef
-	Title     string
-	Author    string
-	IsDraft   bool
-	Review    ReviewState
+	Ref     ItemRef
+	Title   string
+	Body    string
+	Author  string
+	IsDraft bool
+	Labels  []Label
+	Review  ReviewState
+	// Head and Base are the branches a pull request moves between, and
+	// Additions and Deletions the size of the change. All four are empty for
+	// an issue.
+	Head      string
+	Base      string
+	Additions int
+	Deletions int
 	Checks    Checks
 	UpdatedAt time.Time
 	URL       string

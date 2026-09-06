@@ -391,7 +391,7 @@ func TestComposeIgnoresKeysWhilePosting(t *testing.T) {
 }
 
 func TestXEntersConfirmWhenOpen(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	if !m.confirming {
@@ -400,7 +400,7 @@ func TestXEntersConfirmWhenOpen(t *testing.T) {
 }
 
 func TestXIgnoredWhenMerged(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "MERGED"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateMerged}}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("x"))
 	if m.confirming {
@@ -412,7 +412,7 @@ func TestXIgnoredWhenMerged(t *testing.T) {
 }
 
 func TestConfirmYClosesAndRefetches(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("y"))
@@ -434,7 +434,7 @@ func TestConfirmYClosesAndRefetches(t *testing.T) {
 }
 
 func TestConfirmReopenRoutesToReopen(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "CLOSED"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateClosed}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	_, cmd := m.Update(key("y"))
@@ -450,7 +450,7 @@ func TestConfirmReopenRoutesToReopen(t *testing.T) {
 }
 
 func TestConfirmNCancels(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("n"))
@@ -466,7 +466,7 @@ func TestConfirmNCancels(t *testing.T) {
 }
 
 func TestConfirmEscCancels(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("esc"))
@@ -480,7 +480,7 @@ func TestConfirmEscCancels(t *testing.T) {
 
 func TestStateErrorStaysOnDetail(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: "OPEN"},
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		stateErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -505,7 +505,7 @@ func TestStateErrorStaysOnDetail(t *testing.T) {
 }
 
 func TestConfirmViewShowsPrompt(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	view := m.View()
@@ -517,7 +517,7 @@ func TestConfirmViewShowsPrompt(t *testing.T) {
 }
 
 func TestConfirmViewReopenWording(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "CLOSED"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateClosed}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	if !strings.Contains(m.View(), "Reopen") {
@@ -526,7 +526,7 @@ func TestConfirmViewReopenWording(t *testing.T) {
 }
 
 func TestDetailFooterShowsStateAndPickerKeys(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	view := m.View()
 	for _, want := range []string{"x:close", "l:labels", "a:assign"} {
@@ -541,7 +541,7 @@ func TestDetailFooterShowsStateAndPickerKeys(t *testing.T) {
 // r-triggered refresh must clear it once the new detail arrives.
 func TestActionErrClearedOnReload(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: "OPEN"},
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		stateErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -566,7 +566,7 @@ func TestActionErrClearedOnReload(t *testing.T) {
 }
 
 func TestConfirmSubmitOnIssueRoutesToClose(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue", State: "OPEN"}}
+	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue", State: gh.StateOpen}}
 	m := loaded(f, issueRef())
 	m, _ = m.Update(key("x"))
 	_, cmd := m.Update(key("y"))
@@ -582,7 +582,7 @@ func TestConfirmSubmitOnIssueRoutesToClose(t *testing.T) {
 }
 
 func TestConfirmIgnoresKeysWhileWorking(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: "OPEN"}}
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, _ = m.Update(key("y")) // working == true (the cmd is deliberately not run)
@@ -620,7 +620,7 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 func TestBusyStatesShowTheSpinner(t *testing.T) {
 	newPR := func() *fakeSource {
 		return &fakeSource{
-			pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+			pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 			labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 		}
 	}
@@ -664,5 +664,27 @@ func TestSpinnerTickAdvancesTheFrame(t *testing.T) {
 	}
 	if m.spin.View() == before {
 		t.Errorf("the spinner frame did not advance: still %q", before)
+	}
+}
+
+// TestAnAnswerForAnotherItemIsDropped covers what happens when the user opens
+// one item, leaves it and opens another quickly: the first request is still
+// running, and its answer must not put the wrong item on the screen.
+func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
+	other := gh.ItemRef{Kind: gh.ItemPR, Number: 99}
+	m := New(&fakeSource{}, prRef())
+
+	next, _ := m.Update(prMsg{other, gh.PR{Number: 99, Title: "the previous one"}})
+	if !next.loading {
+		t.Error("an answer for another item ended the wait for this one")
+	}
+	if next.title != "" {
+		t.Errorf("the view took the other item's title: %q", next.title)
+	}
+
+	issue := New(&fakeSource{}, issueRef())
+	next, _ = issue.Update(issueMsg{other, gh.Issue{Number: 99, Title: "the previous one"}})
+	if !next.loading || next.title != "" {
+		t.Errorf("an issue answer for another item was accepted: %q", next.title)
 	}
 }

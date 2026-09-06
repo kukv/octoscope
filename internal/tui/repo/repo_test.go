@@ -47,7 +47,7 @@ func samplePRs() []gh.PR {
 	return []gh.PR{
 		{
 			Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
-			UpdatedAt: time.Now(), ReviewDecision: "APPROVED",
+			UpdatedAt: time.Now(), Review: gh.ReviewApproved,
 		},
 		{
 			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},
@@ -67,9 +67,11 @@ func key(s string) tea.KeyPressMsg {
 	}
 }
 
-// loadedModel returns a Model with the PR list already loaded.
+// loadedModel returns a Model with the PR list already loaded, sized as the
+// app sizes it. The list lays itself out to the terminal it was given, so an
+// unsized one draws nothing at all.
 func loadedModel(f *fakeSource) Model {
-	m := New(f)
+	m := sized(New(f), 120)
 	m, _ = m.Update(prListMsg(f.prs))
 	return m
 }
@@ -87,7 +89,7 @@ func TestPRListRenders(t *testing.T) {
 
 func TestRepoNameShownInHeader(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
-	m := New(f)
+	m := sized(New(f), 120)
 	m, _ = m.Update(repoNameMsg("kukv/demo"))
 	if !strings.Contains(m.View(), "kukv/demo") {
 		t.Errorf("header missing the repository name:\n%s", m.View())
@@ -115,7 +117,7 @@ func TestEmptyPRList(t *testing.T) {
 const spinnerFrame = "⣾"
 
 func TestLoadingShowsSpinnerAndText(t *testing.T) {
-	m := New(&fakeSource{prs: samplePRs()})
+	m := sized(New(&fakeSource{prs: samplePRs()}), 120)
 	view := m.View()
 	if !strings.Contains(view, "loading...") {
 		t.Errorf("view missing the loading text before the list arrives:\n%s", view)
@@ -405,41 +407,5 @@ func renderEveryScreen() map[string]string {
 		"list_issues": issues.View(),
 		"empty":       empty.View(),
 		"loading":     New(f).View(),
-	}
-}
-
-func TestPRLineShowsReviewIconAndRelTime(t *testing.T) {
-	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
-	cases := []struct {
-		name string
-		pr   gh.PR
-		want []string
-	}{
-		{"draft", gh.PR{IsDraft: true, UpdatedAt: now.Add(-30 * time.Second)}, []string{"◌", "now"}},
-		{"approved", gh.PR{ReviewDecision: "APPROVED", UpdatedAt: now.Add(-5 * time.Minute)}, []string{"✓", "5m ago"}},
-		{"changes requested", gh.PR{ReviewDecision: "CHANGES_REQUESTED", UpdatedAt: now.Add(-3 * time.Hour)}, []string{"×", "3h ago"}},
-		{"review required", gh.PR{ReviewDecision: "REVIEW_REQUIRED", UpdatedAt: now.Add(-49 * time.Hour)}, []string{"•", "2d ago"}},
-		{"none", gh.PR{UpdatedAt: now}, []string{"•", "now"}},
-	}
-	for _, c := range cases {
-		got := prLine(c.pr, now)
-		for _, want := range c.want {
-			if !strings.Contains(got, want) {
-				t.Errorf("%s: prLine = %q, want to contain %q", c.name, got, want)
-			}
-		}
-	}
-}
-
-func TestIssueLineShowsNumberTitleAuthorAndRelTime(t *testing.T) {
-	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
-	got := issueLine(gh.Issue{
-		Number: 3, Title: "an issue", Author: gh.Author{Login: "bob"},
-		UpdatedAt: now.Add(-5 * time.Minute),
-	}, now)
-	for _, want := range []string{"#3", "an issue", "@bob", "5m ago"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("issueLine = %q, want to contain %q", got, want)
-		}
 	}
 }

@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	prListFields    = "number,title,author,state,isDraft,updatedAt,reviewDecision,url"
+	prListFields = "number,title,author,state,isDraft,updatedAt,reviewDecision,url," +
+		"labels,headRefName,baseRefName,additions,deletions,statusCheckRollup"
 	prViewFields    = prListFields + ",body,comments,labels,assignees"
 	issueListFields = "number,title,author,state,updatedAt,labels,url"
 	issueViewFields = issueListFields + ",body,comments,assignees"
@@ -75,11 +76,11 @@ func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
 	if err != nil {
 		return nil, err
 	}
-	var prs []gh.PR
+	var prs []prJSON
 	if err := json.Unmarshal(out, &prs); err != nil {
 		return nil, fmt.Errorf("parse pr list: %w", err)
 	}
-	return prs, nil
+	return toPRs(prs), nil
 }
 
 func (c *Client) ListIssues(ctx context.Context) ([]gh.Issue, error) {
@@ -88,11 +89,11 @@ func (c *Client) ListIssues(ctx context.Context) ([]gh.Issue, error) {
 	if err != nil {
 		return nil, err
 	}
-	var issues []gh.Issue
+	var issues []issueJSON
 	if err := json.Unmarshal(out, &issues); err != nil {
 		return nil, fmt.Errorf("parse issue list: %w", err)
 	}
-	return issues, nil
+	return toIssues(issues), nil
 }
 
 func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, error) {
@@ -101,11 +102,11 @@ func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, err
 	if err != nil {
 		return gh.PR{}, err
 	}
-	var pr gh.PR
+	var pr prJSON
 	if err := json.Unmarshal(out, &pr); err != nil {
 		return gh.PR{}, fmt.Errorf("parse pr view: %w", err)
 	}
-	return pr, nil
+	return pr.toDomain(), nil
 }
 
 func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error) {
@@ -114,11 +115,11 @@ func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issu
 	if err != nil {
 		return gh.Issue{}, err
 	}
-	var issue gh.Issue
+	var issue issueJSON
 	if err := json.Unmarshal(out, &issue); err != nil {
 		return gh.Issue{}, fmt.Errorf("parse issue view: %w", err)
 	}
-	return issue, nil
+	return issue.toDomain(), nil
 }
 
 func (c *Client) RepoName(ctx context.Context) (string, error) {

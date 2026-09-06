@@ -3,6 +3,7 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -63,9 +64,9 @@ const (
 type Model struct {
 	src Source
 
-	repoName string
-	spin     spinner.Model
-	width    int
+	repoName      string
+	spin          spinner.Model
+	width, height int
 
 	tab     tabID
 	cursors [2]int
@@ -73,6 +74,11 @@ type Model struct {
 	issues  []gh.Issue
 	loaded  [2]bool
 	loading [2]bool
+
+	// fetchedAt is when the shown list arrived. The rows carry relative
+	// times, and View must render the same string from the same state, so
+	// the clock is read here in Update rather than on every draw.
+	fetchedAt [2]time.Time
 }
 
 func New(src Source) Model {
@@ -133,7 +139,7 @@ func openWeb(src Source, ref gh.ItemRef) tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		m.width, m.height = msg.Width, msg.Height
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -145,6 +151,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case prListMsg:
 		m.prs = []gh.PR(msg)
 		m.loaded[tabPRs] = true
+		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
 		}
@@ -153,6 +160,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case issueListMsg:
 		m.issues = []gh.Issue(msg)
 		m.loaded[tabIssues] = true
+		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
 		}
@@ -164,6 +172,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{err} }
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
 	}
 	return m, nil
 }
@@ -172,15 +184,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		if m.tab == tabPRs {
-			m.tab = tabIssues
-		} else {
-			m.tab = tabPRs
+			return m.showTab(tabIssues, true)
 		}
-		if !m.loaded[m.tab] {
-			m.loading[m.tab] = true
-			return m, fetchList(m.src, m.tab)
-		}
-		return m, nil
+		return m.showTab(tabPRs, true)
 	case "j", "down":
 		if n := m.itemCount(); n > 0 && m.cursors[m.tab] < n-1 {
 			m.cursors[m.tab]++

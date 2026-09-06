@@ -119,7 +119,7 @@ func openPicker(t *testing.T, f *fakeSource, ref gh.ItemRef, k string) Model {
 
 func TestLOpensLabelPickerPrechecked(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := loaded(f, prRef())
@@ -141,7 +141,7 @@ func TestLOpensLabelPickerPrechecked(t *testing.T) {
 
 func TestAOpensAssigneePicker(t *testing.T) {
 	f := &fakeSource{
-		pr:    gh.PR{Number: 1, Title: "first pr", State: "OPEN"},
+		pr:    gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		users: []string{"alice", "bob"},
 	}
 	m := openPicker(t, f, prRef(), "a")
@@ -152,7 +152,7 @@ func TestAOpensAssigneePicker(t *testing.T) {
 
 func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
@@ -180,7 +180,7 @@ func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 
 func TestPickerNoChangeClosesWithoutEdit(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
@@ -198,7 +198,7 @@ func TestPickerNoChangeClosesWithoutEdit(t *testing.T) {
 
 func TestPickerEscCancels(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
@@ -217,7 +217,7 @@ func TestPickerEscCancels(t *testing.T) {
 
 func TestPickerApplyErrorKeepsPicker(t *testing.T) {
 	f := &fakeSource{
-		pr:      gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:      gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels:  []gh.Label{{Name: "bug"}, {Name: "wip"}},
 		editErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
@@ -241,7 +241,7 @@ func TestPickerApplyErrorKeepsPicker(t *testing.T) {
 
 func TestPickerFetchErrorInlineOnDetail(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: "OPEN"},
+		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		labelsErr: errors.New("gh label: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -260,7 +260,7 @@ func TestPickerFetchErrorInlineOnDetail(t *testing.T) {
 
 func TestPickerApplyOnIssueRoutesToIssue(t *testing.T) {
 	f := &fakeSource{
-		issue:  gh.Issue{Number: 5, Title: "an issue", State: "OPEN"},
+		issue:  gh.Issue{Number: 5, Title: "an issue", State: gh.StateOpen},
 		labels: []gh.Label{{Name: "bug"}},
 	}
 	m := openPicker(t, f, issueRef(), "l")
@@ -277,7 +277,7 @@ func TestPickerApplyOnIssueRoutesToIssue(t *testing.T) {
 
 func TestPickerApplyAssigneesRoutesToPR(t *testing.T) {
 	f := &fakeSource{
-		pr:    gh.PR{Number: 1, Title: "first pr", State: "OPEN"},
+		pr:    gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		users: []string{"alice"},
 	}
 	m := openPicker(t, f, prRef(), "a")
@@ -294,7 +294,7 @@ func TestPickerApplyAssigneesRoutesToPR(t *testing.T) {
 
 func TestPickerLoadingIgnoresKeys(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN"},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := loaded(f, prRef())
@@ -314,7 +314,7 @@ func TestPickerLoadingIgnoresKeys(t *testing.T) {
 
 func TestPickerIgnoresKeysWhileApplying(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
@@ -334,7 +334,7 @@ func TestPickerIgnoresKeysWhileApplying(t *testing.T) {
 
 func TestPickerViewShowsItemsAndHelp(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: "OPEN", Labels: []gh.Label{{Name: "bug"}}},
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
 		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")

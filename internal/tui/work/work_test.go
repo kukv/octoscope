@@ -32,7 +32,19 @@ func sampleWork() gh.Work {
 		{
 			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 12},
 			Title: "fix the thing", UpdatedAt: now,
-			Checks: gh.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure},
+			// CRLF on purpose: GitHub returns whatever line endings the author
+			// used, and a carriage return left in a drawn line shifts it.
+			Body:   "The renderer dropped every escape.\r\n\r\nThis puts them back.",
+			Labels: []gh.Label{{Name: "bug", Color: "d73a4a"}, {Name: "ci", Color: "d4c5f9"}},
+			Head:   "feat/graph", Base: "main", Additions: 218, Deletions: 31,
+			Checks: gh.Checks{
+				Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
+				Runs: []gh.CheckRun{
+					{Name: "build", State: gh.CheckSuccess},
+					{Name: "lint", State: gh.CheckRunning},
+					{Name: "test", State: gh.CheckFailure},
+				},
+			},
 		},
 		{
 			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3},

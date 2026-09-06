@@ -69,9 +69,16 @@ i18n.Tn("time.hours_ago", 3)   // 複数形。テンプレート変数は .Count
 
 ## 色
 
-`lipgloss` のスタイルはパッケージ変数にまとめ、使う場所に散らさない。
-ターミナルの背景色は前提にできないので、`lipgloss.AdaptiveColor` を使うか、
-どちらの背景でも読める色を選ぶ。
+**色は `internal/tui/theme` にだけ書く。** ビューは `theme.Dim()` のような
+役割の名前で引き、16 進の色をビューのファイルに書かない。
+状態（approved / changes requested / check failure など）に色を足すときも
+theme に足す。同じ状態が画面ごとに違う色になるのを防ぐためである。
+
+ターミナルの背景色は前提にできない。v2 に `lipgloss.AdaptiveColor` は無く、
+代わりに `lipgloss.LightDark(isDark)` を使う。`isDark` は起動時に
+`tea.RequestBackgroundColor` で問い合わせ、`tea.BackgroundColorMsg` が
+返ってきた時点でルートモデルが `theme.SetDark` に渡す。
+返事が来るまでは暗い背景を仮定する。
 
 ## 確認
 
