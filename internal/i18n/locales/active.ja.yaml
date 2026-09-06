@@ -145,8 +145,26 @@ footer:
     other: "q:終了"
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
+  # diff のキーバーはこの並びから組み立てる。重要なものから先に並べ、
+  # 端末幅が足りないときは末尾から落とす（internal/tui/diff/render.go の
+  # fitKeyBar）。esc は先頭に置く — 落としてはいけない唯一の出口だから。
   diff:
-    other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  enter:開く  c:コメント  r:再取得  esc:戻る"
+    esc:
+      other: "esc:戻る"
+    comment:
+      other: "c:コメント"
+    line:
+      other: "j/k:行"
+    file:
+      other: "[/]:ファイル"
+    hunk:
+      other: "{/}:ハンク"
+    open:
+      other: "enter:開く"
+    pane:
+      other: "h/l:ペイン"
+    refresh:
+      other: "r:再取得"
   diff_comment:
     other: "ctrl+s:送信  esc:取消"
 

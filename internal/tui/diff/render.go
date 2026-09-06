@@ -58,11 +58,42 @@ func (m Model) View() string {
 }
 
 func (m Model) keyBar() string {
-	text := i18n.T("footer.diff")
 	if m.composing || m.posting {
-		text = i18n.T("footer.diff_comment")
+		return theme.Dim().Render(clip(i18n.T("footer.diff_comment"), m.width))
 	}
-	return theme.Dim().Render(clip(text, m.width))
+	return theme.Dim().Render(fitKeyBar(diffHints(), m.width))
+}
+
+// diffHints is the diff view's key bar, most important hint first. esc is
+// first because fitKeyBar never drops it: it is the only way out of the
+// view, and every other hint is either repeated elsewhere on screen or
+// discoverable by trying the obvious key.
+func diffHints() []string {
+	return []string{
+		i18n.T("footer.diff.esc"),
+		i18n.T("footer.diff.comment"),
+		i18n.T("footer.diff.line"),
+		i18n.T("footer.diff.file"),
+		i18n.T("footer.diff.hunk"),
+		i18n.T("footer.diff.open"),
+		i18n.T("footer.diff.pane"),
+		i18n.T("footer.diff.refresh"),
+	}
+}
+
+// fitKeyBar joins hints in order and drops from the low-priority end (the
+// tail of the slice) until the joined line fits width. No ellipsis: a bar
+// that shows fewer hints cleanly beats one that shows more but cuts one off
+// mid-word. hints[0] is always kept, so as long as the caller orders esc
+// first, esc is what survives when only one hint fits.
+func fitKeyBar(hints []string, width int) string {
+	for n := len(hints); n > 0; n-- {
+		joined := strings.Join(hints[:n], "  ")
+		if ansi.StringWidth(joined) <= width {
+			return joined
+		}
+	}
+	return hints[0]
 }
 
 // composerLines draws the line-comment composer: a blank separator, the

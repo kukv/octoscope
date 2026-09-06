@@ -149,8 +149,27 @@ footer:
     other: "q:quit"
   work:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
+  # diff's key bar is built from these, most important first, and dropped
+  # from the end when the terminal is too narrow for all of them (see
+  # internal/tui/diff/render.go's fitKeyBar). esc is first because it must
+  # never be the one dropped: it is the only way out of the view.
   diff:
-    other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  enter:open  c:comment  r:refresh  esc:back"
+    esc:
+      other: "esc:back"
+    comment:
+      other: "c:comment"
+    line:
+      other: "j/k:line"
+    file:
+      other: "[/]:file"
+    hunk:
+      other: "{/}:hunk"
+    open:
+      other: "enter:open"
+    pane:
+      other: "h/l:pane"
+    refresh:
+      other: "r:refresh"
   diff_comment:
     other: "ctrl+s:send  esc:cancel"
 
