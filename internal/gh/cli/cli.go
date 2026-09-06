@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	prListFields    = "number,title,author,state,isDraft,updatedAt,reviewDecision,url"
+	prListFields = "number,title,author,state,isDraft,updatedAt,reviewDecision,url," +
+		"labels,headRefName,baseRefName,additions,deletions,statusCheckRollup"
 	prViewFields    = prListFields + ",body,comments,labels,assignees"
 	issueListFields = "number,title,author,state,updatedAt,labels,url"
 	issueViewFields = issueListFields + ",body,comments,assignees"

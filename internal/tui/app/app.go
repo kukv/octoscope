@@ -71,6 +71,11 @@ type Model struct {
 	width, height int
 	tab           tabID
 
+	// now is when the last message arrived. The tab row reports how old the
+	// board's data is, and View may not read a clock of its own
+	// (.claude/rules/tui.md), so the clock is read here.
+	now time.Time
+
 	work   work.Model
 	repo   repo.Model
 	detail detail.Model
@@ -99,6 +104,7 @@ func New(src Source, opts Options) Model {
 func (m Model) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.now = time.Now()
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
 		// The palette cannot assume a background, and this is the only place

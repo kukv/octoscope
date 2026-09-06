@@ -158,3 +158,11 @@ review:
     other: "承認済み"
   changes_requested:
     other: "変更依頼"
+
+summary:
+  attention:
+    other: "要対応 {{.Count}}"
+  failing:
+    other: "CI 失敗 {{.Count}}"
+  updated:
+    other: "更新 {{.Ago}}"

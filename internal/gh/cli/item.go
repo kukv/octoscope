@@ -24,6 +24,13 @@ type prJSON struct {
 	Comments       []gh.Comment `json:"comments"`
 	Labels         []gh.Label   `json:"labels"`
 	Assignees      []gh.Author  `json:"assignees"`
+	HeadRefName    string       `json:"headRefName"`
+	BaseRefName    string       `json:"baseRefName"`
+	Additions      int          `json:"additions"`
+	Deletions      int          `json:"deletions"`
+	// gh pr list returns the roll-up as a flat array of contexts, without the
+	// commit the GraphQL search nests it under.
+	StatusCheckRollup []checkNode `json:"statusCheckRollup"`
 }
 
 func (p prJSON) toDomain() gh.PR {
@@ -40,6 +47,11 @@ func (p prJSON) toDomain() gh.PR {
 		Comments:  p.Comments,
 		Labels:    p.Labels,
 		Assignees: p.Assignees,
+		Head:      p.HeadRefName,
+		Base:      p.BaseRefName,
+		Additions: p.Additions,
+		Deletions: p.Deletions,
+		Checks:    rollup(p.StatusCheckRollup),
 	}
 }
 

@@ -67,6 +67,13 @@ type PR struct {
 	Comments  []Comment
 	Labels    []Label
 	Assignees []Author
+	Checks    Checks
+	// Head and Base are the branches the pull request moves between, and
+	// Additions and Deletions the size of the change.
+	Head      string
+	Base      string
+	Additions int
+	Deletions int
 }
 
 type Issue struct {

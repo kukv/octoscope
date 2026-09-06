@@ -163,3 +163,13 @@ review:
     other: "approved"
   changes_requested:
     other: "changes requested"
+
+summary:
+  attention:
+    one: "{{.Count}} waiting on you"
+    other: "{{.Count}} waiting on you"
+  failing:
+    one: "{{.Count}} CI failure"
+    other: "{{.Count}} CI failures"
+  updated:
+    other: "updated {{.Ago}}"

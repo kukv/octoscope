@@ -40,6 +40,15 @@ func goldenPRs() []gh.PR {
 		{
 			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},
 			UpdatedAt: goldenUpdatedAt, IsDraft: true,
+			Labels: []gh.Label{{Name: "bug", Color: "d73a4a"}},
+			Head:   "fix/thing", Base: "main", Additions: 12, Deletions: 3,
+			Checks: gh.Checks{
+				Total: 2, Passed: 1, Failed: 1, State: gh.CheckFailure,
+				Runs: []gh.CheckRun{
+					{Name: "lint", State: gh.CheckSuccess},
+					{Name: "test", State: gh.CheckFailure},
+				},
+			},
 		},
 		{
 			Number: 9,
@@ -63,6 +72,7 @@ func goldenIssues() []gh.Issue {
 
 func goldenModel(width int) Model {
 	m := loadedModel(&fakeSource{prs: goldenPRs(), issues: goldenIssues()})
+	m, _ = m.Update(repoNameMsg("kukv/octoscope"))
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	m.fetchedAt = [2]time.Time{goldenFetchedAt, goldenFetchedAt}
 	return m

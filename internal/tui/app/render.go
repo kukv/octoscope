@@ -47,7 +47,10 @@ func (m Model) tabLabels() []string {
 	return labels
 }
 
-// tabRow labels each tab with the key that reaches it.
+// tabRow labels each tab with the key that reaches it, and reports on the
+// board at the far right: what is waiting, what is broken, and how old the
+// answer is. The summary lives here rather than on the board because it is
+// true of the whole application, and is worth seeing from the Repos tab too.
 func (m Model) tabRow() string {
 	labels := m.tabLabels()
 	for i, label := range labels {
@@ -57,7 +60,35 @@ func (m Model) tabRow() string {
 			labels[i] = theme.Dim().Render(label)
 		}
 	}
-	return strings.Join(labels, tabGap)
+	row := strings.Join(labels, tabGap)
+
+	summary := m.summary()
+	pad := m.width - ansi.StringWidth(row) - ansi.StringWidth(summary)
+	if summary == "" || pad < 2 {
+		return row // too narrow to say anything beyond which tab this is
+	}
+	return row + strings.Repeat(" ", pad) + summary
+}
+
+// summary is the board's tally, in the order the mockup puts it. A count of
+// zero is left out: the row is there to show what needs doing, and a row of
+// zeroes is noise.
+func (m Model) summary() string {
+	s := m.work.Summary()
+	if !s.Ready {
+		return ""
+	}
+	var parts []string
+	if s.Attention > 0 {
+		parts = append(parts, theme.Count(true).Render(i18n.Tn("summary.attention", s.Attention)))
+	}
+	if s.Failing > 0 {
+		parts = append(parts, theme.Error().Render(i18n.Tn("summary.failing", s.Failing)))
+	}
+	parts = append(parts, theme.Dim().Render(i18n.Tf("summary.updated", map[string]any{
+		"Ago": i18n.RelTime(m.now, s.FetchedAt),
+	})))
+	return strings.Join(parts, theme.Dim().Render(" · "))
 }
 
 // errorView shows the failure that stopped the run. The heading and the key

@@ -176,6 +176,32 @@ func (m *Model) clampCursor() {
 	}
 }
 
+// Summary is what the tab row reports about the board: how much is waiting on
+// the user, how much is broken, and when the board last heard from GitHub.
+// The root draws it, so the board hands it over rather than drawing it in a
+// place that is not its own.
+type Summary struct {
+	Attention int
+	Failing   int
+	FetchedAt time.Time
+	Ready     bool
+}
+
+// Summary counts the board. Attention is what has been asked of the user;
+// Failing is every pull request whose checks are red, wherever it sits.
+func (m Model) Summary() Summary {
+	s := Summary{FetchedAt: m.fetchedAt, Ready: !m.loading && !m.fetchedAt.IsZero()}
+	s.Attention = len(m.work[gh.SectionReviewRequested])
+	for _, items := range m.work {
+		for _, it := range items {
+			if it.Checks.State == gh.CheckFailure {
+				s.Failing++
+			}
+		}
+	}
+	return s
+}
+
 // SelectedRef names the card under the cursor. ok is false when the column is
 // empty.
 func (m Model) SelectedRef() (gh.ItemRef, bool) {

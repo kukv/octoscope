@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -23,6 +24,55 @@ func loadedApp(t *testing.T, src Source, opts Options) Model {
 	t.Helper()
 	next, cmd := New(src, opts).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return resolve(t, next.(Model), cmd)
+}
+
+// TestTheTabRowReportsOnTheBoard is the line the mockup puts at the far right
+// of the tab row: what is waiting, what is broken, and how old the answer is.
+func TestTheTabRowReportsOnTheBoard(t *testing.T) {
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+	failing := gh.WorkItem{
+		Ref:    gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1},
+		Title:  "a broken one",
+		Checks: gh.Checks{Total: 1, Failed: 1, State: gh.CheckFailure},
+	}
+	src := &fakeSource{work: gh.Work{
+		gh.SectionReviewRequested: {failing, failing},
+		gh.SectionYourPRs:         {failing},
+	}}
+
+	m := loadedApp(t, src, Options{})
+	m.now = m.work.Summary().FetchedAt.Add(90 * time.Second)
+
+	row := ansi.Strip(strings.Split(m.View().Content, "\n")[0])
+	for _, want := range []string{
+		i18n.Tn("summary.attention", 2),
+		i18n.Tn("summary.failing", 3),
+		i18n.Tf("summary.updated", map[string]any{"Ago": i18n.RelTime(m.now, m.work.Summary().FetchedAt)}),
+	} {
+		if !strings.Contains(row, want) {
+			t.Errorf("the tab row is missing %q: %q", want, row)
+		}
+	}
+	if got := ansi.StringWidth(row); got > 120 {
+		t.Errorf("the tab row is %d columns wide, want at most 120: %q", got, row)
+	}
+}
+
+// TestABoardWithNothingToReportSaysNothing keeps the row quiet: it is there to
+// show what needs doing, and a row of zeroes is noise.
+func TestABoardWithNothingToReportSaysNothing(t *testing.T) {
+	m := loadedApp(t, &fakeSource{}, Options{})
+	row := ansi.Strip(strings.Split(m.View().Content, "\n")[0])
+
+	if strings.Contains(row, "0") {
+		t.Errorf("an empty board is counted: %q", row)
+	}
+	// Before the first answer there is nothing to be stale, either.
+	fresh := newTestModel(Options{})
+	if got := ansi.Strip(strings.Split(fresh.View().Content, "\n")[0]); strings.Contains(got, "updated") {
+		t.Errorf("a board that has not answered yet reports an age: %q", got)
+	}
 }
 
 // tokenAt finds where a token is drawn on the whole screen, which is the

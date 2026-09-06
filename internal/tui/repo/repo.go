@@ -64,9 +64,9 @@ const (
 type Model struct {
 	src Source
 
-	repoName string
-	spin     spinner.Model
-	width    int
+	repoName      string
+	spin          spinner.Model
+	width, height int
 
 	tab     tabID
 	cursors [2]int
@@ -139,7 +139,7 @@ func openWeb(src Source, ref gh.ItemRef) tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		m.width, m.height = msg.Width, msg.Height
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd

@@ -138,28 +138,34 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 	return item
 }
 
-// checks counts every check-run context once: each context increments Total
-// and exactly one of Passed, Failed, or Running, so Passed+Failed+Running
-// always equals Total.
+// checks reads the roll-up out of the commit the search returned.
 func (n searchNode) checks() gh.Checks {
-	var c gh.Checks
+	var nodes []checkNode
 	for _, commit := range n.Commits.Nodes {
-		rollup := commit.Commit.StatusCheckRollup
-		if rollup == nil {
-			continue
+		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
+			nodes = append(nodes, rollup.Contexts.Nodes...)
 		}
-		for _, node := range rollup.Contexts.Nodes {
-			c.Total++
-			state := checkOutcome(node)
-			c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state})
-			switch state {
-			case gh.CheckSuccess:
-				c.Passed++
-			case gh.CheckFailure:
-				c.Failed++
-			default:
-				c.Running++
-			}
+	}
+	return rollup(nodes)
+}
+
+// rollup counts every check-run context once: each context increments Total
+// and exactly one of Passed, Failed, or Running, so Passed+Failed+Running
+// always equals Total. It is a free function because `gh pr list` returns the
+// same contexts in a flat array, without the commit around them.
+func rollup(nodes []checkNode) gh.Checks {
+	var c gh.Checks
+	for _, node := range nodes {
+		c.Total++
+		state := checkOutcome(node)
+		c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state})
+		switch state {
+		case gh.CheckSuccess:
+			c.Passed++
+		case gh.CheckFailure:
+			c.Failed++
+		default:
+			c.Running++
 		}
 	}
 	switch {
