@@ -44,6 +44,38 @@ func goldenModel(width int) Model {
 	return m
 }
 
+// wideLineNumberFixture is a file whose hunk starts past line nine thousand,
+// so its line numbers need five columns instead of four.
+func wideLineNumberFixture() []gh.FileDiff {
+	return []gh.FileDiff{
+		{
+			Path: "vendor/generated.go", Status: gh.FileModified, Additions: 2, Deletions: 1,
+			Hunks: []gh.Hunk{
+				{
+					Header: "@@ -10240,3 +10240,4 @@ func generated() {",
+					Lines: []gh.DiffLine{
+						{Kind: gh.LineContext, OldLine: 10240, NewLine: 10240, Text: strings.Repeat("x", 200)},
+						{Kind: gh.LineRemoved, OldLine: 10241, Text: strings.Repeat("x", 200)},
+						{Kind: gh.LineAdded, NewLine: 10241, Text: strings.Repeat("x", 200)},
+						{Kind: gh.LineAdded, NewLine: 10242, Text: strings.Repeat("x", 200)},
+					},
+				},
+			},
+		},
+	}
+}
+
+// wideLineNumberModel leaves the cursor on the hunk header (row 0), never on
+// one of the five-digit line rows: a cursor row goes through fit/clip, which
+// truncates, and would hide the overrun this model exists to catch.
+func wideLineNumberModel(width int) Model {
+	m := New(&fakeSource{files: wideLineNumberFixture()},
+		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 130})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	m, _ = m.Update(diffMsg{ref: m.ref, files: wideLineNumberFixture()})
+	return m
+}
+
 func TestGolden(t *testing.T) {
 	for _, lang := range goldenLanguages {
 		for _, w := range goldenWidths {
@@ -64,18 +96,24 @@ func TestGolden(t *testing.T) {
 // and everything below it is then drawn a line lower than the layout
 // believes.
 func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
+	models := map[string]func(int) Model{
+		"tab":              goldenModel,
+		"wide_line_number": wideLineNumberModel,
+	}
 	for _, w := range goldenWidths {
 		for _, lang := range goldenLanguages {
-			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
-				i18n.SetLanguage(lang.tag)
-				t.Cleanup(func() { i18n.SetLanguage(language.English) })
-				for i, line := range strings.Split(goldenModel(w).View(), "\n") {
-					if got := ansi.StringWidth(line); got > w {
-						t.Errorf("line %d is %d columns wide in a terminal %d wide: %q",
-							i, got, w, ansi.Strip(line))
+			for name, model := range models {
+				t.Run(fmt.Sprintf("%s_%s_%d", name, lang.name, w), func(t *testing.T) {
+					i18n.SetLanguage(lang.tag)
+					t.Cleanup(func() { i18n.SetLanguage(language.English) })
+					for i, line := range strings.Split(model(w).View(), "\n") {
+						if got := ansi.StringWidth(line); got > w {
+							t.Errorf("line %d is %d columns wide in a terminal %d wide: %q",
+								i, got, w, ansi.Strip(line))
+						}
 					}
-				}
-			})
+				})
+			}
 		}
 	}
 }

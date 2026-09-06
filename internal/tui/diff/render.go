@@ -17,9 +17,11 @@ const (
 	// degradation reads this same constant rather than a second copy of it.
 	sidebarWidth = 22
 
-	// gutterWidth is the old line number (4), a space, the new line number
-	// (4), the +/- marker (1) and the space that separates it from the text
-	// (1). Task 11's hit-test reads this same constant.
+	// gutterWidth is the floor: the old line number (4), a space, the new
+	// line number (4), the +/- marker (1) and the space that separates it
+	// from the text (1). It is a floor, not a fixed size: a file whose line
+	// numbers run to five digits or more needs a wider gutter, computed by
+	// Model.gutter, which both the drawing and Task 11's hit-test read.
 	gutterWidth = 11
 
 	// headerHeight is the two header lines plus the rule and "Files" heading
@@ -165,7 +167,7 @@ func (m Model) diffLines() []string {
 // would otherwise break.
 func (m Model) diffLine(r row, selected bool, width int) string {
 	if selected {
-		return theme.Selected().Render(fit(plainText(r), width))
+		return theme.Selected().Render(fit(m.plainText(r), width))
 	}
 	switch r.kind {
 	case rowHunkHeader:
@@ -179,22 +181,45 @@ func (m Model) diffLine(r row, selected bool, width int) string {
 
 // plainText is what a row reads as with no styling at all, for the cursor
 // row.
-func plainText(r row) string {
+func (m Model) plainText(r row) string {
 	if r.kind != rowLine {
 		return r.text
 	}
 	old, marker, num := lineNumbers(r.line)
-	return fmt.Sprintf("%4s %4s%s %s", old, num, marker, r.line.Text)
+	return fmt.Sprintf("%*s %*s%s %s", m.lineNumberWidth(), old, m.lineNumberWidth(), num, marker, r.line.Text)
 }
 
 // diffTextLine draws the gutter (two line numbers and the +/- marker) and
 // the line's own text, syntax-highlighted.
 func (m Model) diffTextLine(l gh.DiffLine, width int) string {
 	old, _, num := lineNumbers(l)
-	body := theme.Highlight(m.currentPath(), clip(l.Text, max(width-gutterWidth, 0)))
-	gutter := theme.LineNumber().Render(fmt.Sprintf("%4s %4s", old, num)) +
+	fw := m.lineNumberWidth()
+	body := theme.Highlight(m.currentPath(), clip(l.Text, max(width-m.gutter(), 0)))
+	gutter := theme.LineNumber().Render(fmt.Sprintf("%*s %*s", fw, old, fw, num)) +
 		markerStyle(l.Kind) + " "
 	return gutter + body
+}
+
+// gutter is the columns the line numbers and marker occupy: two
+// lineNumberWidth fields, the space between them, the marker and the space
+// that separates it from the text. The drawing and Task 11's hit-test both
+// read this method, so neither can drift from the other (spec 4.0).
+func (m Model) gutter() int { return 2*m.lineNumberWidth() + 3 }
+
+// lineNumberWidth is how many columns the widest line number in the file
+// currently shown needs, floored at gutterWidth's four digits. The format
+// that draws a line number pads to a minimum rather than truncating, so a
+// file whose numbers run past four digits must widen the gutter, or the row
+// it draws runs past the budget the rest of the layout assumes.
+func (m Model) lineNumberWidth() int {
+	w := (gutterWidth - 3) / 2
+	for _, r := range m.rows {
+		if r.kind != rowLine {
+			continue
+		}
+		w = max(w, len(strconv.Itoa(r.line.OldLine)), len(strconv.Itoa(r.line.NewLine)))
+	}
+	return w
 }
 
 // currentPath is the file the cursor is in, used to pick the syntax
