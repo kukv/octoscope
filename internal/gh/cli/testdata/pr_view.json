@@ -1,0 +1,71 @@
+{
+  "additions": 12436,
+  "assignees": [],
+  "author": {
+    "id": "MDQ6VXNlcjQzODc4ODA5",
+    "is_bot": false,
+    "login": "kukv",
+    "name": "Nonaka Koki"
+  },
+  "baseRefName": "main",
+  "body": "spec の Phase 2。PR の diff を octoscope の中で読み、行にコメントを付け、レビューを提出できるようにする。\n\n- 設計: `docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md` §4.4.1 / §4.4.2\n- 実装計画: `docs/superpowers/plans/2026-09-06-octoscope-phase2.md`\n\n## できるようになること\n\n`d` で diff を開く（Work の カード、Repos の行、詳細ビューのどこからでも）。既存のレビュースレッドは、それが付いている行の下に出る。`c` でその行にコメント、`v` で提出、`X` で破棄。\n\n**未提出のレビューは GitHub 側の pending review として持つ。** octoscope を閉じても書きかけは消えず、Web UI から見えるものと同じ 1 つになる。行コメントを溜めて提出時にまとめて送る方式も検討したが、閉じたら消える代償が大きいので採らなかった（spec §4.4.2）。\n\n**書きかけが無くても `v` は開く。** diff を読んで何も言うことがなく approve する、というのがレビューで最も多い形なので、そこに未提出レビューを先に作らせる理由が無い。その場合は `addPullRequestReview` に event を付けて 1 回で送る。\n\n## 構成\n\n| 追加 | 役割 |\n|---|---|\n| `internal/gh` | diff とレビューのドメイン型 |\n| `internal/gh/cli/diff.go` | `gh pr diff` の unified diff をパース |\n| `internal/gh/cli/review.go` | レビューの GraphQL（1 クエリ + 5 mutation） |\n| `internal/tui/diff` | diff ビュー |\n| `internal/tui/review` | 提出ポップアップ |\n\n`internal/tui/layout` に `FitKeyBar` を足した。キーバーは順序付きのヒント配列になり、幅に入らない分を後ろから落とす。**`esc` だけは落とさない** — 80 桁で最初に切り落とされたのがそれだったため。\n\nルートモデルの `showingDetail bool` はビューのスタックになった。`d` は詳細ビューからも押せるので、真偽値では「詳細の上に diff がある」と「diff だけがある」を区別できない。\n\n## 設計上の判断\n\n**diff の各行は旧側・新側の両方の行番号を持つ。** 描画だけなら文字列 1 本で足りるが、それでは `c` を押したときに何を送るか決められない。コメントの投稿先は行番号と、それが旧側か新側かの組で決まる。\n\n**コメントの投稿先は `c` を押した時点で確定する。** `ctrl+s` の時点ではない。投稿後の再取得が行を挿入してカーソルがずれても、書き始めたときに見ていた行に付く。\n\n**シンタックスハイライトは `theme` が返す。** chroma のスタイルは配色そのものなので、ビューが chroma を呼ぶと「色は theme にだけ書く」が崩れる。`.claude/rules/tui.md` も更新した。\n\n## 実装中に見つけて潰したもの\n\n- **コメントが誰も書いていない行に投稿される** — ハンク見出しの関数コンテキストに `+` / `-` が含まれると行番号が 0 から振り直されていた。`func add(a, b int) int { return a + b }` で再現する。「このパーサの存在意義」を名乗るテストが、fixture にその形の見出しを 1 つも持っていなかったため構造的に検出できていなかった\n- **投稿後の再取得で行がずれ、2 件目のコメントが行 0 に飛ぶ**\n- **`@` で始まるコメント本文が `gh api -F` にローカルファイルとして読まれる** — 利用者の入力は `-f`、`-F` は数値と `{owner}` / `{repo}` の置換だけ\n- 桁あふれ 4 件（タブの幅を lipgloss と ansi が別々に数える / 5 桁行番号でガターが budget を超える / キーバーが `esc` を切り落とす / 複数行コメントの改行が下の行を全部ずらす）\n\n## 300 ファイルを超える PR\n\n`gh pr diff` は 300 ファイルで HTTP 406 を返す。**`pulls/{n}/files` へフォールバックする**（`per_page=100` + `--paginate`）。GitHub のエラー文で分岐はしていない — 失敗したら試す形にして、両方失敗したら `errors.Join` で両方出す。\n\n実際の 418 ファイルの PR で 418 ファイル・526 ハンク・リネーム 14 件を取得できることを確認した。GitHub が patch を返さない巨大ファイルは「差分なし」ではなく「GitHub が差分を返さなかった」と出る。\n\n**エラー画面は `esc` で戻れる。** 失敗したビューが一番上にあるときだけそれを閉じる。起動時の失敗（`gh` が無い等）は戻る先が無いので従来どおり終了する。\n\n## 幅と操作\n\n- サイドバーは 22 桁。**100 桁未満で畳み**、読んでいるファイル名はヘッダへ移る（Work タブがカードの枠を外すのと同じしきい値）\n- ガターの 11 桁は下限で、9999 行を超えるファイルでは広がる。当たり判定も同じ値を読む\n- マウス: サイドバーの行でファイル選択、diff 上のホイールで行移動。**選択中の行をもう一度クリックすると畳まれたスレッドが開く。** ダブルクリックは使わない（Bubble Tea が報告しないので、自前で測ると `Update` に時計が入る）\n- `c` / `v` / `X` が断ったときは理由を出す。以前は無言だったので、「この行にはコメントできない」「レビュー情報がまだ来ていない」「キーが壊れている」を利用者が区別できなかった\n\n## Phase 2 の範囲外\n\nスレッドへの返信と解決（読むだけ）、merge（`m` は Phase 3）、GraphQL のスレッド取得のページング、diff に無いファイルへのコメントの表示。いずれも spec に記録した。\n\n## 検証\n\n`make check` 緑（738 テスト、lint 0 件、カバレッジ 89%）。golden は en / ja × 80 / 120 / 160 桁 + 3 つのグリフセット。\n\n**spec §7 の Phase 2 の検証条件「実際の PR にレビューを提出できる」は TTY と実在の PR が要るため、この環境では代行できない。** 手順は `docs/superpowers/2026-09-06-phase2-handoff.md` にある。要点は、コメント後に同じ PR を Web UI で開いて、書いた行に付いていることを確かめること。ここのどのテストもそれは確認できない。\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "comments": [
+    {
+      "id": "IC_kwDOTVXF-M8AAAABS2DANg",
+      "author": {
+        "login": "github-actions"
+      },
+      "authorAssociation": "NONE",
+      "body": "## Code Metrics Report\n| Coverage | Test Execution Time |\n|---------:|--------------------:|\n| 89.2%    | 36s                 |\n\n\n### Code coverage of files in pull request scope (89.6%, patch 86.8%)\n\n|                                                                        Files                                                                         | Coverage | Patch Coverage |\n|------------------------------------------------------------------------------------------------------------------------------------------------------|---------:|---------------:|\n| [internal/gh/cli/diff.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Fgh%2Fcli%2Fdiff.go)             | 97.1%    | 94.5%          |\n| [internal/gh/cli/review.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Fgh%2Fcli%2Freview.go)         | 92.4%    | 91.4%          |\n| [internal/gh/diff.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Fgh%2Fdiff.go)                       | 0.0%     | 0.0%           |\n| [internal/gh/review.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Fgh%2Freview.go)                   | 0.0%     | 0.0%           |\n| [internal/tui/app/app.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fapp%2Fapp.go)             | 94.8%    | 92.6%          |\n| [internal/tui/app/mouse.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fapp%2Fmouse.go)         | 81.0%    | 25.0%          |\n| [internal/tui/app/render.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fapp%2Frender.go)       | 96.0%    | 87.5%          |\n| [internal/tui/detail/detail.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdetail%2Fdetail.go) | 90.6%    | 88.4%          |\n| [internal/tui/detail/render.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdetail%2Frender.go) | 95.6%    | 100.0%         |\n| [internal/tui/diff/comment.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdiff%2Fcomment.go)   | 92.3%    | 84.3%          |\n| [internal/tui/diff/diff.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdiff%2Fdiff.go)         | 79.3%    | 75.5%          |\n| [internal/tui/diff/mouse.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdiff%2Fmouse.go)       | 82.6%    | 72.4%          |\n| [internal/tui/diff/render.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdiff%2Frender.go)     | 97.0%    | 96.2%          |\n| [internal/tui/diff/review.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdiff%2Freview.go)     | 97.7%    | 97.8%          |\n| [internal/tui/diff/thread.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fdiff%2Fthread.go)     | 97.2%    | 97.8%          |\n| [internal/tui/icon/icon.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Ficon%2Ficon.go)         | 97.2%    | 100.0%         |\n| [internal/tui/layout/layout.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Flayout%2Flayout.go) | 100.0%   | 100.0%         |\n| [internal/tui/repo/repo.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Frepo%2Frepo.go)         | 91.8%    | 100.0%         |\n| [internal/tui/review/render.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Freview%2Frender.go) | 95.8%    | 93.5%          |\n| [internal/tui/review/review.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Freview%2Freview.go) | 82.9%    | 80.3%          |\n| [internal/tui/theme/theme.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Ftheme%2Ftheme.go)     | 63.0%    | 52.7%          |\n| [internal/tui/work/work.go](https://github.com/kukv/octoscope/blob/02cc2463c84aea7aeed377915e8eaef34a58ec7d/internal%2Ftui%2Fwork%2Fwork.go)         | 91.9%    | 100.0%         |\n\n---\nReported by [octocov](https://github.com/k1LoW/octocov)\n<!-- octocov -->",
+      "createdAt": "2026-09-06T13:40:04Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/kukv/octoscope/pull/55#issuecomment-5559599158",
+      "viewerDidAuthor": false
+    }
+  ],
+  "deletions": 151,
+  "headRefName": "feat/phase2-review",
+  "isDraft": false,
+  "labels": [],
+  "number": 55,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "state": "MERGED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-06T13:39:29Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34036727268/job/101496039769",
+      "name": "lint",
+      "startedAt": "2026-09-06T13:38:53Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-06T13:39:07Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34036727297/job/101496039866",
+      "name": "sca",
+      "startedAt": "2026-09-06T13:38:53Z",
+      "status": "COMPLETED",
+      "workflowName": "security"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-06T13:40:07Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34036727268/job/101496039896",
+      "name": "test",
+      "startedAt": "2026-09-06T13:38:53Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    }
+  ],
+  "title": "feat: PR のレビューを octoscope の中で完結させる（Phase 2）",
+  "updatedAt": "2026-09-06T13:40:04Z",
+  "url": "https://github.com/kukv/octoscope/pull/55"
+}

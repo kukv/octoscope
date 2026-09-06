@@ -340,3 +340,23 @@ func TestDiffLineNamesTheSideToCommentOn(t *testing.T) {
 		})
 	}
 }
+
+// The files API returns a patch per file, not a whole diff, and prFiles is
+// what PRDiff falls back to when `gh pr diff` fails. The recording is what
+// proves parseBarePatch is fed the shape GitHub actually sends.
+func TestPRFilesParsesARecordedResponse(t *testing.T) {
+	c, _ := newTestClient(readTestdata(t, "pr_files.json"), nil)
+
+	files, err := c.prFiles(t.Context(), "", 55)
+	if err != nil {
+		t.Fatalf("prFiles: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatal("no files parsed out of the recording")
+	}
+	for _, f := range files {
+		if f.Path == "" {
+			t.Error("a file has no path")
+		}
+	}
+}

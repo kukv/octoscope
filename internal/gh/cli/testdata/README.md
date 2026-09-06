@@ -6,6 +6,40 @@ GitHub の返し方が変わったときに気づけることがこの testdata 
 
 録る対象は自分の公開リポジトリ（`kukv/octoscope`）に限る。秘密情報を入れない。
 
+## レスポンスの録りもの
+
+`pr_list.json` / `issue_list.json` / `pr_view.json` / `issue_view.json` /
+`work.json` / `pr_files.json` は、`gh` の実出力をそのまま録ったもの。
+録った日: 2026-09-07、対象: `kukv/octoscope`（PR #55、Issue #50）。
+
+パースのテストは手書きの JSON ではなくこれを読む。手書きだと「GitHub が実際には
+そう返さない形」でも通ってしまい、返し方が変わったときに気づけない。
+
+```bash
+D=internal/gh/cli/testdata
+gh pr list --repo kukv/octoscope --state all --json \
+  'number,title,author,state,isDraft,updatedAt,reviewDecision,url,labels,headRefName,baseRefName,additions,deletions,statusCheckRollup' \
+  --limit 100 | jq . > $D/pr_list.json
+# 以下同様（Task 4 Step 1 のコマンド一式）
+```
+
+`work.json` は `@me` を含む検索なので、**録った人が見えるリポジトリを全部なめる**。
+録るときに `jq` で `kukv/octoscope` の分だけに絞る（上のコマンド参照）。
+**これは秘密情報の除去であって、「テストを通すための編集」ではない。**
+前者は必須、後者は禁止。
+
+件数はテストの主張に使わない（録り直すたびに変わる）。使うのは
+「4 つのエイリアスが揃っていること」と「`__typename` ごとの変換結果」だけ。
+
+`pr_list.json` は `--state all` で録っている（`ListPRs` 自身は open だけを取る）。
+open / closed / merged の 3 状態が 1 ファイルに入るほうが、`ParseItemState` の
+変換をまとめて確かめられるため。
+
+録った時点の `kukv/octoscope` には、4 つの検索（review-requested / author /
+assignee / mentions、いずれも `is:open`）に該当する項目が無かった。`work.json` は
+4 つのエイリアスがすべて `nodes: []` の空配列で、`ListWork` が空レスポンスを
+正しくパースできることの確認に留まる。
+
 ## `schema.json`
 
 `internal/gh/cli/*.graphql` が選んでいるフィールドが実在するかを

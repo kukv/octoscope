@@ -356,3 +356,28 @@ func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
 		}
 	}
 }
+
+// ListWork reads four aliased searches out of one response. A recording is
+// the only way to know the aliases the query declares and the keys the answer
+// carries are still the same four.
+func TestListWorkParsesARecordedResponse(t *testing.T) {
+	c, _ := newTestClient(readTestdata(t, "work.json"), nil)
+
+	w, err := c.ListWork(t.Context())
+	if err != nil {
+		t.Fatalf("ListWork: %v", err)
+	}
+	for _, section := range gh.WorkSections() {
+		for _, item := range w[section] {
+			if item.Ref.Repo == "" {
+				t.Errorf("section %d: %q has no repo; the card cannot be opened", section, item.Title)
+			}
+			if item.Ref.Number == 0 {
+				t.Errorf("section %d: %q has no number", section, item.Title)
+			}
+			if item.URL == "" {
+				t.Errorf("section %d: %q has no url", section, item.Title)
+			}
+		}
+	}
+}

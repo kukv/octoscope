@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -36,6 +38,19 @@ func (f *fakeRun) run(_ context.Context, dir string, args ...string) ([]byte, er
 func newTestClient(out string, err error) (*Client, *fakeRun) {
 	f := &fakeRun{out: []byte(out), err: err}
 	return &Client{dir: "/repo", run: f.run}, f
+}
+
+// readTestdata returns a recorded gh response. The recordings are what the
+// parse tests answer with: hand-written JSON only proves the parser handles
+// the shape the test author imagined (see testdata/README.md).
+func readTestdata(t *testing.T, name string) string {
+	t.Helper()
+
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+	return string(b)
 }
 
 func TestListPRs(t *testing.T) {
@@ -406,5 +421,54 @@ func TestTheListsAskForMoreThanTheDefaultThirty(t *testing.T) {
 				t.Errorf("--limit %d asks for no more than the default %d", limit, ghDefaultLimit)
 			}
 		})
+	}
+}
+
+// The recorded response is what gh actually prints. A parser that only ever
+// sees hand-written JSON passes on a shape GitHub may not send.
+func TestListPRsParsesARecordedResponse(t *testing.T) {
+	c, _ := newTestClient(readTestdata(t, "pr_list.json"), nil)
+
+	prs, err := c.ListPRs(t.Context())
+	if err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+	if len(prs) == 0 {
+		t.Fatal("no pull requests parsed out of the recording")
+	}
+	for _, pr := range prs {
+		if pr.Number == 0 {
+			t.Errorf("pr %q has no number", pr.Title)
+		}
+		if pr.Title == "" {
+			t.Errorf("pr #%d has no title", pr.Number)
+		}
+		if pr.Author.Login == "" {
+			t.Errorf("pr #%d has no author", pr.Number)
+		}
+		if pr.URL == "" {
+			t.Errorf("pr #%d has no url; o has nothing to open", pr.Number)
+		}
+		if pr.UpdatedAt.IsZero() {
+			t.Errorf("pr #%d has no updatedAt; the board sorts on it", pr.Number)
+		}
+	}
+}
+
+func TestGetPRParsesARecordedResponse(t *testing.T) {
+	c, _ := newTestClient(readTestdata(t, "pr_view.json"), nil)
+
+	pr, err := c.GetPR(t.Context(), "", 55)
+	if err != nil {
+		t.Fatalf("GetPR: %v", err)
+	}
+	if pr.Number != 55 {
+		t.Errorf("number = %d, want 55", pr.Number)
+	}
+	if pr.Body == "" {
+		t.Error("body is empty; the detail view has nothing to draw")
+	}
+	if pr.Head == "" || pr.Base == "" {
+		t.Errorf("head/base = %q/%q, want both", pr.Head, pr.Base)
 	}
 }

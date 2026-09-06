@@ -1,0 +1,16 @@
+{
+  "data": {
+    "reviewRequested": {
+      "nodes": []
+    },
+    "yourPRs": {
+      "nodes": []
+    },
+    "assigned": {
+      "nodes": []
+    },
+    "mentioned": {
+      "nodes": []
+    }
+  }
+}
