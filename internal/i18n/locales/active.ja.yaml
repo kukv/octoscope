@@ -13,6 +13,8 @@ common:
 error:
   gh_not_found:
     other: "gh CLI が見つかりません。インストールして gh auth login を実行してください"
+  no_browser:
+    other: "ブラウザを起動できませんでした。次のアドレスを手で開いてください:\n{{.URL}}"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same

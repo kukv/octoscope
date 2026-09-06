@@ -12,18 +12,22 @@ import (
 )
 
 // prSource is the pull-request half of what the list needs.
-// The list always shows the client's own repository, so only the
-// browser-opening call names one: repo is "owner/repo", and the empty string
-// targets that same repository.
+// The list always shows the client's own repository, so nothing here names
+// one.
 type prSource interface {
 	ListPRs(ctx context.Context) ([]gh.PR, error)
-	OpenPRWeb(repo string, number int) error
 }
 
 // issueSource mirrors prSource for issues.
 type issueSource interface {
 	ListIssues(ctx context.Context) ([]gh.Issue, error)
-	OpenIssueWeb(repo string, number int) error
+}
+
+// webOpener shows an item in a browser. It takes the URL GitHub gave the
+// item rather than a reference to it: the list leaves ItemRef.Repo empty, and
+// building the address by hand would put GitHub's URL layout in the UI.
+type webOpener interface {
+	OpenWeb(url string) error
 }
 
 // repoNamer names the repository shown in the header. It stands alone
@@ -39,6 +43,7 @@ type Source interface {
 	prSource
 	issueSource
 	repoNamer
+	webOpener
 }
 
 // OpenDetailMsg asks the parent to show the detail view for one item.
@@ -132,15 +137,9 @@ func fetchRepoName(src repoNamer) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, ref gh.ItemRef) tea.Cmd {
+func openWeb(src Source, url string) tea.Cmd {
 	return func() tea.Msg {
-		var err error
-		if ref.Kind == gh.ItemPR {
-			err = src.OpenPRWeb(ref.Repo, ref.Number)
-		} else {
-			err = src.OpenIssueWeb(ref.Repo, ref.Number)
-		}
-		if err != nil {
+		if err := src.OpenWeb(url); err != nil {
 			return errMsg{err}
 		}
 		return nil
@@ -216,8 +215,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "o":
-		if ref, ok := m.SelectedRef(); ok {
-			return m, openWeb(m.src, ref)
+		if url, ok := m.selectedURL(); ok {
+			return m, openWeb(m.src, url)
 		}
 		return m, nil
 	case "d":
@@ -237,6 +236,21 @@ func (m Model) itemCount() int {
 		return len(m.prs)
 	}
 	return len(m.issues)
+}
+
+// selectedURL is the address GitHub gave the item under the cursor. ok is
+// false when the tab is empty.
+func (m Model) selectedURL() (string, bool) {
+	if m.tab == tabPRs {
+		if len(m.prs) == 0 {
+			return "", false
+		}
+		return m.prs[m.cursors[tabPRs]].URL, true
+	}
+	if len(m.issues) == 0 {
+		return "", false
+	}
+	return m.issues[m.cursors[tabIssues]].URL, true
 }
 
 // SelectedRef names the item under the cursor. ok is false when the tab is

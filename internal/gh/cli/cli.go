@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 )
 
@@ -19,6 +20,13 @@ const (
 	issueListFields = "number,title,author,state,updatedAt,labels,url"
 	issueViewFields = issueListFields + ",body,comments,assignees"
 )
+
+// listLimit is how many items the gh list subcommands are asked for. Every
+// one of them -- pr list, issue list, label list -- fetches 30 by default and
+// says nothing about the rest, so a repository with more open pull requests
+// than that would lose them without a word. gh names no upper bound; it pages
+// until it has as many as it was asked for.
+const listLimit = "100"
 
 type runFunc func(ctx context.Context, dir string, args ...string) ([]byte, error)
 
@@ -71,7 +79,7 @@ func appendRepo(args []string, repo string) []string {
 }
 
 func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
-	args := appendRepo([]string{"pr", "list", "--json", prListFields}, c.repo)
+	args := appendRepo([]string{"pr", "list", "--json", prListFields, "--limit", listLimit}, c.repo)
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
@@ -84,7 +92,7 @@ func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
 }
 
 func (c *Client) ListIssues(ctx context.Context) ([]gh.Issue, error) {
-	args := appendRepo([]string{"issue", "list", "--json", issueListFields}, c.repo)
+	args := appendRepo([]string{"issue", "list", "--json", issueListFields, "--limit", listLimit}, c.repo)
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
@@ -141,14 +149,13 @@ func (c *Client) RepoName(ctx context.Context) (string, error) {
 	return v.NameWithOwner, nil
 }
 
-func (c *Client) OpenPRWeb(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"pr", "view", strconv.Itoa(number), "--web"}, c.effectiveRepo(repo))...)
-	return err
-}
-
-func (c *Client) OpenIssueWeb(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"issue", "view", strconv.Itoa(number), "--web"}, c.effectiveRepo(repo))...)
-	return err
+// OpenWeb shows the item in a browser. It does not go through gh: `gh ... --web`
+// looks only for xdg-open, x-www-browser, www-browser and wslview, and a WSL
+// machine has none of them -- wslu, which provides wslview, is no longer
+// packaged for Ubuntu. GitHub gives every item its URL, so there is nothing
+// gh would add here.
+func (c *Client) OpenWeb(url string) error {
+	return browser.Open(url)
 }
 
 func (c *Client) AddPRComment(repo string, number int, body string) error {
@@ -182,7 +189,7 @@ func (c *Client) ReopenIssue(repo string, number int) error {
 }
 
 func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
-	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", "100"}, c.effectiveRepo(repo))
+	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err

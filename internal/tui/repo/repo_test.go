@@ -20,7 +20,7 @@ type fakeSource struct {
 	prs      []gh.PR
 	issues   []gh.Issue
 	err      error
-	webCalls []string // "pr:<repo>:<n>" / "issue:<repo>:<n>"
+	webCalls []string // the URLs handed to the browser
 }
 
 func (f *fakeSource) ListPRs(ctx context.Context) ([]gh.PR, error) { return f.prs, f.err }
@@ -31,23 +31,17 @@ func (f *fakeSource) ListIssues(ctx context.Context) ([]gh.Issue, error) {
 
 func (f *fakeSource) RepoName(ctx context.Context) (string, error) { return "kukv/demo", f.err }
 
-func (f *fakeSource) OpenPRWeb(repo string, n int) error {
-	f.webCalls = append(f.webCalls, "pr:"+repo+":"+itoa(n))
+func (f *fakeSource) OpenWeb(url string) error {
+	f.webCalls = append(f.webCalls, url)
 	return nil
 }
-
-func (f *fakeSource) OpenIssueWeb(repo string, n int) error {
-	f.webCalls = append(f.webCalls, "issue:"+repo+":"+itoa(n))
-	return nil
-}
-
-func itoa(n int) string { return string(rune('0' + n)) } // tests only use n < 10
 
 func samplePRs() []gh.PR {
 	return []gh.PR{
 		{
 			Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
 			UpdatedAt: time.Now(), Review: gh.ReviewApproved,
+			URL: "https://github.com/kukv/demo/pull/1",
 		},
 		{
 			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},
@@ -276,7 +270,9 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
-func TestOOpensBrowserForSelection(t *testing.T) {
+// TestOOpensTheSelectionsOwnURL pins that o opens the address GitHub gave
+// the selected item, rather than one octoscope spelled out itself.
+func TestOOpensTheSelectionsOwnURL(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := loadedModel(f)
 	_, cmd := m.Update(key("o"))
@@ -284,8 +280,12 @@ func TestOOpensBrowserForSelection(t *testing.T) {
 		t.Fatal("cmd = nil, want openWeb cmd")
 	}
 	cmd()
-	if len(f.webCalls) != 1 || f.webCalls[0] != "pr::1" {
-		t.Errorf("webCalls = %v, want [pr::1]", f.webCalls)
+	want := f.prs[0].URL
+	if want == "" {
+		t.Fatal("the sample pull request has no URL, so this proves nothing")
+	}
+	if len(f.webCalls) != 1 || f.webCalls[0] != want {
+		t.Errorf("webCalls = %v, want [%s]", f.webCalls, want)
 	}
 }
 

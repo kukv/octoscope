@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"os"
 	"slices"
 	"strconv"
 	"testing"
@@ -11,10 +12,7 @@ import (
 
 const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
   "id":"PR_kwDO1",
-  "reviews":{"nodes":[{"id":"PRR_kwDO9","comments":{"nodes":[
-    {"path":"graph/walk.go","line":16,"diffSide":"RIGHT","body":"duplicate pending at existing position"},
-    {"path":"graph/new.go","line":42,"diffSide":"RIGHT","body":"pending at new position"}
-  ]}}]},
+  "reviews":{"nodes":[{"id":"PRR_kwDO9"}]},
   "reviewThreads":{"nodes":[
     {"isResolved":false,"isOutdated":false,"path":"graph/walk.go","line":14,
      "originalLine":14,"diffSide":"RIGHT","comments":{"nodes":[
@@ -78,8 +76,8 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 	if rc.PendingID != "PRR_kwDO9" {
 		t.Errorf("pending id = %q, want the unsubmitted review's", rc.PendingID)
 	}
-	if len(rc.Threads) != 6 {
-		t.Fatalf("%d threads, want 6 (5 from reviewThreads + 1 appended pending comment)", len(rc.Threads))
+	if len(rc.Threads) != 5 {
+		t.Fatalf("%d threads, want the 5 in reviewThreads", len(rc.Threads))
 	}
 
 	tests := []struct {
@@ -95,7 +93,6 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 		{"outdated threads keep the line they were written against", rc.Threads[2], 3, gh.SideRight, true, false},
 		{"the viewer's unsubmitted comment", rc.Threads[3], 16, gh.SideRight, false, true},
 		{"line override distinguishes current from original", rc.Threads[4], 20, gh.SideRight, false, false},
-		{"pending comment appended from review.comments", rc.Threads[5], 42, gh.SideRight, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -354,5 +351,39 @@ func TestABodyThatStartsWithAtIsNotReadAsAFile(t *testing.T) {
 	}
 	if !slices.Contains(got, "body=@kukv please look") {
 		t.Errorf("args %v do not carry the body verbatim", got)
+	}
+}
+
+// TestPRReviewContextParsesTheRecordedAnswer runs the parse over what GitHub
+// actually sent, rather than over JSON written to match the struct. The
+// recording carries an unsubmitted review with one thread on each side; see
+// testdata/README.md.
+func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
+	recorded, err := os.ReadFile("testdata/review_context.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := New("/w", "kukv/octoscope")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		return recorded, nil
+	}
+	rc, err := c.PRReviewContext(context.Background(), "", 55)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rc.PendingID == "" {
+		t.Error("no pending review id, but the recording has an unsubmitted review")
+	}
+	sides := map[gh.DiffSide]bool{}
+	for _, th := range rc.Threads {
+		if !th.Pending() {
+			t.Errorf("thread on %s:%d is not pending, but every thread in the recording is", th.Path, th.Line)
+		}
+		sides[th.Side] = true
+	}
+	// Both sides have to survive the parse: the side of a pending thread is
+	// the one thing the old query could not ask for.
+	if !sides[gh.SideLeft] || !sides[gh.SideRight] {
+		t.Errorf("threads land on %v, want both sides", sides)
 	}
 }

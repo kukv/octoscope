@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -43,7 +44,7 @@ func TestListPRs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListPRs: %v", err)
 	}
-	wantArgs := []string{"pr", "list", "--json", prListFields}
+	wantArgs := []string{"pr", "list", "--json", prListFields, "--limit", listLimit}
 	if !reflect.DeepEqual(f.args, wantArgs) {
 		t.Errorf("args = %v, want %v", f.args, wantArgs)
 	}
@@ -100,7 +101,7 @@ func TestListIssues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListIssues: %v", err)
 	}
-	wantArgs := []string{"issue", "list", "--json", issueListFields}
+	wantArgs := []string{"issue", "list", "--json", issueListFields, "--limit", listLimit}
 	if !reflect.DeepEqual(f.args, wantArgs) {
 		t.Errorf("args = %v, want %v", f.args, wantArgs)
 	}
@@ -132,28 +133,6 @@ func TestRepoName(t *testing.T) {
 		t.Errorf("name = %q, err = %v; want kukv/demo, nil", name, err)
 	}
 	wantArgs := []string{"repo", "view", "--json", "nameWithOwner"}
-	if !reflect.DeepEqual(f.args, wantArgs) {
-		t.Errorf("args = %v, want %v", f.args, wantArgs)
-	}
-}
-
-func TestOpenPRWebWithRepoOverride(t *testing.T) {
-	c, f := newTestClient("", nil)
-	if err := c.OpenPRWeb("octo/hello", 7); err != nil {
-		t.Fatalf("OpenPRWeb: %v", err)
-	}
-	wantArgs := []string{"pr", "view", "7", "--web", "--repo", "octo/hello"}
-	if !reflect.DeepEqual(f.args, wantArgs) {
-		t.Errorf("args = %v, want %v", f.args, wantArgs)
-	}
-}
-
-func TestOpenIssueWebWithRepoOverride(t *testing.T) {
-	c, f := newTestClient("", nil)
-	if err := c.OpenIssueWeb("octo/hello", 3); err != nil {
-		t.Fatalf("OpenIssueWeb: %v", err)
-	}
-	wantArgs := []string{"issue", "view", "3", "--web", "--repo", "octo/hello"}
 	if !reflect.DeepEqual(f.args, wantArgs) {
 		t.Errorf("args = %v, want %v", f.args, wantArgs)
 	}
@@ -239,7 +218,7 @@ func TestListLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListLabels: %v", err)
 	}
-	wantArgs := []string{"label", "list", "--json", "name,color", "--limit", "100"}
+	wantArgs := []string{"label", "list", "--json", "name,color", "--limit", listLimit}
 	if !reflect.DeepEqual(f.args, wantArgs) {
 		t.Errorf("args = %v, want %v", f.args, wantArgs)
 	}
@@ -336,9 +315,8 @@ func TestClientUsesDefaultRepo(t *testing.T) {
 	if _, err := c.ListPRs(t.Context()); err != nil {
 		t.Fatalf("ListPRs: %v", err)
 	}
-	want := []string{"pr", "list", "--json", prListFields, "--repo", "kukv/octoscope"}
-	if !slices.Equal(got, want) {
-		t.Errorf("args = %v, want %v", got, want)
+	if i := slices.Index(got, "--repo"); i < 0 || got[i+1] != "kukv/octoscope" {
+		t.Errorf("args = %v, want them to name the client's repository", got)
 	}
 }
 
@@ -386,5 +364,47 @@ func TestListAssigneesBuildsAPIPathFromDefaultRepo(t *testing.T) {
 	want := []string{"api", "repos/kukv/octoscope/assignees?per_page=100"}
 	if !slices.Equal(got, want) {
 		t.Errorf("args = %v, want %v", got, want)
+	}
+}
+
+// TestTheListsAskForMoreThanTheDefaultThirty states the requirement rather
+// than the arguments: every gh list subcommand stops at 30 items unless it is
+// told otherwise, and it says nothing when it does. A repository with more
+// open pull requests than that would silently lose the rest.
+func TestTheListsAskForMoreThanTheDefaultThirty(t *testing.T) {
+	const ghDefaultLimit = 30
+
+	tests := map[string]func(*Client) error{
+		"pr list": func(c *Client) error {
+			_, err := c.ListPRs(t.Context())
+			return err
+		},
+		"issue list": func(c *Client) error {
+			_, err := c.ListIssues(t.Context())
+			return err
+		},
+		"label list": func(c *Client) error {
+			_, err := c.ListLabels(t.Context(), "")
+			return err
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			c, f := newTestClient(`[]`, nil)
+			if err := call(c); err != nil {
+				t.Fatal(err)
+			}
+			i := slices.Index(f.args, "--limit")
+			if i < 0 || i+1 >= len(f.args) {
+				t.Fatalf("args %v carry no --limit, so gh stops at %d", f.args, ghDefaultLimit)
+			}
+			limit, err := strconv.Atoi(f.args[i+1])
+			if err != nil {
+				t.Fatalf("--limit %q is not a number", f.args[i+1])
+			}
+			if limit <= ghDefaultLimit {
+				t.Errorf("--limit %d asks for no more than the default %d", limit, ghDefaultLimit)
+			}
+		})
 	}
 }

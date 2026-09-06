@@ -1,0 +1,69 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "id": "PR_kwDOTVXF-M8AAAABCZ8liA",
+        "title": "feat: PR のレビューを octoscope の中で完結させる（Phase 2）",
+        "headRefName": "feat/phase2-review",
+        "baseRefName": "main",
+        "additions": 12436,
+        "deletions": 151,
+        "reviews": {
+          "nodes": [
+            {
+              "id": "PRR_kwDOTVXF-M8AAAABMYTv6g"
+            }
+          ]
+        },
+        "reviewThreads": {
+          "nodes": [
+            {
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "internal/gh/cli/review.graphql",
+              "line": 17,
+              "originalLine": 17,
+              "diffSide": "RIGHT",
+              "comments": {
+                "nodes": [
+                  {
+                    "body": "measurement probe",
+                    "createdAt": "2026-09-06T15:13:26Z",
+                    "author": {
+                      "login": "kukv"
+                    },
+                    "pullRequestReview": {
+                      "state": "PENDING"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "README.md",
+              "line": 5,
+              "originalLine": 5,
+              "diffSide": "LEFT",
+              "comments": {
+                "nodes": [
+                  {
+                    "body": "left side probe",
+                    "createdAt": "2026-09-06T15:13:34Z",
+                    "author": {
+                      "login": "kukv"
+                    },
+                    "pullRequestReview": {
+                      "state": "PENDING"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

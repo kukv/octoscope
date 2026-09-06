@@ -5,13 +5,13 @@
 ```
 cmd/octoscope
      ↓
-internal/tui  ──→  internal/gh    （GitHub へのアクセス）
-     ↓        ──→  internal/config （設定ファイル）
-internal/i18n                      （誰にも依存しない）
+internal/tui  ──→  internal/gh      （GitHub へのアクセス）──→ internal/browser
+     ↓        ──→  internal/config   （設定ファイル）
+internal/i18n     internal/browser   （どちらも誰にも依存しない）
 ```
 
 **下の層は上の層を知らない。** GitHub アクセス層が TUI を import したら設計が壊れている。
-`internal/i18n` は他の internal パッケージを import しない。
+`internal/i18n` と `internal/browser` は他の internal パッケージを import しない。
 
 この向きは目視ではなく lint で守る。`.golangci.yml` の `depguard` に禁止 import を
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**

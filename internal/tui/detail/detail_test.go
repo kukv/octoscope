@@ -17,7 +17,7 @@ type fakeSource struct {
 	pr       gh.PR
 	issue    gh.Issue
 	err      error
-	webCalls []string // "pr:<repo>:<n>" / "issue:<repo>:<n>"
+	webCalls []string // the URLs handed to the browser
 
 	commentCalls []string // "pr:<repo>:<n>:<body>" / "issue:<repo>:<n>:<body>"
 	commentErr   error
@@ -48,13 +48,8 @@ func (f *fakeSource) GetIssue(ctx context.Context, repo string, n int) (gh.Issue
 	return f.issue, f.err
 }
 
-func (f *fakeSource) OpenPRWeb(repo string, n int) error {
-	f.webCalls = append(f.webCalls, "pr:"+repo+":"+itoa(n))
-	return nil
-}
-
-func (f *fakeSource) OpenIssueWeb(repo string, n int) error {
-	f.webCalls = append(f.webCalls, "issue:"+repo+":"+itoa(n))
+func (f *fakeSource) OpenWeb(url string) error {
+	f.webCalls = append(f.webCalls, url)
 	return nil
 }
 
@@ -265,16 +260,29 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
-func TestOOpensBrowser(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+// TestOOpensTheShownItemsOwnURL pins that o opens the address GitHub gave
+// the item, rather than one octoscope spelled out itself.
+func TestOOpensTheShownItemsOwnURL(t *testing.T) {
+	const want = "https://github.com/kukv/demo/pull/1"
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", URL: want}}
 	m := loaded(f, prRef())
 	_, cmd := m.Update(key("o"))
 	if cmd == nil {
 		t.Fatal("cmd = nil, want openWeb cmd")
 	}
 	cmd()
-	if len(f.webCalls) != 1 || f.webCalls[0] != "pr::1" {
-		t.Errorf("webCalls = %v, want [pr::1]", f.webCalls)
+	if len(f.webCalls) != 1 || f.webCalls[0] != want {
+		t.Errorf("webCalls = %v, want [%s]", f.webCalls, want)
+	}
+}
+
+// TestODoesNothingBeforeTheItemLands guards the other half: with no item
+// there is no URL, and opening the empty string would take the browser
+// nowhere.
+func TestODoesNothingBeforeTheItemLands(t *testing.T) {
+	m := New(&fakeSource{}, prRef())
+	if _, cmd := m.Update(key("o")); cmd != nil {
+		t.Errorf("o before the item arrived produced %T", cmd())
 	}
 }
 
