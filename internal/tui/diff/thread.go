@@ -56,10 +56,14 @@ func (m Model) threadRows(hunk int, path string, line int, side gh.DiffSide) []r
 	return rows
 }
 
-// orphanRows are the comments whose line this diff does not show: the file is
-// not in the diff, or the line has gone. They go at the end of the file they
-// name rather than being dropped -- a comment nobody can see is a comment
-// nobody answers.
+// orphanRows are the current file's comments whose line this diff does not
+// show, because the line has moved or gone. They go at the end of the file
+// rather than being dropped -- a comment nobody can see is a comment nobody
+// answers.
+//
+// Known limitation: a thread on a file not in this diff at all is filtered
+// out by the Path check below and never surfaces anywhere in the UI, because
+// this is only called once per file, for the file on screen.
 func (m Model) orphanRows(placed map[string]bool) []row {
 	var rows []row
 	for _, t := range m.review.Threads {
