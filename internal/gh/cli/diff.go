@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,17 +33,25 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.File
 	)
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
-		if files, ferr := c.prFiles(ctx, repo, number); ferr == nil {
+		files, ferr := c.prFiles(ctx, repo, number)
+		if ferr == nil {
 			return files, nil
 		}
-		return nil, err
+		// err is the one that describes what the user actually asked for and
+		// is reported as such (see fail() in internal/tui/app); ferr is
+		// joined in rather than discarded so a bug in prFiles itself (a
+		// parse failure, say) is not silently swallowed
+		// (.claude/rules/errors.md). errors.Is still matches err through the
+		// join.
+		return nil, errors.Join(err, ferr)
 	}
 	return parseDiff(out), nil
 }
 
 // prFiles is the files-API fallback for PRDiff. --paginate is required: the
 // endpoint's default page is 30 files, and the pull request this fallback
-// exists for had 418.
+// exists for had 418. per_page=100 cuts that down to 5 requests instead of
+// 14 (ListAssignees in cli.go does the same for its own listing).
 func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
 	out, err := c.run(ctx, c.dir, "api", prFilesPath(c.effectiveRepo(repo), number), "--paginate")
 	if err != nil {
@@ -68,7 +77,7 @@ func prFilesPath(repo string, number int) string {
 	if repo != "" {
 		repoPart = repo
 	}
-	return fmt.Sprintf("repos/%s/pulls/%d/files", repoPart, number)
+	return fmt.Sprintf("repos/%s/pulls/%d/files?per_page=100", repoPart, number)
 }
 
 // prFileJSON is one entry of the files API's response.

@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -190,6 +192,9 @@ func TestPRDiffFallsBackToTheFilesAPI(t *testing.T) {
 	if !found {
 		t.Errorf("fallback args = %v, want --paginate (this pull request has more files than one page)", fallback)
 	}
+	if !strings.Contains(fallback[1], "per_page=100") {
+		t.Errorf("fallback path = %q, want per_page=100 (30 files a page is 14 requests for this pull request)", fallback[1])
+	}
 	if len(files) != 1 || files[0].Path != "a.go" || files[0].Additions != 1 || files[0].Deletions != 1 {
 		t.Errorf("files = %+v, want one parsed file", files)
 	}
@@ -217,39 +222,52 @@ func TestPRDiffReportsTheOriginalErrorWhenBothFail(t *testing.T) {
 	}
 }
 
-// TestBarePatchParserMatchesTheFullDiffParser guards the files API's patch
-// shape: no "diff --git" header, no ---/+++ lines, just the hunks. It shares
-// hunkStarts with the full-diff parser, so the function-context fix that
-// landed there must not need a second copy here.
-func TestBarePatchParserMatchesTheFullDiffParser(t *testing.T) {
-	patch := "@@ -3,4 +3,5 @@ func add(a, b int) int { return a + b }\n" +
-		" x := a\n" +
-		"-y := b\n" +
-		"+y := b + 1\n" +
-		"+z := 0\n" +
-		" return x + y"
-	hunks := parseBarePatch(patch)
-	if len(hunks) != 1 {
-		t.Fatalf("%d hunks, want 1", len(hunks))
-	}
-	got := make([][3]int, 0, len(hunks[0].Lines))
-	for _, l := range hunks[0].Lines {
-		got = append(got, [3]int{int(l.Kind), l.OldLine, l.NewLine})
-	}
-	want := [][3]int{
-		{int(gh.LineContext), 3, 3},
-		{int(gh.LineRemoved), 4, 0},
-		{int(gh.LineAdded), 0, 4},
-		{int(gh.LineAdded), 0, 5},
-		{int(gh.LineContext), 5, 6},
-	}
-	if len(got) != len(want) {
-		t.Fatalf("%d lines, want %d: %v", len(got), len(want), got)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("line %d = %v, want %v", i, got[i], want[i])
+// TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail guards the sentinel app.fail
+// checks with errors.Is: joining the fallback's error in must not stop
+// ErrGhNotFound from still being found in the result.
+func TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail(t *testing.T) {
+	c := New("/w", "kukv/koto")
+	calls := 0
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		calls++
+		if calls == 1 {
+			return nil, gh.ErrGhNotFound
 		}
+		return nil, errors.New("gh api: HTTP 404: not found")
+	}
+	_, err := c.PRDiff(context.Background(), "", 412)
+	if !errors.Is(err, gh.ErrGhNotFound) {
+		t.Errorf("PRDiff() error = %v, want errors.Is(err, gh.ErrGhNotFound)", err)
+	}
+}
+
+// TestBarePatchParserMatchesTheFullDiffParser guards the files API's patch
+// shape: no "diff --git" header, no ---/+++ lines, just the hunks. It feeds
+// the mathutil/add.go fixture from sample.diff — whose hunk header carries a
+// "+" in its function context, the exact shape that once shifted line
+// numbers — through both entry points and requires the same Hunks out,
+// rather than hardcoding expected values a copy of hunkStarts could also
+// satisfy: this is what actually pins the two paths sharing hunkStarts.
+func TestBarePatchParserMatchesTheFullDiffParser(t *testing.T) {
+	sample := readSample(t)
+	const marker = "diff --git a/mathutil/add.go b/mathutil/add.go"
+	i := bytes.Index(sample, []byte(marker))
+	if i < 0 {
+		t.Fatal("testdata/sample.diff no longer has the mathutil/add.go fixture")
+	}
+	full := parseDiff(sample[i:])
+	if len(full) != 1 {
+		t.Fatalf("%d files from the full-diff parser, want 1", len(full))
+	}
+
+	j := bytes.IndexByte(sample[i:], '@')
+	if j < 0 {
+		t.Fatal("no hunk header found after the diff --git line")
+	}
+	bare := parseBarePatch(string(sample[i+j:]))
+
+	if !reflect.DeepEqual(bare, full[0].Hunks) {
+		t.Errorf("bare-patch hunks = %+v, want the same as the full-diff parser: %+v", bare, full[0].Hunks)
 	}
 }
 
