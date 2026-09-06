@@ -216,6 +216,32 @@ func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 	}
 }
 
+func TestDAsksForTheDiff(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	m := loaded(f, prRef())
+	_, cmd := m.Update(key("d"))
+	if cmd == nil {
+		t.Fatal("d produced no command")
+	}
+	msg, ok := cmd().(OpenDiffMsg)
+	if !ok {
+		t.Fatalf("got %T, want OpenDiffMsg", cmd())
+	}
+	if msg.Ref != prRef() {
+		t.Errorf("Ref = %+v, want %+v", msg.Ref, prRef())
+	}
+}
+
+// TestDDoesNothingOnAnIssue is what stops the diff view opening on something
+// that has no diff.
+func TestDDoesNothingOnAnIssue(t *testing.T) {
+	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	m := loaded(f, issueRef())
+	if _, cmd := m.Update(key("d")); cmd != nil {
+		t.Errorf("d on an issue produced %T", cmd())
+	}
+}
+
 func TestOOpensBrowser(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())

@@ -10,4 +10,4 @@
 [38;2;139;148;158mno checks[m
 
 
-[38;2;139;148;158mj/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  q:quit[m
+[38;2;139;148;158mj/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  q:quit[m

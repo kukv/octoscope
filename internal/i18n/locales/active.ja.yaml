@@ -108,9 +108,13 @@ diff:
 
 footer:
   list:
-    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  q:終了"
+    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  q:終了"
   detail_prefix:
     other: "j/k:移動  r:更新  o:Web  c:コメント  "
+  # この行は80桁の上限にすでに達しているため（detail_prefix + reopen のキー +
+  # このsuffix）、ここには意図的に d:diff を入れていない。d 自体は詳細ビュー
+  # からも diff を開けるが、このフッターでは案内していないだけ。Work ボードと
+  # Repos の一覧では案内している。
   detail_suffix:
     other: "l:ラベル  a:担当  esc:戻る"
   close:
@@ -124,7 +128,7 @@ footer:
   error:
     other: "q:終了"
   work:
-    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  q:終了"
+    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
   diff:
     other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  r:再取得  esc:戻る"
 

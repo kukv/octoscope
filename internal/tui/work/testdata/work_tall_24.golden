@@ -21,4 +21,4 @@
 [38;2;139;148;158mThis puts them back.[m                                                     [38;2;139;148;158m1/3 checks passed, 1 failed, 1 running[m
 
 
-[38;2;139;148;158mh/l:column  j/k:move  enter:detail  r:refresh  q:quit[m
+[38;2;139;148;158mh/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit[m

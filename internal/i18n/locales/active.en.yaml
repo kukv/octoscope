@@ -110,9 +110,13 @@ diff:
 
 footer:
   list:
-    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  q:quit"
+    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  q:quit"
   detail_prefix:
     other: "j/k:move  r:refresh  o:web  c:comment  "
+  # This line is already at its 80-column limit (detail_prefix + the reopen
+  # key + this suffix), so d:diff is deliberately left out here. d still
+  # opens the diff from the detail view; it is just not advertised in this
+  # footer. It is advertised on the Work board and in the Repos list instead.
   detail_suffix:
     other: "l:labels  a:assign  esc:back"
   close:
@@ -126,7 +130,7 @@ footer:
   error:
     other: "q:quit"
   work:
-    other: "h/l:column  j/k:move  enter:detail  r:refresh  q:quit"
+    other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
   diff:
     other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  r:refresh  esc:back"
 

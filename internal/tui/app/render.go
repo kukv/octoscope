@@ -12,10 +12,12 @@ import (
 
 func (m Model) View() tea.View {
 	var content string
-	switch {
+	switch top, ok := m.top(); {
 	case m.errText != "":
 		content = m.errorView()
-	case m.showingDetail:
+	case ok && top == overlayDiff:
+		content = m.diff.View()
+	case ok:
 		content = m.detail.View()
 	default:
 		content = m.tabRow() + "\n\n" + m.activeTab()

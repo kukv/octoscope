@@ -44,6 +44,9 @@ type Source interface {
 // OpenDetailMsg asks the parent to show the detail view for one item.
 type OpenDetailMsg struct{ Ref gh.ItemRef }
 
+// OpenDiffMsg asks the parent to show the diff of the selected pull request.
+type OpenDiffMsg struct{ Ref gh.ItemRef }
+
 // ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
@@ -210,6 +213,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m, openWeb(m.src, ref)
 		}
 		return m, nil
+	case "d":
+		ref, ok := m.SelectedRef()
+		// An issue has no diff. Opening an empty diff view would be a worse
+		// answer than doing nothing.
+		if !ok || ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	}
 	return m, nil
 }

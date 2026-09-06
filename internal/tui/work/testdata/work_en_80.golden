@@ -37,4 +37,4 @@
 
 
 
-[38;2;139;148;158mh/l:column  j/k:move  enter:detail  r:refresh  q:quit[m
+[38;2;139;148;158mh/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit[m
