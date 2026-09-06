@@ -48,6 +48,10 @@ go run ./cmd/octoscope --lang ja
 - **提出しないと Pending のまま GitHub に残る。** 他の誰にも見えないが、消えては
   いない。捨ててよい PR を使うべき理由はこれで、途中で octoscope を終了しても
   書きかけは残り続ける
+- **スレッドとコメントはページングしていない。** `reviewThreads`（100 件）、
+  各スレッドの `comments`（50 件）、pending review の `comments`（100 件）が
+  上限で、これを超える PR ではスレッドが黙って欠け、`pending · N` の件数も
+  実際より少なく出る。ページング対応は Phase 3
 
 ## 参考
 
