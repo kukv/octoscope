@@ -105,6 +105,18 @@ diff:
     other: "バイナリファイル"
   file_count:
     other: "{{.Count}} ファイル"
+  collapsed:
+    other: "片付いたコメント {{.Count}} 件 — enter で開く"
+  orphaned:
+    other: "この diff に無い行へのコメント"
+  resolved:
+    other: "解決済み"
+  outdated:
+    other: "古い"
+  unsent:
+    other: "未送信"
+  pending_note:
+    other: "未提出 · {{.Count}}"
 
 footer:
   list:
@@ -130,7 +142,7 @@ footer:
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
   diff:
-    other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  r:再取得  esc:戻る"
+    other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  enter:開く  r:再取得  esc:戻る"
 
 md:
   author:

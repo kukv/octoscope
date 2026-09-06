@@ -35,11 +35,31 @@ func goldenFixture() []gh.FileDiff {
 	return files
 }
 
+// goldenReview names the pull request, its branches, and one open thread
+// with a Japanese comment, so the recording covers the header's title line
+// and a thread row at once.
+func goldenReview() gh.ReviewContext {
+	return gh.ReviewContext{
+		Title: "add relation graph traversal",
+		Head:  "feat/graph",
+		Base:  "main",
+		Threads: []gh.ReviewThread{
+			{
+				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
+				Comments: []gh.ThreadComment{
+					{Author: gh.Author{Login: "kukv"}, Body: "ここは 2 が既定ではないでしょうか、直しておいてもらえますか?"},
+				},
+			},
+		},
+	}
+}
+
 func goldenModel(width int) Model {
 	m := New(&fakeSource{files: goldenFixture()},
 		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: goldenFixture()})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: goldenReview()})
 	m = press(m, "j")
 	return m
 }
@@ -125,10 +145,15 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 			t.Cleanup(func() { i18n.SetLanguage(language.English) })
 			loading := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1})
 			loading, _ = loading.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+			threads := withThreads(t)
+			expanded := press(openCollapsedThread(threads), "enter")
 			for name, view := range map[string]string{
-				"loaded":  loaded(t, 120, 30).View(),
-				"loading": loading.View(),
-				"empty":   emptyDiff(t, 120, 30).View(),
+				"loaded":   loaded(t, 120, 30).View(),
+				"loading":  loading.View(),
+				"empty":    emptyDiff(t, 120, 30).View(),
+				"threads":  threads.View(),
+				"expanded": expanded.View(),
+				"pending":  withPending(t).View(),
 			} {
 				t.Run(name, func(t *testing.T) {
 					i18n.AssertNoUnresolvedIDs(t, view)

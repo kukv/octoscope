@@ -12,12 +12,17 @@ import (
 )
 
 type fakeSource struct {
-	files []gh.FileDiff
-	err   error
+	files  []gh.FileDiff
+	err    error
+	review gh.ReviewContext
 }
 
 func (f *fakeSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error) {
 	return f.files, f.err
+}
+
+func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewContext, error) {
+	return f.review, nil
 }
 
 // fixture is two files, so that moving between files is testable, with a
@@ -193,7 +198,7 @@ func TestTheDiffFitsTheTerminal(t *testing.T) {
 
 func TestCurrentRowIsZeroBeforeAnythingLoads(t *testing.T) {
 	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1})
-	if got := m.currentRow(); got != (row{}) {
+	if got := m.currentRow(); got.kind != rowHunkHeader || got.hunk != 0 || got.text != "" {
 		t.Errorf("currentRow on an empty model = %+v, want the zero row", got)
 	}
 }

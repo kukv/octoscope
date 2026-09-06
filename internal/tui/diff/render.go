@@ -52,11 +52,16 @@ func (m Model) keyBar() string {
 	return theme.Dim().Render(clip(i18n.T("footer.diff"), m.width))
 }
 
-// header draws the two lines the diff view can fill in on its own: the
-// pull request's own name, and how big the change is. The title, the
-// branches and the thread count arrive with the review context in Task 7.
+// header draws the two lines the diff view can fill in: the pull request's
+// own name and title, and how big the change is. The title and the branches
+// arrive with the review context, which may still be loading when the diff
+// itself has landed, so both are blank until then rather than the view
+// waiting on the slower of the two fetches.
 func (m Model) header() []string {
 	first := fmt.Sprintf("%s #%d", m.ref.Repo, m.ref.Number)
+	if m.review.Title != "" {
+		first += " " + m.review.Title
+	}
 	return []string{
 		clip(theme.Title().Render(first), m.width),
 		clip(m.sizeLine(), m.width),
@@ -64,20 +69,42 @@ func (m Model) header() []string {
 	}
 }
 
-// sizeLine counts the diff itself: how many files, and how much they add and
-// remove.
+// sizeLine is the branches, how big the diff is, and how many unsubmitted
+// comments are waiting to go out.
 func (m Model) sizeLine() string {
 	adds, dels := 0, 0
 	for _, f := range m.files {
 		adds += f.Additions
 		dels += f.Deletions
 	}
-	parts := []string{i18n.Tn("diff.file_count", len(m.files))}
-	if adds > 0 || dels > 0 {
-		parts = append(parts, theme.Added().Render("+"+strconv.Itoa(adds))+
-			" "+theme.Removed().Render("−"+strconv.Itoa(dels)))
+	var parts []string
+	if m.review.Head != "" || m.review.Base != "" {
+		parts = append(parts, m.review.Head+" → "+m.review.Base)
 	}
-	return theme.Dim().Render(strings.Join(parts, " "))
+	size := i18n.Tn("diff.file_count", len(m.files))
+	if adds > 0 || dels > 0 {
+		size += " " + theme.Added().Render("+"+strconv.Itoa(adds)) +
+			" " + theme.Removed().Render("−"+strconv.Itoa(dels))
+	}
+	parts = append(parts, size)
+	if n := m.pendingCount(); n > 0 {
+		parts = append(parts, i18n.Tn("diff.pending_note", n))
+	}
+	return theme.Dim().Render(strings.Join(parts, " · "))
+}
+
+// pendingCount is how many comments across all threads have not been
+// submitted yet.
+func (m Model) pendingCount() int {
+	n := 0
+	for _, t := range m.review.Threads {
+		for _, c := range t.Comments {
+			if c.Pending {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 // filesHeadingLine is the rule that separates the header from the two
@@ -174,19 +201,45 @@ func (m Model) diffLine(r row, selected bool, width int) string {
 		return theme.HunkHeader().Render(clip(r.text, width))
 	case rowNote:
 		return theme.Dim().Render(clip(r.text, width))
+	case rowThread:
+		return m.threadLine(r, width)
+	case rowCollapsed:
+		return theme.Dim().Render(clip("▸ "+r.text, width))
 	default:
 		return m.diffTextLine(r.line, width)
 	}
 }
 
+// threadLine draws one comment of an open review thread: a bar marking it
+// apart from the code, the author, and the body, coloured by whether it has
+// been sent yet.
+func (m Model) threadLine(r row, width int) string {
+	return theme.Thread(r.comment.Pending).Render(clip(m.threadText(r), width))
+}
+
 // plainText is what a row reads as with no styling at all, for the cursor
 // row.
 func (m Model) plainText(r row) string {
-	if r.kind != rowLine {
+	switch r.kind {
+	case rowLine:
+		old, marker, num := lineNumbers(r.line)
+		return fmt.Sprintf("%*s %*s%s %s", m.lineNumberWidth(), old, m.lineNumberWidth(), num, marker, r.line.Text)
+	case rowThread:
+		return m.threadText(r)
+	case rowCollapsed:
+		return "▸ " + r.text
+	default:
 		return r.text
 	}
-	old, marker, num := lineNumbers(r.line)
-	return fmt.Sprintf("%*s %*s%s %s", m.lineNumberWidth(), old, m.lineNumberWidth(), num, marker, r.line.Text)
+}
+
+// threadText is what threadLine draws, without its colour.
+func (m Model) threadText(r row) string {
+	body := r.comment.Author.Login + " · " + expandTabs(r.comment.Body)
+	if r.comment.Pending {
+		body += " (" + i18n.T("diff.unsent") + ")"
+	}
+	return "▌ " + body
 }
 
 // diffTextLine draws the gutter (two line numbers and the +/- marker) and

@@ -107,6 +107,20 @@ diff:
   file_count:
     one: "{{.Count}} file"
     other: "{{.Count}} files"
+  collapsed:
+    one: "{{.Count}} settled comment - enter to open"
+    other: "{{.Count}} settled comments - enter to open"
+  orphaned:
+    other: "comments on lines this diff does not show"
+  resolved:
+    other: "resolved"
+  outdated:
+    other: "outdated"
+  unsent:
+    other: "not sent yet"
+  pending_note:
+    one: "pending · {{.Count}}"
+    other: "pending · {{.Count}}"
 
 footer:
   list:
@@ -132,7 +146,7 @@ footer:
   work:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
   diff:
-    other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  r:refresh  esc:back"
+    other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  enter:open  r:refresh  esc:back"
 
 md:
   author:

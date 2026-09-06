@@ -66,6 +66,10 @@ func (f *fakeSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error)
 	return f.files, f.diffErr
 }
 
+func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewContext, error) {
+	return gh.ReviewContext{}, nil
+}
+
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

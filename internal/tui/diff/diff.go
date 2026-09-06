@@ -17,6 +17,7 @@ import (
 // "owner/repo"; the empty string targets the workspace repository.
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
 }
 
 // ClosedMsg tells the parent the user left the diff view.
@@ -30,6 +31,11 @@ type diffMsg struct {
 	files []gh.FileDiff
 }
 
+type reviewMsg struct {
+	ref gh.ItemRef
+	ctx gh.ReviewContext
+}
+
 type errMsg struct {
 	ref gh.ItemRef
 	err error
@@ -41,17 +47,24 @@ type rowKind int
 const (
 	rowHunkHeader rowKind = iota
 	rowLine
-	rowNote // "binary file", "no files changed": text with nothing behind it
+	rowNote      // "binary file", "no files changed": text with nothing behind it
+	rowThread    // one comment of an open review thread
+	rowCollapsed // a count of settled (resolved or outdated) threads
 )
 
 // row is one drawable line of the diff pane. hunk is the index of the hunk it
 // belongs to, which is what { and } move between; a note belongs to none and
-// carries -1.
+// carries -1. thread, comment and key are set on rowThread and rowCollapsed
+// rows: key names the thread's position (see threadKey) and is what enter
+// looks up in Model.expanded.
 type row struct {
-	kind rowKind
-	hunk int
-	line gh.DiffLine
-	text string
+	kind    rowKind
+	hunk    int
+	line    gh.DiffLine
+	text    string
+	thread  gh.ReviewThread
+	comment gh.ThreadComment
+	key     string
 }
 
 type Model struct {
@@ -65,6 +78,16 @@ type Model struct {
 
 	files []gh.FileDiff
 	file  int
+
+	// review is the review context: the header's title and branches, and the
+	// threads already on the diff. It arrives separately from files (fetch),
+	// and either may land first.
+	review gh.ReviewContext
+
+	// expanded is the set of settled threads the user has opened, keyed by
+	// threadKey. It survives a refetch because it is keyed by position, not
+	// by the thread's own id.
+	expanded map[string]bool
 
 	// rows is the current file, flattened for drawing. It is rebuilt whenever
 	// the file changes rather than on every draw, because View may do no work
@@ -94,7 +117,13 @@ func New(src Source, ref gh.ItemRef) Model {
 // an Init with a value receiver.
 func (m Model) Init() tea.Cmd { return tea.Batch(m.spin.Tick, m.fetch()) }
 
+// fetch takes the diff and the review context in parallel: neither has to
+// wait for the other, and the view draws with whatever has landed.
 func (m Model) fetch() tea.Cmd {
+	return tea.Batch(m.fetchDiff(), m.fetchReview())
+}
+
+func (m Model) fetchDiff() tea.Cmd {
 	src, ref := m.src, m.ref
 	return func() tea.Msg {
 		files, err := src.PRDiff(context.Background(), ref.Repo, ref.Number)
@@ -102,6 +131,17 @@ func (m Model) fetch() tea.Cmd {
 			return errMsg{ref: ref, err: err}
 		}
 		return diffMsg{ref: ref, files: files}
+	}
+}
+
+func (m Model) fetchReview() tea.Cmd {
+	src, ref := m.src, m.ref
+	return func() tea.Msg {
+		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
+		if err != nil {
+			return errMsg{ref: ref, err: err}
+		}
+		return reviewMsg{ref: ref, ctx: ctx}
 	}
 }
 
@@ -119,6 +159,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = false
 		m.files = msg.files
 		m.file, m.row, m.top = 0, 0, 0
+		m.rows = m.buildRows()
+		return m, nil
+	case reviewMsg:
+		// The review context for the pull request the user just left is
+		// still in flight; its answer must not land here.
+		if msg.ref != m.ref {
+			return m, nil
+		}
+		m.review = msg.ctx
 		m.rows = m.buildRows()
 		return m, nil
 	case errMsg:
@@ -162,8 +211,32 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "l":
 		m.sidebar = false
 		return m, nil
+	case "enter":
+		return m.toggleCollapsed(), nil
 	}
 	return m, nil
+}
+
+// toggleCollapsed opens or closes the settled thread under the cursor.
+// Opening replaces the rowCollapsed row with the thread's own rows, which
+// moves the cursor onto one of them (same index, new content) rather than
+// off the thread entirely, so a second enter must still recognise it as the
+// same thread to close it again.
+func (m Model) toggleCollapsed() Model {
+	r := m.currentRow()
+	if r.kind != rowCollapsed && r.kind != rowThread {
+		return m
+	}
+	if r.key == "" {
+		return m
+	}
+	if m.expanded == nil {
+		m.expanded = map[string]bool{}
+	}
+	m.expanded[r.key] = !m.expanded[r.key]
+	m.rows = m.buildRows()
+	m.row = clamp(m.row, 0, len(m.rows)-1)
+	return m.follow()
 }
 
 // buildRows flattens the selected file into the lines the diff pane draws.
@@ -176,6 +249,7 @@ func (m Model) buildRows() []row {
 		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.binary")}}
 	}
 	var rows []row
+	placed := map[string]bool{}
 	for i, h := range f.Hunks {
 		rows = append(rows, row{kind: rowHunkHeader, hunk: i, text: h.Header})
 		for _, l := range h.Lines {
@@ -187,8 +261,14 @@ func (m Model) buildRows() []row {
 			// calculation honest.
 			l.Text = expandTabs(l.Text)
 			rows = append(rows, row{kind: rowLine, hunk: i, line: l})
+			line, side := l.Line()
+			if tr := m.threadRows(i, f.Path, line, side); tr != nil {
+				placed[threadKey(f.Path, line, side)] = true
+				rows = append(rows, tr...)
+			}
 		}
 	}
+	rows = append(rows, m.orphanRows(placed)...)
 	return rows
 }
 
