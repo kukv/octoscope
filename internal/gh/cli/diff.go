@@ -23,9 +23,10 @@ import (
 // limit. Rather than matching GitHub's error text for that (its wording is
 // not ours to depend on, and .claude/rules/errors.md says not to branch on
 // error strings), any failure here is retried through the files API, which
-// is cheap since failures are rare. If that also fails, the original error
-// is what gets reported: it is the one that describes what the user
-// actually asked for.
+// is cheap since failures are rare. If that also fails, both errors are
+// joined rather than one discarding the other: this one still describes
+// what the user actually asked for, but a bug in the fallback itself must
+// not go unseen either.
 func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
 	args := appendRepo(
 		[]string{"pr", "diff", strconv.Itoa(number), "--color", "never"},
