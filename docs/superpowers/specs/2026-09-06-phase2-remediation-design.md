@@ -3,7 +3,6 @@
 - 日付: 2026-09-06
 - 対象: `internal/gh` / `internal/tui` 全体 + `.claude/rules`
 - 前提設計: `docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md`
-- 機能チェック表: `docs/2026-09-06-feature-checklist.md`
 
 ## 1. 背景
 
@@ -130,7 +129,7 @@ EditPRLabels / EditIssueLabels、EditPRAssignees / EditIssueAssignees
 
 ## 3. 特定済みのバグ
 
-機能チェック（`docs/2026-09-06-feature-checklist.md`、2026-09-07 実施）の結果を反映済み。
+2026-09-07 に実機で全機能を 1 つずつ確認した結果を反映済み。
 
 ### 3.0 最優先バグ: レビュー系 GraphQL クエリが必ず失敗する
 
@@ -168,9 +167,9 @@ viewerCanUnminimize viewerCanUpdate viewerCannotUpdateReasons viewerDidAuthor
 
 影響: Phase 2 で追加した機能が丸ごと動かない。
 
-- diff の既存レビュースレッド表示（チェック表 5-16）
-- diff の行コメント（5a-* すべて。`c` が「読み込み中」から進まない）
-- レビューの送信・破棄（5b-* すべて）
+- diff の既存レビュースレッド表示
+- diff の行コメント（`c` が「読み込み中」から進まない）
+- レビューの送信・破棄
 - 詳細画面の `v`
 
 **テストが見逃した理由**: `run` を差し替えたフェイクはクエリ文字列を捨てて
@@ -218,7 +217,7 @@ wantArgs := []string{"pr", "list", "--json", prListFields}
 
 ### 3.3 実バグ: `o`（ブラウザで開く）が WSL で動かない
 
-チェック表 3-7 / 4-5。
+Repos 一覧と詳細画面の `o`。
 
 ```
 exec: "xdg-open,x-www-browser,www-browser,wslview": executable file not found in $PATH
@@ -261,13 +260,13 @@ xdg-open        なし
 `explorer.exe` は成功時も終了コード 1 を返すことが知られているため、
 `powershell.exe` の `Start-Process` を採る。この事情はコードにコメントで残す。
 
-### 3.4 再現しなかったもの: 詳細画面の `c`（チェック表 4a-1）
+### 3.4 再現しなかったもの: 詳細画面の `c`
 
 「`c` を押しても何も起きない」との報告。実 API を使って次を再現したが、
 いずれも入力欄は正常に開いた。
 
 - Issue #50 の詳細を開いて `c`
-- PR #55 の詳細 → `d` で diff → `esc` で戻る → `c`（チェック表の実施順と同じ）
+- PR #55 の詳細 → `d` で diff → `esc` で戻る → `c`（実機での確認と同じ順）
 
 `app` 経由・`detail` 単体の両方で確認。`handleKey` の `case "c"` に到達し、
 `composing` が真になり、`View()` が入力欄に変わることを確認している。
@@ -394,7 +393,7 @@ const (
 )
 ```
 
-対応表（これが機能チェック表の各行と 1 対 1 で対応する）:
+対応表:
 
 | 状態 | mode | phase | 旧フィールド |
 |---|---|---|---|
@@ -538,14 +537,14 @@ Bubble Tea を起動せずに検証する。
 
 | # | 内容 | 検証 |
 |---|---|---|
-| 0 | `review.graphql` の `diffSide` 修正（3.0）+ クエリをスキーマに突き合わせるテスト | 実 PR で 5-16 / 5a / 5b が動く |
+| 0 | `review.graphql` の `diffSide` 修正（3.0）+ クエリをスキーマに突き合わせるテスト | 実 PR でスレッド表示・行コメント・レビュー送信/破棄が動く |
 | 1 | `--limit` バグ修正 + 仕様テストへの置き換え | 実機で 31 件以上のリポジトリを開いて全部出る |
-| 1.5 | `o` を octoscope 自身で開く（3.3） | WSL / Linux / macOS で 3-7 と 4-5 が通る |
+| 1.5 | `o` を octoscope 自身で開く（3.3） | WSL / Linux / macOS で Repos と詳細の `o` が通る |
 | 2 | GitHub API 仕様の確認（4.6）→ ページング対応 | 100 件超のラベル / スレッドを持つ PR で切れない |
 | 3 | 規約 10 項目を rules と `.golangci.yml` に反映 | `make lint` が通る |
 | 4 | `internal/usecase` 導入。`detail.Source` 19 → 6、オーケストレーション 2 箇所を移動 | golden 不変。`make check` |
 | 5 | `testdata` を実物で録り直す | 既存のパーステストが実物で通る |
-| 6 | `detail` / `diff` の bool → enum | golden 不変。機能チェック表を再走 |
+| 6 | `detail` / `diff` の bool → enum | golden 不変。実機で全機能を再走 |
 | 7 | `Update` の case を名前つき method に分割 | golden 不変 |
 | 8 | コメント削除（26 箇所 + 言い直し） | `make check` |
 | 9 | シナリオテスト追加 | 新テストが空振りでないことを確認 |
@@ -566,7 +565,7 @@ Bubble Tea を起動せずに検証する。
 
 ## 8. 完了条件
 
-1. `docs/2026-09-06-feature-checklist.md` の全項目が `OK`
+1. 実機で全機能を 1 つずつ確認し、動かないものが無い
 2. `make check` が通る
 3. `detail.Source` が 6 メソッド以下
 4. `internal/tui` に bool の mode フラグが無い
