@@ -25,6 +25,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		m.file = i
 		m.sidebar = true
 		m.top = 0
+		m.declined = ""
 		m.rows = m.buildRows()
 		m.row = firstRow(m.rows)
 		m = m.follow()
@@ -43,6 +44,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	}
 	m.row = i
 	m.sidebar = false
+	m.declined = ""
 	return m, nil
 }
 

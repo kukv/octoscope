@@ -127,6 +127,12 @@ diff:
     other: "Comment on this line"
   posting:
     other: "sending the comment"
+  decline_no_line:
+    other: "this row has no line to comment on"
+  decline_loading:
+    other: "still loading the review; try again in a moment"
+  decline_no_pending_review:
+    other: "no pending review to discard"
 
 submit:
   title:

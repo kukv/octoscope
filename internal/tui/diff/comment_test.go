@@ -266,6 +266,72 @@ func TestCDoesNothingOnAThreadRow(t *testing.T) {
 	}
 }
 
+// TestCOnAHunkHeaderSaysWhyNothingHappened is the c-silent fix's other half:
+// the guard in startComposing is correct (a hunk header has no line), but it
+// used to leave the screen unchanged, indistinguishable from the key doing
+// nothing at all.
+func TestCOnAHunkHeaderSaysWhyNothingHappened(t *testing.T) {
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
+	m.row = 0 // the first row of the fixture is a hunk header
+	m = press(m, "c")
+	if m.composing {
+		t.Fatal("c opened the composer on a hunk header")
+	}
+	if m.declined != i18n.T("diff.decline_no_line") {
+		t.Errorf("declined = %q, want the no-line message", m.declined)
+	}
+	if !strings.Contains(ansi.Strip(m.View()), i18n.T("diff.decline_no_line")) {
+		t.Errorf("the no-line message is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// TestCBeforeTheContextArrivesSaysItIsLoading is TestCDoesNothingBeforeThe-
+// ContextArrives with the message on top: for the ~6.5s the review context
+// takes to fetch, c is inert, and the viewer needs to know it is loading
+// rather than broken.
+func TestCBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
+	m := loaded(t, 120, 40) // the diff only
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	if m.composing {
+		t.Fatal("c opened the composer before the pull request's id was known")
+	}
+	if m.declined != i18n.T("diff.decline_loading") {
+		t.Errorf("declined = %q, want the loading message", m.declined)
+	}
+}
+
+// TestCAddsNoSecondMessageWhenTheReviewContextFailed: reviewErr is already
+// drawn on its own footer line, so a second line saying the same thing would
+// just repeat it.
+func TestCAddsNoSecondMessageWhenTheReviewContextFailed(t *testing.T) {
+	m := loaded(t, 120, 40)
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
+	m = press(m, "c")
+	if m.composing {
+		t.Fatal("c opened the composer after a review-context failure")
+	}
+	if m.declined != "" {
+		t.Errorf("declined = %q, want empty: reviewErr already says this", m.declined)
+	}
+}
+
+// TestTheDeclineMessageClearsWhenTheCursorMoves: the message stops being
+// true the moment the viewer moves off the row it was about.
+func TestTheDeclineMessageClearsWhenTheCursorMoves(t *testing.T) {
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
+	m.row = 0
+	m = press(m, "c")
+	if m.declined == "" {
+		t.Fatal("no decline message to begin with; this test proves nothing")
+	}
+	m = press(m, "j")
+	if m.declined != "" {
+		t.Errorf("declined = %q after moving the cursor, want cleared", m.declined)
+	}
+}
+
 func TestEscThrowsTheDraftAway(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
@@ -499,6 +565,31 @@ func TestVDoesNothingBeforeTheContextArrives(t *testing.T) {
 	m = press(m, "v")
 	if m.submitting {
 		t.Error("v opened the popup before the pull request's id was known")
+	}
+}
+
+// TestVBeforeTheContextArrivesSaysItIsLoading is v's share of the same fix
+// c got: it has the same PullRequestID guard, and the same silence.
+func TestVBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
+	m := loaded(t, 120, 40) // the diff only
+	m = press(m, "v")
+	if m.submitting {
+		t.Fatal("v opened the popup before the pull request's id was known")
+	}
+	if m.declined != i18n.T("diff.decline_loading") {
+		t.Errorf("declined = %q, want the loading message", m.declined)
+	}
+}
+
+func TestXWithNoPendingReviewSaysWhyNothingHappened(t *testing.T) {
+	m := withThreads(t, 120, 40)
+	m.review.PendingID = ""
+	m = press(m, "X")
+	if m.discarding {
+		t.Fatal("X asked to discard with no pending review")
+	}
+	if m.declined != i18n.T("diff.decline_no_pending_review") {
+		t.Errorf("declined = %q, want the no-pending-review message", m.declined)
 	}
 }
 

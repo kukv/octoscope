@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type (
@@ -29,7 +30,11 @@ type (
 // nothing there rather than posting somewhere arbitrary. Neither does it open
 // before the review context has arrived: the diff and the context are fetched
 // in parallel, and starting a review needs the pull request's node id, which
-// only the context carries.
+// only the context carries. Both declines say why at footer level
+// (m.declined) rather than leaving the screen unchanged -- that silence is
+// what made c look broken in the first place. A context that failed outright
+// is the one exception: reviewErr already says so on its own line, so this
+// adds nothing on top of it.
 //
 // The target line and side are captured here, not read again at send time.
 // A refetch that lands mid-composition rebuilds m.rows and can insert thread
@@ -39,9 +44,17 @@ type (
 // above has just confirmed it.
 func (m Model) startComposing() Model {
 	r := m.currentRow()
-	if r.kind != rowLine || m.review.PullRequestID == "" {
+	switch {
+	case r.kind != rowLine:
+		m.declined = i18n.T("diff.decline_no_line")
+		return m
+	case m.reviewErr != nil:
+		return m
+	case m.review.PullRequestID == "":
+		m.declined = i18n.T("diff.decline_loading")
 		return m
 	}
+	m.declined = ""
 	line, side := r.line.Line()
 	m.target = gh.PendingComment{Path: m.files[m.file].Path, Line: line, Side: side}
 	m.composing = true

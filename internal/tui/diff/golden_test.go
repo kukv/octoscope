@@ -163,6 +163,15 @@ func discardingModel(width int) Model {
 	return press(m, "X")
 }
 
+// declinedNoLineModel is goldenModel with the cursor put back on the hunk
+// header and c pressed against it, so the "no line here" message is on
+// screen instead of the composer.
+func declinedNoLineModel(width int) Model {
+	m := goldenModel(width)
+	m.row = 0
+	return press(m, "c")
+}
+
 // TestGoldenIconSets records a view with both an open thread and a folded
 // one, once per glyph set: the marker and the comment bar are the two
 // literals this glyph pair covers, and a set that draws them the wrong width
@@ -187,6 +196,7 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 		"posting":          postingModel,
 		"submitting":       submittingModel,
 		"discarding":       discardingModel,
+		"declined_no_line": declinedNoLineModel,
 	}
 	// 99 and 100 straddle minWidthForSidebar, the one width where the layout
 	// itself changes; goldenWidths never lands on it.
@@ -231,6 +241,7 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 				"posting":        postingModel(120).View(),
 				"submitting":     submittingModel(120).View(),
 				"discarding":     discardingModel(120).View(),
+				"declined":       declinedNoLineModel(120).View(),
 			} {
 				t.Run(name, func(t *testing.T) {
 					i18n.AssertNoUnresolvedIDs(t, view)

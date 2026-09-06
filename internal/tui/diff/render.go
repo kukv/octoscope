@@ -63,6 +63,9 @@ func (m Model) View() string {
 	if m.reviewErr != nil {
 		lines = append(lines, m.reviewErrLine())
 	}
+	if m.declined != "" {
+		lines = append(lines, m.declinedLine())
+	}
 	if m.composing || m.posting {
 		lines = append(lines, m.composerLines()...)
 	}
@@ -211,6 +214,25 @@ func (m Model) reviewErrHeight() int {
 	return 0
 }
 
+// declinedLine reports why c, v or X just did nothing: the row has no line,
+// the review context has not arrived yet, or (X) there is no pending review.
+// It is drawn the same way reviewErrLine is -- one line above the key bar,
+// dim rather than red, since it is not a failure -- rather than leaving the
+// screen unchanged the way the silent guards used to (.claude/rules/errors.md
+// applies the same "say why" rule to a declined key as to a failed one).
+func (m Model) declinedLine() string {
+	return clip(theme.Dim().Render(m.declined), m.width)
+}
+
+// declinedHeight is the extra line declinedLine takes, out of the pane's
+// height budget the same way reviewErrHeight is.
+func (m Model) declinedHeight() int {
+	if m.declined != "" {
+		return 1
+	}
+	return 0
+}
+
 // header draws the two lines the diff view can fill in: the pull request's
 // own name and title, and how big the change is. The title and the branches
 // arrive with the review context, which may still be loading when the diff
@@ -284,7 +306,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.composerHeight()-m.submitHeight()-m.discardHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.declinedHeight()-m.composerHeight()-m.submitHeight()-m.discardHeight(), 1)
 }
 
 // body lays the sidebar and the diff pane side by side, the way the Repos

@@ -138,6 +138,14 @@ type Model struct {
 	// again from the cursor at send time (see comment.go).
 	target gh.PendingComment
 
+	// declined says why the last c, v or X did nothing: the cursor is on a
+	// row with no line, the review context has not arrived yet, or (X only)
+	// there is no pending review to discard. It is drawn on its own footer
+	// line, empty otherwise. reviewErr takes precedence over the loading
+	// case: once the context has failed, that line already says so, and a
+	// second message would only repeat it.
+	declined string
+
 	// submit is the review submission popup (v), a small window drawn over
 	// this view rather than a view of its own (see review.go). submitErr is
 	// a failed submission's text, kept here rather than in submit itself so
@@ -237,6 +245,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.review = msg.ctx
 		m.reviewErr = nil
+		m.declined = ""
 		m.rows = m.buildRows()
 		m.row = clamp(m.row, len(m.rows)-1)
 		m = m.follow()
@@ -246,6 +255,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.reviewErr = msg.err
+		m.declined = ""
 		return m, nil
 	case errMsg:
 		if msg.ref != m.ref {
@@ -440,6 +450,7 @@ func (m Model) moveRow(delta int) Model {
 		return m.moveFile(delta)
 	}
 	m.row = clamp(m.row+delta, len(m.rows)-1)
+	m.declined = ""
 	return m.follow()
 }
 
@@ -449,6 +460,7 @@ func (m Model) moveFile(delta int) Model {
 	}
 	m.file = clamp(m.file+delta, len(m.files)-1)
 	m.top = 0
+	m.declined = ""
 	m.rows = m.buildRows()
 	m.row = firstRow(m.rows)
 	m = m.follow()
@@ -482,6 +494,7 @@ func (m Model) moveHunk(delta int) Model {
 	for i, r := range m.rows {
 		if r.kind == rowHunkHeader && r.hunk == want {
 			m.row = i
+			m.declined = ""
 			return m.follow()
 		}
 	}

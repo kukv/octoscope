@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
 )
 
@@ -19,11 +20,17 @@ type discardedMsg struct {
 // approving a diff the viewer had nothing to say about is the commonest
 // review there is. It does nothing before the review context has arrived --
 // the diff and the context are fetched in parallel, and submitting needs the
-// pull request's node id, which only the context carries.
+// pull request's node id, which only the context carries. Same decline
+// treatment as c (comment.go): say why at footer level, except when reviewErr
+// already does.
 func (m Model) openSubmit() Model {
 	if m.review.PullRequestID == "" {
+		if m.reviewErr == nil {
+			m.declined = i18n.T("diff.decline_loading")
+		}
 		return m
 	}
+	m.declined = ""
 	target := review.Target{
 		PullRequestID:   m.review.PullRequestID,
 		PendingID:       m.review.PendingID,
@@ -44,11 +51,14 @@ func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // startDiscard asks before X throws a pending review away: one keystroke is
 // too little between a written review and no review. It does nothing when
-// there is no pending review to discard.
+// there is no pending review to discard, and says so at footer level rather
+// than leaving the screen unchanged.
 func (m Model) startDiscard() Model {
 	if m.review.PendingID == "" {
+		m.declined = i18n.T("diff.decline_no_pending_review")
 		return m
 	}
+	m.declined = ""
 	m.discarding = true
 	m.discardErr = ""
 	return m

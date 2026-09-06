@@ -123,6 +123,12 @@ diff:
     other: "この行へのコメント"
   posting:
     other: "コメントを送信中"
+  decline_no_line:
+    other: "この行にはコメントできません"
+  decline_loading:
+    other: "レビュー情報を読み込み中です。少し待ってからもう一度"
+  decline_no_pending_review:
+    other: "破棄する未提出のレビューがありません"
 
 submit:
   title:
