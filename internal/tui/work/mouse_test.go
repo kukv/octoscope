@@ -176,3 +176,39 @@ func TestASingleColumnBoardStillHitTests(t *testing.T) {
 		t.Errorf("clicking the second card selected #%d, want #3", got.Number)
 	}
 }
+
+// TestClickingACardInAScrolledColumn is the case the fixtures above never
+// reach: a column taller than the board draws its nth visible card, not its
+// nth card, and a hit-test that ignored the offset would select the wrong one
+// exactly when the board is worth scrolling.
+func TestClickingACardInAScrolledColumn(t *testing.T) {
+	var w gh.Work
+	for i := range 40 {
+		w[gh.SectionReviewRequested] = append(w[gh.SectionReviewRequested], gh.WorkItem{
+			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: i + 1},
+			Title: fmt.Sprintf("card-%d", i),
+		})
+	}
+	m := New(&fakeSource{work: w})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
+	m, _ = m.Update(workMsg(w))
+	if !m.boxed() {
+		t.Fatal("the cards are not boxed at 120 columns; this test covers nothing")
+	}
+
+	// Walk the cursor past the last visible card, so the column is scrolled.
+	visible := m.visibleCards(m.boardHeight())
+	for range visible + 2 {
+		m, _ = m.Update(key("j"))
+	}
+	if m.cardWindow(gh.SectionReviewRequested, m.boardHeight()) == 0 {
+		t.Fatal("the column did not scroll; this test covers nothing")
+	}
+
+	want := m.row
+	x, y := titleAt(t, m, fmt.Sprintf("card-%d", want))
+	after, _ := m.Update(click(x, y))
+	if got, _ := after.SelectedRef(); got.Number != want+1 {
+		t.Errorf("clicking card-%d selected #%d, want #%d", want, got.Number, want+1)
+	}
+}

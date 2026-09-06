@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -127,5 +128,32 @@ func TestTheWheelMovesTheCursor(t *testing.T) {
 	}
 	if got, _ := up.SelectedRef(); got.Number != 1 {
 		t.Errorf("scrolling past the top selected #%d, want #1", got.Number)
+	}
+}
+
+// TestClickingARowInAScrolledList is what the fixtures above never reach: a
+// list taller than the terminal draws its nth visible row, not its nth item,
+// and a hit-test that ignored the offset would select the wrong one exactly
+// when the list is long enough to be worth scrolling.
+func TestClickingARowInAScrolledList(t *testing.T) {
+	var prs []gh.PR
+	for i := range 60 {
+		prs = append(prs, gh.PR{Number: i + 1, Title: fmt.Sprintf("pr-%d", i)})
+	}
+	m := loadedModel(&fakeSource{prs: prs})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
+
+	for range m.visibleRows() + 2 {
+		m, _ = m.Update(key("j"))
+	}
+	if m.rowWindow(m.visibleRows()) == 0 {
+		t.Fatal("the list did not scroll; this test covers nothing")
+	}
+
+	want := m.cursors[tabPRs]
+	x, y := tokenAt(t, m, fmt.Sprintf("pr-%d", want))
+	after, _ := m.Update(click(x, y))
+	if got, _ := after.SelectedRef(); got.Number != want+1 {
+		t.Errorf("clicking pr-%d selected #%d, want #%d", want, got.Number, want+1)
 	}
 }

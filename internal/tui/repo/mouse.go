@@ -22,8 +22,14 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if msg.Y == subTabRow {
 		return m.showTab(m.subTabAt(msg.X))
 	}
+	// The list scrolls, so the row under the pointer is the nth row on screen,
+	// not the nth item of the list.
 	row := msg.Y - listTop
-	if row < 0 || row >= m.itemCount() {
+	if row < 0 || row >= m.visibleRows() {
+		return m, nil
+	}
+	row += m.rowWindow(m.visibleRows())
+	if row >= m.itemCount() {
 		return m, nil
 	}
 	// Clicking the selected row opens it. Bubble Tea reports no double clicks,
