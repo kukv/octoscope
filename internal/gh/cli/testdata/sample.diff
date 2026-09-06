@@ -53,3 +53,14 @@ index eee5555..fff6666 100644
 \ No newline at end of file
 +new
 \ No newline at end of file
+diff --git a/mathutil/add.go b/mathutil/add.go
+index 1111111..2222222 100644
+--- a/mathutil/add.go
++++ b/mathutil/add.go
+@@ -3,4 +3,5 @@ func add(a, b int) int { return a + b }
+ package mathutil
+
+-func add(a, b int) int { return a + b }
++func add(a, b int) int {
++	return a + b
++}

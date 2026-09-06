@@ -51,8 +51,8 @@ func TestPRDiffBuildsTheCommand(t *testing.T) {
 
 func TestPRDiffParsesEveryShape(t *testing.T) {
 	files := sampleFiles(t)
-	if len(files) != 6 {
-		t.Fatalf("parsed %d files, want 6", len(files))
+	if len(files) != 7 {
+		t.Fatalf("parsed %d files, want 7", len(files))
 	}
 
 	tests := []struct {
@@ -72,6 +72,7 @@ func TestPRDiffParsesEveryShape(t *testing.T) {
 		{"renamed", files[3], "docs/b.md", "docs/a.md", gh.FileRenamed, 1, 1, false, 1},
 		{"binary", files[4], "logo.png", "", gh.FileModified, 0, 0, true, 0},
 		{"no trailing newline", files[5], "noeol.txt", "", gh.FileModified, 1, 1, false, 1},
+		{"hunk header with function context", files[6], "mathutil/add.go", "", gh.FileModified, 3, 1, false, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -114,6 +115,36 @@ func TestLineNumbersRunDownBothSides(t *testing.T) {
 		{int(gh.LineAdded), 0, 16},
 		{int(gh.LineContext), 15, 17},
 		{int(gh.LineContext), 16, 18},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("%d lines, want %d: %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+// TestHunkHeaderFunctionContextDoesNotShiftLineNumbers guards against a hunk
+// header like `@@ -3,4 +3,5 @@ func add(a, b int) int { return a + b }`: the
+// function-context text git appends after the second `@@` can contain a
+// token starting with `+` or `-` (here, the literal `+` in the signature),
+// which must not be mistaken for the start-of-hunk fields.
+func TestHunkHeaderFunctionContextDoesNotShiftLineNumbers(t *testing.T) {
+	hunk := sampleFiles(t)[6].Hunks[0]
+
+	got := make([][3]int, 0, len(hunk.Lines))
+	for _, l := range hunk.Lines {
+		got = append(got, [3]int{int(l.Kind), l.OldLine, l.NewLine})
+	}
+	want := [][3]int{
+		{int(gh.LineContext), 3, 3},
+		{int(gh.LineContext), 4, 4},
+		{int(gh.LineRemoved), 5, 0},
+		{int(gh.LineAdded), 0, 5},
+		{int(gh.LineAdded), 0, 6},
+		{int(gh.LineAdded), 0, 7},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("%d lines, want %d: %v", len(got), len(want), got)

@@ -137,9 +137,14 @@ func pathFromGitHeader(line string) string {
 }
 
 // hunkStarts reads the first line number of each side out of
-// `@@ -12,7 +12,9 @@ func Walk(...)`.
+// `@@ -12,7 +12,9 @@ func Walk(...)`. Only the two fields between the leading
+// and trailing `@@` carry the range; git appends the enclosing function's
+// name after the second `@@` (its xfuncname heuristic), and a one-line
+// function body is exactly the shape that puts a `+` or `-` token there
+// too, so fields past the second `@@` must not be scanned for a range.
 func hunkStarts(header string) (oldNo, newNo int) {
-	for _, f := range strings.Fields(header) {
+	fields := strings.Fields(header)
+	for _, f := range fields[:min(3, len(fields))] {
 		switch {
 		case strings.HasPrefix(f, "-"):
 			oldNo = firstNumber(f[1:])
