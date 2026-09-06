@@ -2353,7 +2353,9 @@ git commit -m "docs: record the usecase decision in the rules and guard it with 
 **Interfaces:** なし
 
 規約を実装より先に入れたため、`.claude/rules/` と `.golangci.yml` に
-「今これを破っている / いつ直す」という**暫定の注記が 8 箇所**残っている。
+「今これを破っている / いつ直す」という**暫定の注記**が残っている
+（2026-09-07 に数えて 9 箇所。以後 rules を触れば増減するので、**件数は
+数えてから使う** — Step 1）。
 コードが追いついた時点で消さないと、規約が現状と食い違ったまま残り、
 次のセッションがどちらを信じればいいか分からなくなる。
 
@@ -2366,7 +2368,7 @@ grep -rn 'TRANSIENT' .claude/rules .golangci.yml
 各マーカーは `TRANSIENT(Part1 Task N)` / `TRANSIENT(Part2 作業順 N)` の形で、
 **どの作業が完了したら消せるか**を持っている。
 
-**Part 1 で消すもの（6 箇所）**
+**Part 1 で消すもの（7 箇所 = `Task 5` が 4、`Task 7` が 3）**
 
 | マーカー | 場所 | 消す条件 | 消し方 |
 |---|---|---|---|
@@ -2387,11 +2389,23 @@ grep -rn 'TRANSIENT' .claude/rules .golangci.yml
 
 - [ ] **Step 1: 残っているマーカーを数える**
 
+**この計画に書いた件数を信じない。数えてから始める。**
+下は 2026-09-07 に数えた値で、その後 rules を触れば変わる。
+
 ```bash
-grep -rn 'TRANSIENT' .claude/rules .golangci.yml
+grep -rho 'TRANSIENT([^)]*)' .claude/rules .golangci.yml | sort | uniq -c
 ```
 
-Expected: 8 箇所
+Expected（2026-09-07 時点）:
+
+```
+      4 TRANSIENT(Part1 Task 5)
+      3 TRANSIENT(Part1 Task 7)
+      1 TRANSIENT(Part2 作業順 6)
+      1 TRANSIENT(Part2 作業順 8)
+```
+
+数が違ったら、上の表と突き合わせて**表のほうを直してから**先に進む。
 
 - [ ] **Step 2: Task 5 の 4 箇所を消す**
 
@@ -2422,13 +2436,13 @@ grep -rn 'ItemPR' internal/tui/ | grep -v '_test.go'
 残ってはいけないのは「PR なら `GetPR`、Issue なら `GetIssue`」という
 **呼び分け**である。区別がつかない行が出てきたら止めて相談する。
 
-- [ ] **Step 5: 残りが Part 2 の 2 箇所だけであることを確認**
+- [ ] **Step 5: `Part1` のマーカーが 1 つも残っていないことを確認**
 
 ```bash
-grep -rn 'TRANSIENT' .claude/rules .golangci.yml
+grep -rn 'TRANSIENT(Part1' .claude/rules .golangci.yml
 ```
 
-Expected: 2 箇所（どちらも `Part2`）
+Expected: 出力なし（`Part2` のものだけが残る）
 
 - [ ] **Step 6: `make check` とコミット**
 
@@ -2545,6 +2559,6 @@ Part 2 の完了条件に「`grep -rn 'TRANSIENT' .claude/rules .golangci.yml` �
 | 6 実物 testdata | Task 4 |
 | 7 シナリオテスト 3 本 | **Part 2**（作業順 9） |
 | 8 rules 10 項目 + depguard | Task 8（**完了済み**） |
-| **9（追加）`TRANSIENT` の注記が 0 件** | Task 8.5 で 6 箇所、**Part 2** で残り 2 箇所 |
+| **9（追加）`TRANSIENT` の注記が 0 件** | `Part1` のものは Task 8.5、`Part2` のものは **Part 2** |
 
 **未確定として実装者に判断を委ねた箇所: 無い。** TBD / 後で決める、は 1 つも残していない。
