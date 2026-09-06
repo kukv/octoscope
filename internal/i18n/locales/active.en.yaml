@@ -136,7 +136,7 @@ submit:
   comment:
     other: "Comment"
   placeholder:
-    other: "Leave a note (optional)"
+    other: "Leave a note (required unless approving)"
   pending_count:
     one: "{{.Count}} line comment will be sent"
     other: "{{.Count}} line comments will be sent"

@@ -132,7 +132,7 @@ submit:
   comment:
     other: "コメント"
   placeholder:
-    other: "ひとこと（任意）"
+    other: "ひとこと（承認以外は必須）"
   pending_count:
     other: "行コメント {{.Count}} 件が一緒に送られます"
   no_pending:
