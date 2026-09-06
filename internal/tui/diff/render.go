@@ -45,11 +45,34 @@ func (m Model) View() string {
 	}
 
 	lines := append(m.header(), m.body()...)
+	if m.reviewErr != nil {
+		lines = append(lines, m.reviewErrLine())
+	}
 	return strings.Join(append(lines, m.keyBar()), "\n")
 }
 
 func (m Model) keyBar() string {
 	return theme.Dim().Render(clip(i18n.T("footer.diff"), m.width))
+}
+
+// reviewErrLine reports a review-context fetch that failed. The diff itself
+// may still be readable, so this is one line above the key bar rather than
+// the parent's whole-screen error view (.claude/rules/errors.md). GitHub's
+// own wording carries the most information, so only the prefix is
+// translated.
+func (m Model) reviewErrLine() string {
+	text := theme.Error().Render(i18n.T("common.error_prefix")) + m.reviewErr.Error()
+	return clip(text, m.width)
+}
+
+// reviewErrHeight is the extra line reviewErrLine takes, taken out of the
+// pane's height budget the same way the key bar is, so a failure never pushes
+// the key bar off the bottom.
+func (m Model) reviewErrHeight() int {
+	if m.reviewErr != nil {
+		return 1
+	}
+	return 0
 }
 
 // header draws the two lines the diff view can fill in: the pull request's
@@ -123,7 +146,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight, 1)
+	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight(), 1)
 }
 
 // body lays the sidebar and the diff pane side by side, the way the Repos

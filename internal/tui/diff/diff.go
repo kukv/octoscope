@@ -36,7 +36,17 @@ type reviewMsg struct {
 	ctx gh.ReviewContext
 }
 
+// errMsg is the diff fetch's own failure: with no diff there is nothing to
+// show, so it escalates to the parent's whole-screen error view (ErrorMsg).
 type errMsg struct {
+	ref gh.ItemRef
+	err error
+}
+
+// reviewErrMsg is the review context's own failure: the diff itself may
+// still be readable, so this is shown on one line above the key bar instead
+// of escalating (.claude/rules/errors.md's Bubble Tea section).
+type reviewErrMsg struct {
 	ref gh.ItemRef
 	err error
 }
@@ -83,6 +93,11 @@ type Model struct {
 	// threads already on the diff. It arrives separately from files (fetch),
 	// and either may land first.
 	review gh.ReviewContext
+
+	// reviewErr is set when the review context fails to fetch. The diff may
+	// still be readable, so this is drawn on its own footer line rather than
+	// replacing the whole screen; nil means no failure to show.
+	reviewErr error
 
 	// expanded is the set of settled threads the user has opened, keyed by
 	// threadKey. It survives a refetch because it is keyed by position, not
@@ -139,7 +154,7 @@ func (m Model) fetchReview() tea.Cmd {
 	return func() tea.Msg {
 		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
-			return errMsg{ref: ref, err: err}
+			return reviewErrMsg{ref: ref, err: err}
 		}
 		return reviewMsg{ref: ref, ctx: ctx}
 	}
@@ -168,7 +183,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.review = msg.ctx
+		m.reviewErr = nil
 		m.rows = m.buildRows()
+		return m, nil
+	case reviewErrMsg:
+		if msg.ref != m.ref {
+			return m, nil
+		}
+		m.reviewErr = msg.err
 		return m, nil
 	case errMsg:
 		if msg.ref != m.ref {
@@ -192,6 +214,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "r":
 		m.loading = true
+		m.reviewErr = nil
 		return m, tea.Batch(m.spin.Tick, m.fetch())
 	case "j", "down":
 		return m.moveRow(1), nil

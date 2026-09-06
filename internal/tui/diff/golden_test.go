@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -115,10 +116,23 @@ func TestGolden(t *testing.T) {
 // Every row is checked at every width, because a row that overruns wraps,
 // and everything below it is then drawn a line lower than the layout
 // believes.
+// reviewFailureModel is goldenModel with a review-context failure on top,
+// its message long and partly Japanese so a line this wide has to be
+// truncated rather than allowed to overrun.
+func reviewFailureModel(width int) Model {
+	m := goldenModel(width)
+	m, _ = m.Update(reviewErrMsg{
+		ref: m.ref,
+		err: errors.New("GraphQL: このプルリクエストのレビュー情報を取得できませんでした (fetchReviewContext)"),
+	})
+	return m
+}
+
 func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 	models := map[string]func(int) Model{
 		"tab":              goldenModel,
 		"wide_line_number": wideLineNumberModel,
+		"review_failure":   reviewFailureModel,
 	}
 	for _, w := range goldenWidths {
 		for _, lang := range goldenLanguages {
@@ -148,12 +162,13 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 			threads := withThreads(t)
 			expanded := press(openCollapsedThread(threads), "enter")
 			for name, view := range map[string]string{
-				"loaded":   loaded(t, 120, 30).View(),
-				"loading":  loading.View(),
-				"empty":    emptyDiff(t, 120, 30).View(),
-				"threads":  threads.View(),
-				"expanded": expanded.View(),
-				"pending":  withPending(t).View(),
+				"loaded":         loaded(t, 120, 30).View(),
+				"loading":        loading.View(),
+				"empty":          emptyDiff(t, 120, 30).View(),
+				"threads":        threads.View(),
+				"expanded":       expanded.View(),
+				"pending":        withPending(t).View(),
+				"review_failure": reviewFailureModel(120).View(),
 			} {
 				t.Run(name, func(t *testing.T) {
 					i18n.AssertNoUnresolvedIDs(t, view)

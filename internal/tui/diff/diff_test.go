@@ -2,6 +2,7 @@ package diff
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -207,5 +208,75 @@ func TestCurrentRowFollowsTheCursor(t *testing.T) {
 	m := press(loaded(t, 120, 30), "}")
 	if got := m.currentRow(); got.kind != rowHunkHeader || got.hunk != 1 {
 		t.Errorf("currentRow after } = %+v, want the second hunk's header", got)
+	}
+}
+
+// TestADiffFailureGoesToTheParentsErrorScreen is the diff fetch's own
+// failure, which leaves nothing to show: it still becomes ErrorMsg for the
+// parent's whole-screen error view.
+func TestADiffFailureGoesToTheParentsErrorScreen(t *testing.T) {
+	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, cmd := m.Update(errMsg{ref: m.ref, err: errors.New("boom")})
+	if cmd == nil {
+		t.Fatal("a diff failure produced no command")
+	}
+	got, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("a diff failure produced %T, want ErrorMsg", cmd())
+	}
+	if got.Err.Error() != "boom" {
+		t.Errorf("ErrorMsg.Err = %q, want %q", got.Err, "boom")
+	}
+}
+
+// TestAReviewFailureLeavesTheDiffReadable is the review context's own
+// failure: the diff itself is fine, so it must not escalate to the parent's
+// error screen, and the diff must still be on screen alongside the failure.
+func TestAReviewFailureLeavesTheDiffReadable(t *testing.T) {
+	m := loaded(t, 120, 30)
+	m, cmd := m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
+	if cmd != nil {
+		if _, ok := cmd().(ErrorMsg); ok {
+			t.Fatal("a review failure escalated to the parent's error screen")
+		}
+	}
+	out := ansi.Strip(m.View())
+	if !strings.Contains(out, "func Walk") {
+		t.Errorf("the diff is no longer readable after a review failure:\n%s", out)
+	}
+	if !strings.Contains(out, "boom from github") {
+		t.Errorf("the review failure is not shown:\n%s", out)
+	}
+}
+
+// TestAReviewFailureForAnotherPullRequestIsDropped mirrors
+// TestAnswersForAnotherPullRequestAreDropped: the request for the item the
+// user just left is still in flight, and its failure must not land here.
+func TestAReviewFailureForAnotherPullRequestIsDropped(t *testing.T) {
+	m := loaded(t, 120, 30)
+	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	m, _ = m.Update(reviewErrMsg{ref: other, err: errors.New("boom")})
+	if strings.Contains(ansi.Strip(m.View()), "boom") {
+		t.Errorf("a review failure for %v was shown in this view's footer", other)
+	}
+}
+
+// TestTheDiffFitsTheTerminalWithAReviewFailure extends
+// TestTheDiffFitsTheTerminal: the failure line must come out of the pane's
+// height budget, the same way the key bar does, so it must never push the key
+// bar off the bottom.
+func TestTheDiffFitsTheTerminalWithAReviewFailure(t *testing.T) {
+	for _, width := range []int{80, 120} {
+		for _, height := range []int{24, 40} {
+			m := loaded(t, width, height)
+			m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom")})
+			out := m.View()
+			if got := len(strings.Split(out, "\n")); got > height {
+				t.Errorf("the diff drew %d lines into a %dx%d terminal", got, width, height)
+			}
+			if !strings.Contains(ansi.Strip(out), ansi.Strip(m.keyBar())) {
+				t.Errorf("the key bar was pushed off the screen:\n%s", ansi.Strip(out))
+			}
+		}
 	}
 }
