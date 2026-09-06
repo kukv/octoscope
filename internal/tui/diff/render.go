@@ -61,7 +61,7 @@ func (m Model) keyBar() string {
 // own wording carries the most information, so only the prefix is
 // translated.
 func (m Model) reviewErrLine() string {
-	text := theme.Error().Render(i18n.T("common.error_prefix")) + m.reviewErr.Error()
+	text := theme.Error().Render(i18n.T("common.error_prefix")) + singleLine(m.reviewErr.Error())
 	return clip(text, m.width)
 }
 
@@ -258,7 +258,7 @@ func (m Model) plainText(r row) string {
 
 // threadText is what threadLine draws, without its colour.
 func (m Model) threadText(r row) string {
-	body := r.comment.Author.Login + " · " + expandTabs(r.comment.Body)
+	body := r.comment.Author.Login + " · " + singleLine(r.comment.Body)
 	if r.comment.Pending {
 		body += " (" + i18n.T("diff.unsent") + ")"
 	}
@@ -352,6 +352,14 @@ const tabWidth = 4
 // measures or truncates it, rather than trusting any of those three to
 // agree.
 func expandTabs(s string) string { return strings.ReplaceAll(s, "\t", strings.Repeat(" ", tabWidth)) }
+
+// singleLine folds a GitHub body or error text onto one row. A review
+// comment is markdown and routinely has newlines in it, and View joins one
+// string per row: a body carrying its own newline would draw as extra visual
+// rows and shift every row under it down by one, the same failure as a tab
+// left unexpanded. Folding every run of whitespace to a single space keeps as
+// much of the text visible as fits, rather than showing only its first line.
+func singleLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // clip cuts s to w display columns. Japanese takes two columns per
 // character, so the count is never a byte or a rune count.

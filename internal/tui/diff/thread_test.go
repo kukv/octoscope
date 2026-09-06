@@ -147,6 +147,61 @@ func TestAnswersForAnotherPullRequestAreDroppedForReview(t *testing.T) {
 	}
 }
 
+// multiLineReview builds a review context with one comment whose body is the
+// given multi-line text.
+func multiLineReview(body string) gh.ReviewContext {
+	return gh.ReviewContext{
+		PullRequestID: "PR_1",
+		Threads: []gh.ReviewThread{
+			{
+				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
+				Comments: []gh.ThreadComment{
+					{Author: gh.Author{Login: "kukv"}, Body: body},
+				},
+			},
+		},
+	}
+}
+
+// TestAMultiLineCommentStaysOnOneRow is the newline sibling of the tab bug
+// this package already fixed once: a review comment is markdown and
+// routinely has blank lines in it, and View joins one string per row, so a
+// body carrying its own newline would draw as extra visual rows and shift
+// every row under it down by one.
+func TestAMultiLineCommentStaysOnOneRow(t *testing.T) {
+	single := loaded(t, 120, 40)
+	single, _ = single.Update(reviewMsg{ref: single.ref, ctx: multiLineReview("this needs a guard see the issue for why")})
+	want := len(strings.Split(single.View(), "\n"))
+
+	multi := loaded(t, 120, 40)
+	multi, _ = multi.Update(reviewMsg{ref: multi.ref, ctx: multiLineReview("this needs a guard\n\nsee the issue for why")})
+	got := len(strings.Split(multi.View(), "\n"))
+
+	if got != want {
+		t.Errorf("a multi-line comment drew %d rows, want %d (one row, same as a single-line body)", got, want)
+	}
+	if !strings.Contains(ansi.Strip(multi.View()), "this needs a guard") {
+		t.Errorf("the comment text is missing:\n%s", ansi.Strip(multi.View()))
+	}
+}
+
+// TestAMultiLineJapaneseCommentStaysOnOneRow guards the width arithmetic:
+// folding whitespace must not disturb the double-width counting this package
+// has already fought for twice.
+func TestAMultiLineJapaneseCommentStaysOnOneRow(t *testing.T) {
+	m := loaded(t, 120, 40)
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: multiLineReview("ここは直したほうがいい\n\n理由は issue を見て")})
+	out := ansi.Strip(m.View())
+	if !strings.Contains(out, "ここは直したほうがいい") {
+		t.Errorf("the Japanese comment text is missing:\n%s", out)
+	}
+	for i, line := range strings.Split(m.View(), "\n") {
+		if w := ansi.StringWidth(line); w > 120 {
+			t.Errorf("line %d is %d columns wide in a 120-wide terminal: %q", i, w, ansi.Strip(line))
+		}
+	}
+}
+
 // TestSidesAreNotMixedUp is the test that stops a comment on the old version
 // of a line being drawn under the new one.
 func TestSidesAreNotMixedUp(t *testing.T) {

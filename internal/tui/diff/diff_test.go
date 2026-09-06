@@ -261,6 +261,27 @@ func TestAReviewFailureForAnotherPullRequestIsDropped(t *testing.T) {
 	}
 }
 
+// TestAMultiLineReviewFailureStaysOnOneRow is reviewErrLine's share of the
+// newline bug: gh and GitHub both return multi-line error text (a GraphQL
+// error array, a wrapped stderr), and the failure line has the same one-row
+// invariant as a thread comment.
+func TestAMultiLineReviewFailureStaysOnOneRow(t *testing.T) {
+	single := loaded(t, 120, 30)
+	single, _ = single.Update(reviewErrMsg{ref: single.ref, err: errors.New("boom from github: retry later")})
+	want := len(strings.Split(single.View(), "\n"))
+
+	multi := loaded(t, 120, 30)
+	multi, _ = multi.Update(reviewErrMsg{ref: multi.ref, err: errors.New("boom from github\n\nretry later")})
+	got := len(strings.Split(multi.View(), "\n"))
+
+	if got != want {
+		t.Errorf("a multi-line review failure drew %d rows, want %d", got, want)
+	}
+	if !strings.Contains(ansi.Strip(multi.View()), "boom from github") {
+		t.Errorf("the failure text is missing:\n%s", ansi.Strip(multi.View()))
+	}
+}
+
 // TestTheDiffFitsTheTerminalWithAReviewFailure extends
 // TestTheDiffFitsTheTerminal: the failure line must come out of the pane's
 // height budget, the same way the key bar does, so it must never push the key
