@@ -321,9 +321,10 @@ func (m Model) body() []string {
 }
 
 // sidebarLines draws the file list: a path per file, truncated from the
-// right when it does not fit, and the size of that file's change under it.
-// It starts at m.fileTop, which followSidebar keeps in step with the
-// selected file, the same way m.top keeps the diff pane's cursor on screen.
+// right when it does not fit, and the size of that file's change under it,
+// followed by the count of review threads on that file (spec 4.4.1). It
+// starts at m.fileTop, which followSidebar keeps in step with the selected
+// file, the same way m.top keeps the diff pane's cursor on screen.
 func (m Model) sidebarLines() []string {
 	if len(m.files) == 0 {
 		return nil
@@ -333,18 +334,46 @@ func (m Model) sidebarLines() []string {
 		f := m.files[i]
 		path := clip(f.Path, sidebarWidth)
 		plainSize := fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)
+		count, pending := m.threadCount(f.Path)
+		badge := ""
+		if count > 0 {
+			badge = fmt.Sprintf("%s%d", icon.ThreadBadge(), count)
+		}
+		plainRow := plainSize
+		if badge != "" && ansi.StringWidth(plainSize)+1+ansi.StringWidth(badge) <= sidebarWidth {
+			plainRow = plainSize + " " + badge
+		}
 		selected := i == m.file && m.sidebar
 		if selected {
 			lines = append(lines,
 				theme.Selected().Render(fit(path, sidebarWidth)),
-				theme.Selected().Render(fit(plainSize, sidebarWidth)))
+				theme.Selected().Render(fit(plainRow, sidebarWidth)))
 			continue
 		}
 		size := theme.Added().Render("+"+strconv.Itoa(f.Additions)) +
 			" " + theme.Removed().Render("−"+strconv.Itoa(f.Deletions))
+		if plainRow != plainSize {
+			size += " " + theme.Count(pending).Render(badge)
+		}
 		lines = append(lines, path, size)
 	}
 	return lines
+}
+
+// threadCount reports how many review threads sit on a file, and whether any
+// of them is pending: a count the reviewer has not submitted yet draws in
+// the colour that says so (theme.Count).
+func (m Model) threadCount(path string) (count int, pending bool) {
+	for _, t := range m.review.Threads {
+		if t.Path != path {
+			continue
+		}
+		count++
+		if t.Pending() {
+			pending = true
+		}
+	}
+	return count, pending
 }
 
 // diffLines draws the visible slice of the current file's rows, from top for

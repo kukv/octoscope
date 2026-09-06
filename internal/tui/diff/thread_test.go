@@ -113,6 +113,53 @@ func TestASettledThreadIsACountUntilItIsOpened(t *testing.T) {
 	}
 }
 
+// settledThreadWithTwoComments is one resolved thread with two comments, so
+// opening it draws two rowThread rows sharing the same key.
+func settledThreadWithTwoComments() gh.ReviewContext {
+	return gh.ReviewContext{
+		PullRequestID: "PR_1",
+		Threads: []gh.ReviewThread{
+			{
+				Path: "graph/walk.go", Line: 13, Side: gh.SideRight, Resolved: true,
+				Comments: []gh.ThreadComment{
+					{Author: gh.Author{Login: "kukv"}, Body: "first"},
+					{Author: gh.Author{Login: "someone"}, Body: "second"},
+				},
+			},
+		},
+	}
+}
+
+// TestEnterClosesAnOpenThreadFromAnyOfItsRows guards the reason toggleCollapsed
+// accepts rowThread as well as rowCollapsed: an open, multi-comment thread
+// draws one row per comment, and enter has to close the whole group from
+// whichever of those rows the cursor is on, not only the first.
+func TestEnterClosesAnOpenThreadFromAnyOfItsRows(t *testing.T) {
+	m := loaded(t, 120, 40)
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: settledThreadWithTwoComments()})
+	m = press(openCollapsedThread(m), "enter")
+	if !strings.Contains(ansi.Strip(m.View()), "second") {
+		t.Fatalf("enter did not open the thread:\n%s", ansi.Strip(m.View()))
+	}
+
+	// Move the cursor onto the second comment's row before closing it.
+	last := -1
+	for i, r := range m.rows {
+		if r.kind == rowThread {
+			last = i
+		}
+	}
+	if last < 0 {
+		t.Fatal("no rowThread rows after opening the thread")
+	}
+	m.row = last
+
+	m = press(m, "enter")
+	if strings.Contains(ansi.Strip(m.View()), "second") {
+		t.Errorf("enter on the last comment row did not close the thread:\n%s", ansi.Strip(m.View()))
+	}
+}
+
 // TestACommentOnALineThisDiffDoesNotShowIsStillVisible: dropping it would
 // hide the fact that someone objected at all.
 func TestACommentOnALineThisDiffDoesNotShowIsStillVisible(t *testing.T) {
@@ -132,6 +179,34 @@ func TestAnUnsentCommentIsMarked(t *testing.T) {
 	}
 	if !strings.Contains(out, "pending · 1") {
 		t.Errorf("the header does not count the pending comment:\n%s", out)
+	}
+}
+
+// TestSidebarShowsAThreadCountBadge covers spec 4.4.1's "●2": the sidebar
+// draws a file's thread count next to its size, and says nothing at all for
+// a file with no threads.
+func TestSidebarShowsAThreadCountBadge(t *testing.T) {
+	m := withThreads(t, 120, 40)
+	lines := m.sidebarLines()
+
+	out := strings.Join(lines, "\n")
+	if !strings.Contains(ansi.Strip(out), "●3") {
+		t.Errorf("graph/walk.go has 3 threads but no badge is drawn:\n%s", ansi.Strip(out))
+	}
+	if strings.Contains(ansi.Strip(out), "●0") {
+		t.Errorf("a zero count must draw nothing, not ●0:\n%s", ansi.Strip(out))
+	}
+
+	// logo.png is the second file in the fixture (lines 2 and 3: path, then
+	// size) and has no threads at all, so its size line must carry no badge.
+	if strings.Contains(ansi.Strip(lines[3]), "●") {
+		t.Errorf("logo.png has no threads but drew a badge: %q", ansi.Strip(lines[3]))
+	}
+
+	for _, l := range lines {
+		if w := ansi.StringWidth(l); w > sidebarWidth {
+			t.Errorf("sidebar line %q is %d columns wide, want at most %d", ansi.Strip(l), w, sidebarWidth)
+		}
 	}
 }
 

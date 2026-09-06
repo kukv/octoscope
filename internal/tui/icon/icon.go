@@ -41,6 +41,7 @@ type glyphs struct {
 	checkSuccess, checkFailure, checkRunning         string
 	barDone, barRest                                 string
 	collapsed, commentBar                            string
+	threadBadge                                      string
 }
 
 var sets = map[Set]glyphs{
@@ -50,6 +51,7 @@ var sets = map[Set]glyphs{
 		checkSuccess: "✓", checkFailure: "×", checkRunning: "◍",
 		barDone: "▰", barRest: "▱",
 		collapsed: "▸", commentBar: "▌",
+		threadBadge: "●",
 	},
 	Nerd: {
 		approved: "", changesRequested: "", reviewPending: "", draft: "",
@@ -57,6 +59,7 @@ var sets = map[Set]glyphs{
 		checkSuccess: "", checkFailure: "", checkRunning: "",
 		barDone: "█", barRest: "░",
 		collapsed: "▸", commentBar: "▌",
+		threadBadge: "●",
 	},
 	ASCII: {
 		approved: "+", changesRequested: "x", reviewPending: "*", draft: "o",
@@ -64,6 +67,7 @@ var sets = map[Set]glyphs{
 		checkSuccess: "+", checkFailure: "x", checkRunning: "~",
 		barDone: "#", barRest: "-",
 		collapsed: ">", commentBar: "|",
+		threadBadge: "*",
 	},
 }
 
@@ -144,6 +148,10 @@ func Collapsed() string { return active().collapsed }
 // CommentBar returns the one-column bar drawn down the left of a review
 // comment.
 func CommentBar() string { return active().commentBar }
+
+// ThreadBadge returns the one-column marker drawn beside a file's review
+// thread count in the diff sidebar (spec 4.4.1).
+func ThreadBadge() string { return active().threadBadge }
 
 // BarWidth is how many cells a checks bar occupies. A Work card has about 30
 // columns, so the bar has to stay narrow (spec 4.1, 6.4).
