@@ -49,3 +49,6 @@ test-report.xml
 
 ### GoReleaser ###
 dist/
+
+# InstructionsLoaded フックのログ（機械ごとに増える）
+.claude/instructions-loaded.log

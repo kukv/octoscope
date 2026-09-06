@@ -1,3 +1,9 @@
+---
+paths:
+  - "internal/tui/**"
+  - "internal/i18n/**"
+---
+
 # TUI
 
 ## ライブラリ
