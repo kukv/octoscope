@@ -34,6 +34,9 @@ linters:
               desc: views go through internal/usecase; only cmd/octoscope names a backend
         # usecase sits below the UI: it decides which GitHub calls an
         # operation takes, and knows nothing of screens or messages.
+        # The package does not exist yet -- the rule is here so the boundary
+        # is guarded from the first file, not after the fact. No file matches
+        # until then, which costs nothing.
         usecase-layer:
           files:
             - "**/internal/usecase/**"
