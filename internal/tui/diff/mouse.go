@@ -24,8 +24,10 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		}
 		m.file = i
 		m.sidebar = true
-		m.row, m.top = 0, 0
+		m.top = 0
 		m.rows = m.buildRows()
+		m.row = firstRow(m.rows)
+		m = m.follow()
 		return m.followSidebar(), nil
 	}
 	i := m.rowAt(msg.Y)

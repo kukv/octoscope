@@ -203,6 +203,56 @@ func TestChangingFileResetsTheCursor(t *testing.T) {
 	}
 }
 
+// TestOpeningADiffParksOnTheFirstLine guards against c-silent: the cursor
+// used to start on row 0, which buildRows always fills with a rowHunkHeader,
+// and a hunk header has no line to comment on. The fixture check is what
+// keeps this test honest -- if the fixture ever stopped starting with a
+// hunk header, the assertion below could pass by accident.
+func TestOpeningADiffParksOnTheFirstLine(t *testing.T) {
+	m := loaded(t, 120, 30)
+	if got := m.rows[0].kind; got != rowHunkHeader {
+		t.Fatalf("fixture's first row is %v, not rowHunkHeader -- this test proves nothing", got)
+	}
+	if got := m.currentRow().kind; got != rowLine {
+		t.Errorf("cursor parked on %v after opening, want rowLine", got)
+	}
+}
+
+// TestChangingFileParksOnTheFirstLine is ] and ['s share of the same fix:
+// moveFile rebuilds m.rows for the new file, and the cursor must land on a
+// line there too, not on the new file's own hunk header.
+func TestChangingFileParksOnTheFirstLine(t *testing.T) {
+	files := manyFilesFixture()
+	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
+	if got := m.rows[0].kind; got != rowHunkHeader {
+		t.Fatalf("fixture's first row is %v, not rowHunkHeader -- this test proves nothing", got)
+	}
+	m = press(m, "]")
+	if got := m.currentRow().kind; got != rowLine {
+		t.Errorf("cursor parked on %v after changing file, want rowLine", got)
+	}
+}
+
+// TestNoCommentableLineLeavesCursorOnTheNote covers the fallback: a binary
+// file, a file whose patch GitHub omitted, and an empty diff each render a
+// single rowNote and nothing else, so there is no line to park on.
+func TestNoCommentableLineLeavesCursorOnTheNote(t *testing.T) {
+	m := press(loaded(t, 120, 30), "]") // logo.png, binary
+	if got := m.currentRow().kind; got != rowNote {
+		t.Errorf("cursor on %v for a binary file, want rowNote", got)
+	}
+	_ = m.View() // must not panic
+
+	if got := noPatchDiff(t, 120, 30).currentRow().kind; got != rowNote {
+		t.Errorf("cursor on %v for a file with no patch, want rowNote", got)
+	}
+	if got := emptyDiff(t, 120, 30).currentRow().kind; got != rowNote {
+		t.Errorf("cursor on %v for an empty diff, want rowNote", got)
+	}
+}
+
 func TestEscAsksTheParentToClose(t *testing.T) {
 	m := loaded(t, 120, 30)
 	_, cmd := m.Update(key("esc"))

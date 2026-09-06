@@ -225,9 +225,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.loading = false
 		m.files = msg.files
-		m.file, m.row, m.top, m.fileTop = 0, 0, 0, 0
+		m.file, m.top, m.fileTop = 0, 0, 0
 		m.rows = m.buildRows()
-		return m, nil
+		m.row = firstRow(m.rows)
+		return m.follow(), nil
 	case reviewMsg:
 		// The review context for the pull request the user just left is
 		// still in flight; its answer must not land here.
@@ -447,8 +448,10 @@ func (m Model) moveFile(delta int) Model {
 		return m
 	}
 	m.file = clamp(m.file+delta, len(m.files)-1)
-	m.row, m.top = 0, 0
+	m.top = 0
 	m.rows = m.buildRows()
+	m.row = firstRow(m.rows)
+	m = m.follow()
 	return m.followSidebar()
 }
 
@@ -506,6 +509,20 @@ func (m Model) currentRow() row {
 		return row{}
 	}
 	return m.rows[m.row]
+}
+
+// firstRow is the index of the first rowLine, so the cursor opens on a line
+// it can comment on rather than the hunk header buildRows always puts at
+// index 0. It falls back to 0 when the file has no line at all -- a binary
+// file, a file whose patch GitHub omitted, or an empty diff, all of which
+// buildRows renders as a single rowNote.
+func firstRow(rows []row) int {
+	for i, r := range rows {
+		if r.kind == rowLine {
+			return i
+		}
+	}
+	return 0
 }
 
 // clamp keeps v within [0, hi]. Every caller clamps a cursor index, which is
