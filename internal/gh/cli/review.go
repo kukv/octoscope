@@ -41,12 +41,15 @@ var discardReviewMutation string
 // Those placeholders are only substituted in -F values, which is why this is
 // the one place a value that is not a number goes through -F. Everything the
 // user typed still goes through -f (see AddReviewThread).
-func repoArgs(repo string) []string {
+func repoArgs(repo string) ([]string, error) {
 	if repo == "" {
-		return []string{"-F", "owner={owner}", "-F", "name={repo}"}
+		return []string{"-F", "owner={owner}", "-F", "name={repo}"}, nil
 	}
-	owner, name, _ := strings.Cut(repo, "/")
-	return []string{"-f", "owner=" + owner, "-f", "name=" + name}
+	owner, name, ok := strings.Cut(repo, "/")
+	if !ok {
+		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
+	}
+	return []string{"-f", "owner=" + owner, "-f", "name=" + name}, nil
 }
 
 type reviewContextResponse struct {
@@ -103,8 +106,11 @@ type threadCommentNode struct {
 // PRReviewContext fetches, in one request, everything the diff view needs to
 // draw and change a review.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
-	args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery},
-		repoArgs(c.effectiveRepo(repo))...)
+	repoFields, err := repoArgs(c.effectiveRepo(repo))
+	if err != nil {
+		return gh.ReviewContext{}, err
+	}
+	args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
 	args = append(args, "-F", "number="+strconv.Itoa(number))
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
@@ -203,7 +209,7 @@ func (n threadNode) toDomain() gh.ReviewThread {
 	return t
 }
 
-// The four mutations take no context. They are changes, not fetches: a
+// The five mutations take no context. They are changes, not fetches: a
 // comment that has been sent has been sent, so there is nothing to abandon
 // half-way. The existing AddPRComment and ClosePR take none for the same
 // reason (.claude/rules/go-style.md).

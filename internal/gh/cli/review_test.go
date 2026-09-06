@@ -159,6 +159,21 @@ func TestPRReviewContextInTheWorkingDirectorysRepo(t *testing.T) {
 	}
 }
 
+// TestPRReviewContextRejectsARepoWithNoSlash guards against silently querying
+// the wrong repository: a --repo value with no "/" cannot be split into
+// owner and name, so the call must fail rather than send an empty owner or
+// name to GitHub.
+func TestPRReviewContextRejectsARepoWithNoSlash(t *testing.T) {
+	c := New("/w", "not-a-repo")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		t.Fatal("gh was invoked with a repo that cannot be split into owner/name")
+		return nil, nil
+	}
+	if _, err := c.PRReviewContext(context.Background(), "", 128); err == nil {
+		t.Fatal("PRReviewContext did not fail for a repo with no slash")
+	}
+}
+
 func TestPRReviewContextWithNoPendingReview(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
