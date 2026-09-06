@@ -179,6 +179,13 @@ func (m Model) buildRows() []row {
 	for i, h := range f.Hunks {
 		rows = append(rows, row{kind: rowHunkHeader, hunk: i, text: h.Header})
 		for _, l := range h.Lines {
+			// A literal tab has no fixed display width: a terminal advances
+			// to the next tab stop, and lipgloss's own Style.Render silently
+			// expands it to four spaces while ansi.StringWidth counts it as
+			// zero. Expanding it here, once, before anything measures or
+			// truncates the line, is what keeps every later width
+			// calculation honest.
+			l.Text = expandTabs(l.Text)
 			rows = append(rows, row{kind: rowLine, hunk: i, line: l})
 		}
 	}

@@ -238,6 +238,20 @@ func markerStyle(k gh.DiffLineKind) string {
 	}
 }
 
+// tabWidth is how many columns expandTabs turns a tab into. It matches
+// lipgloss's own default, so a row that goes through Style.Render (the
+// cursor row) and one that does not (chroma's formatter, which leaves a
+// tab as a literal byte) measure the same either way.
+const tabWidth = 4
+
+// expandTabs replaces a literal tab with spaces. A raw tab has no fixed
+// display width — a terminal advances it to the next tab stop, chroma's
+// formatter counts it as zero, lipgloss's Style.Render silently expands it
+// to four spaces — so every diff line is expanded once, before anything
+// measures or truncates it, rather than trusting any of those three to
+// agree.
+func expandTabs(s string) string { return strings.ReplaceAll(s, "\t", strings.Repeat(" ", tabWidth)) }
+
 // clip cuts s to w display columns. Japanese takes two columns per
 // character, so the count is never a byte or a rune count.
 func clip(s string, w int) string { return ansi.Truncate(s, w, "…") }

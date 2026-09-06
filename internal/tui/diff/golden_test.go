@@ -2,9 +2,11 @@ package diff
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -49,6 +51,30 @@ func TestGolden(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
 				golden.Assert(t, fmt.Sprintf("diff_%s_%d", lang.name, w), goldenModel(w).View())
+			})
+		}
+	}
+}
+
+// TestNoLineIsWiderThanTheTerminal is what catches a tab in a diff line
+// pushing the cursor row past the right edge. goldenModel moves the cursor
+// onto the row with the Japanese comment, which is also the row with a tab
+// in front of it, so this exercises the exact row the golden files record.
+// Every row is checked at every width, because a row that overruns wraps,
+// and everything below it is then drawn a line lower than the layout
+// believes.
+func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
+	for _, w := range goldenWidths {
+		for _, lang := range goldenLanguages {
+			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
+				i18n.SetLanguage(lang.tag)
+				t.Cleanup(func() { i18n.SetLanguage(language.English) })
+				for i, line := range strings.Split(goldenModel(w).View(), "\n") {
+					if got := ansi.StringWidth(line); got > w {
+						t.Errorf("line %d is %d columns wide in a terminal %d wide: %q",
+							i, got, w, ansi.Strip(line))
+					}
+				}
 			})
 		}
 	}
