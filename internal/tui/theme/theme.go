@@ -197,7 +197,6 @@ func textOn(r, g, b int) string {
 // diff reads here the way it reads in the web UI.
 func DiffAdded() lipgloss.Style   { return fg("#1a7f37", "#3fb950") }
 func DiffRemoved() lipgloss.Style { return fg("#cf222e", "#f85149") }
-func DiffContext() lipgloss.Style { return lipgloss.NewStyle() }
 
 // HunkHeader styles the @@ line. It is a signpost rather than code, so it
 // takes the muted colour and a weight of its own.
