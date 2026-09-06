@@ -44,6 +44,9 @@ type Source interface {
 // OpenDetailMsg asks the parent to show the detail view for one item.
 type OpenDetailMsg struct{ Ref gh.ItemRef }
 
+// OpenDiffMsg asks the parent to show the diff of the selected pull request.
+type OpenDiffMsg struct{ Ref gh.ItemRef }
+
 // ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
@@ -91,6 +94,14 @@ func New(src Source) Model {
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, fetchRepoName(m.src), fetchList(m.src, m.tab))
+}
+
+// Refresh re-fetches the current tab. The parent calls it after an event
+// elsewhere changes what these lists show — a submitted review, say — the
+// same way pressing r does.
+func (m Model) Refresh() (Model, tea.Cmd) {
+	m.loading[m.tab] = true
+	return m, fetchList(m.src, m.tab)
 }
 
 func fetchList(src Source, t tabID) tea.Cmd {
@@ -198,8 +209,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "r":
-		m.loading[m.tab] = true
-		return m, fetchList(m.src, m.tab)
+		return m.Refresh()
 	case "enter":
 		if ref, ok := m.SelectedRef(); ok {
 			return m, func() tea.Msg { return OpenDetailMsg{ref} }
@@ -210,6 +220,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m, openWeb(m.src, ref)
 		}
 		return m, nil
+	case "d":
+		ref, ok := m.SelectedRef()
+		// An issue has no diff. Opening an empty diff view would be a worse
+		// answer than doing nothing.
+		if !ok || ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	}
 	return m, nil
 }

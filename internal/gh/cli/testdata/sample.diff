@@ -1,0 +1,66 @@
+diff --git a/graph/walk.go b/graph/walk.go
+index 1a2b3c4..5d6e7f8 100644
+--- a/graph/walk.go
++++ b/graph/walk.go
+@@ -12,5 +12,7 @@ func Walk(ctx context.Context, q string) error {
+ 	ctx, cancel := context.WithTimeout(ctx, d)
+ 	defer cancel()
+-	if depth == 0 {
++	if depth <= 0 {
++		depth = defaultDepth
++	}
+ 	return nil
+ }
+@@ -40,2 +42,3 @@ func helper() {
+ 	_ = q
++	_ = depth
+ }
+diff --git a/graph/new.go b/graph/new.go
+new file mode 100644
+index 0000000..9f8e7d6
+--- /dev/null
++++ b/graph/new.go
+@@ -0,0 +1,2 @@
++package graph
++
+diff --git a/graph/old.go b/graph/old.go
+deleted file mode 100644
+index 9f8e7d6..0000000
+--- a/graph/old.go
++++ /dev/null
+@@ -1 +0,0 @@
+-package graph
+diff --git a/docs/a.md b/docs/b.md
+similarity index 92%
+rename from docs/a.md
+rename to docs/b.md
+index aaa1111..bbb2222 100644
+--- a/docs/a.md
++++ b/docs/b.md
+@@ -1,2 +1,2 @@
+-# a
++# b
+ body
+diff --git a/logo.png b/logo.png
+index ccc3333..ddd4444 100644
+Binary files a/logo.png and b/logo.png differ
+diff --git a/noeol.txt b/noeol.txt
+index eee5555..fff6666 100644
+--- a/noeol.txt
++++ b/noeol.txt
+@@ -1 +1 @@
+-old
+\ No newline at end of file
++new
+\ No newline at end of file
+diff --git a/mathutil/add.go b/mathutil/add.go
+index 1111111..2222222 100644
+--- a/mathutil/add.go
++++ b/mathutil/add.go
+@@ -3,4 +3,5 @@ func add(a, b int) int { return a + b }
+ package mathutil
+
+-func add(a, b int) int { return a + b }
++func add(a, b int) int {
++	return a + b
++}

@@ -12,7 +12,9 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
+	"github.com/kukv/octoscope/internal/tui/diff"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
@@ -23,6 +25,7 @@ type Source interface {
 	work.Source
 	repo.Source
 	detail.Source
+	diff.Source
 }
 
 // Options carries what main determined before the UI started.
@@ -81,6 +84,15 @@ const (
 	tabRepos
 )
 
+// overlay is a view drawn over the tabs. They stack: d from the detail view
+// puts the diff on top of it, and esc takes it back off.
+type overlay int
+
+const (
+	overlayDetail overlay = iota
+	overlayDiff
+)
+
 type Model struct {
 	src  Source
 	opts Options
@@ -96,14 +108,28 @@ type Model struct {
 	work   work.Model
 	repo   repo.Model
 	detail detail.Model
+	diff   diff.Model
 
 	// started guards the first fetch, which waits for the first size rather
 	// than happening in Init: work.Refresh hands back a model carrying the
 	// cancel function of its request, and a value-receiver Init cannot keep it.
 	started bool
 
-	showingDetail bool
-	errText       string
+	// stack holds the views drawn over the tabs, bottom first. Empty means
+	// the tabs are showing. A bool could not tell "the diff over the detail
+	// view" apart from "the diff on its own", and esc has to know which one
+	// to go back to.
+	stack   []overlay
+	errText string
+
+	// errOverlay names which overlay's fetch produced errText, when any did
+	// (errFromOverlay). A board or Repos-list failure is not tied to an
+	// overlay at all: it can arrive while an overlay sits on top of the
+	// stack (submit a review from the diff, the root refreshes the board,
+	// the board's fetch fails), and esc must then clear the error without
+	// popping a view that never failed.
+	errOverlay     overlay
+	errFromOverlay bool
 
 	// repoLookupTimedOut says the Repos tab is missing because the lookup ran
 	// out of time, not because there is no repository here.
@@ -156,8 +182,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
+	case work.OpenDiffMsg:
+		return m.openDiff(msg.Ref)
+	case repo.OpenDiffMsg:
+		return m.openDiff(msg.Ref)
+	case detail.OpenDiffMsg:
+		return m.openDiffOverDetail(msg.Ref)
 	case detail.ClosedMsg:
-		m.showingDetail = false
+		m.stack = m.pop(overlayDetail)
+		return m, nil
+	case diff.ClosedMsg:
+		m.stack = m.pop(overlayDiff)
 		return m, nil
 	case work.ErrorMsg:
 		return m.fail(msg.Err)
@@ -166,12 +201,65 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case detail.ErrorMsg:
 		// The detail view keeps requests in flight after the user leaves it.
 		// Their failures must not drag a closed view's error onto the screen.
-		if !m.showingDetail {
+		if !m.has(overlayDetail) {
 			return m, nil
 		}
-		return m.fail(msg.Err)
+		return m.failOverlay(msg.Err, overlayDetail)
+	case diff.ErrorMsg:
+		// Same rule as detail.ErrorMsg: a request outlives the view that
+		// started it, and its failure must not reach the error screen once
+		// the diff is no longer on the stack.
+		if !m.has(overlayDiff) {
+			return m, nil
+		}
+		return m.failOverlay(msg.Err, overlayDiff)
+	case review.SubmittedMsg:
+		// detail and diff each refetch their own PR when a review goes out
+		// (broadcast below reaches them); the board and the Repos list have
+		// no popup of their own to notice from, so the root refreshes them
+		// (spec 4.4.2).
+		next, cmd := m.broadcast(msg)
+		m = next.(Model)
+		var workCmd tea.Cmd
+		m.work, workCmd = m.work.Refresh()
+		cmds := []tea.Cmd{cmd, workCmd}
+		if m.opts.HasRepo {
+			var repoCmd tea.Cmd
+			m.repo, repoCmd = m.repo.Refresh()
+			cmds = append(cmds, repoCmd)
+		}
+		return m, tea.Batch(cmds...)
 	}
 	return m.broadcast(msg)
+}
+
+// has reports whether o is anywhere on the stack, not only on top: the
+// detail view keeps fetching while the diff is drawn over it.
+func (m Model) has(o overlay) bool {
+	for _, x := range m.stack {
+		if x == o {
+			return true
+		}
+	}
+	return false
+}
+
+// top is the view on screen, if any.
+func (m Model) top() (overlay, bool) {
+	if len(m.stack) == 0 {
+		return 0, false
+	}
+	return m.stack[len(m.stack)-1], true
+}
+
+// pop takes o off the stack, but only when it is the one on top. A
+// ClosedMsg answers the view that sent it, and a second one queued before
+// the first lands (two quick esc presses) must not pop twice.
+func (m Model) pop(o overlay) []overlay {
+	if top, ok := m.top(); !ok || top != o {
+		return m.stack
+	}
+	return m.stack[:len(m.stack)-1]
 }
 
 // broadcast hands a message to every live child rather than only to the one on
@@ -190,8 +278,13 @@ func (m Model) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-	if m.showingDetail {
+	if m.has(overlayDetail) {
 		m.detail, cmd = m.detail.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	if m.has(overlayDiff) {
+		m.diff, cmd = m.diff.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -204,17 +297,22 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	// A tab is told how much room is left under the tab row, not how big the
 	// terminal is: it lays its own contents out to fit, and a tab that
 	// measured the whole screen would push the last of them off the bottom.
-	// The detail view is drawn from the top and gets the whole thing.
+	// A view on the stack is drawn from the top and gets the whole thing.
 	next, cmd := m.broadcast(tea.WindowSizeMsg{
 		Width:  msg.Width,
 		Height: max(msg.Height-tabRowHeight, 1),
 	})
 	m = next.(Model)
 	cmds := []tea.Cmd{cmd}
-	if m.showingDetail {
+	if m.has(overlayDetail) {
 		var detailCmd tea.Cmd
 		m.detail, detailCmd = m.detail.Update(msg)
 		cmds = append(cmds, detailCmd)
+	}
+	if m.has(overlayDiff) {
+		var diffCmd tea.Cmd
+		m.diff, diffCmd = m.diff.Update(msg)
+		cmds = append(cmds, diffCmd)
 	}
 
 	if !m.started {
@@ -233,17 +331,58 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) openDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 	m.detail = detail.New(m.src, ref)
-	m.showingDetail = true
+	m.stack = []overlay{overlayDetail}
 	// The view is built after the terminal size is known, so it never sees the
 	// WindowSizeMsg that told the others how wide they are.
 	m.detail, _ = m.detail.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	return m, m.detail.Init()
 }
 
-// fail moves to the error screen. Only the environment's own failures are
-// translated; anything GitHub said is shown as it said it
-// (.claude/rules/errors.md).
+// openDiff shows the diff on its own, with the tabs underneath: the Work
+// board and a Repos row have no detail view open when they ask for it.
+func (m Model) openDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+	m.stack = []overlay{overlayDiff}
+	return m.startDiff(ref)
+}
+
+// openDiffOverDetail puts the diff on top of the detail view, so esc goes
+// back to it rather than to the tabs.
+func (m Model) openDiffOverDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+	m.stack = append(m.stack, overlayDiff)
+	return m.startDiff(ref)
+}
+
+func (m Model) startDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+	m.diff = diff.New(m.src, ref)
+	// The view is built after the terminal size is known, so it never sees the
+	// WindowSizeMsg that told the others how wide they are.
+	m.diff, _ = m.diff.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	return m, m.diff.Init()
+}
+
+// fail moves to the error screen for a failure that is not tied to any one
+// overlay (the board, or the Repos list). esc on this error must never pop
+// the stack: whatever overlay is on top of it, if any, did not fail.
 func (m Model) fail(err error) (tea.Model, tea.Cmd) {
+	m.errFromOverlay = false
+	return m.showError(err)
+}
+
+// failOverlay moves to the error screen for a failure that belongs to one
+// overlay (the detail view or the diff). esc pops the stack only when that
+// overlay is still the one on top of it (see handleKey): a stale failure
+// from a view the user is no longer looking at must not discard whatever is
+// on top now.
+func (m Model) failOverlay(err error, o overlay) (tea.Model, tea.Cmd) {
+	m.errFromOverlay = true
+	m.errOverlay = o
+	return m.showError(err)
+}
+
+// showError renders err onto the error screen. Only the environment's own
+// failures are translated; anything GitHub said is shown as it said it
+// (.claude/rules/errors.md).
+func (m Model) showError(err error) (tea.Model, tea.Cmd) {
 	if errors.Is(err, gh.ErrGhNotFound) {
 		m.errText = i18n.T("error.gh_not_found")
 	} else {
@@ -261,16 +400,44 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.errText != "" {
-		if k := msg.String(); k == "q" || k == "esc" {
+		switch msg.String() {
+		case "q":
 			return m, m.quit()
+		case "esc":
+			// Nothing to go back to at start-up (gh not on PATH, say): both
+			// keys still quit. Once an overlay is on the stack, esc takes the
+			// view that just failed off it and returns to whatever is
+			// underneath, rather than costing the whole session over one
+			// diff that would not load.
+			if len(m.stack) == 0 {
+				return m, m.quit()
+			}
+			m.errText = ""
+			// Only pop when the view that failed is the one on top: a board
+			// or Repos-list failure (errFromOverlay false) never belongs to
+			// an overlay, and a stale overlay failure can arrive after
+			// another overlay was pushed on top of it. Either way the view
+			// on screen did not fail and must stay put.
+			if m.errFromOverlay {
+				if top, ok := m.top(); ok && top == m.errOverlay {
+					m.stack = m.stack[:len(m.stack)-1]
+				}
+			}
+			m.errFromOverlay = false
+			return m, nil
 		}
 		return m, nil
 	}
 
-	// q leaves the detail view rather than the app, so it is delegated too.
-	if m.showingDetail {
+	// q leaves the view on top rather than the app, so it is delegated too.
+	if top, ok := m.top(); ok {
 		var cmd tea.Cmd
-		m.detail, cmd = m.detail.Update(msg)
+		switch top {
+		case overlayDiff:
+			m.diff, cmd = m.diff.Update(msg)
+		default:
+			m.detail, cmd = m.detail.Update(msg)
+		}
 		return m, cmd
 	}
 

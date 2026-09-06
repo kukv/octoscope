@@ -40,15 +40,17 @@ func TestTheWheelIsIgnoredUnderAnOverlay(t *testing.T) {
 	base := loaded(&fakeSource{pr: longPR()}, prRef())
 	base, _ = base.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 
-	composing, confirming, picking := base, base, base
+	composing, confirming, picking, submitting := base, base, base, base
 	composing.composing = true
 	confirming.confirming = true
 	picking.picking = true
+	submitting.submitting = true
 
 	for name, m := range map[string]Model{
 		"the composer":     composing,
 		"the confirmation": confirming,
 		"the picker":       picking,
+		"the submit popup": submitting,
 	} {
 		before := m.body.View()
 		after, _ := m.Update(wheelDown())

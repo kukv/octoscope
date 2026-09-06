@@ -21,3 +21,24 @@ func ClipLines(s string, w int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// FitKeyBar joins hints in order and drops from the low-priority end (the
+// tail of the slice) until the joined line fits width. No ellipsis: a bar
+// that shows fewer hints cleanly beats one that shows more but cuts one off
+// mid-word. hints[0] is never dropped, so as long as the caller orders its
+// most important hint first, that hint is what survives when only one hint
+// fits — clipped, if even it does not fit, rather than left to overrun width.
+// A width of zero or less means no width is known yet, and every hint is
+// joined unclipped.
+func FitKeyBar(hints []string, width int) string {
+	if width <= 0 {
+		return strings.Join(hints, "  ")
+	}
+	for n := len(hints); n > 0; n-- {
+		joined := strings.Join(hints[:n], "  ")
+		if ansi.StringWidth(joined) <= width {
+			return joined
+		}
+	}
+	return ClipLines(hints[0], width)
+}

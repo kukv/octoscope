@@ -246,6 +246,36 @@ func TestEnterOnEmptyListDoesNothing(t *testing.T) {
 	}
 }
 
+func TestDAsksForTheDiff(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := loadedModel(f)
+	m, _ = m.Update(key("j")) // second PR
+	_, cmd := m.Update(key("d"))
+	if cmd == nil {
+		t.Fatal("d produced no command")
+	}
+	msg, ok := cmd().(OpenDiffMsg)
+	if !ok {
+		t.Fatalf("got %T, want OpenDiffMsg", cmd())
+	}
+	want, _ := m.SelectedRef()
+	if msg.Ref != want {
+		t.Errorf("d asked for %+v, want the selected row %+v", msg.Ref, want)
+	}
+}
+
+// TestDDoesNothingOnAnIssue is what stops the diff view opening on something
+// that has no diff.
+func TestDDoesNothingOnAnIssue(t *testing.T) {
+	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := loadedModel(f)
+	m, cmd := m.Update(key("tab"))
+	m, _ = m.Update(cmd())
+	if _, cmd := m.Update(key("d")); cmd != nil {
+		t.Errorf("d on an issue produced %T", cmd())
+	}
+}
+
 func TestOOpensBrowserForSelection(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := loadedModel(f)

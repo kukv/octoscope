@@ -20,19 +20,66 @@ func (m Model) View() string {
 	if m.confirming {
 		return m.confirmView()
 	}
+	if m.submitting {
+		return m.submitView()
+	}
 	if m.picking {
 		return m.pickerView()
 	}
-	if m.loading || m.pickerLoading {
+	if m.loading || m.pickerLoading || m.openingReview {
 		return layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
 	}
 	header := theme.Title().Render(m.title)
-	footer := theme.Dim().Render(i18n.T("footer.detail_prefix") + m.stateFooterKey() + i18n.T("footer.detail_suffix"))
+	footer := theme.Dim().Render(m.footer())
 	body := layout.ClipLines(header, m.width) + "\n" + m.body.View() + "\n"
 	if m.actionErr != "" {
 		body += wrapErr(m.actionErr, m.width) + "\n"
 	}
 	return body + layout.ClipLines(footer, m.width)
+}
+
+// footer builds the detail view's key bar from hints, most important first,
+// dropping from the low-priority end when the terminal is too narrow for all
+// of them -- the same mechanism diff's render.go uses for its own key bar.
+func (m Model) footer() string {
+	return layout.FitKeyBar(m.footerHints(), m.width)
+}
+
+// footerHints lists the detail view's hints, most important first. esc is
+// first because layout.FitKeyBar never drops it: it is the only way out of
+// the view. review and diff only apply to a pull request, and state (close
+// or reopen) only when the item can do one of them (not merged).
+func (m Model) footerHints() []string {
+	hints := []string{
+		i18n.T("footer.detail.esc"),
+		i18n.T("footer.detail.move"),
+		i18n.T("footer.detail.comment"),
+	}
+	if m.ref.Kind == gh.ItemPR {
+		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"))
+	}
+	if s := m.stateFooterKey(); s != "" {
+		hints = append(hints, s)
+	}
+	return append(hints,
+		i18n.T("footer.detail.refresh"),
+		i18n.T("footer.detail.web"),
+		i18n.T("footer.detail.labels"),
+		i18n.T("footer.detail.assign"),
+	)
+}
+
+// submitView draws the review popup: the title, the popup's own box, and a
+// failed submission's error underneath it. The popup keeps no error text of
+// its own, so what the user typed and chose is still there for a retry
+// (.claude/rules/errors.md).
+func (m Model) submitView() string {
+	body := layout.ClipLines(theme.Title().Render(m.title), m.width) + "\n\n"
+	body += m.submit.View() + "\n"
+	if m.submitErr != "" {
+		body += wrapErr(m.submitErr, m.width) + "\n"
+	}
+	return body + layout.ClipLines(theme.Dim().Render(i18n.T("footer.submit")), m.width)
 }
 
 // wrapErr lays out a failure that came from gh or GitHub. Unlike the hints and

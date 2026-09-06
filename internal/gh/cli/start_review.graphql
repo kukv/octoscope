@@ -1,0 +1,7 @@
+mutation ($pullRequestId: ID!) {
+  addPullRequestReview(input: {pullRequestId: $pullRequestId}) {
+    pullRequestReview {
+      id
+    }
+  }
+}

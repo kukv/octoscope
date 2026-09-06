@@ -94,25 +94,134 @@ work:
   column_position:
     other: "{{.Index}}/{{.Total}} 列目"
 
+diff:
+  files:
+    other: "ファイル"
+  loading:
+    other: "diff を取得中"
+  no_changes:
+    other: "変更されたファイルはありません"
+  binary:
+    other: "バイナリファイル"
+  patch_omitted:
+    other: "GitHub がこのファイルの diff を送ってきませんでした"
+  file_count:
+    other: "{{.Count}} ファイル"
+  collapsed:
+    other: "片付いたコメント {{.Count}} 件 — enter で開く"
+  orphaned:
+    other: "この diff に無い行へのコメント"
+  resolved:
+    other: "解決済み"
+  outdated:
+    other: "古い"
+  unsent:
+    other: "未送信"
+  pending_note:
+    other: "未提出 · {{.Count}}"
+  comment_placeholder:
+    other: "この行へのコメント"
+  posting:
+    other: "コメントを送信中"
+  decline_no_line:
+    other: "この行にはコメントできません"
+  decline_loading:
+    other: "レビュー情報を読み込み中です。少し待ってからもう一度"
+  decline_no_pending_review:
+    other: "破棄する未提出のレビューがありません"
+
+submit:
+  title:
+    other: "レビューを提出"
+  approve:
+    other: "承認"
+  request_changes:
+    other: "変更を要求"
+  comment:
+    other: "コメント"
+  placeholder:
+    other: "ひとこと（承認以外は必須）"
+  pending_count:
+    other: "行コメント {{.Count}} 件が一緒に送られます"
+  no_pending:
+    other: "溜まっている行コメントはありません"
+  sending:
+    other: "レビューを提出中"
+  discard_confirm:
+    other: "未提出のレビューとそのコメントをすべて破棄しますか?"
+
 footer:
   list:
-    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  q:終了"
-  detail_prefix:
-    other: "j/k:移動  r:更新  o:Web  c:コメント  "
-  detail_suffix:
-    other: "l:ラベル  a:担当  esc:戻る"
+    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  q:終了"
   close:
-    other: "x:クローズ  "
+    other: "x:クローズ"
   reopen:
-    other: "x:再オープン  "
+    other: "x:再オープン"
   picker:
     other: "space:選択  enter:適用  esc:中止"
   compose:
     other: "ctrl+s:送信  esc:中止"
   error:
-    other: "q:終了"
+    esc:
+      other: "esc:戻る"
+    quit:
+      other: "q:終了"
   work:
-    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  q:終了"
+    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
+  # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、
+  # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar。
+  # diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
+  # 唯一の出口だから。state は close か reopen のどちらか該当する方で、
+  # どちらも該当しない（マージ済み）ときは丸ごと外れる。
+  detail:
+    esc:
+      other: "esc:戻る"
+    move:
+      other: "j/k:移動"
+    comment:
+      other: "c:コメント"
+    review:
+      other: "v:レビュー"
+    diff:
+      other: "d:diff"
+    refresh:
+      other: "r:更新"
+    web:
+      other: "o:Web"
+    labels:
+      other: "l:ラベル"
+    assign:
+      other: "a:担当"
+  submit:
+    other: "tab:種別  ctrl+s:提出  esc:取消"
+  discard:
+    other: "y:破棄  n:やめる"
+  # diff のキーバーはこの並びから組み立てる。重要なものから先に並べ、
+  # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar）。
+  # esc は先頭に置く — 落としてはいけない唯一の出口だから。
+  diff:
+    esc:
+      other: "esc:戻る"
+    comment:
+      other: "c:コメント"
+    review:
+      other: "v:レビュー"
+    discard:
+      other: "X:破棄"
+    line:
+      other: "j/k:行"
+    file:
+      other: "[/]:ファイル"
+    hunk:
+      other: "{/}:ハンク"
+    open:
+      other: "enter:開く"
+    pane:
+      other: "h/l:ペイン"
+    refresh:
+      other: "r:再取得"
+  diff_comment:
+    other: "ctrl+s:送信  esc:取消"
 
 md:
   author:

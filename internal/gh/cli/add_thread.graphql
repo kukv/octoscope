@@ -1,0 +1,13 @@
+mutation ($reviewId: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: String!) {
+  addPullRequestReviewThread(input: {
+    pullRequestReviewId: $reviewId
+    path: $path
+    line: $line
+    side: $side
+    body: $body
+  }) {
+    thread {
+      id
+    }
+  }
+}

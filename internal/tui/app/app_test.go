@@ -15,7 +15,9 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
+	"github.com/kukv/octoscope/internal/tui/diff"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
@@ -23,16 +25,26 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work   gh.Work
-	prs    []gh.PR
-	pr     gh.PR
-	prErr  error
-	labels []gh.Label
+	work      gh.Work
+	prs       []gh.PR
+	pr        gh.PR
+	prErr     error
+	labels    []gh.Label
+	files     []gh.FileDiff
+	diffErr   error
+	workCalls int
+	prCalls   int
 }
 
-func (f *fakeSource) ListWork(context.Context) (gh.Work, error) { return f.work, nil }
+func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
+	f.workCalls++
+	return f.work, nil
+}
 
-func (f *fakeSource) ListPRs(context.Context) ([]gh.PR, error)       { return f.prs, nil }
+func (f *fakeSource) ListPRs(context.Context) ([]gh.PR, error) {
+	f.prCalls++
+	return f.prs, nil
+}
 func (f *fakeSource) ListIssues(context.Context) ([]gh.Issue, error) { return nil, nil }
 func (f *fakeSource) RepoName(context.Context) (string, error)       { return "kukv/demo", nil }
 
@@ -58,6 +70,24 @@ func (f *fakeSource) EditPRAssignees(string, int, []string, []string) error   { 
 func (f *fakeSource) EditIssueAssignees(string, int, []string, []string) error {
 	return nil
 }
+
+func (f *fakeSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error) {
+	return f.files, f.diffErr
+}
+
+func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewContext, error) {
+	return gh.ReviewContext{}, nil
+}
+
+func (f *fakeSource) StartReview(string) (string, error) { return "", nil }
+
+func (f *fakeSource) AddReviewThread(string, gh.PendingComment) error { return nil }
+
+func (f *fakeSource) DiscardReview(string) error { return nil }
+
+func (f *fakeSource) SubmitReview(string, gh.ReviewEvent, string) error { return nil }
+
+func (f *fakeSource) SubmitNewReview(string, gh.ReviewEvent, string) error { return nil }
 
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
@@ -266,11 +296,11 @@ func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 		Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3},
 	})
 	m = next.(Model)
-	if !m.showingDetail {
+	if !m.has(overlayDetail) {
 		t.Fatal("the detail view did not open")
 	}
 	next, _ = m.Update(detail.ClosedMsg{})
-	if next.(Model).showingDetail {
+	if next.(Model).has(overlayDetail) {
 		t.Error("the detail view did not close on ClosedMsg")
 	}
 }
@@ -279,8 +309,100 @@ func TestRepoOpenDetailMsgShowsTheDetailView(t *testing.T) {
 	next, _ := newTestModel(Options{HasRepo: true}).Update(repo.OpenDetailMsg{
 		Ref: gh.ItemRef{Kind: gh.ItemIssue, Number: 7},
 	})
-	if !next.(Model).showingDetail {
+	if !next.(Model).has(overlayDetail) {
 		t.Error("the detail view did not open")
+	}
+}
+
+var someRef = gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3}
+
+func TestDFromTheBoardOpensTheDiffOnItsOwn(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	got := next.(Model)
+	if len(got.stack) != 1 || got.stack[0] != overlayDiff {
+		t.Errorf("stack = %v, want just the diff", got.stack)
+	}
+}
+
+func TestDOpensTheDiffOverTheDetailView(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
+	got := next.(Model)
+	if len(got.stack) != 2 {
+		t.Fatalf("stack = %v, want the detail view with the diff over it", got.stack)
+	}
+	if got.stack[1] != overlayDiff {
+		t.Errorf("the top of the stack is %v, want the diff", got.stack[1])
+	}
+}
+
+func TestEscTakesTheDiffOffAndLeavesTheDetailView(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
+	next, _ = next.(Model).Update(diff.ClosedMsg{})
+	got := next.(Model)
+	if len(got.stack) != 1 || got.stack[0] != overlayDetail {
+		t.Errorf("stack = %v, want just the detail view", got.stack)
+	}
+}
+
+// TestAStaleClosedMsgDoesNotPopTwice covers two esc presses queued before the
+// first ClosedMsg lands: the old showingDetail bool was idempotent to a
+// second one, and a stack must be too, or the next legitimate close pops the
+// tabs instead of nothing.
+func TestAStaleClosedMsgDoesNotPopTwice(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ = next.(Model).Update(detail.ClosedMsg{})
+	next, _ = next.(Model).Update(detail.ClosedMsg{})
+	got := next.(Model)
+	if len(got.stack) != 0 {
+		t.Errorf("stack = %v, want empty after two closes", got.stack)
+	}
+}
+
+// TestAClosedDiffsFailureIsNotShown mirrors the rule the detail view already
+// follows: a request outlives the view that started it, and its failure must
+// not drag a closed view's error onto the screen.
+func TestAClosedDiffsFailureIsNotShown(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(diff.ErrorMsg{Err: errors.New("boom")})
+	if got := next.(Model).errText; got != "" {
+		t.Errorf("error screen shows %q for a diff that is not open", got)
+	}
+}
+
+// TestASubmittedReviewRefreshesTheBoardAndTheReposList guards spec 4.4.2: a
+// submitted review must be reflected in the Work board and the Repos list,
+// not just in the detail/diff view the reviewer submitted it from.
+func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
+	f := &fakeSource{}
+	m := newTestModelWith(f, Options{HasRepo: true})
+
+	_, cmd := m.Update(review.SubmittedMsg{})
+	if cmd == nil {
+		t.Fatal("review.SubmittedMsg produced no command")
+	}
+	resolve(t, m, cmd)
+
+	if f.workCalls == 0 {
+		t.Error("the board was not refreshed after a submitted review")
+	}
+	if f.prCalls == 0 {
+		t.Error("the Repos list was not refreshed after a submitted review")
+	}
+}
+
+// TestASubmittedReviewWithNoRepoTabDoesNotPanic covers the case where the
+// Repos tab does not exist yet: there is nothing to refresh there, and
+// nothing should try to.
+func TestASubmittedReviewWithNoRepoTabDoesNotPanic(t *testing.T) {
+	m := newTestModel(Options{HasRepo: false})
+	if _, cmd := m.Update(review.SubmittedMsg{}); cmd == nil {
+		t.Error("review.SubmittedMsg produced no command")
 	}
 }
 
@@ -360,6 +482,120 @@ func TestErrorScreenKeysQuit(t *testing.T) {
 	}
 }
 
+// TestEscGoesBackFromAnErrorOverAnOverlay covers the diff view failing on a
+// pull request too large for gh: esc must return to what was underneath
+// rather than quitting the whole session (the bug the user hit).
+func TestEscGoesBackFromAnErrorOverAnOverlay(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(diff.ErrorMsg{Err: errors.New("boom")})
+	m = next.(Model)
+	if m.errText == "" {
+		t.Fatal("the error screen did not show")
+	}
+
+	next, cmd := m.Update(key("esc"))
+	m = next.(Model)
+	if isQuit(cmd) {
+		t.Fatal("esc quit the app instead of going back")
+	}
+	if m.errText != "" {
+		t.Error("esc did not clear the error")
+	}
+	if len(m.stack) != 0 {
+		t.Errorf("stack = %v, want empty: the failed diff view must come off it", m.stack)
+	}
+}
+
+// TestEscGoesBackToTheDetailViewFromAnErrorOverIt is the deeper case: a diff
+// opened over the detail view fails, and esc must land back on the detail
+// view, not on the tabs.
+func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(diff.ErrorMsg{Err: errors.New("boom")})
+	m = next.(Model)
+
+	next, _ = m.Update(key("esc"))
+	m = next.(Model)
+	if m.errText != "" {
+		t.Error("esc did not clear the error")
+	}
+	if len(m.stack) != 1 || m.stack[0] != overlayDetail {
+		t.Errorf("stack = %v, want just the detail view", m.stack)
+	}
+}
+
+// TestEscLeavesAnUnrelatedOverlayStanding covers the reachable path a board
+// or Repos-list failure takes while an overlay is open: submit a review from
+// the diff, the root refreshes the board, and the board's own fetch fails
+// with the diff still on top. That failure belongs to neither overlay on the
+// stack, so esc must clear it without discarding a diff that never failed.
+func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(work.ErrorMsg{Err: errors.New("boom")})
+	m = next.(Model)
+	if m.errText == "" {
+		t.Fatal("the error screen did not show")
+	}
+
+	next, _ = m.Update(key("esc"))
+	m = next.(Model)
+	if m.errText != "" {
+		t.Error("esc did not clear the error")
+	}
+	if len(m.stack) != 2 || m.stack[1] != overlayDiff {
+		t.Errorf("stack = %v, want [detail diff] still: esc must not discard a diff that never failed", m.stack)
+	}
+}
+
+// TestEscStillQuitsWithNoOverlay is the start-up case: gh not being on PATH
+// fails before anything is on the stack, and there is nowhere for esc to go
+// back to, so it must keep quitting like q does.
+func TestEscStillQuitsWithNoOverlay(t *testing.T) {
+	next, _ := newTestModel(Options{HasRepo: true}).
+		Update(work.ErrorMsg{Err: errors.New("boom")})
+	m := next.(Model)
+	if len(m.stack) != 0 {
+		t.Fatalf("stack = %v, want empty for this case", m.stack)
+	}
+	_, cmd := m.Update(key("esc"))
+	if !isQuit(cmd) {
+		t.Error("esc did not quit with nothing to go back to")
+	}
+}
+
+// TestErrorScreenKeyBarNamesWhatIsAvailable guards the footer: it must say
+// esc:back only when there is something to go back to.
+func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	next, _ = next.(Model).Update(diff.ErrorMsg{Err: errors.New("boom")})
+
+	view := content(next.(Model))
+	if !strings.Contains(view, i18n.T("footer.error.esc")) {
+		t.Errorf("key bar does not offer esc:back with an overlay open:\n%s", view)
+	}
+
+	noOverlay, _ := newTestModel(Options{HasRepo: true}).
+		Update(work.ErrorMsg{Err: errors.New("boom")})
+	view = content(noOverlay.(Model))
+	if strings.Contains(view, i18n.T("footer.error.esc")) {
+		t.Errorf("key bar offers esc:back with nothing to go back to:\n%s", view)
+	}
+	if !strings.Contains(view, i18n.T("footer.error.quit")) {
+		t.Errorf("key bar does not offer q:quit:\n%s", view)
+	}
+}
+
 func TestQQuitsOnTheTabs(t *testing.T) {
 	_, cmd := pressCmd(newTestModel(Options{HasRepo: true}), "q")
 	if !isQuit(cmd) {
@@ -379,7 +615,7 @@ func TestQGoesBackInTheDetailView(t *testing.T) {
 				t.Fatalf("%s quit the app instead of leaving the detail view", k)
 			}
 			m = resolve(t, m, cmd)
-			if m.showingDetail {
+			if m.has(overlayDetail) {
 				t.Errorf("%s did not leave the detail view", k)
 			}
 		})
@@ -511,7 +747,7 @@ func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 
 	m, cmd = pressCmd(m, "enter")
 	m = resolve(t, m, cmd)
-	if !m.showingDetail {
+	if !m.has(overlayDetail) {
 		t.Fatal("enter on the board did not open the detail view")
 	}
 	if !strings.Contains(content(m), "add the work board") {
@@ -578,15 +814,24 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 
 	failed, _ := board.Update(work.ErrorMsg{Err: errors.New(overlongTitle)})
 
+	// An error tied to an overlay draws a different key bar (esc:back, not
+	// just q:quit) from the board/Repos-list case above, and that bar's IDs
+	// (footer.error.esc in particular) are only ever exercised through this
+	// state — nothing else in this function opens an overlay and fails it.
+	overlayFailed, cmd := board.Update(work.OpenDiffMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1}})
+	overlayFailed = resolve(t, overlayFailed.(Model), cmd)
+	overlayFailed, _ = overlayFailed.(Model).Update(diff.ErrorMsg{Err: errors.New(overlongTitle)})
+
 	noRepo, cmd := New(src, Options{}).Update(size)
 	noRepo = resolve(t, noRepo.(Model), cmd)
 
 	return map[string]string{
-		"work":    content(board),
-		"repos":   content(repos.(Model)),
-		"detail":  content(item.(Model)),
-		"error":   content(failed.(Model)),
-		"no_repo": content(noRepo.(Model)),
+		"work":          content(board),
+		"repos":         content(repos.(Model)),
+		"detail":        content(item.(Model)),
+		"error":         content(failed.(Model)),
+		"error_overlay": content(overlayFailed.(Model)),
+		"no_repo":       content(noRepo.(Model)),
 	}
 }
 
@@ -619,7 +864,7 @@ func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
 	next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
 	m = resolve(t, m, cmd)
-	if m.showingDetail {
+	if m.has(overlayDetail) {
 		t.Fatal("q did not leave the detail view")
 	}
 

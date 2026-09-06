@@ -43,7 +43,9 @@ func markers() []string {
 		got = append(got, icon.Check(s))
 	}
 	done, rest := icon.ChecksBar(gh.Checks{Total: 2, Passed: 1})
-	return append(got, done, rest)
+	got = append(got, done, rest)
+	got = append(got, icon.Collapsed(), icon.CommentBar(), icon.ThreadBadge())
+	return got
 }
 
 // TestEveryGlyphIsOneColumn is what keeps a set usable: the board pads its

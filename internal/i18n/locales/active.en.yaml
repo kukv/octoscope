@@ -95,25 +95,140 @@ work:
   column_position:
     other: "column {{.Index}}/{{.Total}}"
 
+diff:
+  files:
+    other: "Files"
+  loading:
+    other: "loading the diff"
+  no_changes:
+    other: "no files changed"
+  binary:
+    other: "binary file"
+  patch_omitted:
+    other: "GitHub did not send a diff for this file"
+  file_count:
+    one: "{{.Count}} file"
+    other: "{{.Count}} files"
+  collapsed:
+    one: "{{.Count}} settled comment - enter to open"
+    other: "{{.Count}} settled comments - enter to open"
+  orphaned:
+    other: "comments on lines this diff does not show"
+  resolved:
+    other: "resolved"
+  outdated:
+    other: "outdated"
+  unsent:
+    other: "not sent yet"
+  pending_note:
+    one: "pending · {{.Count}}"
+    other: "pending · {{.Count}}"
+  comment_placeholder:
+    other: "Comment on this line"
+  posting:
+    other: "sending the comment"
+  decline_no_line:
+    other: "this row has no line to comment on"
+  decline_loading:
+    other: "still loading the review; try again in a moment"
+  decline_no_pending_review:
+    other: "no pending review to discard"
+
+submit:
+  title:
+    other: "Submit review"
+  approve:
+    other: "Approve"
+  request_changes:
+    other: "Request changes"
+  comment:
+    other: "Comment"
+  placeholder:
+    other: "Leave a note (required unless approving)"
+  pending_count:
+    one: "{{.Count}} line comment will be sent"
+    other: "{{.Count}} line comments will be sent"
+  no_pending:
+    other: "no line comments are waiting"
+  sending:
+    other: "submitting the review"
+  discard_confirm:
+    other: "Discard the unsubmitted review and every comment on it?"
+
 footer:
   list:
-    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  q:quit"
-  detail_prefix:
-    other: "j/k:move  r:refresh  o:web  c:comment  "
-  detail_suffix:
-    other: "l:labels  a:assign  esc:back"
+    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  q:quit"
   close:
-    other: "x:close  "
+    other: "x:close"
   reopen:
-    other: "x:reopen  "
+    other: "x:reopen"
   picker:
     other: "space:toggle  enter:apply  esc:cancel"
   compose:
     other: "ctrl+s:send  esc:cancel"
   error:
-    other: "q:quit"
+    esc:
+      other: "esc:back"
+    quit:
+      other: "q:quit"
   work:
-    other: "h/l:column  j/k:move  enter:detail  r:refresh  q:quit"
+    other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
+  # detail's key bar is built from these, most important first, and dropped
+  # from the end when the terminal is too narrow for all of them (see
+  # internal/tui/layout.FitKeyBar, the same mechanism as diff's below). esc
+  # is first because it must never be the one dropped: it is the only way
+  # out of the view. state is close or reopen, whichever applies, and is
+  # left out entirely once the item can do neither (merged).
+  detail:
+    esc:
+      other: "esc:back"
+    move:
+      other: "j/k:move"
+    comment:
+      other: "c:comment"
+    review:
+      other: "v:review"
+    diff:
+      other: "d:diff"
+    refresh:
+      other: "r:refresh"
+    web:
+      other: "o:web"
+    labels:
+      other: "l:labels"
+    assign:
+      other: "a:assign"
+  submit:
+    other: "tab:event  ctrl+s:submit  esc:cancel"
+  discard:
+    other: "y:discard  n:keep"
+  # diff's key bar is built from these, most important first, and dropped
+  # from the end when the terminal is too narrow for all of them (see
+  # internal/tui/layout.FitKeyBar). esc is first because it must never be
+  # the one dropped: it is the only way out of the view.
+  diff:
+    esc:
+      other: "esc:back"
+    comment:
+      other: "c:comment"
+    review:
+      other: "v:review"
+    discard:
+      other: "X:discard"
+    line:
+      other: "j/k:line"
+    file:
+      other: "[/]:file"
+    hunk:
+      other: "{/}:hunk"
+    open:
+      other: "enter:open"
+    pane:
+      other: "h/l:pane"
+    refresh:
+      other: "r:refresh"
+  diff_comment:
+    other: "ctrl+s:send  esc:cancel"
 
 md:
   author:

@@ -21,11 +21,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.errText != "" {
 		return m, nil
 	}
-	// The detail view is drawn from the top of the screen, so its coordinates
-	// are the screen's.
-	if m.showingDetail {
+	// A view on top of the stack is drawn from the top of the screen, so its
+	// coordinates are the screen's.
+	if top, ok := m.top(); ok {
 		var cmd tea.Cmd
-		m.detail, cmd = m.detail.Update(msg)
+		switch top {
+		case overlayDiff:
+			m.diff, cmd = m.diff.Update(msg)
+		default:
+			m.detail, cmd = m.detail.Update(msg)
+		}
 		return m, cmd
 	}
 

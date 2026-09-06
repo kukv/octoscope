@@ -67,7 +67,8 @@ internal/tui/         Bubble Tea モデル群
   ├ detail/           PR/Issue 詳細                                        [Phase 1]
   ├ icon/             状態アイコン                                        [Phase 1]
   ├ layout/           表示幅に応じた行の折り返し・切り詰め（`ClipLines`）  [Phase 1]
-  └ diff/             diff ビューア                                        (Phase 3)
+  ├ diff/             diff ビューア（ファイルサイドバー + 行コメント）      (Phase 2)
+  └ review/           レビュー提出のポップアップ                            (Phase 2)
 ```
 
 `internal/tui/repo`（単数）と `internal/tui/repos`（複数）は綴りが似ているが別のパッケージ。
@@ -230,6 +231,105 @@ GitHub の検索構文を覚えていなくても絞り込めることがこの�
 ### 4.4 詳細ビュー
 
 PR / Issue の詳細からは、diff 閲覧、レビュー提出、checks 一覧、merge 操作へ遷移する。
+diff とレビューは Phase 2、checks 一覧と merge は Phase 3 で作る。
+
+モックアップに diff とレビューの画面は無く、キーバーに `d` / `v` / `m` が
+予約されているだけである。以下の 4.4.1 と 4.4.2 がその 2 つの設計であり、
+**この 2 節についてはモックアップではなくこの文章が正**である。
+
+#### 4.4.1 diff ビュー
+
+**左にファイルのサイドバー、右にそのファイルの diff** を置く 2 ペイン構成とし、
+Repos タブと骨格を揃える。unified 表示のみとする。左右 2 分割の split は
+80 桁で片側 40 桁しか残らず、コードの行がほぼ読めないため採らない。
+
+```
+┌─ 1 Work  2 Repos ────────────────────────────────────────┐
+│ kukv/koto #128 feat: add relation graph traversal        │
+│ feat/graph → main · 4 files +218 −31 · pending · 2       │
+├─ Files ────────────┬────────────────────────────────────┤
+│ ▸ graph/walk.go    │ @@ -12,7 +12,9 @@ func Walk(...)    │
+│     +182 −4     ●2 │  12  12   ctx, cancel := ...       │
+│   graph/walk_test  │  13  13   defer cancel()           │
+│     +30  −0        │  14     - if depth == 0 {          │
+│   cmd/root.go      │      14 + if depth <= 0 {          │
+│     +6   −27       │      15 +   depth = defaultDepth   │
+│   README.md        │  15  16   }                        │
+│     +0   −0        │ ▌ ● kukv: ここは 2 が既定では?      │
+└────────────────────┴────────────────────────────────────┘
+ j/k 行  [/] ファイル  {/} ハンク  c 行コメント  v レビュー
+```
+
+- サイドバーの各行はパス、`+追加 −削除`、その ファイルに付いたスレッドの件数バッジ
+- diff の行は `旧行番号 新行番号 記号 本文`。**両側の行番号を各行が持つ。**
+  行コメントの投稿には行番号と、それが旧側か新側かの区別が要る
+- 行の本文はシンタックスハイライトする（4.5 の「装飾は最大限」）
+- レビューのスレッドは該当行の直下に `▌` 付きで展開する。
+  **解決済み（resolved）と outdated のスレッドは畳んで件数だけ出し、
+  その行で `enter` を押したときに開く。** 既に片付いた議論が diff を押し流さないため
+- 自分の未提出コメントは既存スレッドと同じ場所に、色で区別して並べる
+
+入口は Work のカード、Repos タブの行、詳細ビューのいずれからも `d`。
+
+| キー | 動作 |
+|---|---|
+| `j` / `k` | 行 |
+| `[` / `]` | ファイル |
+| `{` / `}` | ハンク |
+| `h` / `l` | ペイン |
+| `c` | この行にコメントを書く |
+| `enter` | 畳まれたスレッドを開く |
+| `v` | レビューを提出する |
+| `X` | 未提出のレビューを破棄する（`y` 確定 / `n` 中止） |
+| `r` | 取り直す |
+| `esc` / `q` | 戻る |
+
+マウスはサイドバーの行のクリックでファイル選択、ホイールで diff のスクロール
+（4.0 に従い、当たり判定は描画と同じ関数を読む）。
+
+サイドバーの幅は 22 桁。ガター（行番号 2 つと記号）は 11 桁を床とし、
+9999 行を超えるファイルではその分だけ広がる（4.6）。
+
+**Phase 2 の既知の限界。** 既存スレッドは、diff に載っているファイルの行にしか
+描けない。フォースプッシュ後などでスレッドの対象ファイルが今の diff に
+1 つも無い場合、そのスレッドはどこにも描かれず利用者からは見えない
+（スレッドへの返信・解決も範囲外。下の Phase 2 の項を参照）。
+
+`reviewThreads`（100 件）、各スレッドの `comments`（50 件）、pending review の
+`comments`（100 件）はいずれもページングしていない。これを超える PR では
+スレッドが黙って欠け、`pending · N` の件数も実際より少なく出る。
+ページングは Phase 3 で対応する。
+
+#### 4.4.2 レビューの提出
+
+**未提出のレビューは GitHub 側の pending review として持つ。** 行コメントを
+octoscope のメモリに溜めて提出時に一括で送る方式と比べ、エンドポイントは増えるが、
+**octoscope を閉じても書きかけが消えず、GitHub の Web UI とも同じものを見る。**
+
+GraphQL の 4 つの mutation で足りる。
+
+| したいこと | mutation |
+|---|---|
+| 未提出のレビューを始める | `addPullRequestReview` |
+| 行コメントを 1 件足す | `addPullRequestReviewThread` |
+| 提出する | `submitPullRequestReview` |
+| 書きかけが無い状態でそのまま提出する | `addPullRequestReview`（`event` と `body` を付ければ 1 回で済む） |
+| 破棄する | `deletePullRequestReview` |
+
+diff を開いた時点で `pullRequest.reviews(states: [PENDING])` を引き、
+**既にあれば黙って引き継ぐ**。ヘッダに `pending · N` と出して、
+書きかけが存在することを隠さない。
+
+`v` で提出のポップアップを開く。event（approve / request changes / comment）を
+選び、本文を書いて `ctrl+s` で提出する。提出後は PR を取り直し、
+一覧のレビュー状態を更新する。
+
+**書きかけが無くても `v` は開く。** diff を読んで何も言うことがなく approve する、
+というのがレビューで最も多い形であり、そこに未提出レビューを先に作らせる理由が無い。
+書きかけが無いときは `addPullRequestReview` に `event` を付けて 1 回で送る。
+
+**提出のポップアップは詳細ビューからも開く。** diff を読まずに approve したい
+場面はあり、そのために diff を経由させる理由が無い。
 
 ### 4.5 装飾
 
@@ -239,6 +339,13 @@ PR / Issue の詳細からは、diff 閲覧、レビュー提出、checks 一覧
 - 変更量の推移スパークライン（`▁▃▅▇▅▂`）
 - GitHub ラベルの実色を再現した塗りつぶしバッジ
 - 状態アイコン（成功 / 失敗 / 実行中 / draft / approved）
+- diff のシンタックスハイライト（Phase 2）
+
+シンタックスハイライトは chroma で行う。`.claude/rules/tui.md` は
+「色は `internal/tui/theme` にだけ書く」としているが、chroma のスタイルは
+配色そのものであり、ビューに持たせるとこの規約が崩れる。
+**chroma のスタイル名を `theme` に置き、`theme` がハイライト済みの文字列を返す。**
+ビューは chroma を import しない。実装時に rules も同じ内容へ更新する。
 
 アイコンは 3 つのセットを持つ。`unicode`（既定）、`nerd`、`ascii`。
 
@@ -266,7 +373,8 @@ PR / Issue の詳細からは、diff 閲覧、レビュー提出、checks 一覧
 
 端末幅が足りない場合は、次の順に段階的に劣化させる。
 
-1. サイドバーを畳む（Repos / Search）
+1. サイドバーを畳む（Repos / Search / diff。diff は 100 桁未満で畳み、
+   現在のファイル名だけをヘッダに残す）
 2. ドロワー・詳細ペインを畳む（Work / Repos）。**同時に Work のカードの枠も外す**
    （100 桁未満）。1 列は 17 桁ほどしかなく、枠が 2 桁を取るとタイトルが残らない。
    枠を外した分、選択はカーソル記号で示す
@@ -432,11 +540,24 @@ Phase 0 時点のフラグは `--repo` / `--lang` / `--version` の 3 つで、
 
 ### Phase 2: PR レビュー
 
-- diff ビューア（シンタックスハイライト、ファイル間移動、ハンク単位の移動）
-- レビュー提出（approve / request changes / comment）
-- 行コメントの追加
+- `internal/gh` に diff とレビューのドメイン型を足す
+  （`FileDiff` / `Hunk` / `DiffLine` / `ReviewThread` / `ReviewEvent`）
+- `gh pr diff --color=never` の unified diff をパースする（`internal/gh/cli`）。
+  **各行が旧側・新側の両方の行番号を持つ。** 行コメントの投稿がそれを要求する
+- diff ビューア（4.4.1）。ファイルサイドバー、ハンク単位の移動、
+  シンタックスハイライト、既存レビュースレッドの表示
+- レビューの提出と行コメント（4.4.2）。GitHub 側の pending review として持ち、
+  GraphQL の `addPullRequestReview` / `addPullRequestReviewThread` /
+  `submitPullRequestReview` / `deletePullRequestReview` を使う
+- ルートモデルのナビゲーションを `showingDetail bool` からビューのスタックに変える
+
+**Phase 2 の範囲外**: スレッドへの返信、スレッドの解決。既存スレッドは読むだけ。
+4.4.1 に書いた既知の限界（diff に無いファイルのスレッドは描かれない）とあわせて、
+どちらも次のフェーズの持ち物とする。
 
 **検証**: 実際の PR に対して TUI からレビューを提出できる。
+**この検証は TTY と実在の PR が要るため、TTY の無い環境では代行できない。**
+自動で確かめられるのは golden までであり、最後は人手で確認する。
 
 ### Phase 3: checks / merge
 

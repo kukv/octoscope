@@ -15,6 +15,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/review"
 )
 
 // prSource is the pull-request half of what the detail view needs.
@@ -27,6 +28,11 @@ type prSource interface {
 	ReopenPR(repo string, number int) error
 	EditPRLabels(repo string, number int, add, remove []string) error
 	EditPRAssignees(repo string, number int, add, remove []string) error
+	// PRReviewContext is what v needs before it can open the review popup:
+	// the pull request's node id and the unsubmitted review, if any. detail
+	// has no diff of its own, so unlike diff's Source this is the only thing
+	// it reads off the review context.
+	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
 }
 
 // issueSource mirrors prSource for issues. The two are kept apart rather
@@ -51,15 +57,21 @@ type candidateSource interface {
 
 // Source is what the detail view needs from the GitHub layer. A command that
 // acts on one kind takes that half; the ones that pick the kind at run time
-// take the whole.
+// take the whole. review.Source is embedded rather than repeated: the
+// submission popup this view holds needs exactly those two methods, and
+// review already declares them for exactly this purpose.
 type Source interface {
 	prSource
 	issueSource
 	candidateSource
+	review.Source
 }
 
 // ClosedMsg tells the parent the user left the detail view.
 type ClosedMsg struct{}
+
+// OpenDiffMsg asks the parent to show the diff of the shown pull request.
+type OpenDiffMsg struct{ Ref gh.ItemRef }
 
 // ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
@@ -92,6 +104,18 @@ type (
 	}
 	pickerAppliedMsg struct{}
 	pickErrorMsg     struct{ err error }
+
+	// reviewContextMsg and reviewContextErrMsg carry v's own fetch: unlike
+	// prMsg and issueMsg, this one is not part of the initial load, so it
+	// still needs the ref guard against an item the user has since left.
+	reviewContextMsg struct {
+		ref gh.ItemRef
+		ctx gh.ReviewContext
+	}
+	reviewContextErrMsg struct {
+		ref gh.ItemRef
+		err error
+	}
 )
 
 type Model struct {
@@ -121,6 +145,16 @@ type Model struct {
 	picker        picker
 	labels        []string
 	assignees     []string
+
+	// submit is the review submission popup (v), a small window drawn over
+	// this view rather than a view of its own. openingReview is set between
+	// pressing v and the review context it needs arriving; submitErr is a
+	// failed submission's text, kept here rather than in submit itself so
+	// the popup's own fields stay just its event and its note.
+	submit        review.Model
+	submitting    bool
+	openingReview bool
+	submitErr     string
 }
 
 func New(src Source, ref gh.ItemRef) Model {
@@ -167,6 +201,18 @@ func fetch(src Source, ref gh.ItemRef) tea.Cmd {
 			return errMsg{ref, err}
 		}
 		return issueMsg{ref, issue}
+	}
+}
+
+// fetchReviewContext is what v runs before it can open the review popup: an
+// issue has no review, so this is only ever called on a pull request.
+func fetchReviewContext(src prSource, ref gh.ItemRef) tea.Cmd {
+	return func() tea.Msg {
+		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
+		if err != nil {
+			return reviewContextErrMsg{ref: ref, err: err}
+		}
+		return reviewContextMsg{ref: ref, ctx: ctx}
 	}
 }
 
@@ -286,6 +332,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.body.SetHeight(max(msg.Height-4, 5))
 		m.textarea.SetWidth(msg.Width)
 		m.textarea.SetHeight(max(msg.Height-6, 3))
+		if m.submit.Active() {
+			m.submit, _ = m.submit.Update(msg)
+		}
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -368,6 +417,50 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.actionErr = msg.err.Error()
 		}
 		return m, nil
+	case reviewContextMsg:
+		if msg.ref != m.ref {
+			return m, nil // an answer for an item the user has already left
+		}
+		m.openingReview = false
+		target := review.Target{
+			PullRequestID:   msg.ctx.PullRequestID,
+			PendingID:       msg.ctx.PendingID,
+			PendingComments: msg.ctx.PendingCount(),
+		}
+		m.submit = review.New(m.src, target)
+		m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.submitting = true
+		m.submitErr = ""
+		return m, nil
+	case reviewContextErrMsg:
+		if msg.ref != m.ref {
+			return m, nil
+		}
+		m.openingReview = false
+		m.actionErr = msg.err.Error()
+		return m, nil
+	case review.CancelledMsg:
+		if !m.submitting {
+			return m, nil
+		}
+		m.submitting = false
+		return m, nil
+	case review.SubmittedMsg:
+		if !m.submitting {
+			return m, nil
+		}
+		m.submitting = false
+		m.submitErr = ""
+		m.loading = true
+		return m, fetch(m.src, m.ref)
+	case review.ErrorMsg:
+		if !m.submitting {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.submit, cmd = m.submit.Update(msg)
+		m.submitErr = msg.Err.Error()
+		return m, cmd
 	case errMsg:
 		if msg.ref != m.ref {
 			return m, nil
@@ -379,10 +472,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	case tea.MouseWheelMsg:
 		// The body is the only thing here that scrolls. The composer, the
-		// confirmation and the picker are drawn over it, and a wheel that
-		// moved the text underneath them would be scrolling what nobody can
-		// see.
-		if m.composing || m.confirming || m.picking || m.loading {
+		// confirmation, the picker and the submit popup are drawn over it,
+		// and a wheel that moved the text underneath them would be
+		// scrolling what nobody can see.
+		if m.composing || m.confirming || m.picking || m.loading || m.submitting {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -402,14 +495,25 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.picking {
 		return m.handlePickerKey(msg)
 	}
-	if m.pickerLoading {
-		return m, nil // ignore keys while the candidates are being fetched
+	if m.submitting {
+		return m.handleSubmitKey(msg)
+	}
+	if m.pickerLoading || m.openingReview {
+		return m, nil // ignore keys while the candidates/review are being fetched
 	}
 	switch msg.String() {
 	case "q", "esc":
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "o":
 		return m, openWeb(m.src, m.ref)
+	case "d":
+		// An issue has no diff. Opening an empty diff view would be a worse
+		// answer than doing nothing.
+		if m.ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		ref := m.ref
+		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "r":
 		m.loading = true
 		return m, fetch(m.src, m.ref)
@@ -432,6 +536,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.confirming = true
 		m.actionErr = ""
 		return m, nil
+	case "v":
+		// An issue has no review. detail has no diff of its own, so unlike
+		// the diff view's v this always needs a fetch first -- there is no
+		// review context already sitting on the model to open the popup
+		// against.
+		if m.loading || m.ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		m.openingReview = true
+		m.actionErr = ""
+		return m, fetchReviewContext(m.src, m.ref)
 	case "l":
 		if m.loading {
 			return m, nil
@@ -480,6 +595,12 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, applyPicker(m.src, m.ref, m.picker.kind, add, remove)
 	}
 	return m, nil
+}
+
+func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.submit, cmd = m.submit.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {

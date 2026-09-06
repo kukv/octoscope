@@ -42,6 +42,10 @@ linters:
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/detail
               desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/review
+              desc: review is a popup held by diff and detail, not a sibling view
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child view must not import its parent
         tui-repo:
@@ -52,6 +56,10 @@ linters:
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/detail
               desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/review
+              desc: review is a popup held by diff and detail, not a sibling view
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child view must not import its parent
         tui-detail:
@@ -62,8 +70,39 @@ linters:
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/repo
               desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child view must not import its parent
+        tui-diff:
+          files:
+            - "**/internal/tui/diff/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/tui/work
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/repo
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/detail
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/app
+              desc: a child view must not import its parent
+        # review is a popup, not a view: work, repo and their siblings have no
+        # reason to reach into it, and it must never import the views that
+        # hold it (see internal/tui/review's own package comment).
+        tui-review:
+          files:
+            - "**/internal/tui/review/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/tui/work
+              desc: review is a popup held by diff and detail, not a sibling view
+            - pkg: github.com/kukv/octoscope/internal/tui/repo
+              desc: review is a popup held by diff and detail, not a sibling view
+            - pkg: github.com/kukv/octoscope/internal/tui/detail
+              desc: review must not depend on the views that hold it
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: review must not depend on the views that hold it
+            - pkg: github.com/kukv/octoscope/internal/tui/app
+              desc: a child must not import its parent
         # icon and layout sit below the views: they draw glyphs and measure
         # columns, and know nothing of the models that call them.
         tui-icon:
@@ -75,6 +114,8 @@ linters:
             - pkg: github.com/kukv/octoscope/internal/tui/repo
               desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/detail
+              desc: a leaf must not depend on the views that use it
+            - pkg: github.com/kukv/octoscope/internal/tui/review
               desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a leaf must not depend on the views that use it
@@ -88,6 +129,8 @@ linters:
               desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/detail
               desc: a leaf must not depend on the views that use it
+            - pkg: github.com/kukv/octoscope/internal/tui/review
+              desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a leaf must not depend on the views that use it
         tui-layout:
@@ -99,6 +142,8 @@ linters:
             - pkg: github.com/kukv/octoscope/internal/tui/repo
               desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/detail
+              desc: a leaf must not depend on the views that use it
+            - pkg: github.com/kukv/octoscope/internal/tui/review
               desc: a leaf must not depend on the views that use it
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a leaf must not depend on the views that use it
