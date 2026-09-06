@@ -376,6 +376,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // moves the cursor onto one of them (same index, new content) rather than
 // off the thread entirely, so a second enter must still recognise it as the
 // same thread to close it again.
+//
+// This is why rowThread is accepted here too, not only rowCollapsed: once
+// open, an every-comment thread draws one rowThread per comment, all sharing
+// the same key, and enter has to close the group from whichever of those
+// rows the cursor happens to be on -- not only the first.
 func (m Model) toggleCollapsed() Model {
 	r := m.currentRow()
 	if r.kind != rowCollapsed && r.kind != rowThread {
