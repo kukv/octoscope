@@ -171,6 +171,24 @@ func declinedNoLineModel(width int) Model {
 	return press(m, "c")
 }
 
+// declinedLoadingModel is goldenModel's diff with no review context landed
+// yet, c pressed against it, so the "still loading" message is on screen --
+// the longest of the three decline messages and the one most likely to
+// overrun a narrow terminal.
+func declinedLoadingModel(width int) Model {
+	m := New(&fakeSource{files: goldenFixture()},
+		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	m, _ = m.Update(diffMsg{ref: m.ref, files: goldenFixture()})
+	return press(m, "c")
+}
+
+// declinedNoPendingReviewModel is goldenModel with X pressed: goldenReview
+// has no PendingID, so there is nothing to discard.
+func declinedNoPendingReviewModel(width int) Model {
+	return press(goldenModel(width), "X")
+}
+
 // TestGoldenIconSets records a view with both an open thread and a folded
 // one, once per glyph set: the marker and the comment bar are the two
 // literals this glyph pair covers, and a set that draws them the wrong width
@@ -188,14 +206,16 @@ func TestGoldenIconSets(t *testing.T) {
 
 func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 	models := map[string]func(int) Model{
-		"tab":              goldenModel,
-		"wide_line_number": wideLineNumberModel,
-		"review_failure":   reviewFailureModel,
-		"composing":        composingModel,
-		"posting":          postingModel,
-		"submitting":       submittingModel,
-		"discarding":       discardingModel,
-		"declined_no_line": declinedNoLineModel,
+		"tab":                        goldenModel,
+		"wide_line_number":           wideLineNumberModel,
+		"review_failure":             reviewFailureModel,
+		"composing":                  composingModel,
+		"posting":                    postingModel,
+		"submitting":                 submittingModel,
+		"discarding":                 discardingModel,
+		"declined_no_line":           declinedNoLineModel,
+		"declined_loading":           declinedLoadingModel,
+		"declined_no_pending_review": declinedNoPendingReviewModel,
 	}
 	// 99 and 100 straddle minWidthForSidebar, the one width where the layout
 	// itself changes; goldenWidths never lands on it.
@@ -228,19 +248,21 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 			threads := withThreads(t, 120, 40)
 			expanded := press(openCollapsedThread(threads), "enter")
 			for name, view := range map[string]string{
-				"loaded":         loaded(t, 120, 30).View(),
-				"loading":        loading.View(),
-				"empty":          emptyDiff(t, 120, 30).View(),
-				"no_patch":       noPatchDiff(t, 120, 30).View(),
-				"threads":        threads.View(),
-				"expanded":       expanded.View(),
-				"pending":        withPending(t).View(),
-				"review_failure": reviewFailureModel(120).View(),
-				"composing":      composingModel(120).View(),
-				"posting":        postingModel(120).View(),
-				"submitting":     submittingModel(120).View(),
-				"discarding":     discardingModel(120).View(),
-				"declined":       declinedNoLineModel(120).View(),
+				"loaded":                     loaded(t, 120, 30).View(),
+				"loading":                    loading.View(),
+				"empty":                      emptyDiff(t, 120, 30).View(),
+				"no_patch":                   noPatchDiff(t, 120, 30).View(),
+				"threads":                    threads.View(),
+				"expanded":                   expanded.View(),
+				"pending":                    withPending(t).View(),
+				"review_failure":             reviewFailureModel(120).View(),
+				"composing":                  composingModel(120).View(),
+				"posting":                    postingModel(120).View(),
+				"submitting":                 submittingModel(120).View(),
+				"discarding":                 discardingModel(120).View(),
+				"declined":                   declinedNoLineModel(120).View(),
+				"declined_loading":           declinedLoadingModel(120).View(),
+				"declined_no_pending_review": declinedNoPendingReviewModel(120).View(),
 			} {
 				t.Run(name, func(t *testing.T) {
 					i18n.AssertNoUnresolvedIDs(t, view)
