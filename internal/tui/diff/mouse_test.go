@@ -124,6 +124,62 @@ func manyLineFixture() []gh.FileDiff {
 	}
 }
 
+// TestClickingAFoldedPaneSelectsTheDiffRowNotAFile proves the click handler's
+// m.showSidebar() guard, not just fileAt's own bounds check, is what keeps a
+// click in the left columns off the file list once it stops being drawn.
+// Without the guard this click would still land inside sidebarWidth and pick
+// a file the user cannot see.
+func TestClickingAFoldedPaneSelectsTheDiffRowNotAFile(t *testing.T) {
+	m := loaded(t, 80, 30)
+	if m.showSidebar() {
+		t.Fatal("this fixture must be narrow enough to fold the sidebar; this test covers nothing")
+	}
+	y := rowY(t, m, "if depth <= 0 {")
+	m = click(m, 2, y)
+	if got := m.currentRow(); got.kind != rowLine || got.line.Text != expandTabs("\tif depth <= 0 {") {
+		t.Errorf("the click at a folded width selected %+v, want the diff line it landed on", got)
+	}
+}
+
+// TestTheWheelAtAFoldedWidthMovesTheDiffNotTheFile proves the wheel handler's
+// own m.showSidebar() guard: at a folded width the pointer is always over
+// the diff pane, even in the columns that would be the sidebar if it were
+// drawn.
+func TestTheWheelAtAFoldedWidthMovesTheDiffNotTheFile(t *testing.T) {
+	m := loaded(t, 80, 30)
+	if m.showSidebar() {
+		t.Fatal("this fixture must be narrow enough to fold the sidebar; this test covers nothing")
+	}
+	beforeFile, beforeRow := m.file, m.row
+	m, _ = m.Update(tea.MouseWheelMsg{X: 2, Y: 6, Button: tea.MouseWheelDown})
+	if m.file != beforeFile {
+		t.Errorf("the wheel at a folded width moved the file to %d, want it unchanged", m.file)
+	}
+	if m.row == beforeRow {
+		t.Error("the wheel at a folded width moved nothing")
+	}
+}
+
+// TestClickingAPlainLineTwiceDoesNothing covers the click path for
+// toggleCollapsed's guard: a plain rowLine has nothing to open, so a second
+// click on an already-selected line must be a no-op, not just silently
+// swallowed by toggleCollapsed.
+func TestClickingAPlainLineTwiceDoesNothing(t *testing.T) {
+	m := loaded(t, 120, 30)
+	y := rowY(t, m, "if depth <= 0 {")
+	m = click(m, sidebarWidth+m.gutter()+5, y)
+	before := m.currentRow()
+	beforeRows := len(m.rows)
+	m = click(m, sidebarWidth+m.gutter()+5, y)
+	after := m.currentRow()
+	if after.kind != before.kind || after.line.Text != before.line.Text {
+		t.Errorf("a second click on a plain line changed the selection: %+v -> %+v", before, after)
+	}
+	if len(m.rows) != beforeRows {
+		t.Errorf("a second click on a plain line rebuilt the rows: %d -> %d", beforeRows, len(m.rows))
+	}
+}
+
 // TestClickingAScrolledDiffPaneSelectsTheRightRow proves the hit test reads
 // m.top: without it, a click after the pane has scrolled would select
 // whatever row happens to sit at that offset from the top of the file
