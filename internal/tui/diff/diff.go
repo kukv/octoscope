@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -18,6 +19,8 @@ import (
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
+	StartReview(pullRequestID string) (string, error)
+	AddReviewThread(reviewID string, c gh.PendingComment) error
 }
 
 // ClosedMsg tells the parent the user left the diff view.
@@ -114,6 +117,13 @@ type Model struct {
 	// sidebar is where the cursor is: false in the diff pane, true in the
 	// file list. h and l move between them.
 	sidebar bool
+
+	// textarea, composing and posting are the line-comment composer. It is
+	// the same shape as detail's: ctrl+s sends, esc discards the draft.
+	textarea  textarea.Model
+	composing bool
+	posting   bool
+	postErr   string
 }
 
 // New builds the view for one pull request. It takes only what names the
@@ -124,7 +134,11 @@ type Model struct {
 func New(src Source, ref gh.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return Model{src: src, ref: ref, loading: true, spin: s}
+	ta := textarea.New()
+	ta.Placeholder = i18n.T("diff.comment_placeholder")
+	ta.ShowLineNumbers = false
+	ta.SetHeight(composerRows)
+	return Model{src: src, ref: ref, loading: true, spin: s, textarea: ta}
 }
 
 // Init starts the fetch. Unlike the Work board this view is built once per
@@ -164,6 +178,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.textarea.SetWidth(max(m.width, 0))
 		return m, nil
 	case diffMsg:
 		// The request for the pull request the user just left is still in
@@ -198,6 +213,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.loading = false
 		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	case commentPostedMsg:
+		if msg.ref != m.ref {
+			return m, nil
+		}
+		m.posting = false
+		m.postErr = ""
+		m.textarea.Reset()
+		m.review.PendingID = msg.reviewID
+		return m, m.fetchReview()
+	case commentErrorMsg:
+		m.posting = false
+		m.composing = true
+		m.postErr = msg.err.Error()
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case spinner.TickMsg:
@@ -209,6 +238,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.composing || m.posting {
+		return m.handleComposeKey(msg)
+	}
 	switch msg.String() {
 	case "esc", "q":
 		return m, func() tea.Msg { return ClosedMsg{} }
@@ -236,6 +268,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		return m.toggleCollapsed(), nil
+	case "c":
+		return m.startComposing(), nil
 	}
 	return m, nil
 }

@@ -32,6 +32,9 @@ const (
 
 	// keyBarHeight is the single line at the bottom of the screen.
 	keyBarHeight = 1
+
+	// composerRows is the line-comment composer's fixed textarea height.
+	composerRows = 3
 )
 
 func (m Model) View() string {
@@ -48,11 +51,48 @@ func (m Model) View() string {
 	if m.reviewErr != nil {
 		lines = append(lines, m.reviewErrLine())
 	}
+	if m.composing || m.posting {
+		lines = append(lines, m.composerLines()...)
+	}
 	return strings.Join(append(lines, m.keyBar()), "\n")
 }
 
 func (m Model) keyBar() string {
-	return theme.Dim().Render(clip(i18n.T("footer.diff"), m.width))
+	text := i18n.T("footer.diff")
+	if m.composing || m.posting {
+		text = i18n.T("footer.diff_comment")
+	}
+	return theme.Dim().Render(clip(text, m.width))
+}
+
+// composerLines draws the line-comment composer: a blank separator, the
+// textarea, and at most one more line -- a failed post's error, or the
+// spinner while the comment is in flight. composerHeight has to agree with
+// how many lines this returns, or the pane's height budget goes stale and
+// the key bar gets pushed off the bottom.
+func (m Model) composerLines() []string {
+	lines := append([]string{""}, strings.Split(m.textarea.View(), "\n")...)
+	switch {
+	case m.postErr != "":
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.postErr), m.width))
+	case m.posting:
+		lines = append(lines, clip(m.spin.View()+" "+i18n.T("diff.posting"), m.width))
+	}
+	return lines
+}
+
+// composerHeight is what composerLines takes, out of the pane's height
+// budget the same way reviewErrHeight is, so the composer never pushes the
+// key bar off the bottom.
+func (m Model) composerHeight() int {
+	if !m.composing && !m.posting {
+		return 0
+	}
+	h := 1 + composerRows
+	if m.postErr != "" || m.posting {
+		h++
+	}
+	return h
 }
 
 // reviewErrLine reports a review-context fetch that failed. The diff itself
@@ -146,7 +186,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.composerHeight(), 1)
 }
 
 // body lays the sidebar and the diff pane side by side, the way the Repos

@@ -70,6 +70,10 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewCon
 	return gh.ReviewContext{}, nil
 }
 
+func (f *fakeSource) StartReview(string) (string, error) { return "", nil }
+
+func (f *fakeSource) AddReviewThread(string, gh.PendingComment) error { return nil }
+
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

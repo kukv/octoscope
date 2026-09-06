@@ -117,6 +117,10 @@ diff:
     other: "未送信"
   pending_note:
     other: "未提出 · {{.Count}}"
+  comment_placeholder:
+    other: "この行へのコメント"
+  posting:
+    other: "コメントを送信中"
 
 footer:
   list:
@@ -142,7 +146,9 @@ footer:
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
   diff:
-    other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  enter:開く  r:再取得  esc:戻る"
+    other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  enter:開く  c:コメント  r:再取得  esc:戻る"
+  diff_comment:
+    other: "ctrl+s:送信  esc:取消"
 
 md:
   author:

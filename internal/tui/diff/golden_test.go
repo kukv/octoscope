@@ -41,9 +41,10 @@ func goldenFixture() []gh.FileDiff {
 // and a thread row at once.
 func goldenReview() gh.ReviewContext {
 	return gh.ReviewContext{
-		Title: "add relation graph traversal",
-		Head:  "feat/graph",
-		Base:  "main",
+		PullRequestID: "PR_128",
+		Title:         "add relation graph traversal",
+		Head:          "feat/graph",
+		Base:          "main",
 		Threads: []gh.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
@@ -62,6 +63,23 @@ func goldenModel(width int) Model {
 	m, _ = m.Update(diffMsg{ref: m.ref, files: goldenFixture()})
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: goldenReview()})
 	m = press(m, "j")
+	return m
+}
+
+// composingModel is goldenModel with the composer open on the row the cursor
+// already sits on (a rowLine, per goldenModel's own comment): a row this
+// wide, with the composer's rows taken out of the pane's height budget, is
+// what would first show a composer wide or tall enough to overrun the
+// terminal.
+func composingModel(width int) Model {
+	return press(goldenModel(width), "c")
+}
+
+// postingModel is composingModel after ctrl+s, with the post cmd
+// deliberately not run so the model is caught mid-send.
+func postingModel(width int) Model {
+	m := typeInto(composingModel(width), "why not 2?")
+	m, _ = m.Update(keyPress("ctrl+s"))
 	return m
 }
 
@@ -133,6 +151,8 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 		"tab":              goldenModel,
 		"wide_line_number": wideLineNumberModel,
 		"review_failure":   reviewFailureModel,
+		"composing":        composingModel,
+		"posting":          postingModel,
 	}
 	for _, w := range goldenWidths {
 		for _, lang := range goldenLanguages {
@@ -169,6 +189,8 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 				"expanded":       expanded.View(),
 				"pending":        withPending(t).View(),
 				"review_failure": reviewFailureModel(120).View(),
+				"composing":      composingModel(120).View(),
+				"posting":        postingModel(120).View(),
 			} {
 				t.Run(name, func(t *testing.T) {
 					i18n.AssertNoUnresolvedIDs(t, view)

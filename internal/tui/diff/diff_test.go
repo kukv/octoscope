@@ -26,6 +26,13 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewCon
 	return f.review, nil
 }
 
+// StartReview and AddReviewThread are stubs so fakeSource satisfies Source;
+// recordingSource (comment_test.go) overrides them to assert what a comment
+// sends.
+func (f *fakeSource) StartReview(string) (string, error) { return "", nil }
+
+func (f *fakeSource) AddReviewThread(string, gh.PendingComment) error { return nil }
+
 // fixture is two files, so that moving between files is testable, with a
 // second hunk in the first so that hunk movement is too.
 func fixture() []gh.FileDiff {
@@ -87,6 +94,8 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "ctrl+s":
+		return tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
 	default:
 		return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
 	}

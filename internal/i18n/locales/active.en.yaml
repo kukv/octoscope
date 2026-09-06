@@ -121,6 +121,10 @@ diff:
   pending_note:
     one: "pending · {{.Count}}"
     other: "pending · {{.Count}}"
+  comment_placeholder:
+    other: "Comment on this line"
+  posting:
+    other: "sending the comment"
 
 footer:
   list:
@@ -146,7 +150,9 @@ footer:
   work:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
   diff:
-    other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  enter:open  r:refresh  esc:back"
+    other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  enter:open  c:comment  r:refresh  esc:back"
+  diff_comment:
+    other: "ctrl+s:send  esc:cancel"
 
 md:
   author:
