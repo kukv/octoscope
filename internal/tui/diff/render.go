@@ -9,6 +9,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -72,7 +73,7 @@ func (m Model) keyBar() string {
 	case m.discarding:
 		return theme.Dim().Render(clip(i18n.T("footer.discard"), m.width))
 	default:
-		return theme.Dim().Render(fitKeyBar(diffHints(), m.width))
+		return theme.Dim().Render(layout.FitKeyBar(diffHints(), m.width))
 	}
 }
 
@@ -147,22 +148,6 @@ func (m Model) discardHeight() int {
 		h++
 	}
 	return h
-}
-
-// fitKeyBar joins hints in order and drops from the low-priority end (the
-// tail of the slice) until the joined line fits width. No ellipsis: a bar
-// that shows fewer hints cleanly beats one that shows more but cuts one off
-// mid-word. hints[0] is always kept, so as long as the caller orders esc
-// first, esc is what survives when only one hint fits -- clipped, if even it
-// does not fit, rather than left to overrun the width budget.
-func fitKeyBar(hints []string, width int) string {
-	for n := len(hints); n > 0; n-- {
-		joined := strings.Join(hints[:n], "  ")
-		if ansi.StringWidth(joined) <= width {
-			return joined
-		}
-	}
-	return clip(hints[0], width)
 }
 
 // composerLines draws the line-comment composer: a blank separator, the

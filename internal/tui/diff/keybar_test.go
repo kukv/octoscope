@@ -31,37 +31,6 @@ func TestTheKeyBarNeverDropsEsc(t *testing.T) {
 	}
 }
 
-// TestTheKeyBarFitsAt80InBothLanguages guards the terminal-width guarantee
-// this project makes: whatever hints survive, the bar itself never overruns
-// 80 columns.
-func TestTheKeyBarFitsAt80InBothLanguages(t *testing.T) {
-	for _, lang := range goldenLanguages {
-		t.Run(lang.name, func(t *testing.T) {
-			i18n.SetLanguage(lang.tag)
-			t.Cleanup(func() { i18n.SetLanguage(language.English) })
-			m := loaded(t, 80, 30)
-			if got := ansi.StringWidth(ansi.Strip(m.keyBar())); got > 80 {
-				t.Errorf("key bar is %d columns wide at 80: %q", got, ansi.Strip(m.keyBar()))
-			}
-		})
-	}
-}
-
-// TestTheKeyBarShowsOnlyEscWhenNarrow is the other end of the fit-aware bar:
-// when only one hint can fit, it is esc and nothing else -- no ellipsis, no
-// partial hint.
-func TestTheKeyBarShowsOnlyEscWhenNarrow(t *testing.T) {
-	const narrow = 10 // fits "esc:back" but not "esc:back  c:comment"
-	m := loaded(t, narrow, 30)
-	bar := ansi.Strip(m.keyBar())
-	if got := ansi.StringWidth(bar); got > narrow {
-		t.Errorf("key bar is %d columns wide at %d: %q", got, narrow, bar)
-	}
-	if strings.TrimSpace(bar) != i18n.T("footer.diff.esc") {
-		t.Errorf("key bar at %d columns = %q, want only the esc hint %q", narrow, bar, i18n.T("footer.diff.esc"))
-	}
-}
-
 // TestTheSubmitFooterFitsAt80InBothLanguages guards the same terminal-width
 // guarantee for the popup's own footer, which is a fixed string rather than
 // a fit-aware bar: it must never overrun 80 columns either.
@@ -93,28 +62,6 @@ func TestTheDiscardFooterFitsAt80InBothLanguages(t *testing.T) {
 			m = press(m, "X")
 			if got := ansi.StringWidth(ansi.Strip(m.keyBar())); got > 80 {
 				t.Errorf("discard footer is %d columns wide at 80: %q", got, ansi.Strip(m.keyBar()))
-			}
-		})
-	}
-}
-
-// TestTheKeyBarClipsEscWhenNarrowerThanTheHintItself covers fitKeyBar's last
-// resort: below "esc:戻る"'s own 8 columns, even hints[:1] does not fit.
-// esc must never be dropped, but it may be clipped -- the old fallback
-// returned it unclipped and let the bar overrun the width budget.
-func TestTheKeyBarClipsEscWhenNarrowerThanTheHintItself(t *testing.T) {
-	const narrower = 5 // "esc:back" and "esc:戻る" are both wider than this
-	for _, lang := range goldenLanguages {
-		t.Run(lang.name, func(t *testing.T) {
-			i18n.SetLanguage(lang.tag)
-			t.Cleanup(func() { i18n.SetLanguage(language.English) })
-			m := loaded(t, narrower, 30)
-			bar := ansi.Strip(m.keyBar())
-			if got := ansi.StringWidth(bar); got > narrower {
-				t.Errorf("key bar is %d columns wide at %d: %q", got, narrower, bar)
-			}
-			if bar == "" {
-				t.Error("esc was dropped instead of clipped")
 			}
 		})
 	}

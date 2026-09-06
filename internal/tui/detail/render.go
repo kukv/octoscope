@@ -42,7 +42,7 @@ func (m Model) View() string {
 // dropping from the low-priority end when the terminal is too narrow for all
 // of them -- the same mechanism diff's render.go uses for its own key bar.
 func (m Model) footer() string {
-	return fitKeyBar(m.footerHints(), m.width)
+	return layout.FitKeyBar(m.footerHints(), m.width)
 }
 
 // footerHints lists the detail view's hints, most important first. esc is
@@ -67,29 +67,6 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.detail.labels"),
 		i18n.T("footer.detail.assign"),
 	)
-}
-
-// fitKeyBar joins hints in order and drops from the low-priority end (the
-// tail of the slice) until the joined line fits width. No ellipsis: a bar
-// that shows fewer hints cleanly beats one that shows more but cuts one off
-// mid-word. hints[0] is always kept, so as long as the caller orders esc
-// first, esc is what survives when only one hint fits -- clipped, if even it
-// does not fit, rather than left to overrun the width budget.
-//
-// This is the same mechanism as internal/tui/diff/render.go's fitKeyBar;
-// sharing it (in internal/tui/layout, say) would be a reasonable follow-up,
-// but this task does not restructure that package without asking first.
-func fitKeyBar(hints []string, width int) string {
-	if width <= 0 {
-		return strings.Join(hints, "  ")
-	}
-	for n := len(hints); n > 0; n-- {
-		joined := strings.Join(hints[:n], "  ")
-		if ansi.StringWidth(joined) <= width {
-			return joined
-		}
-	}
-	return layout.ClipLines(hints[0], width)
 }
 
 // submitView draws the review popup: the title, the popup's own box, and a
