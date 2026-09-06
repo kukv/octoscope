@@ -299,6 +299,7 @@ GraphQL の 4 つの mutation で足りる。
 | 未提出のレビューを始める | `addPullRequestReview` |
 | 行コメントを 1 件足す | `addPullRequestReviewThread` |
 | 提出する | `submitPullRequestReview` |
+| 書きかけが無い状態でそのまま提出する | `addPullRequestReview`（`event` と `body` を付ければ 1 回で済む） |
 | 破棄する | `deletePullRequestReview` |
 
 diff を開いた時点で `pullRequest.reviews(states: [PENDING])` を引き、
@@ -308,6 +309,10 @@ diff を開いた時点で `pullRequest.reviews(states: [PENDING])` を引き、
 `v` で提出のポップアップを開く。event（approve / request changes / comment）を
 選び、本文を書いて `ctrl+s` で提出する。提出後は PR を取り直し、
 一覧のレビュー状態を更新する。
+
+**書きかけが無くても `v` は開く。** diff を読んで何も言うことがなく approve する、
+というのがレビューで最も多い形であり、そこに未提出レビューを先に作らせる理由が無い。
+書きかけが無いときは `addPullRequestReview` に `event` を付けて 1 回で送る。
 
 **提出のポップアップは詳細ビューからも開く。** diff を読まずに approve したい
 場面はあり、そのために diff を経由させる理由が無い。

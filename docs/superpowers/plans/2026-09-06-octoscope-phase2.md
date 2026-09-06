@@ -703,10 +703,19 @@ const (
 )
 
 // ReviewContext is everything the diff view needs before it can draw or
-// change a review: the pull request's node id, the unsubmitted review if
-// there is one, and the threads already on the diff.
+// change a review: the pull request's node id, what its header says, the
+// unsubmitted review if there is one, and the threads already on the diff.
+//
+// The header belongs here rather than being handed in by whoever opened the
+// view, because a card on the Work board and a row in the Repos tab know
+// different amounts about the pull request, and neither knows all of it.
 type ReviewContext struct {
 	PullRequestID string
+	Title         string
+	Head          string
+	Base          string
+	Additions     int
+	Deletions     int
 	// PendingID is the unsubmitted review's node id, empty when there is
 	// none. A pending review is visible only to its author, so anything that
 	// comes back here belongs to the viewer.
@@ -724,9 +733,22 @@ query ($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       id
+      title
+      headRefName
+      baseRefName
+      additions
+      deletions
       reviews(states: [PENDING], first: 1) {
         nodes {
           id
+          comments(first: 100) {
+            nodes {
+              path
+              line
+              diffSide
+              body
+            }
+          }
         }
       }
       reviewThreads(first: 100) {
@@ -794,6 +816,13 @@ const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
   ]}
 }}}}`
 
+// reviewContextJSONWithHeader carries the fields the diff view's header
+// draws, which arrive with the same query.
+const reviewContextHeaderJSON = `{"data":{"repository":{"pullRequest":{
+  "id":"PR_1","title":"feat: add relation graph traversal",
+  "headRefName":"feat/graph","baseRefName":"main","additions":218,"deletions":31,
+  "reviews":{"nodes":[]},"reviewThreads":{"nodes":[]}}}}}`
+
 func TestPRReviewContextBuildsTheQuery(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	var got []string
@@ -859,6 +888,52 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 	}
 }
 
+// TestPRReviewContextInTheWorkingDirectorysRepo is the ordinary case: no
+// --repo, so there is no "owner/name" to split and gh has to fill the
+// placeholders from the checkout's remote. Sending empty strings here asks
+// GitHub for a repository called "".
+func TestPRReviewContextCarriesTheHeader(t *testing.T) {
+	c := New("/w", "kukv/koto")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		return []byte(reviewContextHeaderJSON), nil
+	}
+	rc, err := c.PRReviewContext(context.Background(), "", 128)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rc.Title != "feat: add relation graph traversal" {
+		t.Errorf("title = %q", rc.Title)
+	}
+	if rc.Head != "feat/graph" || rc.Base != "main" {
+		t.Errorf("%s -> %s, want feat/graph -> main", rc.Head, rc.Base)
+	}
+	if rc.Additions != 218 || rc.Deletions != 31 {
+		t.Errorf("+%d -%d, want +218 -31", rc.Additions, rc.Deletions)
+	}
+}
+
+func TestPRReviewContextInTheWorkingDirectorysRepo(t *testing.T) {
+	c := New("/w", "")
+	var got []string
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return []byte(reviewContextJSON), nil
+	}
+	if _, err := c.PRReviewContext(context.Background(), "", 128); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"owner={owner}", "name={repo}"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("args %v do not carry %q", got, want)
+		}
+	}
+	for _, unwanted := range []string{"owner=", "name="} {
+		if slices.Contains(got, unwanted) {
+			t.Errorf("args %v name an empty repository", got)
+		}
+	}
+}
+
 func TestPRReviewContextWithNoPendingReview(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
@@ -902,21 +977,41 @@ import (
 //go:embed review.graphql
 var reviewContextQuery string
 
-// splitRepo cuts "owner/name" in two. GraphQL's repository() takes the halves
-// separately, unlike `gh pr` which takes the whole thing after --repo.
-func splitRepo(repo string) (owner, name string) {
-	owner, name, _ = strings.Cut(repo, "/")
-	return owner, name
+// repoArgs names the repository for a GraphQL call.
+//
+// GraphQL's repository() takes owner and name separately, unlike `gh pr`
+// which takes the whole "owner/name" after --repo. When no repository was
+// named -- the ordinary case of running octoscope inside a checkout -- there
+// is nothing to split, and `gh api` fills the placeholders {owner} and {repo}
+// from the working directory's remote.
+//
+// Those placeholders are only substituted in -F values, which is why this is
+// the one place a value that is not a number goes through -F. Everything the
+// user typed still goes through -f (see AddReviewThread).
+func repoArgs(repo string) []string {
+	if repo == "" {
+		return []string{"-F", "owner={owner}", "-F", "name={repo}"}
+	}
+	owner, name, _ := strings.Cut(repo, "/")
+	return []string{"-f", "owner=" + owner, "-f", "name=" + name}
 }
 
 type reviewContextResponse struct {
 	Data struct {
 		Repository struct {
 			PullRequest struct {
-				ID      string `json:"id"`
-				Reviews struct {
+				ID          string `json:"id"`
+				Title       string `json:"title"`
+				HeadRefName string `json:"headRefName"`
+				BaseRefName string `json:"baseRefName"`
+				Additions   int    `json:"additions"`
+				Deletions   int    `json:"deletions"`
+				Reviews     struct {
 					Nodes []struct {
-						ID string `json:"id"`
+						ID       string `json:"id"`
+						Comments struct {
+							Nodes []pendingCommentNode `json:"nodes"`
+						} `json:"comments"`
 					} `json:"nodes"`
 				} `json:"reviews"`
 				ReviewThreads struct {
@@ -955,13 +1050,10 @@ type threadCommentNode struct {
 // PRReviewContext fetches, in one request, everything the diff view needs to
 // draw and change a review.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
-	owner, name := splitRepo(c.effectiveRepo(repo))
-	out, err := c.run(ctx, c.dir, "api", "graphql",
-		"-f", "query="+reviewContextQuery,
-		"-f", "owner="+owner,
-		"-f", "name="+name,
-		"-F", "number="+strconv.Itoa(number),
-	)
+	args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery},
+		repoArgs(c.effectiveRepo(repo))...)
+	args = append(args, "-F", "number="+strconv.Itoa(number))
+	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return gh.ReviewContext{}, err
 	}
@@ -970,14 +1062,66 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		return gh.ReviewContext{}, fmt.Errorf("parse review context: %w", err)
 	}
 	pr := resp.Data.Repository.PullRequest
-	rc := gh.ReviewContext{PullRequestID: pr.ID}
+	rc := gh.ReviewContext{
+		PullRequestID: pr.ID,
+		Title:         pr.Title,
+		Head:          pr.HeadRefName,
+		Base:          pr.BaseRefName,
+		Additions:     pr.Additions,
+		Deletions:     pr.Deletions,
+	}
+	placed := map[string]bool{}
+	for _, n := range pr.ReviewThreads.Nodes {
+		t := n.toDomain()
+		if t.Pending() {
+			placed[threadPosition(t)] = true
+		}
+		rc.Threads = append(rc.Threads, t)
+	}
 	if len(pr.Reviews.Nodes) > 0 {
 		rc.PendingID = pr.Reviews.Nodes[0].ID
-	}
-	for _, n := range pr.ReviewThreads.Nodes {
-		rc.Threads = append(rc.Threads, n.toDomain())
+		// The unsubmitted review's own comments are asked for as well as
+		// read out of reviewThreads. They should be the same set -- a pending
+		// comment does come back in both -- but the whole point of keeping the
+		// review on GitHub is that a comment written here is still there
+		// later, and a design that rests on one field's behaviour deserves
+		// the second source. Anything reviewThreads did not carry is added.
+		for _, c := range pr.Reviews.Nodes[0].Comments.Nodes {
+			if t, ok := c.toThread(); ok && !placed[threadPosition(t)] {
+				rc.Threads = append(rc.Threads, t)
+			}
+		}
 	}
 	return rc, nil
+}
+
+// threadPosition names where a thread sits, for deduplicating the same
+// comment arriving from two fields of the same query.
+func threadPosition(t gh.ReviewThread) string {
+	return fmt.Sprintf("%s:%d:%d", t.Path, t.Line, t.Side)
+}
+
+// pendingCommentNode is one comment of the unsubmitted review, read straight
+// off the review rather than out of reviewThreads.
+type pendingCommentNode struct {
+	Path     string `json:"path"`
+	Line     *int   `json:"line"`
+	DiffSide string `json:"diffSide"`
+	Body     string `json:"body"`
+}
+
+// toThread turns it into a one-comment thread. A comment with no line has
+// nowhere to be drawn, so it is skipped rather than landing on line 0.
+func (c pendingCommentNode) toThread() (gh.ReviewThread, bool) {
+	if c.Line == nil {
+		return gh.ReviewThread{}, false
+	}
+	t := gh.ReviewThread{Path: c.Path, Line: *c.Line}
+	if c.DiffSide == "LEFT" {
+		t.Side = gh.SideLeft
+	}
+	t.Comments = []gh.ThreadComment{{Body: c.Body, Pending: true}}
+	return t, true
 }
 
 func (n threadNode) toDomain() gh.ReviewThread {
@@ -1043,6 +1187,7 @@ the review it belongs to says which is which.
 - Create: `internal/gh/cli/start_review.graphql`
 - Create: `internal/gh/cli/add_thread.graphql`
 - Create: `internal/gh/cli/submit_review.graphql`
+- Create: `internal/gh/cli/review_at_once.graphql`
 - Create: `internal/gh/cli/discard_review.graphql`
 - Modify: `internal/gh/cli/review_test.go`
 
@@ -1052,6 +1197,7 @@ the review it belongs to says which is which.
   - `(*cli.Client).StartReview(pullRequestID string) (string, error)`
   - `(*cli.Client).AddReviewThread(reviewID string, c gh.PendingComment) error`
   - `(*cli.Client).SubmitReview(reviewID string, event gh.ReviewEvent, body string) error`
+  - `(*cli.Client).SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error`
   - `(*cli.Client).DiscardReview(reviewID string) error`
 
 ### context を通さない理由
@@ -1100,6 +1246,23 @@ mutation ($reviewId: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: 
 mutation ($reviewId: ID!, $event: PullRequestReviewEvent!, $body: String!) {
   submitPullRequestReview(input: {
     pullRequestReviewId: $reviewId
+    event: $event
+    body: $body
+  }) {
+    pullRequestReview {
+      id
+    }
+  }
+}
+```
+
+`internal/gh/cli/review_at_once.graphql`。**`addPullRequestReview` に `event` を
+付けた形**で、作成と提出を 1 回で行う。行コメントが溜まっていないレビューはこれで送る。
+
+```graphql
+mutation ($pullRequestId: ID!, $event: PullRequestReviewEvent!, $body: String!) {
+  addPullRequestReview(input: {
+    pullRequestId: $pullRequestId
     event: $event
     body: $body
   }) {
@@ -1220,6 +1383,23 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 	}
 }
 
+func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
+	c := New("/w", "kukv/koto")
+	var got []string
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`), nil
+	}
+	if err := c.SubmitNewReview("PR_1", gh.EventApprove, ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"pullRequestId=PR_1", "event=APPROVE", "body="} {
+		if !slices.Contains(got, want) {
+			t.Errorf("args %v do not carry %q", got, want)
+		}
+	}
+}
+
 func TestDiscardReviewNamesTheReview(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	var got []string
@@ -1256,6 +1436,9 @@ var addThreadMutation string
 
 //go:embed submit_review.graphql
 var submitReviewMutation string
+
+//go:embed review_at_once.graphql
+var reviewAtOnceMutation string
 
 //go:embed discard_review.graphql
 var discardReviewMutation string
@@ -1336,6 +1519,20 @@ func (c *Client) SubmitReview(reviewID string, event gh.ReviewEvent, body string
 	return err
 }
 
+// SubmitNewReview submits a review that has no unsubmitted comments waiting.
+// addPullRequestReview takes an event, so creating and submitting is one
+// call. Approving a diff you had nothing to say about is the commonest review
+// there is, and it should not have to leave a pending review behind first.
+func (c *Client) SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+reviewAtOnceMutation,
+		"-f", "pullRequestId="+pullRequestID,
+		"-f", "event="+apiEvent(event),
+		"-f", "body="+body,
+	)
+	return err
+}
+
 // DiscardReview throws the unsubmitted review away, comments and all.
 func (c *Client) DiscardReview(reviewID string) error {
 	_, err := c.run(context.Background(), c.dir, "api", "graphql",
@@ -1357,7 +1554,8 @@ func (c *Client) DiscardReview(reviewID string) error {
 | 変数 | フラグ | 理由 |
 |---|---|---|
 | `number` / `line` | `-F` | GraphQL の型が `Int!`。文字列を送ると型エラーになる |
-| `owner` / `name` / `path` / `body` / `side` / 各種 id | `-f` | 文字列であり、**利用者の入力を含むものは絶対に解釈させない** |
+| `path` / `body` / `side` / 各種 id | `-f` | 文字列であり、**利用者の入力を含むものは絶対に解釈させない** |
+| `owner` / `name` | `--repo` 指定時は `-f`、無指定時は `-F` | `{owner}` / `{repo}` の置換は **`-F` でしか起きない**。`repoArgs` がこの分岐を 1 箇所に閉じ込める |
 
 `@` で始まるコメント本文（`@kukv please look`）は現実にあり、`-F` で送ると
 **ローカルのファイルを読んで PR に投稿してしまう。** `-f` はこれを解釈しない。
@@ -1387,8 +1585,9 @@ func TestABodyThatStartsWithAtIsNotReadAsAFile(t *testing.T) {
 `@` を解釈しないことは `gh api --help` で確認済みだが、**`-F` に書き換えられたら
 このテストは通ったままになる。** そこで `SubmitReview` の `-f` を `-F` に変えて
 `TestSubmitReviewNamesTheEvent` が落ちないことを確認したうえで、
-**`grep -n '"-F"' internal/gh/cli/review.go` の結果が `number` と `line` の 2 行だけである**
-ことを目で見る。これは lint では縛れないので、レビューで見る。
+**`grep -n '"-F"' internal/gh/cli/review.go` の結果が `number`、`line`、および
+`repoArgs` の中の `{owner}` / `{repo}` だけである**ことを目で見る。
+これは lint では縛れないので、レビューで見る。
 
 - [ ] **Step 6: テストが通ることを確かめる**
 
@@ -1466,6 +1665,20 @@ func TestHighlightLeavesUnknownFilesAlone(t *testing.T) {
 	}
 }
 
+// TestHighlightFollowsTheBackground: the palette that reads on a dark
+// terminal is unreadable on a light one, so the two must not come out the
+// same.
+func TestHighlightFollowsTheBackground(t *testing.T) {
+	theme.SetDark(true)
+	t.Cleanup(func() { theme.SetDark(true) })
+	dark := theme.Highlight("walk.go", "func Walk() {}")
+	theme.SetDark(false)
+	light := theme.Highlight("walk.go", "func Walk() {}")
+	if dark == light {
+		t.Errorf("the same escapes on both backgrounds: %q", dark)
+	}
+}
+
 // TestHighlightKeepsTheWidth is what stops highlighting from breaking every
 // column downstream: escapes must not count towards the width, and the text
 // must come back rune for rune.
@@ -1485,7 +1698,29 @@ func TestHighlightKeepsTheWidth(t *testing.T) {
 Run: `go test ./internal/tui/theme/ -run TestHighlight -v`
 Expected: FAIL（`theme.Highlight undefined`）
 
-- [ ] **Step 3: 実装する**
+- [ ] **Step 3: `SetDark` に真偽値を覚えさせる**
+
+既存の `SetDark` は `lipgloss.LightDark(dark)` を作って捨てている。
+**`isDark` も残す。** `lightDark` は色を 2 つ受けて色を返す関数であり、
+スタイル名のような色でないものを選ばせられない。
+
+```go
+var (
+	mu        sync.RWMutex
+	lightDark = lipgloss.LightDark(true)
+	isDark    = true
+)
+
+// SetDark tells the palette which way the terminal's background goes.
+func SetDark(dark bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	lightDark = lipgloss.LightDark(dark)
+	isDark = dark
+}
+```
+
+- [ ] **Step 4: 実装する**
 
 `internal/tui/theme/theme.go` に足す:
 
@@ -1516,10 +1751,16 @@ func Thread(pending bool) lipgloss.Style {
 // chromaStyle names the syntax-highlighting palette for each background.
 // A chroma style *is* a palette, so it belongs here rather than in a view
 // (.claude/rules/tui.md).
+//
+// lipgloss.LightDark chooses between two *colours*, so it cannot choose
+// between two style names. SetDark keeps the answer as a bool for this.
 func chromaStyle() string {
 	mu.RLock()
 	defer mu.RUnlock()
-	return lightDark("github", "github-dark")
+	if isDark {
+		return "github-dark"
+	}
+	return "github"
 }
 
 // Highlight colours one line of source, chosen by the file's name.
@@ -1563,7 +1804,7 @@ import に足すもの:
 	"github.com/alecthomas/chroma/v2/styles"
 ```
 
-- [ ] **Step 4: chroma を直接依存へ昇格し、テストを通す**
+- [ ] **Step 5: chroma を直接依存へ昇格し、テストを通す**
 
 ```
 go get github.com/alecthomas/chroma/v2
@@ -1575,11 +1816,11 @@ Expected: PASS。`go.mod` の `github.com/alecthomas/chroma/v2` から `// indir
 
 **注意:** `lexers.Match` は末尾に改行を含む出力を返すことがある。`TestHighlightKeepsTheWidth` の空文字列のケースがそれを捕まえる。落ちるなら `strings.TrimRight(buf.String(), "\n")` を挟む。
 
-- [ ] **Step 5: アサーションが空振りしていないことを確かめる**
+- [ ] **Step 6: アサーションが空振りしていないことを確かめる**
 
 `Highlight` を `return code` だけの実装に一時的に戻し、`TestHighlightColoursCodeItKnows` が落ちることを目で見る。
 
-- [ ] **Step 6: rules を更新する**
+- [ ] **Step 7: rules を更新する**
 
 `.claude/rules/tui.md` の「## 色」の節の末尾に足す:
 
@@ -1589,7 +1830,7 @@ Expected: PASS。`go.mod` の `github.com/alecthomas/chroma/v2` から `// indir
 呼び、chroma を import しない。スタイル名（明背景 / 暗背景）は theme が持つ。
 ```
 
-- [ ] **Step 7: `make check` を通してコミット**
+- [ ] **Step 8: `make check` を通してコミット**
 
 ```
 make check
@@ -1624,9 +1865,11 @@ colour a diff costs a request each, which is more than the colour is worth.
 
 **Interfaces:**
 - Consumes: Task 1 の `gh.FileDiff` / `gh.DiffLine`、Task 4 の `theme.*`
+- **ヘッダの見出し（タイトル・ブランチ・変更量）は Task 7 で入る。** このタスクの
+  ヘッダは `owner/name #番号` と `N files +X −Y`（diff から数える）だけを出す
 - Produces:
   - `diff.Source` interface（`PRDiff(ctx, repo string, number int) ([]gh.FileDiff, error)`）
-  - `diff.New(src Source, ref gh.ItemRef, title, head, base string) Model`
+  - `diff.New(src Source, ref gh.ItemRef) Model`
   - `diff.Model` の `Init` / `Update` / `View() string`
   - `diff.ClosedMsg` / `diff.ErrorMsg`
 
@@ -1634,7 +1877,7 @@ colour a diff costs a request each, which is more than the colour is worth.
 
 ```
 行 1        ヘッダ 1: owner/name #番号 タイトル
-行 2        ヘッダ 2: head → base · N files +X −Y
+行 2        ヘッダ 2: head → base · N files +X −Y · pending · N
 行 3        罫線 + "Files" 見出し
 行 4..n-1   サイドバー（左 22 桁）│ diff（残り）
 行 n        キーバー
@@ -1764,10 +2007,13 @@ func fixture() []gh.FileDiff {
 func loaded(t *testing.T, width, height int) Model {
 	t.Helper()
 	m := New(&fakeSource{files: fixture()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128},
-		"feat: add relation graph traversal", "feat/graph", "main")
+		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
+	// The header's title and branches arrive with the review context, not
+	// with the diff, so a view that has only the diff draws a header with
+	// the number in it and nothing else. Tests that read the header have to
+	// hand the context over as well; see withThreads.
 	return m
 }
 
@@ -1932,11 +2178,8 @@ type row struct {
 }
 
 type Model struct {
-	src   Source
-	ref   gh.ItemRef
-	title string
-	head  string
-	base  string
+	src Source
+	ref gh.ItemRef
 
 	width, height int
 
@@ -1960,13 +2203,15 @@ type Model struct {
 	cancel context.CancelFunc
 }
 
-func New(src Source, ref gh.ItemRef, title, head, base string) Model {
+// New builds the view for one pull request. It takes only what names the
+// pull request: the title, the branches and the size of the change arrive
+// with the review context (Task 7), because a Work card and a Repos row know
+// different amounts about a pull request and neither knows all of it. It also
+// keeps the argument list to two (.claude/rules/go-style.md).
+func New(src Source, ref gh.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return Model{
-		src: src, ref: ref, title: title, head: head, base: base,
-		loading: true, spin: s,
-	}
+	return Model{src: src, ref: ref, loading: true, spin: s}
 }
 
 // Init starts the fetch. Unlike the Work board this view is built once per
@@ -2147,10 +2392,45 @@ make golden
 cat -v internal/tui/diff/testdata/diff_ja_80.golden
 ```
 
-**diff を目で見てからコミットする。** 80 桁で本文が何桁残るかを数えること
-（22 + 1 + 11 = 34 桁が本文の前に消える。80 桁なら本文は 46 桁）。
+**diff を目で見てからコミットする。** 見るのは 2 つ。
 
-- [ ] **Step 8: 画面が端末に収まることをテストで縛る**
+1. 80 桁で本文が何桁残るか（22 + 1 + 11 = 34 桁が本文の前に消えるので、46 桁）
+2. **カーソル行の背景が行末まで続いているか。** chroma はトークンごとに `\x1b[0m`
+   を吐くので、`theme.Selected()` の背景で包んだハイライト済みの行は、
+   最初のトークンの終わりで背景がリセットされ、まだらになる。
+   なっていたら、**カーソル行だけ `Highlight` を通さない**（選択の色が読めることの
+   ほうが、その 1 行の色より大事である）。`cat -v` でこれは見える。
+
+- [ ] **Step 8: 翻訳漏れのガードを足す**
+
+`internal/tui/work/render_test.go` の `TestNoUnresolvedIDsInTheWorkView` と
+同じものを `diff` にも書く。**このガードはパッケージごとに書かれており、
+新しいビューは自分で足さないと一度も見られない**（spec §6.5）。
+
+```go
+func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		t.Run(lang.name, func(t *testing.T) {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			for name, view := range map[string]string{
+				"loaded":  loaded(t, 120, 30).View(),
+				"loading": New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1}).View(),
+				"empty":   emptyDiff(t, 120, 30).View(),
+			} {
+				t.Run(name, func(t *testing.T) {
+					i18n.AssertNoUnresolvedIDs(t, view)
+				})
+			}
+		})
+	}
+}
+```
+
+**Task 7 / 8 / 9 で状態が増えるたびに、この map にその状態を足すこと。**
+（スレッドを開いた状態、コメント入力中、提出中、破棄の確認中）
+
+- [ ] **Step 9: 画面が端末に収まることをテストで縛る**
 
 ```go
 func TestTheDiffFitsTheTerminal(t *testing.T) {
@@ -2167,7 +2447,7 @@ func TestTheDiffFitsTheTerminal(t *testing.T) {
 }
 ```
 
-- [ ] **Step 9: `make check` を通してコミット**
+- [ ] **Step 10: `make check` を通してコミット**
 
 ```
 make check
@@ -2193,7 +2473,9 @@ file cannot push the key bar off the bottom the way the board once did.
 **Files:**
 - Modify: `internal/tui/app/app.go`
 - Modify: `internal/tui/app/render.go`
+- Modify: `internal/tui/app/mouse.go`（`showingDetail` を読んでいる。スタックの一番上へ配る形に変える）
 - Modify: `internal/tui/app/app_test.go`
+- Modify: `internal/tui/app/mouse_test.go`
 - Modify: `internal/tui/work/work.go` / `work_test.go`
 - Modify: `internal/tui/repo/repo.go` / `repo_test.go`
 - Modify: `internal/tui/detail/detail.go` / `detail_test.go`
@@ -2345,6 +2627,9 @@ type OpenDiffMsg struct{ Ref gh.ItemRef }
 - `detail.ErrorMsg` / `diff.ErrorMsg` は、**そのビューがスタックに載っているときだけ**
   エラー画面に出す
 - `render.go` はスタックの一番上を描く
+- `mouse.go` も `showingDetail` を読んでいる。**キーと同じく、スタックの一番上に
+  だけマウスを配る。** スタックが空のときだけタブ行の Y オフセットを引く
+  （重なるビューは全画面なので、引かない）
 
 `app.Source` に `diff.Source` を足す:
 
@@ -2844,6 +3129,8 @@ func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 	m := loadedWith(t, src, 120, 40)
 
 	// Put the cursor on the added line "if depth <= 0 {".
+	// loadedWith hands over the review context as well as the diff; without
+	// it c does nothing (see TestCDoesNothingBeforeTheContextArrives).
 	m = cursorOnLine(t, m, gh.LineAdded, 13)
 	m = press(m, "c")
 	if !m.composing {
@@ -2901,6 +3188,18 @@ func TestTheSecondCommentReusesTheReview(t *testing.T) {
 	}
 }
 
+// TestCWaitsForThePullRequestID: the diff and the review context are fetched
+// in parallel. If the diff lands first and c opened the composer, sending
+// would call StartReview with an empty node id.
+func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
+	m := loaded(t, 120, 40) // the diff only
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	if m.composing {
+		t.Error("c opened the composer before the pull request's id was known")
+	}
+}
+
 func TestCDoesNothingOnAHunkHeader(t *testing.T) {
 	m := loaded(t, 120, 40)
 	m.row = 0 // the first row of the fixture is a hunk header
@@ -2930,7 +3229,8 @@ func TestEscThrowsTheDraftAway(t *testing.T) {
 ```
 
 ヘルパー（`loadedWith` / `cursorOnLine` / `typeInto` / `keyPress` / `runCmd` /
-`runInto`）は同じファイルに書く。`cursorOnLine` は `m.rows` を走査して
+`runInto`）は同じファイルに書く。**`loadedWith` は diff とレビューの両方を
+渡すこと**（`c` は `PullRequestID` が来るまで開かない）。`cursorOnLine` は `m.rows` を走査して
 「その種類とその行番号を持つ `rowLine`」を探し、見つからなければ `t.Fatal`。
 **探して見つからないまま通るテストにしない。**
 
@@ -2957,12 +3257,16 @@ type (
 	commentErrorMsg  struct{ err error }
 )
 
-// startComposing opens the composer on the line under the cursor. A hunk
-// header, a thread and a note have no line to comment on, so c does nothing
-// there rather than posting somewhere arbitrary.
+// startComposing opens the composer on the line under the cursor.
+//
+// A hunk header, a thread and a note have no line to comment on, so c does
+// nothing there rather than posting somewhere arbitrary. Neither does it open
+// before the review context has arrived: the diff and the context are fetched
+// in parallel, and starting a review needs the pull request's node id, which
+// only the context carries.
 func (m Model) startComposing() Model {
 	r := m.currentRow()
-	if r.kind != rowLine {
+	if r.kind != rowLine || m.review.PullRequestID == "" {
 		return m
 	}
 	m.composing = true
@@ -3093,9 +3397,10 @@ that pins it is the one to keep.
 **Interfaces:**
 - Consumes: Task 3 の `SubmitReview` / `DiscardReview`
 - Produces:
-  - `review.Source` interface（`SubmitReview(reviewID string, event gh.ReviewEvent, body string) error`）
+  - `review.Source` interface（`SubmitReview` と `SubmitNewReview` の 2 メソッド）
   - `diff.Source` に `DiscardReview(reviewID string) error` を足す（`X` を押すのは diff ビューであり、ポップアップではない）
-  - `review.New(src Source, reviewID string, pendingComments int) Model`
+  - `review.Target struct { PullRequestID, PendingID string; PendingComments int }`
+  - `review.New(src Source, target Target) Model`
   - `review.Model` の `Update` / `View() string` / `Active() bool`
   - `review.SubmittedMsg{}` / `review.CancelledMsg{}` / `review.ErrorMsg{Err error}`
 
@@ -3105,6 +3410,15 @@ that pins it is the one to keep.
 Repos の追加ダイアログ（Phase 4）も同じ扱いになる。`diff` と `detail` が
 それぞれ `review.Model` を 1 つ持ち、`Active()` が真のときだけ自分の `View` に
 重ねて描き、キーを先に渡す。**ルートモデルはポップアップの存在を知らない。**
+
+### 書きかけが無くても `v` は開く
+
+**approve は「言うことが何も無い」ときにこそ押される。** 未提出レビューが
+無いことを理由に `v` を断ると、最も多い操作ができなくなる。
+
+ポップアップは `Target` を受け取り、`PendingID` があれば `SubmitReview`、
+無ければ `SubmitNewReview` を呼ぶ。**どちらを呼ぶかはポップアップの中で決まり、
+開いた側は知らない。**
 
 ### 破棄（`X`）
 
@@ -3130,8 +3444,8 @@ submit:
   pending_count:
     one: "{{.Count}} line comment will be sent"
     other: "{{.Count}} line comments will be sent"
-  nothing_to_submit:
-    other: "there is no unsubmitted review"
+  no_pending:
+    other: "no line comments are waiting"
   sending:
     other: "submitting the review"
   discard_confirm:
@@ -3163,8 +3477,8 @@ submit:
     other: "ひとこと（任意）"
   pending_count:
     other: "行コメント {{.Count}} 件が一緒に送られます"
-  nothing_to_submit:
-    other: "未提出のレビューはありません"
+  no_pending:
+    other: "溜まっている行コメントはありません"
   sending:
     other: "レビューを提出中"
   discard_confirm:
@@ -3199,10 +3513,11 @@ import (
 )
 
 type fakeSource struct {
-	event gh.ReviewEvent
-	body  string
-	calls int
-	err   error
+	event    gh.ReviewEvent
+	body     string
+	calls    int
+	newCalls int
+	err      error
 }
 
 func (f *fakeSource) SubmitReview(_ string, event gh.ReviewEvent, body string) error {
@@ -3211,8 +3526,22 @@ func (f *fakeSource) SubmitReview(_ string, event gh.ReviewEvent, body string) e
 	return f.err
 }
 
+func (f *fakeSource) SubmitNewReview(_ string, event gh.ReviewEvent, body string) error {
+	f.newCalls++
+	f.event, f.body = event, body
+	return f.err
+}
+
 func open(src Source) Model {
-	m := New(src, "PRR_9", 2)
+	m := New(src, Target{PullRequestID: "PR_1", PendingID: "PRR_9", PendingComments: 2})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	return m
+}
+
+// openWithNothingWaiting is the commonest review there is: read the diff, had
+// nothing to say, approve.
+func openWithNothingWaiting(src Source) Model {
+	m := New(src, Target{PullRequestID: "PR_1"})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }
@@ -3264,6 +3593,28 @@ func TestApprovingWithNoNoteIsAllowed(t *testing.T) {
 	}
 }
 
+// TestApprovingWithNothingWaitingGoesInOneCall: with no pending review there
+// is nothing to submit against, so the review is created with its event on
+// it. Going through StartReview first would leave an empty pending review
+// behind if the submission then failed.
+func TestApprovingWithNothingWaitingGoesInOneCall(t *testing.T) {
+	src := &fakeSource{}
+	m := openWithNothingWaiting(src)
+	m, _ = m.Update(keyPress("tab")) // approve
+	_, cmd := m.Update(keyPress("ctrl+s"))
+	runCmd(t, cmd)
+
+	if src.newCalls != 1 {
+		t.Errorf("%d one-shot submissions, want 1", src.newCalls)
+	}
+	if src.calls != 0 {
+		t.Errorf("%d submissions against a review that does not exist", src.calls)
+	}
+	if src.event != gh.EventApprove {
+		t.Errorf("event = %v, want approve", src.event)
+	}
+}
+
 func TestTheLineCommentCountIsShown(t *testing.T) {
 	out := ansi.Strip(open(&fakeSource{}).View())
 	if !strings.Contains(out, "2 line comments") {
@@ -3287,18 +3638,32 @@ func TestEscCancelsWithoutSending(t *testing.T) {
 `internal/tui/diff/comment_test.go` に足す:
 
 ```go
-func TestVOpensTheSubmitPopupOnlyWhenThereIsSomethingToSubmit(t *testing.T) {
-	m := loaded(t, 120, 40) // no review context yet: no pending review
-	m = press(m, "v")
-	if m.review.PendingID == "" && m.submitting {
-		t.Error("the popup opened with nothing to submit")
-	}
-
-	m = withThreads(t, 120, 40)
-	m.review.PendingID = "PRR_9"
+// TestVOpensThePopupWithOrWithoutAPendingReview: approving a diff you had
+// nothing to say about is the commonest review there is.
+func TestVOpensThePopupWithOrWithoutAPendingReview(t *testing.T) {
+	m := withThreads(t, 120, 40) // the context has arrived; nothing waiting
+	m.review.PendingID = ""
 	m = press(m, "v")
 	if !m.submitting {
+		t.Error("v did nothing with no pending review; approving needs no comments")
+	}
+
+	m2 := withThreads(t, 120, 40)
+	m2.review.PendingID = "PRR_9"
+	m2 = press(m2, "v")
+	if !m2.submitting {
 		t.Error("v did not open the popup when a review was waiting")
+	}
+}
+
+// TestVDoesNothingBeforeTheContextArrives: the diff and the review context
+// are fetched in parallel, so v can be pressed while only the diff has
+// landed. Opening then would submit against an empty node id.
+func TestVDoesNothingBeforeTheContextArrives(t *testing.T) {
+	m := loaded(t, 120, 40) // the diff only
+	m = press(m, "v")
+	if m.submitting {
+		t.Error("v opened the popup before the pull request's id was known")
 	}
 }
 
@@ -3360,8 +3725,9 @@ type ErrorMsg struct{ Err error }
 - [ ] **Step 5: `diff` と `detail` に組み込む**
 
 - `Model` に `submit review.Model` / `submitting bool` / `discarding bool` を足す
-- `v`: `m.review.PendingID == ""` なら**何もしない**（`detail` では
-  `PRReviewContext` を取ってから開く）。あれば `submitting = true`
+- `v`: `m.review.PullRequestID == ""`（レビューの取得がまだ返っていない）なら
+  **何もしない**。返っていれば、書きかけの有無にかかわらず `submitting = true`。
+  `review.New` に `Target{PullRequestID, PendingID, PendingComments}` を渡す
 - `submitting` なら、キーは先に `m.submit.Update` へ。`CancelledMsg` で
   `submitting = false`、`SubmittedMsg` で `fetchReview()` を返す
 - `X`: `PendingID` があれば `discarding = true`。`y` で `DiscardReview` を呼び、
@@ -3372,17 +3738,23 @@ type ErrorMsg struct{ Err error }
 `detail` 側は `v` で `PRReviewContext` を取ってから同じポップアップを開く。
 **`detail` は diff を持たないので、行コメントは無い。ポップアップだけ。**
 
-- [ ] **Step 6: depguard に `tui-review` を足す**
+- [ ] **Step 6: `review` にも翻訳漏れのガードを足す**
+
+Task 5 Step 8 と同じものを `internal/tui/review` に書く。ガードはパッケージごとで、
+新しいビューは自分で足さないと一度も見られない。`diff` 側のガードの map にも
+「提出中」「破棄の確認中」の状態を足す。
+
+- [ ] **Step 7: depguard に `tui-review` を足す**
 
 `tui-diff` と同じ形で、兄弟（`work` / `repo` / `detail` / `diff`）と親（`app`）を deny。
 既存の各ルールの deny にも `internal/tui/review` を足す。
 
-- [ ] **Step 7: テストが通ることを確かめる**
+- [ ] **Step 8: テストが通ることを確かめる**
 
 Run: `go test ./internal/tui/... -v`
 Expected: PASS
 
-- [ ] **Step 8: golden を録ってコミット**
+- [ ] **Step 9: golden を録ってコミット**
 
 ```
 make golden
@@ -3890,8 +4262,9 @@ type Source interface {
 	DiscardReview(reviewID string) error
 ```
 
-`review.Source` は 1 メソッド（`SubmitReview`）だけである。提出しか知らないので、
-テスト用のフェイクも 1 メソッドで済む（`.claude/rules/architecture.md`）。
+`review.Source` は 2 メソッド（`SubmitReview` と `SubmitNewReview`）。提出しか
+知らないので、テスト用のフェイクも 2 メソッドで済む
+（`.claude/rules/architecture.md`）。
 
 ### 確認したこと（実装前に実機で確かめた事実）
 
@@ -3906,3 +4279,13 @@ type Source interface {
 - `gh api` の `-F` は値を解釈し（`@path` はファイル読み込み、整数は数値化）、
   `-f` は常に文字列。**利用者の入力は `-f`**
 - `chroma/v2` は glamour 経由で既に依存グラフにある（`go.mod` の indirect）
+- `AddPullRequestReviewInput` は `event` と `body` も取る。**作成と提出を 1 回で
+  できる**ので、書きかけの無い approve に未提出レビューを先に作らせる必要は無い
+- `gh api` の `{owner}` / `{repo}` の置換は **`-F` の値でしか起きない**
+  （help の "placeholder-determined values"）。`--repo` 無しで起動したときの
+  GraphQL は、この置換に頼るしかない
+- `lipgloss.LightDark(dark)` が返すのは**色を 2 つ受けて色を返す関数**であり、
+  スタイル名のような色でないものは選べない。`SetDark` に真偽値も覚えさせる
+- 翻訳漏れのガード（`i18n.AssertNoUnresolvedIDs`）は**パッケージごとに書かれている**。
+  `work` / `repo` / `detail` / `app` にはあるが、新しいビューは自分で足さないと
+  一度も見られない
