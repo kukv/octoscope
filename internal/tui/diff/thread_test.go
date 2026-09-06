@@ -290,3 +290,46 @@ func TestSidesAreNotMixedUp(t *testing.T) {
 		t.Errorf("the right side of line 13 has %+v, want the open thread", right)
 	}
 }
+
+// TestCollapseThreadClearsTheDeclineMessage checks that when a thread with
+// multiple comments is collapsed under the cursor (so the same index lands on
+// a rowLine), the decline message left by c is cleared. Reproduction: press c
+// on the last comment row of an expanded thread, then enter to collapse it.
+func TestCollapseThreadClearsTheDeclineMessage(t *testing.T) {
+	m := loaded(t, 120, 40)
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: settledThreadWithTwoComments()})
+	m = press(openCollapsedThread(m), "enter")
+	if !strings.Contains(ansi.Strip(m.View()), "second") {
+		t.Fatalf("enter did not open the thread:\n%s", ansi.Strip(m.View()))
+	}
+
+	// Move the cursor onto the second comment's row before pressing c.
+	last := -1
+	for i, r := range m.rows {
+		if r.kind == rowThread {
+			last = i
+		}
+	}
+	if last < 0 {
+		t.Fatal("no rowThread rows after opening the thread")
+	}
+	m.row = last
+
+	// Press c on the thread row; it should decline with a message.
+	m = press(m, "c")
+	if m.declined == "" {
+		t.Error("c on a thread row should have set a decline message")
+	}
+
+	// Press enter to collapse the thread. The cursor now lands on a line due
+	// to rows being removed above it, so the decline message must be cleared.
+	m = press(m, "enter")
+	if m.declined != "" {
+		t.Errorf("m.declined = %q, want empty after collapse", m.declined)
+	}
+
+	// Assert the cursor is now on a rowLine.
+	if m.currentRow().kind != rowLine {
+		t.Errorf("cursor is on %v, want rowLine after collapse", m.currentRow().kind)
+	}
+}

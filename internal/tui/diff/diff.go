@@ -408,6 +408,7 @@ func (m Model) toggleCollapsed() Model {
 	m.expanded[r.key] = !m.expanded[r.key]
 	m.rows = m.buildRows()
 	m.row = clamp(m.row, len(m.rows)-1)
+	m.declined = ""
 	return m.follow()
 }
 
