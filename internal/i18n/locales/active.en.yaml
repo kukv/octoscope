@@ -104,6 +104,8 @@ diff:
     other: "no files changed"
   binary:
     other: "binary file"
+  patch_omitted:
+    other: "GitHub did not send a diff for this file"
   file_count:
     one: "{{.Count}} file"
     other: "{{.Count}} files"

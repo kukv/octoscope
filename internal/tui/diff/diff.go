@@ -407,6 +407,9 @@ func (m Model) buildRows() []row {
 	if f.Binary {
 		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.binary")}}
 	}
+	if f.PatchOmitted {
+		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.patch_omitted")}}
+	}
 	var rows []row
 	placed := map[string]bool{}
 	for i, h := range f.Hunks {

@@ -52,6 +52,13 @@ go run ./cmd/octoscope --lang ja
   各スレッドの `comments`（50 件）、pending review の `comments`（100 件）が
   上限で、これを超える PR ではスレッドが黙って欠け、`pending · N` の件数も
   実際より少なく出る。ページング対応は Phase 3
+- **`gh pr diff` は 300 ファイルを超える PR を断る（HTTP 406）。** octoscope は
+  この場合 files API（`repos/{owner}/{repo}/pulls/{n}/files`、`--paginate`）に
+  自動で切り替える。files API にもページ数の上限はあるが、300 ファイルよりは
+  ずっと大きい。両方失敗したときは `gh pr diff` 側のエラーをそのまま見せる
+- **GitHub は大きすぎるファイルの diff を送ってこないことがある。** その場合
+  そのファイルは「バイナリファイル」ではなく「GitHub がこのファイルの diff を
+  送ってきませんでした」と出る。files API 経由でしか起きない
 
 ## 参考
 

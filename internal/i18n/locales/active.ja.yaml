@@ -103,6 +103,8 @@ diff:
     other: "変更されたファイルはありません"
   binary:
     other: "バイナリファイル"
+  patch_omitted:
+    other: "GitHub がこのファイルの diff を送ってきませんでした"
   file_count:
     other: "{{.Count}} ファイル"
   collapsed:

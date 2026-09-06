@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type fakeSource struct {
@@ -95,6 +96,18 @@ func emptyDiff(t *testing.T, width, height int) Model {
 	return m
 }
 
+// noPatchDiff is a model whose one file is too large for GitHub to have sent
+// a patch for (the files-API fallback's own failure mode), so the
+// patch-omitted note is what draws instead of the binary one.
+func noPatchDiff(t *testing.T, width, height int) Model {
+	t.Helper()
+	files := []gh.FileDiff{{Path: "vendor/bundle.js", Status: gh.FileModified, PatchOmitted: true}}
+	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 130})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
+	return m
+}
+
 // key builds the KeyPressMsg for a key name, matching the shape the app uses.
 func key(s string) tea.KeyMsg {
 	switch s {
@@ -136,6 +149,19 @@ func TestBracketsMoveBetweenFiles(t *testing.T) {
 	m = press(m, "[")
 	if m.file != 0 {
 		t.Errorf("file = %d, want back at 0", m.file)
+	}
+}
+
+// TestAFileWithNoPatchSaysSo guards the files-API fallback's own failure
+// mode: a file too large for GitHub to send a patch for must not read as a
+// file with no changes.
+func TestAFileWithNoPatchSaysSo(t *testing.T) {
+	out := ansi.Strip(noPatchDiff(t, 120, 30).View())
+	if !strings.Contains(out, i18n.T("diff.patch_omitted")) {
+		t.Errorf("the view does not say the patch was omitted:\n%s", out)
+	}
+	if strings.Contains(out, i18n.T("diff.binary")) {
+		t.Errorf("a file with no patch must not read as binary:\n%s", out)
 	}
 }
 

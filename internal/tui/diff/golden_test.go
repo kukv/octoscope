@@ -222,6 +222,7 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 				"loaded":         loaded(t, 120, 30).View(),
 				"loading":        loading.View(),
 				"empty":          emptyDiff(t, 120, 30).View(),
+				"no_patch":       noPatchDiff(t, 120, 30).View(),
 				"threads":        threads.View(),
 				"expanded":       expanded.View(),
 				"pending":        withPending(t).View(),
