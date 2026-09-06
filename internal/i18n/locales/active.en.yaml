@@ -164,10 +164,10 @@ footer:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
   # detail's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
-  # internal/tui/detail/render.go's fitKeyBar, the same mechanism as diff's
-  # below). esc is first because it must never be the one dropped: it is the
-  # only way out of the view. state is close or reopen, whichever applies, and
-  # is left out entirely once the item can do neither (merged).
+  # internal/tui/layout.FitKeyBar, the same mechanism as diff's below). esc
+  # is first because it must never be the one dropped: it is the only way
+  # out of the view. state is close or reopen, whichever applies, and is
+  # left out entirely once the item can do neither (merged).
   detail:
     esc:
       other: "esc:back"
@@ -193,8 +193,8 @@ footer:
     other: "y:discard  n:keep"
   # diff's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
-  # internal/tui/diff/render.go's fitKeyBar). esc is first because it must
-  # never be the one dropped: it is the only way out of the view.
+  # internal/tui/layout.FitKeyBar). esc is first because it must never be
+  # the one dropped: it is the only way out of the view.
   diff:
     esc:
       other: "esc:back"

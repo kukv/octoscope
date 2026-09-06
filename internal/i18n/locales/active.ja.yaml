@@ -158,8 +158,8 @@ footer:
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
   # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、
-  # 端末幅が足りないときは末尾から落とす（internal/tui/detail/render.go の
-  # fitKeyBar。diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
+  # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar。
+  # diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
   # 唯一の出口だから。state は close か reopen のどちらか該当する方で、
   # どちらも該当しない（マージ済み）ときは丸ごと外れる。
   detail:
@@ -186,8 +186,8 @@ footer:
   discard:
     other: "y:破棄  n:やめる"
   # diff のキーバーはこの並びから組み立てる。重要なものから先に並べ、
-  # 端末幅が足りないときは末尾から落とす（internal/tui/diff/render.go の
-  # fitKeyBar）。esc は先頭に置く — 落としてはいけない唯一の出口だから。
+  # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar）。
+  # esc は先頭に置く — 落としてはいけない唯一の出口だから。
   diff:
     esc:
       other: "esc:戻る"

@@ -78,7 +78,7 @@ func (m Model) keyBar() string {
 }
 
 // diffHints is the diff view's key bar, most important hint first. esc is
-// first because fitKeyBar never drops it: it is the only way out of the
+// first because layout.FitKeyBar never drops it: it is the only way out of the
 // view, and every other hint is either repeated elsewhere on screen or
 // discoverable by trying the obvious key. v comes right after comment --
 // it is the point of this phase -- and X sits last: it is rare and
