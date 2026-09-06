@@ -8,8 +8,11 @@ import (
 
 type (
 	// commentPostedMsg carries the review id the post went through, so
-	// Update can let the next comment reuse it without waiting on a
-	// refetch of the review context.
+	// Update can set m.review.PendingID synchronously, before the refetch
+	// it also triggers comes back. The refetch is asynchronous; without this
+	// field, a second c sent before it lands would still see PendingID
+	// empty and call StartReview again, leaving two pending reviews open on
+	// the pull request.
 	commentPostedMsg struct {
 		ref      gh.ItemRef
 		reviewID string

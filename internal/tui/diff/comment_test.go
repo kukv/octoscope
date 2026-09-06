@@ -176,6 +176,39 @@ func TestTheSecondCommentReusesTheReview(t *testing.T) {
 	}
 }
 
+// TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview: post() reads
+// m.review.PendingID, but the fetch that would confirm that id from GitHub
+// is asynchronous -- commentPostedMsg sets PendingID itself, synchronously,
+// precisely so a second c sent before that fetch's answer arrives still
+// finds it set. Getting this wrong calls StartReview twice and leaves two
+// pending reviews open on the pull request.
+func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
+	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
+	m := loadedWith(t, src)
+
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	m = typeInto(m, "first")
+	m, cmd := m.Update(keyPress("ctrl+s"))
+	posted := cmd() // runs the network side: StartReview + AddReviewThread
+	m, _ = m.Update(posted)
+	// posted's own fetchReview command is deliberately never run: the
+	// refetch's answer must not be what makes PendingID available.
+
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	m = typeInto(m, "second")
+	_, cmd = m.Update(keyPress("ctrl+s"))
+	runCmd(t, cmd)
+
+	if src.started != 1 {
+		t.Errorf("started %d reviews, want 1", src.started)
+	}
+	if len(src.comments) != 2 {
+		t.Errorf("%d comments sent, want 2", len(src.comments))
+	}
+}
+
 // TestCWaitsForThePullRequestID: the diff and the review context are fetched
 // in parallel. If the diff lands first and c opened the composer, sending
 // would call StartReview with an empty node id.
