@@ -1,3 +1,10 @@
+---
+paths:
+  - "internal/**"
+  - "cmd/**"
+  - ".golangci.yml"
+---
+
 # アーキテクチャ
 
 ## 依存の向き

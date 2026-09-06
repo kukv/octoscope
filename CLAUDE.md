@@ -5,10 +5,14 @@ Windows / macOS / Linux で動く単一バイナリ。
 
 ## 作業を始める前に
 
-設計と実装計画は次の場所にある。**該当する範囲のものを読んでから手を動かす。**
+**`internal/` と `cmd/` を編集する前に、該当する実装計画を読む。**
+無ければ、設計から実装計画を書き、承認を得てから編集に入る。
 
 - 設計: `docs/superpowers/specs/`
 - 実装計画: `docs/superpowers/plans/`
+
+読まずに編集しようとすると `PreToolUse` フックが止める。止められたら、設計と計画を
+読んでから続ける。フックを外して回避しない。
 
 設計に書かれているパッケージ構成が、まだコードに存在しないことがある。
 その場合は設計が誤りなのではなく、まだそこまで実装が進んでいない。
@@ -28,11 +32,8 @@ make release-check # goreleaser の設定と 3 OS のクロスコンパイル
 
 ## 規約
 
-- @.claude/rules/architecture.md — パッケージ境界、依存の向き、interface の置き場所
-- @.claude/rules/go-style.md — Go の書き方
-- @.claude/rules/errors.md — エラーの設計
-- @.claude/rules/testing.md — テストの書き方
-- @.claude/rules/tui.md — Bubble Tea、表示幅、多言語対応
+規約は `.claude/rules/` にあり、**触るファイルに応じて自動で読み込まれる**（frontmatter の `paths`）。
+自分で読みに行く必要はない。読み込まれたことは `/context` で確認できる。
 
 規約に無理があると感じたら、黙って逸脱せず、規約の変更を提案する。
 提案の仕方は `.claude/rules/architecture.md` の「規約そのものを変える」にある。
