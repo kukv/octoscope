@@ -20,6 +20,13 @@ const (
 	issueViewFields = issueListFields + ",body,comments,assignees"
 )
 
+// listLimit is how many items the gh list subcommands are asked for. Every
+// one of them -- pr list, issue list, label list -- fetches 30 by default and
+// says nothing about the rest, so a repository with more open pull requests
+// than that would lose them without a word. gh names no upper bound; it pages
+// until it has as many as it was asked for.
+const listLimit = "100"
+
 type runFunc func(ctx context.Context, dir string, args ...string) ([]byte, error)
 
 // Client runs gh commands in a fixed directory, against a fixed repository.
@@ -71,7 +78,7 @@ func appendRepo(args []string, repo string) []string {
 }
 
 func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
-	args := appendRepo([]string{"pr", "list", "--json", prListFields}, c.repo)
+	args := appendRepo([]string{"pr", "list", "--json", prListFields, "--limit", listLimit}, c.repo)
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
@@ -84,7 +91,7 @@ func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
 }
 
 func (c *Client) ListIssues(ctx context.Context) ([]gh.Issue, error) {
-	args := appendRepo([]string{"issue", "list", "--json", issueListFields}, c.repo)
+	args := appendRepo([]string{"issue", "list", "--json", issueListFields, "--limit", listLimit}, c.repo)
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
@@ -182,7 +189,7 @@ func (c *Client) ReopenIssue(repo string, number int) error {
 }
 
 func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
-	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", "100"}, c.effectiveRepo(repo))
+	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
