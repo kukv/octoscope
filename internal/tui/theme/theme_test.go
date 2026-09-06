@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
@@ -108,6 +110,50 @@ func TestAnUnusableLabelColourStillRendersTheName(t *testing.T) {
 		}
 		if strings.Contains(got, "48;2;") {
 			t.Errorf("Badge(%q) filled a background from a colour it could not read: %q", hex, got)
+		}
+	}
+}
+
+func TestHighlightColoursCodeItKnows(t *testing.T) {
+	got := theme.Highlight("walk.go", "func Walk() {}")
+	if !strings.Contains(got, "\x1b[") {
+		t.Errorf("Highlight returned no escapes for Go source: %q", got)
+	}
+	if ansi.Strip(got) != "func Walk() {}" {
+		t.Errorf("Highlight changed the text: %q", ansi.Strip(got))
+	}
+}
+
+func TestHighlightLeavesUnknownFilesAlone(t *testing.T) {
+	const line = "some prose"
+	if got := theme.Highlight("NOTES", line); got != line {
+		t.Errorf("Highlight(%q) = %q, want it untouched", line, got)
+	}
+}
+
+// TestHighlightFollowsTheBackground: the palette that reads on a dark
+// terminal is unreadable on a light one, so the two must not come out the
+// same.
+func TestHighlightFollowsTheBackground(t *testing.T) {
+	theme.SetDark(true)
+	t.Cleanup(func() { theme.SetDark(true) })
+	dark := theme.Highlight("walk.go", "func Walk() {}")
+	theme.SetDark(false)
+	light := theme.Highlight("walk.go", "func Walk() {}")
+	if dark == light {
+		t.Errorf("the same escapes on both backgrounds: %q", dark)
+	}
+}
+
+// TestHighlightKeepsTheWidth is what stops highlighting from breaking every
+// column downstream: escapes must not count towards the width, and the text
+// must come back rune for rune.
+func TestHighlightKeepsTheWidth(t *testing.T) {
+	for _, line := range []string{"func Walk() {}", "\t// 日本語のコメント", ""} {
+		got := theme.Highlight("walk.go", line)
+		if ansi.StringWidth(got) != ansi.StringWidth(line) {
+			t.Errorf("Highlight(%q) is %d columns, want %d",
+				line, ansi.StringWidth(got), ansi.StringWidth(line))
 		}
 	}
 }

@@ -10,9 +10,13 @@ package theme
 import (
 	"image/color"
 	"strconv"
+	"strings"
 	"sync"
 
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 
 	"github.com/kukv/octoscope/internal/gh"
 )
@@ -20,6 +24,7 @@ import (
 var (
 	mu        sync.RWMutex
 	lightDark = lipgloss.LightDark(true)
+	isDark    = true
 )
 
 // SetDark tells the palette which way the terminal's background goes.
@@ -27,6 +32,7 @@ func SetDark(dark bool) {
 	mu.Lock()
 	defer mu.Unlock()
 	lightDark = lipgloss.LightDark(dark)
+	isDark = dark
 }
 
 // pick chooses between the two variants of one colour. The hex pairs below
@@ -178,4 +184,72 @@ func textOn(r, g, b int) string {
 		return "#000000"
 	}
 	return "#ffffff"
+}
+
+// Diff colours. GitHub's own values for an added and a removed line, so a
+// diff reads here the way it reads in the web UI.
+func DiffAdded() lipgloss.Style   { return fg("#1a7f37", "#3fb950") }
+func DiffRemoved() lipgloss.Style { return fg("#cf222e", "#f85149") }
+func DiffContext() lipgloss.Style { return lipgloss.NewStyle() }
+
+// HunkHeader styles the @@ line. It is a signpost rather than code, so it
+// takes the muted colour and a weight of its own.
+func HunkHeader() lipgloss.Style { return muted().Bold(true) }
+
+// LineNumber styles the two numbers down the left of the diff.
+func LineNumber() lipgloss.Style { return muted() }
+
+// Thread styles a review comment drawn under the line it is about. A comment
+// the user has not submitted yet is marked apart from one everyone can see:
+// the difference decides whether pressing X would throw it away.
+func Thread(pending bool) lipgloss.Style {
+	if pending {
+		return attention()
+	}
+	return accent()
+}
+
+// chromaStyle names the syntax-highlighting palette for each background.
+// A chroma style *is* a palette, so it belongs here rather than in a view
+// (.claude/rules/tui.md).
+//
+// lipgloss.LightDark chooses between two *colours*, so it cannot choose
+// between two style names. SetDark keeps the answer as a bool for this.
+func chromaStyle() string {
+	mu.RLock()
+	defer mu.RUnlock()
+	if isDark {
+		return "github-dark"
+	}
+	return "github"
+}
+
+// Highlight colours one line of source, chosen by the file's name.
+//
+// It is one line at a time because a diff is all we have: a string or a
+// comment that opens on an earlier line looks unterminated here and simply
+// goes uncoloured. Fetching whole files to colour a diff would cost a request
+// per file, which is more than the colour is worth.
+//
+// A file chroma has no lexer for, and any failure inside chroma, comes back
+// unchanged: the diff is still readable without colour.
+func Highlight(path, code string) string {
+	lexer := lexers.Match(path)
+	if lexer == nil {
+		return code
+	}
+	style := styles.Get(chromaStyle())
+	formatter := formatters.Get("terminal256")
+	if style == nil || formatter == nil {
+		return code
+	}
+	iter, err := lexer.Tokenise(nil, code)
+	if err != nil {
+		return code
+	}
+	var buf strings.Builder
+	if err := formatter.Format(&buf, style, iter); err != nil {
+		return code
+	}
+	return buf.String()
 }
