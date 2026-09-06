@@ -44,7 +44,10 @@ func goldenModel(width int) Model {
 	// The order mirrors the app: the view is sized as soon as it is built,
 	// and the item arrives afterwards, so the body is laid out for the width
 	// it will be drawn at.
-	f := &fakeSource{pr: goldenPR()}
+	f := &fakeSource{
+		pr:        goldenPR(),
+		reviewCtx: gh.ReviewContext{PullRequestID: "PR_128", PendingID: "PRR_1"},
+	}
 	m := New(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	m, _ = m.Update(fetch(f, prRef())())
@@ -64,6 +67,10 @@ func TestGolden(t *testing.T) {
 				confirming := m
 				confirming.confirming = true
 				golden.Assert(t, fmt.Sprintf("detail_confirm_%s_%d", lang.name, w), confirming.View())
+
+				opening, cmd := m.Update(key("v"))
+				submitting, _ := opening.Update(cmd())
+				golden.Assert(t, fmt.Sprintf("detail_submit_%s_%d", lang.name, w), submitting.View())
 			})
 		}
 	}

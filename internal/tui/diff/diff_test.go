@@ -26,12 +26,19 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewCon
 	return f.review, nil
 }
 
-// StartReview and AddReviewThread are stubs so fakeSource satisfies Source;
-// recordingSource (comment_test.go) overrides them to assert what a comment
-// sends.
+// StartReview, AddReviewThread, DiscardReview, SubmitReview and
+// SubmitNewReview are stubs so fakeSource satisfies Source; recordingSource
+// (comment_test.go) overrides the ones a comment test needs to assert
+// against.
 func (f *fakeSource) StartReview(string) (string, error) { return "", nil }
 
 func (f *fakeSource) AddReviewThread(string, gh.PendingComment) error { return nil }
+
+func (f *fakeSource) DiscardReview(string) error { return nil }
+
+func (f *fakeSource) SubmitReview(string, gh.ReviewEvent, string) error { return nil }
+
+func (f *fakeSource) SubmitNewReview(string, gh.ReviewEvent, string) error { return nil }
 
 // fixture is two files, so that moving between files is testable, with a
 // second hunk in the first so that hunk movement is too.

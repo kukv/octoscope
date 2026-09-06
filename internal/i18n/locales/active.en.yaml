@@ -126,21 +126,34 @@ diff:
   posting:
     other: "sending the comment"
 
+submit:
+  title:
+    other: "Submit review"
+  approve:
+    other: "Approve"
+  request_changes:
+    other: "Request changes"
+  comment:
+    other: "Comment"
+  placeholder:
+    other: "Leave a note (optional)"
+  pending_count:
+    one: "{{.Count}} line comment will be sent"
+    other: "{{.Count}} line comments will be sent"
+  no_pending:
+    other: "no line comments are waiting"
+  sending:
+    other: "submitting the review"
+  discard_confirm:
+    other: "Discard the unsubmitted review and every comment on it?"
+
 footer:
   list:
     other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  q:quit"
-  detail_prefix:
-    other: "j/k:move  r:refresh  o:web  c:comment  "
-  # This line is already at its 80-column limit (detail_prefix + the reopen
-  # key + this suffix), so d:diff is deliberately left out here. d still
-  # opens the diff from the detail view; it is just not advertised in this
-  # footer. It is advertised on the Work board and in the Repos list instead.
-  detail_suffix:
-    other: "l:labels  a:assign  esc:back"
   close:
-    other: "x:close  "
+    other: "x:close"
   reopen:
-    other: "x:reopen  "
+    other: "x:reopen"
   picker:
     other: "space:toggle  enter:apply  esc:cancel"
   compose:
@@ -149,6 +162,35 @@ footer:
     other: "q:quit"
   work:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
+  # detail's key bar is built from these, most important first, and dropped
+  # from the end when the terminal is too narrow for all of them (see
+  # internal/tui/detail/render.go's fitKeyBar, the same mechanism as diff's
+  # below). esc is first because it must never be the one dropped: it is the
+  # only way out of the view. state is close or reopen, whichever applies, and
+  # is left out entirely once the item can do neither (merged).
+  detail:
+    esc:
+      other: "esc:back"
+    move:
+      other: "j/k:move"
+    comment:
+      other: "c:comment"
+    review:
+      other: "v:review"
+    diff:
+      other: "d:diff"
+    refresh:
+      other: "r:refresh"
+    web:
+      other: "o:web"
+    labels:
+      other: "l:labels"
+    assign:
+      other: "a:assign"
+  submit:
+    other: "tab:event  ctrl+s:submit  esc:cancel"
+  discard:
+    other: "y:discard  n:keep"
   # diff's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
   # internal/tui/diff/render.go's fitKeyBar). esc is first because it must
@@ -158,6 +200,10 @@ footer:
       other: "esc:back"
     comment:
       other: "c:comment"
+    review:
+      other: "v:review"
+    discard:
+      other: "X:discard"
     line:
       other: "j/k:line"
     file:

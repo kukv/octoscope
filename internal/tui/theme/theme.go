@@ -82,6 +82,13 @@ func Selected() lipgloss.Style {
 	return lipgloss.NewStyle().Background(pick("#e8eef5", "#1d2735"))
 }
 
+// Popup styles the frame around a small window drawn over an existing view:
+// the review submission box, and Repos' add dialog in Phase 4.
+func Popup() lipgloss.Style {
+	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1).
+		BorderForeground(pick("#d9dee4", "#262d39"))
+}
+
 // Count styles the tally beside a column heading. A column that wants
 // attention says so in its own colour rather than only by being long.
 func Count(attention bool) lipgloss.Style {

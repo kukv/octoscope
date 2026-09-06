@@ -31,6 +31,13 @@ type fakeSource struct {
 	labelsErr error
 	usersErr  error
 	editErr   error
+
+	reviewCtx gh.ReviewContext
+	reviewErr error
+
+	submitCalls    []string // "event:body"
+	submitNewCalls []string
+	submitErr      error
 }
 
 func (f *fakeSource) GetPR(ctx context.Context, repo string, n int) (gh.PR, error) {
@@ -107,6 +114,20 @@ func (f *fakeSource) EditPRAssignees(repo string, n int, add, remove []string) e
 func (f *fakeSource) EditIssueAssignees(repo string, n int, add, remove []string) error {
 	f.editCalls = append(f.editCalls, "issue:assignees:"+repo+":"+itoa(n)+editSuffix(add, remove))
 	return f.editErr
+}
+
+func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (gh.ReviewContext, error) {
+	return f.reviewCtx, f.reviewErr
+}
+
+func (f *fakeSource) SubmitReview(reviewID string, event gh.ReviewEvent, body string) error {
+	f.submitCalls = append(f.submitCalls, reviewID+":"+body)
+	return f.submitErr
+}
+
+func (f *fakeSource) SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error {
+	f.submitNewCalls = append(f.submitNewCalls, pullRequestID+":"+body)
+	return f.submitErr
 }
 
 func editSuffix(add, remove []string) string {
@@ -548,6 +569,105 @@ func TestConfirmViewReopenWording(t *testing.T) {
 	m, _ = m.Update(key("x"))
 	if !strings.Contains(m.View(), "Reopen") {
 		t.Errorf("confirm view missing Reopen wording:\n%s", m.View())
+	}
+}
+
+// TestVFetchesReviewContextAndOpensThePopup: unlike the diff view, detail
+// never has a review context already on the model, so v always fetches
+// first.
+func TestVFetchesReviewContextAndOpensThePopup(t *testing.T) {
+	f := &fakeSource{
+		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+	}
+	m := loaded(f, prRef())
+	m, cmd := m.Update(key("v"))
+	if !m.openingReview || cmd == nil {
+		t.Fatalf("openingReview = %v, cmd = %v; want opening with a fetch cmd", m.openingReview, cmd)
+	}
+	msg := cmd()
+	if _, ok := msg.(reviewContextMsg); !ok {
+		t.Fatalf("msg = %T, want reviewContextMsg", msg)
+	}
+	m, _ = m.Update(msg)
+	if m.openingReview || !m.submitting {
+		t.Errorf("openingReview = %v, submitting = %v; want the popup open", m.openingReview, m.submitting)
+	}
+}
+
+// TestVDoesNothingOnAnIssue mirrors d's own guard: an issue has no review.
+func TestVDoesNothingOnAnIssue(t *testing.T) {
+	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	m := loaded(f, issueRef())
+	if _, cmd := m.Update(key("v")); cmd != nil {
+		t.Errorf("v on an issue produced %T", cmd())
+	}
+}
+
+// TestReviewContextFailureStaysInline is the same rule as a state-change
+// failure: the fetch's own error is shown inline, not escalated to the
+// parent's error screen.
+func TestReviewContextFailureStaysInline(t *testing.T) {
+	f := &fakeSource{
+		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		reviewErr: errors.New("gh pr: HTTP 403 forbidden"),
+	}
+	m := loaded(f, prRef())
+	m, cmd := m.Update(key("v"))
+	m, cmd = m.Update(cmd())
+	if m.submitting {
+		t.Error("submitting = true after a failed review-context fetch")
+	}
+	if cmd != nil {
+		t.Errorf("cmd = non-nil, want nil (a fetch failure stays inline)")
+	}
+	if !strings.Contains(m.actionErr, "403") {
+		t.Errorf("actionErr = %q, want to contain 403", m.actionErr)
+	}
+}
+
+// TestSubmitEscCancelsThePopup checks that esc from inside the popup takes it
+// away without closing the whole view.
+func TestSubmitEscCancelsThePopup(t *testing.T) {
+	f := &fakeSource{
+		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+	}
+	m := loaded(f, prRef())
+	m, cmd := m.Update(key("v"))
+	m, _ = m.Update(cmd())
+	if !m.submitting {
+		t.Fatal("precondition: submitting = false, want true")
+	}
+	m, cmd = m.Update(key("esc"))
+	m, cmd = m.Update(cmd())
+	if m.submitting {
+		t.Error("esc did not close the submit popup")
+	}
+	if cmd != nil {
+		t.Errorf("cmd = non-nil after CancelledMsg, want nil (esc cancels the popup, it does not close the view)")
+	}
+}
+
+// TestSubmitSuccessRefetches checks the other exit from the popup: a
+// successful submit reloads the item, so an approval's new review state
+// shows up.
+func TestSubmitSuccessRefetches(t *testing.T) {
+	f := &fakeSource{
+		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+	}
+	m := loaded(f, prRef())
+	m, cmd := m.Update(key("v"))
+	m, _ = m.Update(cmd())
+	m, cmd = m.Update(key("ctrl+s"))
+	msg := cmd()
+	m, cmd = m.Update(msg)
+	if m.submitting || !m.loading || cmd == nil {
+		t.Errorf("submitting = %v, loading = %v, cmd = %v; want false, true, non-nil", m.submitting, m.loading, cmd)
+	}
+	if len(f.submitNewCalls) != 1 {
+		t.Errorf("submitNewCalls = %v, want one submission", f.submitNewCalls)
 	}
 }
 

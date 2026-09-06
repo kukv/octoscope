@@ -62,6 +62,42 @@ func TestTheKeyBarShowsOnlyEscWhenNarrow(t *testing.T) {
 	}
 }
 
+// TestTheSubmitFooterFitsAt80InBothLanguages guards the same terminal-width
+// guarantee for the popup's own footer, which is a fixed string rather than
+// a fit-aware bar: it must never overrun 80 columns either.
+func TestTheSubmitFooterFitsAt80InBothLanguages(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		t.Run(lang.name, func(t *testing.T) {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			m := loaded(t, 80, 30)
+			m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
+			m = press(m, "v")
+			if got := ansi.StringWidth(ansi.Strip(m.keyBar())); got > 80 {
+				t.Errorf("submit footer is %d columns wide at 80: %q", got, ansi.Strip(m.keyBar()))
+			}
+		})
+	}
+}
+
+// TestTheDiscardFooterFitsAt80InBothLanguages is the discard confirmation's
+// share of the same guarantee.
+func TestTheDiscardFooterFitsAt80InBothLanguages(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		t.Run(lang.name, func(t *testing.T) {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			m := loaded(t, 80, 30)
+			m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
+			m.review.PendingID = "PRR_9"
+			m = press(m, "X")
+			if got := ansi.StringWidth(ansi.Strip(m.keyBar())); got > 80 {
+				t.Errorf("discard footer is %d columns wide at 80: %q", got, ansi.Strip(m.keyBar()))
+			}
+		})
+	}
+}
+
 // TestTheKeyBarClipsEscWhenNarrowerThanTheHintItself covers fitKeyBar's last
 // resort: below "esc:戻る"'s own 8 columns, even hints[:1] does not fit.
 // esc must never be dropped, but it may be clipped -- the old fallback

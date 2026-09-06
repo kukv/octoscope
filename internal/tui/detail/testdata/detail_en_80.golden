@@ -35,4 +35,4 @@
                                                                                 
                                                                                 
                                                                                 
-[38;2;139;148;158mj/k:move  r:refresh  o:web  c:comment  x:close  l:labels  a:assign  esc:back[m
+[38;2;139;148;158mesc:back  j/k:move  c:comment  v:review  d:diff  x:close  r:refresh  o:web[m

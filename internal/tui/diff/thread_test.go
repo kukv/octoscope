@@ -40,9 +40,9 @@ func threadFixture() gh.ReviewContext {
 // withThreads loads the fixture at the size every caller here needs the same
 // (120 columns, wide enough for a thread line and its author not to be
 // truncated, and 40 rows so every fixture thread fits on screen at once).
-func withThreads(t *testing.T) Model {
+func withThreads(t *testing.T, width, height int) Model {
 	t.Helper()
-	m := loaded(t, 120, 40)
+	m := loaded(t, width, height)
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
 	return m
 }
@@ -72,7 +72,7 @@ func withPending(t *testing.T) Model {
 }
 
 func TestAnOpenThreadIsShownUnderItsLine(t *testing.T) {
-	out := ansi.Strip(withThreads(t).View())
+	out := ansi.Strip(withThreads(t, 120, 40).View())
 	if !strings.Contains(out, "is 2 not the default?") {
 		t.Errorf("the open thread is not on screen:\n%s", out)
 	}
@@ -94,7 +94,7 @@ func openCollapsedThread(m Model) Model {
 }
 
 func TestASettledThreadIsACountUntilItIsOpened(t *testing.T) {
-	m := withThreads(t)
+	m := withThreads(t, 120, 40)
 	out := ansi.Strip(m.View())
 	if strings.Contains(out, "settled long ago") {
 		t.Errorf("a resolved thread is shown in full before it is opened:\n%s", out)
@@ -116,7 +116,7 @@ func TestASettledThreadIsACountUntilItIsOpened(t *testing.T) {
 // TestACommentOnALineThisDiffDoesNotShowIsStillVisible: dropping it would
 // hide the fact that someone objected at all.
 func TestACommentOnALineThisDiffDoesNotShowIsStillVisible(t *testing.T) {
-	out := ansi.Strip(withThreads(t).View())
+	out := ansi.Strip(withThreads(t, 120, 40).View())
 	if !strings.Contains(out, "on a line not in this diff") {
 		t.Errorf("an unplaceable comment was dropped:\n%s", out)
 	}
@@ -205,7 +205,7 @@ func TestAMultiLineJapaneseCommentStaysOnOneRow(t *testing.T) {
 // TestSidesAreNotMixedUp is the test that stops a comment on the old version
 // of a line being drawn under the new one.
 func TestSidesAreNotMixedUp(t *testing.T) {
-	m := withThreads(t)
+	m := withThreads(t, 120, 40)
 	left := m.threadsFor("graph/walk.go", 13, gh.SideLeft)
 	right := m.threadsFor("graph/walk.go", 13, gh.SideRight)
 	if len(left) != 1 || !left[0].Resolved {

@@ -54,31 +54,99 @@ func (m Model) View() string {
 	if m.composing || m.posting {
 		lines = append(lines, m.composerLines()...)
 	}
+	if m.submitting {
+		lines = append(lines, m.submitLines()...)
+	}
+	if m.discarding {
+		lines = append(lines, m.discardLines()...)
+	}
 	return strings.Join(append(lines, m.keyBar()), "\n")
 }
 
 func (m Model) keyBar() string {
-	if m.composing || m.posting {
+	switch {
+	case m.composing || m.posting:
 		return theme.Dim().Render(clip(i18n.T("footer.diff_comment"), m.width))
+	case m.submitting:
+		return theme.Dim().Render(clip(i18n.T("footer.submit"), m.width))
+	case m.discarding:
+		return theme.Dim().Render(clip(i18n.T("footer.discard"), m.width))
+	default:
+		return theme.Dim().Render(fitKeyBar(diffHints(), m.width))
 	}
-	return theme.Dim().Render(fitKeyBar(diffHints(), m.width))
 }
 
 // diffHints is the diff view's key bar, most important hint first. esc is
 // first because fitKeyBar never drops it: it is the only way out of the
 // view, and every other hint is either repeated elsewhere on screen or
-// discoverable by trying the obvious key.
+// discoverable by trying the obvious key. v comes right after comment --
+// it is the point of this phase -- and X sits last: it is rare and
+// destructive, and the first thing to go when the terminal is narrow.
 func diffHints() []string {
 	return []string{
 		i18n.T("footer.diff.esc"),
 		i18n.T("footer.diff.comment"),
+		i18n.T("footer.diff.review"),
 		i18n.T("footer.diff.line"),
 		i18n.T("footer.diff.file"),
 		i18n.T("footer.diff.hunk"),
 		i18n.T("footer.diff.open"),
 		i18n.T("footer.diff.pane"),
 		i18n.T("footer.diff.refresh"),
+		i18n.T("footer.diff.discard"),
 	}
+}
+
+// submitLines draws the review popup over the diff: a blank separator, the
+// popup's own box, and a failed submission's error underneath it. The popup
+// keeps no error text of its own, so what the user typed and chose is still
+// there for a retry (.claude/rules/errors.md).
+func (m Model) submitLines() []string {
+	lines := append([]string{""}, strings.Split(m.submit.View(), "\n")...)
+	if m.submitErr != "" {
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.submitErr), m.width))
+	}
+	return lines
+}
+
+// submitHeight is what submitLines takes, out of the pane's height budget the
+// same way composerHeight is, so the popup never pushes the key bar off the
+// bottom.
+func (m Model) submitHeight() int {
+	if !m.submitting {
+		return 0
+	}
+	h := 1 + len(strings.Split(m.submit.View(), "\n"))
+	if m.submitErr != "" {
+		h++
+	}
+	return h
+}
+
+// discardLines draws the discard confirmation: the question, and either the
+// spinner while DiscardReview is running or a failure underneath it.
+func (m Model) discardLines() []string {
+	lines := []string{"", clip(theme.Error().Render(i18n.T("submit.discard_confirm")), m.width)}
+	switch {
+	case m.discardErr != "":
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.discardErr), m.width))
+	case m.discardWorking:
+		lines = append(lines, clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
+	}
+	return lines
+}
+
+// discardHeight is what discardLines takes, out of the pane's height budget
+// the same way submitHeight is.
+func (m Model) discardHeight() int {
+	if !m.discarding {
+		return 0
+	}
+	h := 2
+	if m.discardErr != "" || m.discardWorking {
+		h++
+	}
+	return h
 }
 
 // fitKeyBar joins hints in order and drops from the low-priority end (the
@@ -190,17 +258,7 @@ func (m Model) sizeLine() string {
 
 // pendingCount is how many comments across all threads have not been
 // submitted yet.
-func (m Model) pendingCount() int {
-	n := 0
-	for _, t := range m.review.Threads {
-		for _, c := range t.Comments {
-			if c.Pending {
-				n++
-			}
-		}
-	}
-	return n
-}
+func (m Model) pendingCount() int { return m.review.PendingCount() }
 
 // filesHeadingLine is the rule that separates the header from the two
 // panes, with the "Files" heading over the sidebar column.
@@ -218,7 +276,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.composerHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.composerHeight()-m.submitHeight()-m.discardHeight(), 1)
 }
 
 // body lays the sidebar and the diff pane side by side, the way the Repos

@@ -12,15 +12,22 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/review"
 )
 
 // Source is what the diff view needs from the GitHub layer. repo is
 // "owner/repo"; the empty string targets the workspace repository.
+//
+// review.Source is embedded rather than repeated: the submission popup this
+// view holds needs exactly those two methods, and review already declares
+// them for exactly this purpose.
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
 	StartReview(pullRequestID string) (string, error)
 	AddReviewThread(reviewID string, c gh.PendingComment) error
+	DiscardReview(reviewID string) error
+	review.Source
 }
 
 // ClosedMsg tells the parent the user left the diff view.
@@ -129,6 +136,21 @@ type Model struct {
 	// started against, captured by startComposing at c-time rather than read
 	// again from the cursor at send time (see comment.go).
 	target gh.PendingComment
+
+	// submit is the review submission popup (v), a small window drawn over
+	// this view rather than a view of its own (see review.go). submitErr is
+	// a failed submission's text, kept here rather than in submit itself so
+	// the popup's own fields stay just its event and its note.
+	submit     review.Model
+	submitting bool
+	submitErr  string
+
+	// discarding asks before X throws the pending review away.
+	// discardWorking is separate from discarding so a second y sent before
+	// DiscardReview's answer lands cannot fire the call twice.
+	discarding     bool
+	discardWorking bool
+	discardErr     string
 }
 
 // New builds the view for one pull request. It takes only what names the
@@ -184,6 +206,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.textarea.SetWidth(max(m.width, 0))
+		if m.submit.Active() {
+			m.submit, _ = m.submit.Update(msg)
+		}
 		return m, nil
 	case diffMsg:
 		// The request for the pull request the user just left is still in
@@ -238,6 +263,43 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.composing = true
 		m.postErr = msg.err.Error()
 		return m, nil
+	case review.CancelledMsg:
+		// Also reaches here when the diff is drawn over the detail view and
+		// the submission was detail's own (broadcast hands the message to
+		// both); only the one that actually opened the popup acts on it.
+		if !m.submitting {
+			return m, nil
+		}
+		m.submitting = false
+		return m, nil
+	case review.SubmittedMsg:
+		if !m.submitting {
+			return m, nil
+		}
+		m.submitting = false
+		m.submitErr = ""
+		m.review.PendingID = ""
+		return m, m.fetchReview()
+	case review.ErrorMsg:
+		if !m.submitting {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.submit, cmd = m.submit.Update(msg)
+		m.submitErr = msg.Err.Error()
+		return m, cmd
+	case discardedMsg:
+		if msg.ref != m.ref {
+			return m, nil
+		}
+		m.discardWorking = false
+		if msg.err != nil {
+			m.discardErr = msg.err.Error()
+			return m, nil
+		}
+		m.discarding = false
+		m.review.PendingID = ""
+		return m, m.fetchReview()
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case spinner.TickMsg:
@@ -251,6 +313,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.composing || m.posting {
 		return m.handleComposeKey(msg)
+	}
+	if m.submitting {
+		return m.handleSubmitKey(msg)
+	}
+	if m.discarding {
+		return m.handleDiscardKey(msg)
 	}
 	switch msg.String() {
 	case "esc", "q":
@@ -281,6 +349,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.toggleCollapsed(), nil
 	case "c":
 		return m.startComposing(), nil
+	case "v":
+		return m.openSubmit(), nil
+	case "X":
+		return m.startDiscard(), nil
 	}
 	return m, nil
 }

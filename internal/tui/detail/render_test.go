@@ -90,8 +90,9 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	t.Helper()
 	size := tea.WindowSizeMsg{Width: width, Height: 40}
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen, Body: overlongBody},
-		labels: []gh.Label{{Name: overlongLabel, Color: "ff0000"}},
+		pr:        gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen, Body: overlongBody},
+		labels:    []gh.Label{{Name: overlongLabel, Color: "ff0000"}},
+		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
 	}
 	closed := &fakeSource{pr: gh.PR{Number: 2, Title: overlongTitle, State: gh.StateClosed}}
 
@@ -102,6 +103,17 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	detail := sized(loaded(f, prRef()))
 	compose, _ := detail.Update(key("c"))
 	confirm, _ := detail.Update(key("x"))
+
+	opening, cmd := detail.Update(key("v"))
+	submit, _ := opening.Update(cmd())
+
+	reviewErrSrc := &fakeSource{
+		pr:        gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen},
+		reviewErr: errors.New(overlongTitle),
+	}
+	reviewErrDetail := sized(loaded(reviewErrSrc, prRef()))
+	_, reviewErrCmd := reviewErrDetail.Update(key("v"))
+	reviewErrShown, _ := reviewErrDetail.Update(reviewErrCmd())
 
 	picker := sized(openPicker(t, f, prRef(), "l"))
 	failed, _ := picker.Update(pickErrorMsg{err: errors.New(overlongTitle)})
@@ -117,30 +129,32 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 		"detail_closed":   sized(loaded(closed, gh.ItemRef{Kind: gh.ItemPR, Number: 2})).View(),
 		"compose":         compose.View(),
 		"confirm":         confirm.View(),
+		"submit":          submit.View(),
+		"review_error":    reviewErrShown.View(),
 		"picker":          picker.View(),
 		"picker_applying": applying.View(),
 		"picker_error":    failed.View(),
 	}
 }
 
-// TestTheFooterIsWholeAtEightyColumns is the other half of the width guard.
-// The width test alone is satisfied by truncation: a footer that grew to 81
-// columns would be cut back to 80 and every assertion would stay green while
-// esc:back vanished off the end. The suffix is the tail of the footer and so
-// the first thing a cut takes, which is what makes it the thing to look for.
-func TestTheFooterIsWholeAtEightyColumns(t *testing.T) {
+// TestTheFooterNeverDropsEsc is detail's counterpart to diff's
+// TestTheKeyBarNeverDropsEsc: esc is the only way out of the view, and it
+// must survive whatever else the fit-aware footer drops at a narrow width.
+func TestTheFooterNeverDropsEsc(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
 	for _, lang := range []language.Tag{language.English, language.Japanese} {
 		i18n.SetLanguage(lang)
-		screens := renderEveryScreenSized(t, 80)
-		// The open item draws the close footer and the closed one the reopen
-		// footer; reopen is the wider of the two.
-		for _, name := range []string{"detail", "detail_closed"} {
-			suffix := i18n.T("footer.detail_suffix")
-			if !strings.Contains(screens[name], suffix) {
-				t.Errorf("%s lang %s: the footer was cut short of %q:\n%s",
-					name, lang, suffix, screens[name])
+		for _, width := range []int{50, 80, 100, 120} {
+			screens := renderEveryScreenSized(t, width)
+			// The open item draws the close footer and the closed one the
+			// reopen footer; reopen is the wider of the two.
+			for _, name := range []string{"detail", "detail_closed"} {
+				esc := i18n.T("footer.detail.esc")
+				if !strings.Contains(screens[name], esc) {
+					t.Errorf("%s lang %s width %d: footer missing %q:\n%s",
+						name, lang, width, esc, screens[name])
+				}
 			}
 		}
 	}

@@ -78,3 +78,17 @@ type ReviewContext struct {
 	PendingID string
 	Threads   []ReviewThread
 }
+
+// PendingCount is how many comments across every thread have not been
+// submitted yet -- what a review submission is about to send along with it.
+func (c ReviewContext) PendingCount() int {
+	n := 0
+	for _, t := range c.Threads {
+		for _, comment := range t.Comments {
+			if comment.Pending {
+				n++
+			}
+		}
+	}
+	return n
+}

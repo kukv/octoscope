@@ -146,6 +146,22 @@ func reviewFailureModel(width int) Model {
 	return m
 }
 
+// submittingModel is goldenModel with the review popup open, a pending
+// review already on the diff so the popup has a line comment to count.
+func submittingModel(width int) Model {
+	m := goldenModel(width)
+	m.review.PendingID = "PRR_1"
+	return press(m, "v")
+}
+
+// discardingModel is goldenModel with the discard confirmation up, over a
+// pending review: X does nothing without one to discard.
+func discardingModel(width int) Model {
+	m := goldenModel(width)
+	m.review.PendingID = "PRR_1"
+	return press(m, "X")
+}
+
 func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 	models := map[string]func(int) Model{
 		"tab":              goldenModel,
@@ -153,6 +169,8 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 		"review_failure":   reviewFailureModel,
 		"composing":        composingModel,
 		"posting":          postingModel,
+		"submitting":       submittingModel,
+		"discarding":       discardingModel,
 	}
 	for _, w := range goldenWidths {
 		for _, lang := range goldenLanguages {
@@ -179,7 +197,7 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 			t.Cleanup(func() { i18n.SetLanguage(language.English) })
 			loading := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1})
 			loading, _ = loading.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-			threads := withThreads(t)
+			threads := withThreads(t, 120, 40)
 			expanded := press(openCollapsedThread(threads), "enter")
 			for name, view := range map[string]string{
 				"loaded":         loaded(t, 120, 30).View(),
@@ -191,6 +209,8 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 				"review_failure": reviewFailureModel(120).View(),
 				"composing":      composingModel(120).View(),
 				"posting":        postingModel(120).View(),
+				"submitting":     submittingModel(120).View(),
+				"discarding":     discardingModel(120).View(),
 			} {
 				t.Run(name, func(t *testing.T) {
 					i18n.AssertNoUnresolvedIDs(t, view)

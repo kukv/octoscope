@@ -122,21 +122,33 @@ diff:
   posting:
     other: "コメントを送信中"
 
+submit:
+  title:
+    other: "レビューを提出"
+  approve:
+    other: "承認"
+  request_changes:
+    other: "変更を要求"
+  comment:
+    other: "コメント"
+  placeholder:
+    other: "ひとこと（任意）"
+  pending_count:
+    other: "行コメント {{.Count}} 件が一緒に送られます"
+  no_pending:
+    other: "溜まっている行コメントはありません"
+  sending:
+    other: "レビューを提出中"
+  discard_confirm:
+    other: "未提出のレビューとそのコメントをすべて破棄しますか?"
+
 footer:
   list:
     other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  q:終了"
-  detail_prefix:
-    other: "j/k:移動  r:更新  o:Web  c:コメント  "
-  # この行は80桁の上限にすでに達しているため（detail_prefix + reopen のキー +
-  # このsuffix）、ここには意図的に d:diff を入れていない。d 自体は詳細ビュー
-  # からも diff を開けるが、このフッターでは案内していないだけ。Work ボードと
-  # Repos の一覧では案内している。
-  detail_suffix:
-    other: "l:ラベル  a:担当  esc:戻る"
   close:
-    other: "x:クローズ  "
+    other: "x:クローズ"
   reopen:
-    other: "x:再オープン  "
+    other: "x:再オープン"
   picker:
     other: "space:選択  enter:適用  esc:中止"
   compose:
@@ -145,6 +157,34 @@ footer:
     other: "q:終了"
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
+  # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、
+  # 端末幅が足りないときは末尾から落とす（internal/tui/detail/render.go の
+  # fitKeyBar。diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
+  # 唯一の出口だから。state は close か reopen のどちらか該当する方で、
+  # どちらも該当しない（マージ済み）ときは丸ごと外れる。
+  detail:
+    esc:
+      other: "esc:戻る"
+    move:
+      other: "j/k:移動"
+    comment:
+      other: "c:コメント"
+    review:
+      other: "v:レビュー"
+    diff:
+      other: "d:diff"
+    refresh:
+      other: "r:更新"
+    web:
+      other: "o:Web"
+    labels:
+      other: "l:ラベル"
+    assign:
+      other: "a:担当"
+  submit:
+    other: "tab:種別  ctrl+s:提出  esc:取消"
+  discard:
+    other: "y:破棄  n:やめる"
   # diff のキーバーはこの並びから組み立てる。重要なものから先に並べ、
   # 端末幅が足りないときは末尾から落とす（internal/tui/diff/render.go の
   # fitKeyBar）。esc は先頭に置く — 落としてはいけない唯一の出口だから。
@@ -153,6 +193,10 @@ footer:
       other: "esc:戻る"
     comment:
       other: "c:コメント"
+    review:
+      other: "v:レビュー"
+    discard:
+      other: "X:破棄"
     line:
       other: "j/k:行"
     file:

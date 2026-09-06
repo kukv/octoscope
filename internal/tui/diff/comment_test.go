@@ -465,6 +465,91 @@ func TestARefetchReclampsTheCursorIntoRange(t *testing.T) {
 // TestACommentErrorForAnotherPullRequestIsDropped mirrors
 // TestAReviewFailureForAnotherPullRequestIsDropped: a post for the pull
 // request the user has since left must not surface here.
+// TestVOpensThePopupWithOrWithoutAPendingReview: approving a diff you had
+// nothing to say about is the commonest review there is.
+func TestVOpensThePopupWithOrWithoutAPendingReview(t *testing.T) {
+	m := withThreads(t, 120, 40) // the context has arrived; nothing waiting
+	m.review.PendingID = ""
+	m = press(m, "v")
+	if !m.submitting {
+		t.Error("v did nothing with no pending review; approving needs no comments")
+	}
+
+	m2 := withThreads(t, 120, 40)
+	m2.review.PendingID = "PRR_9"
+	m2 = press(m2, "v")
+	if !m2.submitting {
+		t.Error("v did not open the popup when a review was waiting")
+	}
+}
+
+// TestVDoesNothingBeforeTheContextArrives: the diff and the review context
+// are fetched in parallel, so v can be pressed while only the diff has
+// landed. Opening then would submit against an empty node id.
+func TestVDoesNothingBeforeTheContextArrives(t *testing.T) {
+	m := loaded(t, 120, 40) // the diff only
+	m = press(m, "v")
+	if m.submitting {
+		t.Error("v opened the popup before the pull request's id was known")
+	}
+}
+
+func TestCapitalXAsksBeforeDiscarding(t *testing.T) {
+	m := withThreads(t, 120, 40)
+	m.review.PendingID = "PRR_9"
+	m = press(m, "X")
+	if !m.discarding {
+		t.Fatal("X did not ask")
+	}
+	if !strings.Contains(ansi.Strip(m.View()), "Discard") {
+		t.Errorf("the question is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+	m = press(m, "n")
+	if m.discarding {
+		t.Error("n did not take the question away")
+	}
+}
+
+// TestTheSubmitPopupFitsTheTerminal is TestTheComposerFitsTheTerminal's
+// counterpart for the review popup: its rows come out of the pane's height
+// budget, so the key bar must stay on screen the same way the composer's
+// does.
+func TestTheSubmitPopupFitsTheTerminal(t *testing.T) {
+	for _, width := range []int{80, 120} {
+		for _, height := range []int{24, 40} {
+			m := withThreads(t, width, height)
+			m.review.PendingID = "PRR_9"
+			m = press(m, "v")
+			out := m.View()
+			if got := len(strings.Split(out, "\n")); got > height {
+				t.Errorf("the submit popup drew %d lines into a %dx%d terminal", got, width, height)
+			}
+			if !strings.Contains(ansi.Strip(out), ansi.Strip(m.keyBar())) {
+				t.Errorf("the key bar was pushed off the screen:\n%s", ansi.Strip(out))
+			}
+		}
+	}
+}
+
+// TestTheDiscardConfirmationFitsTheTerminal is the discard confirmation's
+// share of the same budget.
+func TestTheDiscardConfirmationFitsTheTerminal(t *testing.T) {
+	for _, width := range []int{80, 120} {
+		for _, height := range []int{24, 40} {
+			m := withThreads(t, width, height)
+			m.review.PendingID = "PRR_9"
+			m = press(m, "X")
+			out := m.View()
+			if got := len(strings.Split(out, "\n")); got > height {
+				t.Errorf("the discard confirmation drew %d lines into a %dx%d terminal", got, width, height)
+			}
+			if !strings.Contains(ansi.Strip(out), ansi.Strip(m.keyBar())) {
+				t.Errorf("the key bar was pushed off the screen:\n%s", ansi.Strip(out))
+			}
+		}
+	}
+}
+
 func TestACommentErrorForAnotherPullRequestIsDropped(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)

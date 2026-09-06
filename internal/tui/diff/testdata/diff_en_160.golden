@@ -27,4 +27,4 @@ logo.png              [38;2;38;45;57m│[m[38;2;139;148;158m  12   12[m  [3
                       [38;2;38;45;57m│[m
                       [38;2;38;45;57m│[m
                       [38;2;38;45;57m│[m
-[38;2;139;148;158mesc:back  c:comment  j/k:line  [/]:file  {/}:hunk  enter:open  h/l:pane  r:refresh[m
+[38;2;139;148;158mesc:back  c:comment  v:review  j/k:line  [/]:file  {/}:hunk  enter:open  h/l:pane  r:refresh  X:discard[m
