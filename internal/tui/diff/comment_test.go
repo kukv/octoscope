@@ -301,24 +301,40 @@ func TestCBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	}
 }
 
-// TestCAddsNoSecondMessageWhenTheReviewContextFailed: reviewErr is already
-// drawn on its own footer line, so a second line saying the same thing would
-// just repeat it. This has to be built with loadedWith, not loaded: with
-// loaded, m.review.PullRequestID is always "" (no reviewMsg ever arrives), so
-// this could pass even if c wrongly stayed dead once the context was known --
-// it would then be the PullRequestID guard, not the reviewErr one, keeping
-// composing false. See TestCStillWorksAfterASecondReviewContextFetchFails for
-// the case that actually distinguishes the two.
-func TestCAddsNoSecondMessageWhenTheReviewContextFailed(t *testing.T) {
-	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
-	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
-	m = press(m, "c")
-	if !m.composing {
-		t.Fatal("c did not open the composer even though the pull request id is known")
+// TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived: c, v
+// and X all guard "the review context has never arrived" with an "unless
+// reviewErr already says so" clause, so a single failed fetch (before any
+// reviewMsg) does not draw the loading message on top of reviewErr's own
+// footer line. This is built with loaded, not loadedWith: with loaded,
+// m.review.PullRequestID is always "" (no reviewMsg ever arrives), which is
+// exactly the case the guard exists for. Each guard is deleted in turn while
+// developing this test to confirm the corresponding row fails without it.
+func TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		needsLine bool // c also declines on a non-line row, so it needs the cursor moved first
+		acted     func(m Model) bool
+	}{
+		{name: "c", key: "c", needsLine: true, acted: func(m Model) bool { return m.composing }},
+		{name: "v", key: "v", acted: func(m Model) bool { return m.submitting }},
+		{name: "X", key: "X", acted: func(m Model) bool { return m.discarding }},
 	}
-	if m.declined != "" {
-		t.Errorf("declined = %q, want empty: reviewErr already says this", m.declined)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := loaded(t, 120, 30)
+			if tt.needsLine {
+				m = cursorOnLine(t, m, gh.LineAdded, 13)
+			}
+			m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
+			m = press(m, tt.key)
+			if tt.acted(m) {
+				t.Fatalf("%s acted even though the review context has never arrived", tt.key)
+			}
+			if m.declined != "" {
+				t.Errorf("declined = %q, want empty: reviewErr already says this", m.declined)
+			}
+		})
 	}
 }
 
