@@ -96,6 +96,14 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, fetchRepoName(m.src), fetchList(m.src, m.tab))
 }
 
+// Refresh re-fetches the current tab. The parent calls it after an event
+// elsewhere changes what these lists show — a submitted review, say — the
+// same way pressing r does.
+func (m Model) Refresh() (Model, tea.Cmd) {
+	m.loading[m.tab] = true
+	return m, fetchList(m.src, m.tab)
+}
+
 func fetchList(src Source, t tabID) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -201,8 +209,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "r":
-		m.loading[m.tab] = true
-		return m, fetchList(m.src, m.tab)
+		return m.Refresh()
 	case "enter":
 		if ref, ok := m.SelectedRef(); ok {
 			return m, func() tea.Msg { return OpenDetailMsg{ref} }

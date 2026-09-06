@@ -17,6 +17,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/diff"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
@@ -24,18 +25,26 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work    gh.Work
-	prs     []gh.PR
-	pr      gh.PR
-	prErr   error
-	labels  []gh.Label
-	files   []gh.FileDiff
-	diffErr error
+	work      gh.Work
+	prs       []gh.PR
+	pr        gh.PR
+	prErr     error
+	labels    []gh.Label
+	files     []gh.FileDiff
+	diffErr   error
+	workCalls int
+	prCalls   int
 }
 
-func (f *fakeSource) ListWork(context.Context) (gh.Work, error) { return f.work, nil }
+func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
+	f.workCalls++
+	return f.work, nil
+}
 
-func (f *fakeSource) ListPRs(context.Context) ([]gh.PR, error)       { return f.prs, nil }
+func (f *fakeSource) ListPRs(context.Context) ([]gh.PR, error) {
+	f.prCalls++
+	return f.prs, nil
+}
 func (f *fakeSource) ListIssues(context.Context) ([]gh.Issue, error) { return nil, nil }
 func (f *fakeSource) RepoName(context.Context) (string, error)       { return "kukv/demo", nil }
 
@@ -363,6 +372,37 @@ func TestAClosedDiffsFailureIsNotShown(t *testing.T) {
 	next, _ := m.Update(diff.ErrorMsg{Err: errors.New("boom")})
 	if got := next.(Model).errText; got != "" {
 		t.Errorf("error screen shows %q for a diff that is not open", got)
+	}
+}
+
+// TestASubmittedReviewRefreshesTheBoardAndTheReposList guards spec 4.4.2: a
+// submitted review must be reflected in the Work board and the Repos list,
+// not just in the detail/diff view the reviewer submitted it from.
+func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
+	f := &fakeSource{}
+	m := newTestModelWith(f, Options{HasRepo: true})
+
+	_, cmd := m.Update(review.SubmittedMsg{})
+	if cmd == nil {
+		t.Fatal("review.SubmittedMsg produced no command")
+	}
+	resolve(t, m, cmd)
+
+	if f.workCalls == 0 {
+		t.Error("the board was not refreshed after a submitted review")
+	}
+	if f.prCalls == 0 {
+		t.Error("the Repos list was not refreshed after a submitted review")
+	}
+}
+
+// TestASubmittedReviewWithNoRepoTabDoesNotPanic covers the case where the
+// Repos tab does not exist yet: there is nothing to refresh there, and
+// nothing should try to.
+func TestASubmittedReviewWithNoRepoTabDoesNotPanic(t *testing.T) {
+	m := newTestModel(Options{HasRepo: false})
+	if _, cmd := m.Update(review.SubmittedMsg{}); cmd == nil {
+		t.Error("review.SubmittedMsg produced no command")
 	}
 }
 

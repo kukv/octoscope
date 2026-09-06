@@ -14,6 +14,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/diff"
 	"github.com/kukv/octoscope/internal/tui/repo"
+	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
@@ -203,6 +204,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.fail(msg.Err)
+	case review.SubmittedMsg:
+		// detail and diff each refetch their own PR when a review goes out
+		// (broadcast below reaches them); the board and the Repos list have
+		// no popup of their own to notice from, so the root refreshes them
+		// (spec 4.4.2).
+		next, cmd := m.broadcast(msg)
+		m = next.(Model)
+		var workCmd tea.Cmd
+		m.work, workCmd = m.work.Refresh()
+		cmds := []tea.Cmd{cmd, workCmd}
+		if m.opts.HasRepo {
+			var repoCmd tea.Cmd
+			m.repo, repoCmd = m.repo.Refresh()
+			cmds = append(cmds, repoCmd)
+		}
+		return m, tea.Batch(cmds...)
 	}
 	return m.broadcast(msg)
 }
