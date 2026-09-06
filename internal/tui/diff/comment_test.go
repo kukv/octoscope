@@ -17,10 +17,11 @@ import (
 // asserting: nothing here talks to GitHub.
 type recordingSource struct {
 	fakeSource
-	mu       sync.Mutex
-	started  int
-	comments []gh.PendingComment
-	reviewID string
+	mu           sync.Mutex
+	started      int
+	comments     []gh.PendingComment
+	reviewID     string
+	discardCalls int
 }
 
 func (s *recordingSource) StartReview(string) (string, error) {
@@ -35,6 +36,13 @@ func (s *recordingSource) AddReviewThread(_ string, c gh.PendingComment) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.comments = append(s.comments, c)
+	return nil
+}
+
+func (s *recordingSource) DiscardReview(string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.discardCalls++
 	return nil
 }
 
@@ -507,6 +515,28 @@ func TestCapitalXAsksBeforeDiscarding(t *testing.T) {
 	m = press(m, "n")
 	if m.discarding {
 		t.Error("n did not take the question away")
+	}
+}
+
+// TestASecondYWhileDiscardingDoesNotCallDiscardTwice guards discardWorking:
+// once the first y has sent DiscardReview and is waiting on its answer, a
+// second y arriving before that answer lands must not fire a second call.
+func TestASecondYWhileDiscardingDoesNotCallDiscardTwice(t *testing.T) {
+	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
+	m := loadedWith(t, src)
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
+	m.review.PendingID = "PRR_9"
+	m = press(m, "X")
+
+	m, cmd1 := m.Update(keyPress("y")) // starts the discard; DiscardReview not yet run
+	m, cmd2 := m.Update(keyPress("y")) // must be ignored: the first discard is still in flight
+	runCmd(t, cmd1)
+	if cmd2 != nil {
+		cmd2()
+	}
+
+	if src.discardCalls != 1 {
+		t.Errorf("%d DiscardReview calls, want 1", src.discardCalls)
 	}
 }
 
