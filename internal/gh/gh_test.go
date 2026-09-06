@@ -84,3 +84,36 @@ func TestParseReviewDecision(t *testing.T) {
 		}
 	}
 }
+
+// Work is indexed by WorkSection. A fifth column added without widening Work
+// panics at run time on the first item that lands in it -- there is no
+// compiler error to catch it.
+//
+// The section list here is written out by hand on purpose. Taking it from
+// WorkSections() would give both sides of the comparison the same source and
+// the test could not fail, which is the shape .claude/rules/testing.md warns
+// about: a column added to the enum and not to this list is what makes it go
+// red, and that red is the reminder.
+func TestEverySectionConstantIsASlotInWork(t *testing.T) {
+	t.Parallel()
+
+	sections := []gh.WorkSection{
+		gh.SectionReviewRequested,
+		gh.SectionYourPRs,
+		gh.SectionAssigned,
+		gh.SectionMentioned,
+	}
+
+	var w gh.Work
+	if len(w) != len(sections) {
+		t.Fatalf("Work has %d slots, %d sections are declared", len(w), len(sections))
+	}
+	if got := len(gh.WorkSections()); got != len(sections) {
+		t.Errorf("WorkSections() returns %d, %d sections are declared", got, len(sections))
+	}
+	for _, s := range sections {
+		if int(s) < 0 || int(s) >= len(w) {
+			t.Errorf("section %d is not an index into Work (len %d)", s, len(w))
+		}
+	}
+}

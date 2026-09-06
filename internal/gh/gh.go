@@ -191,17 +191,22 @@ const (
 	SectionYourPRs
 	SectionAssigned
 	SectionMentioned
+
+	// WorkSectionCount is how many columns there are. It has to be the last
+	// constant in this block: Work is an array indexed by WorkSection, and
+	// iota is the only thing that keeps its length and this list from
+	// drifting apart.
+	WorkSectionCount = iota
 )
 
 // WorkSections returns the columns in display order, left to right.
 func WorkSections() []WorkSection {
-	return []WorkSection{
-		SectionReviewRequested,
-		SectionYourPRs,
-		SectionAssigned,
-		SectionMentioned,
+	sections := make([]WorkSection, WorkSectionCount)
+	for i := range sections {
+		sections[i] = WorkSection(i)
 	}
+	return sections
 }
 
 // Work holds the items of each column, indexed by WorkSection.
-type Work [4][]WorkItem
+type Work [WorkSectionCount][]WorkItem
