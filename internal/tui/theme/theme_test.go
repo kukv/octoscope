@@ -146,14 +146,31 @@ func TestHighlightFollowsTheBackground(t *testing.T) {
 }
 
 // TestHighlightKeepsTheWidth is what stops highlighting from breaking every
-// column downstream: escapes must not count towards the width, and the text
-// must come back rune for rune.
+// column downstream: ANSI escapes must not count towards the width, and the
+// text must come back rune for rune, not smuggling newlines or other characters.
 func TestHighlightKeepsTheWidth(t *testing.T) {
-	for _, line := range []string{"func Walk() {}", "\t// 日本語のコメント", ""} {
-		got := theme.Highlight("walk.go", line)
-		if ansi.StringWidth(got) != ansi.StringWidth(line) {
-			t.Errorf("Highlight(%q) is %d columns, want %d",
-				line, ansi.StringWidth(got), ansi.StringWidth(line))
-		}
+	cases := []struct {
+		name string
+		path string
+		line string
+	}{
+		{name: "Go with tab", path: "walk.go", line: "func Walk() {}"},
+		{name: "Go with Japanese", path: "walk.go", line: "\t// 日本語のコメント"},
+		{name: "empty", path: "walk.go", line: ""},
+		{name: "Makefile that triggers EnsureNL", path: "Makefile", line: "const x = 1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := theme.Highlight(tc.path, tc.line)
+			stripped := ansi.Strip(got)
+			if stripped != tc.line {
+				t.Errorf("Highlight(%q, %q) changed the text to %q", tc.path, tc.line, stripped)
+			}
+			if ansi.StringWidth(got) != ansi.StringWidth(tc.line) {
+				t.Errorf("Highlight(%q, %q) is %d columns, want %d",
+					tc.path, tc.line, ansi.StringWidth(got), ansi.StringWidth(tc.line))
+			}
+		})
 	}
 }

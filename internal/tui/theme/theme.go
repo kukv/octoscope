@@ -251,5 +251,8 @@ func Highlight(path, code string) string {
 	if err := formatter.Format(&buf, style, iter); err != nil {
 		return code
 	}
-	return buf.String()
+	// Tokenise appends a newline for lexers configured with EnsureNL (Makefile,
+	// TypeScript, Rust, C, C++, etc.), and a newline inside a line would break
+	// every row drawn under it once the diff view lands.
+	return strings.TrimRight(buf.String(), "\n")
 }
