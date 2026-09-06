@@ -38,22 +38,39 @@ type Options struct {
 
 // repoLookupTimeout bounds the one call that decides whether the Repos tab
 // exists. It is generous: the tab appearing late is a smaller problem than
-// its never appearing on a slow network.
-const repoLookupTimeout = 5 * time.Second
+// its never appearing on a slow network. `gh repo view` reaches the API, and
+// a cold one has been measured at over six seconds.
+const repoLookupTimeout = 20 * time.Second
 
-// repoResolvedMsg carries the answer to that lookup.
-type repoResolvedMsg struct{ found bool }
+// repoResolvedMsg carries the answer to that lookup. timedOut is kept apart
+// from found because the two look identical on screen — no Repos tab — and
+// only one of them is the truth about the directory.
+type repoResolvedMsg struct {
+	found    bool
+	timedOut bool
+}
 
 // resolveRepo asks the GitHub layer to name the working directory's
-// repository. Any failure means "there is none": a directory that is not a
-// repository, one with nowhere to fetch from, and a network error all arrive
-// the same way, and none of them gives the Repos tab anything to show.
+// repository. A failure means "there is none" — a directory that is not a
+// repository and one with nowhere to fetch from give the Repos tab nothing to
+// show either — except a timeout, which is reported: silently dropping the tab
+// because the network was slow reads as a bug in whatever else was changed.
 func resolveRepo(src Source) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), repoLookupTimeout)
 		defer cancel()
 		name, err := src.RepoName(ctx)
-		return repoResolvedMsg{found: err == nil && name != ""}
+		return resolved(ctx, name, err)
+	}
+}
+
+// resolved reads one lookup's outcome. exec reports a killed subprocess as
+// "signal: killed" rather than wrapping the deadline, so whether time ran out
+// is a question for the context, not for the error.
+func resolved(ctx context.Context, name string, err error) repoResolvedMsg {
+	return repoResolvedMsg{
+		found:    err == nil && name != "",
+		timedOut: err != nil && ctx.Err() != nil,
 	}
 }
 
@@ -87,6 +104,10 @@ type Model struct {
 
 	showingDetail bool
 	errText       string
+
+	// repoLookupTimedOut says the Repos tab is missing because the lookup ran
+	// out of time, not because there is no repository here.
+	repoLookupTimedOut bool
 }
 
 func New(src Source, opts Options) Model {
@@ -119,6 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 	case repoResolvedMsg:
 		if !msg.found {
+			m.repoLookupTimedOut = msg.timedOut
 			return m, nil
 		}
 		m.opts.HasRepo = true

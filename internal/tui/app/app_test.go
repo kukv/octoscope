@@ -687,3 +687,53 @@ func TestTheTerminalBackgroundReachesThePalette(t *testing.T) {
 		t.Error("a light terminal is still drawn with the dark palette")
 	}
 }
+
+// TestASlowLookupSaysSoInsteadOfDroppingTheTab is the difference between the
+// two ways the Repos tab can be missing. `gh repo view` reaches the API and a
+// cold one has been measured at over six seconds; treating that the same as
+// "this directory is not a repository" makes the tab vanish for a reason the
+// screen never gives, and the disappearance gets blamed on whatever else
+// changed that day.
+func TestASlowLookupSaysSoInsteadOfDroppingTheTab(t *testing.T) {
+	m := newTestModel(Options{})
+
+	quiet, _ := m.Update(repoResolvedMsg{found: false})
+	if got := content(quiet.(Model)); strings.Contains(got, i18n.T("tab.repo_lookup_timeout")) {
+		t.Errorf("a directory with no repository is reported as a timeout: %q", got)
+	}
+
+	slow, _ := m.Update(repoResolvedMsg{found: false, timedOut: true})
+	if got := content(slow.(Model)); !strings.Contains(got, i18n.T("tab.repo_lookup_timeout")) {
+		t.Errorf("a lookup that timed out says nothing: %q", got)
+	}
+}
+
+// TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered covers the seam
+// the test above cannot: exec reports a killed subprocess as "signal: killed",
+// so a check for context.DeadlineExceeded on the returned error never fires.
+func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
+	expired, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cases := map[string]struct {
+		ctx  context.Context
+		name string
+		err  error
+		want repoResolvedMsg
+	}{
+		"a repository": {context.Background(), "kukv/octoscope", nil, repoResolvedMsg{found: true}},
+		"none here": {
+			context.Background(), "", errors.New("no repository in this directory"),
+			repoResolvedMsg{},
+		},
+		"out of time": {
+			expired, "", errors.New("signal: killed"),
+			repoResolvedMsg{timedOut: true},
+		},
+	}
+	for name, c := range cases {
+		if got := resolved(c.ctx, c.name, c.err); got != c.want {
+			t.Errorf("%s: resolved = %+v, want %+v", name, got, c.want)
+		}
+	}
+}
