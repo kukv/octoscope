@@ -530,6 +530,33 @@ func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
 	}
 }
 
+// TestEscLeavesAnUnrelatedOverlayStanding covers the reachable path a board
+// or Repos-list failure takes while an overlay is open: submit a review from
+// the diff, the root refreshes the board, and the board's own fetch fails
+// with the diff still on top. That failure belongs to neither overlay on the
+// stack, so esc must clear it without discarding a diff that never failed.
+func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(work.ErrorMsg{Err: errors.New("boom")})
+	m = next.(Model)
+	if m.errText == "" {
+		t.Fatal("the error screen did not show")
+	}
+
+	next, _ = m.Update(key("esc"))
+	m = next.(Model)
+	if m.errText != "" {
+		t.Error("esc did not clear the error")
+	}
+	if len(m.stack) != 2 || m.stack[1] != overlayDiff {
+		t.Errorf("stack = %v, want [detail diff] still: esc must not discard a diff that never failed", m.stack)
+	}
+}
+
 // TestEscStillQuitsWithNoOverlay is the start-up case: gh not being on PATH
 // fails before anything is on the stack, and there is nowhere for esc to go
 // back to, so it must keep quitting like q does.
@@ -787,15 +814,24 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 
 	failed, _ := board.Update(work.ErrorMsg{Err: errors.New(overlongTitle)})
 
+	// An error tied to an overlay draws a different key bar (esc:back, not
+	// just q:quit) from the board/Repos-list case above, and that bar's IDs
+	// (footer.error.esc in particular) are only ever exercised through this
+	// state — nothing else in this function opens an overlay and fails it.
+	overlayFailed, cmd := board.Update(work.OpenDiffMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1}})
+	overlayFailed = resolve(t, overlayFailed.(Model), cmd)
+	overlayFailed, _ = overlayFailed.(Model).Update(diff.ErrorMsg{Err: errors.New(overlongTitle)})
+
 	noRepo, cmd := New(src, Options{}).Update(size)
 	noRepo = resolve(t, noRepo.(Model), cmd)
 
 	return map[string]string{
-		"work":    content(board),
-		"repos":   content(repos.(Model)),
-		"detail":  content(item.(Model)),
-		"error":   content(failed.(Model)),
-		"no_repo": content(noRepo.(Model)),
+		"work":          content(board),
+		"repos":         content(repos.(Model)),
+		"detail":        content(item.(Model)),
+		"error":         content(failed.(Model)),
+		"error_overlay": content(overlayFailed.(Model)),
+		"no_repo":       content(noRepo.(Model)),
 	}
 }
 

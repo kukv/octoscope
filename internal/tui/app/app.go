@@ -122,6 +122,15 @@ type Model struct {
 	stack   []overlay
 	errText string
 
+	// errOverlay names which overlay's fetch produced errText, when any did
+	// (errFromOverlay). A board or Repos-list failure is not tied to an
+	// overlay at all: it can arrive while an overlay sits on top of the
+	// stack (submit a review from the diff, the root refreshes the board,
+	// the board's fetch fails), and esc must then clear the error without
+	// popping a view that never failed.
+	errOverlay     overlay
+	errFromOverlay bool
+
 	// repoLookupTimedOut says the Repos tab is missing because the lookup ran
 	// out of time, not because there is no repository here.
 	repoLookupTimedOut bool
@@ -195,7 +204,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.has(overlayDetail) {
 			return m, nil
 		}
-		return m.fail(msg.Err)
+		return m.failOverlay(msg.Err, overlayDetail)
 	case diff.ErrorMsg:
 		// Same rule as detail.ErrorMsg: a request outlives the view that
 		// started it, and its failure must not reach the error screen once
@@ -203,7 +212,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.has(overlayDiff) {
 			return m, nil
 		}
-		return m.fail(msg.Err)
+		return m.failOverlay(msg.Err, overlayDiff)
 	case review.SubmittedMsg:
 		// detail and diff each refetch their own PR when a review goes out
 		// (broadcast below reaches them); the board and the Repos list have
@@ -351,10 +360,29 @@ func (m Model) startDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 	return m, m.diff.Init()
 }
 
-// fail moves to the error screen. Only the environment's own failures are
-// translated; anything GitHub said is shown as it said it
-// (.claude/rules/errors.md).
+// fail moves to the error screen for a failure that is not tied to any one
+// overlay (the board, or the Repos list). esc on this error must never pop
+// the stack: whatever overlay is on top of it, if any, did not fail.
 func (m Model) fail(err error) (tea.Model, tea.Cmd) {
+	m.errFromOverlay = false
+	return m.showError(err)
+}
+
+// failOverlay moves to the error screen for a failure that belongs to one
+// overlay (the detail view or the diff). esc pops the stack only when that
+// overlay is still the one on top of it (see handleKey): a stale failure
+// from a view the user is no longer looking at must not discard whatever is
+// on top now.
+func (m Model) failOverlay(err error, o overlay) (tea.Model, tea.Cmd) {
+	m.errFromOverlay = true
+	m.errOverlay = o
+	return m.showError(err)
+}
+
+// showError renders err onto the error screen. Only the environment's own
+// failures are translated; anything GitHub said is shown as it said it
+// (.claude/rules/errors.md).
+func (m Model) showError(err error) (tea.Model, tea.Cmd) {
 	if errors.Is(err, gh.ErrGhNotFound) {
 		m.errText = i18n.T("error.gh_not_found")
 	} else {
@@ -385,7 +413,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, m.quit()
 			}
 			m.errText = ""
-			m.stack = m.stack[:len(m.stack)-1]
+			// Only pop when the view that failed is the one on top: a board
+			// or Repos-list failure (errFromOverlay false) never belongs to
+			// an overlay, and a stale overlay failure can arrive after
+			// another overlay was pushed on top of it. Either way the view
+			// on screen did not fail and must stay put.
+			if m.errFromOverlay {
+				if top, ok := m.top(); ok && top == m.errOverlay {
+					m.stack = m.stack[:len(m.stack)-1]
+				}
+			}
+			m.errFromOverlay = false
 			return m, nil
 		}
 		return m, nil
