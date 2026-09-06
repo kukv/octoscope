@@ -1,6 +1,9 @@
 package gh
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // ThreadComment is one comment inside a review thread. Pending marks a
 // comment the viewer has written but not submitted: GitHub returns it in the
@@ -27,10 +30,10 @@ type ReviewThread struct {
 	Comments []ThreadComment
 }
 
-// Pending reports whether this thread is one the viewer has not submitted.
-// Such a thread has exactly one comment, and it is theirs.
+// Pending reports whether this thread contains any unsubmitted comment.
+// A pending reply inside an otherwise public thread is still pending.
 func (t ReviewThread) Pending() bool {
-	return len(t.Comments) > 0 && t.Comments[0].Pending
+	return slices.ContainsFunc(t.Comments, func(c ThreadComment) bool { return c.Pending })
 }
 
 // Collapsed reports whether the thread is drawn as a count rather than in

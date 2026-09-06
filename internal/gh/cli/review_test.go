@@ -10,7 +10,10 @@ import (
 
 const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
   "id":"PR_kwDO1",
-  "reviews":{"nodes":[{"id":"PRR_kwDO9"}]},
+  "reviews":{"nodes":[{"id":"PRR_kwDO9","comments":{"nodes":[
+    {"path":"graph/walk.go","line":16,"diffSide":"RIGHT","body":"duplicate pending at existing position"},
+    {"path":"graph/new.go","line":42,"diffSide":"RIGHT","body":"pending at new position"}
+  ]}}]},
   "reviewThreads":{"nodes":[
     {"isResolved":false,"isOutdated":false,"path":"graph/walk.go","line":14,
      "originalLine":14,"diffSide":"RIGHT","comments":{"nodes":[
@@ -27,7 +30,11 @@ const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
     {"isResolved":false,"isOutdated":false,"path":"graph/walk.go","line":16,
      "originalLine":16,"diffSide":"RIGHT","comments":{"nodes":[
        {"body":"mine, not sent yet","createdAt":"2026-09-06T13:00:00Z",
-        "author":{"login":"kukv"},"pullRequestReview":{"state":"PENDING"}}]}}
+        "author":{"login":"kukv"},"pullRequestReview":{"state":"PENDING"}}]}},
+    {"isResolved":false,"isOutdated":false,"path":"graph/moved.go","line":20,
+     "originalLine":8,"diffSide":"RIGHT","comments":{"nodes":[
+       {"body":"code moved slightly","createdAt":"2026-09-06T11:00:00Z",
+        "author":{"login":"someone"},"pullRequestReview":{"state":"COMMENTED"}}]}}
   ]}
 }}}}`
 
@@ -70,8 +77,8 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 	if rc.PendingID != "PRR_kwDO9" {
 		t.Errorf("pending id = %q, want the unsubmitted review's", rc.PendingID)
 	}
-	if len(rc.Threads) != 4 {
-		t.Fatalf("%d threads, want 4", len(rc.Threads))
+	if len(rc.Threads) != 6 {
+		t.Fatalf("%d threads, want 6 (5 from reviewThreads + 1 appended pending comment)", len(rc.Threads))
 	}
 
 	tests := []struct {
@@ -86,6 +93,8 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 		{"resolved threads collapse", rc.Threads[1], 12, gh.SideLeft, true, false},
 		{"outdated threads keep the line they were written against", rc.Threads[2], 3, gh.SideRight, true, false},
 		{"the viewer's unsubmitted comment", rc.Threads[3], 16, gh.SideRight, false, true},
+		{"line override distinguishes current from original", rc.Threads[4], 20, gh.SideRight, false, false},
+		{"pending comment appended from review.comments", rc.Threads[5], 42, gh.SideRight, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -161,5 +170,33 @@ func TestPRReviewContextWithNoPendingReview(t *testing.T) {
 	}
 	if rc.PendingID != "" {
 		t.Errorf("pending id = %q, want empty", rc.PendingID)
+	}
+}
+
+func TestThreadWithPublicThenPendingCommentReportsPending(t *testing.T) {
+	c := New("/w", "kukv/koto")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		return []byte(`{"data":{"repository":{"pullRequest":{
+  "id":"PR_1",
+  "reviews":{"nodes":[]},
+  "reviewThreads":{"nodes":[
+    {"isResolved":false,"isOutdated":false,"path":"graph/walk.go","line":10,
+     "originalLine":10,"diffSide":"RIGHT","comments":{"nodes":[
+       {"body":"public comment","createdAt":"2026-09-06T12:00:00Z",
+        "author":{"login":"someone"},"pullRequestReview":{"state":"COMMENTED"}},
+       {"body":"pending reply","createdAt":"2026-09-06T13:00:00Z",
+        "author":{"login":"kukv"},"pullRequestReview":{"state":"PENDING"}}]}}
+  ]}
+}}}}`), nil
+	}
+	rc, err := c.PRReviewContext(context.Background(), "", 128)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rc.Threads) != 1 {
+		t.Fatalf("%d threads, want 1", len(rc.Threads))
+	}
+	if !rc.Threads[0].Pending() {
+		t.Errorf("Pending() = false, want true for thread with pending reply")
 	}
 }
