@@ -42,6 +42,8 @@ linters:
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/detail
               desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child view must not import its parent
         tui-repo:
@@ -52,6 +54,8 @@ linters:
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/detail
               desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child view must not import its parent
         tui-detail:
@@ -61,6 +65,20 @@ linters:
             - pkg: github.com/kukv/octoscope/internal/tui/work
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/repo
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/app
+              desc: a child view must not import its parent
+        tui-diff:
+          files:
+            - "**/internal/tui/diff/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/tui/work
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/repo
+              desc: sibling views communicate through the app model, not directly
+            - pkg: github.com/kukv/octoscope/internal/tui/detail
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child view must not import its parent

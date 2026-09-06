@@ -94,6 +94,18 @@ work:
   column_position:
     other: "{{.Index}}/{{.Total}} 列目"
 
+diff:
+  files:
+    other: "ファイル"
+  loading:
+    other: "diff を取得中"
+  no_changes:
+    other: "変更されたファイルはありません"
+  binary:
+    other: "バイナリファイル"
+  file_count:
+    other: "{{.Count}} ファイル"
+
 footer:
   list:
     other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  q:終了"
@@ -113,6 +125,8 @@ footer:
     other: "q:終了"
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  q:終了"
+  diff:
+    other: "j/k:行  [/]:ファイル  {/}:ハンク  h/l:ペイン  r:再取得  esc:戻る"
 
 md:
   author:

@@ -95,6 +95,19 @@ work:
   column_position:
     other: "column {{.Index}}/{{.Total}}"
 
+diff:
+  files:
+    other: "Files"
+  loading:
+    other: "loading the diff"
+  no_changes:
+    other: "no files changed"
+  binary:
+    other: "binary file"
+  file_count:
+    one: "{{.Count}} file"
+    other: "{{.Count}} files"
+
 footer:
   list:
     other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  q:quit"
@@ -114,6 +127,8 @@ footer:
     other: "q:quit"
   work:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  q:quit"
+  diff:
+    other: "j/k:line  [/]:file  {/}:hunk  h/l:pane  r:refresh  esc:back"
 
 md:
   author:
