@@ -30,11 +30,15 @@ type (
 // nothing there rather than posting somewhere arbitrary. Neither does it open
 // before the review context has arrived: the diff and the context are fetched
 // in parallel, and starting a review needs the pull request's node id, which
-// only the context carries. Both declines say why at footer level
-// (m.declined) rather than leaving the screen unchanged -- that silence is
-// what made c look broken in the first place. A context that failed outright
-// is the one exception: reviewErr already says so on its own line, so this
-// adds nothing on top of it.
+// only the context carries. Whether c can act is decided by PullRequestID
+// alone -- reviewErr only decides whether the loading message is shown on top
+// of it, because reviewErr just means the last refetch failed, not that the
+// pull request id or a pending review that request already confirmed have
+// gone away (reviewErrMsg never touches m.review). Both declines say why at
+// footer level (m.declined) rather than leaving the screen unchanged -- that
+// silence is what made c look broken in the first place. A context that
+// failed outright before ever arriving is the one exception: reviewErr
+// already says so on its own line, so this adds nothing on top of it.
 //
 // The target line and side are captured here, not read again at send time.
 // A refetch that lands mid-composition rebuilds m.rows and can insert thread
@@ -48,10 +52,10 @@ func (m Model) startComposing() Model {
 	case r.kind != rowLine:
 		m.declined = i18n.T("diff.decline_no_line")
 		return m
-	case m.reviewErr != nil:
-		return m
 	case m.review.PullRequestID == "":
-		m.declined = i18n.T("diff.decline_loading")
+		if m.reviewErr == nil {
+			m.declined = i18n.T("diff.decline_loading")
+		}
 		return m
 	}
 	m.declined = ""

@@ -303,14 +303,40 @@ func TestCBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 
 // TestCAddsNoSecondMessageWhenTheReviewContextFailed: reviewErr is already
 // drawn on its own footer line, so a second line saying the same thing would
-// just repeat it.
+// just repeat it. This has to be built with loadedWith, not loaded: with
+// loaded, m.review.PullRequestID is always "" (no reviewMsg ever arrives), so
+// this could pass even if c wrongly stayed dead once the context was known --
+// it would then be the PullRequestID guard, not the reviewErr one, keeping
+// composing false. See TestCStillWorksAfterASecondReviewContextFetchFails for
+// the case that actually distinguishes the two.
 func TestCAddsNoSecondMessageWhenTheReviewContextFailed(t *testing.T) {
-	m := loaded(t, 120, 40)
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
 	m = cursorOnLine(t, m, gh.LineAdded, 13)
 	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
 	m = press(m, "c")
-	if m.composing {
-		t.Fatal("c opened the composer after a review-context failure")
+	if !m.composing {
+		t.Fatal("c did not open the composer even though the pull request id is known")
+	}
+	if m.declined != "" {
+		t.Errorf("declined = %q, want empty: reviewErr already says this", m.declined)
+	}
+}
+
+// TestCStillWorksAfterASecondReviewContextFetchFails is the regression this
+// wave exists for: reviewErrMsg only means the last refetch failed, it never
+// touches m.review (diff.go's reviewErrMsg case sets m.reviewErr alone), so a
+// pull request id and a pending review confirmed by an earlier, successful
+// fetch are still good. c used to check reviewErr before PullRequestID and
+// decline unconditionally, which meant posting a comment, letting the
+// automatic refetch after it hiccup, and losing c for the rest of the
+// session -- exactly the silence this branch was written to remove.
+func TestCStillWorksAfterASecondReviewContextFetchFails(t *testing.T) {
+	m := withThreads(t, 120, 40) // a real PullRequestID from threadFixture
+	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	if !m.composing {
+		t.Fatal("c is dead after a review-context refetch failure, though the pull request id is known")
 	}
 	if m.declined != "" {
 		t.Errorf("declined = %q, want empty: reviewErr already says this", m.declined)
@@ -575,6 +601,21 @@ func TestVBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	m = press(m, "v")
 	if m.submitting {
 		t.Fatal("v opened the popup before the pull request's id was known")
+	}
+	if m.declined != i18n.T("diff.decline_loading") {
+		t.Errorf("declined = %q, want the loading message", m.declined)
+	}
+}
+
+// TestXBeforeTheContextArrivesSaysItIsLoading is X's share of the same fix c
+// and v got: PendingID == "" before the context has arrived is not "no
+// pending review" but "not known yet", and the two need different messages
+// -- one says wait, the other says there is nothing to do.
+func TestXBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
+	m := loaded(t, 120, 40) // the diff only
+	m = press(m, "X")
+	if m.discarding {
+		t.Fatal("X asked to discard before the pull request's id was known")
 	}
 	if m.declined != i18n.T("diff.decline_loading") {
 		t.Errorf("declined = %q, want the loading message", m.declined)

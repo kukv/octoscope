@@ -53,8 +53,20 @@ func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // too little between a written review and no review. It does nothing when
 // there is no pending review to discard, and says so at footer level rather
 // than leaving the screen unchanged.
+//
+// PendingID == "" is ambiguous on its own: it also means "not known yet",
+// during the ~6.5s the review context takes to load, or after a refetch has
+// failed and left the last confirmed state in place. Only once PullRequestID
+// is known does an empty PendingID mean what X should call "no pending
+// review" -- so that check comes first, mirroring openSubmit's shape.
 func (m Model) startDiscard() Model {
-	if m.review.PendingID == "" {
+	switch {
+	case m.review.PullRequestID == "":
+		if m.reviewErr == nil {
+			m.declined = i18n.T("diff.decline_loading")
+		}
+		return m
+	case m.review.PendingID == "":
 		m.declined = i18n.T("diff.decline_no_pending_review")
 		return m
 	}
