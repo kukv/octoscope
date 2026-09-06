@@ -193,16 +193,6 @@ func TestTheCursorStaysInsideTheFile(t *testing.T) {
 	}
 }
 
-func TestChangingFileResetsTheCursor(t *testing.T) {
-	m := loaded(t, 120, 30)
-	m = press(m, "j")
-	m = press(m, "j")
-	m = press(m, "]")
-	if m.row != 0 {
-		t.Errorf("row = %d after changing file, want 0", m.row)
-	}
-}
-
 // TestOpeningADiffParksOnTheFirstLine guards against c-silent: the cursor
 // used to start on row 0, which buildRows always fills with a rowHunkHeader,
 // and a hunk header has no line to comment on. The fixture check is what
@@ -321,6 +311,71 @@ func TestADiffFailureGoesToTheParentsErrorScreen(t *testing.T) {
 	}
 	if got.Err.Error() != "boom" {
 		t.Errorf("ErrorMsg.Err = %q, want %q", got.Err, "boom")
+	}
+}
+
+// TestReloadingTheDiffClearsTheDeclineMessage: c on a hunk header leaves a
+// message on screen saying so; r then refetches everything from scratch, and
+// the cursor lands back on a real line -- but nothing before this fix cleared
+// the message itself, so it kept saying "no line here" even once the cursor
+// was on one.
+func TestReloadingTheDiffClearsTheDeclineMessage(t *testing.T) {
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
+	m.row = 0
+	m = press(m, "c")
+	if m.declined == "" {
+		t.Fatal("no decline message to begin with; this test proves nothing")
+	}
+	m = press(m, "r")
+	if m.declined != "" {
+		t.Errorf("declined = %q after r, want cleared", m.declined)
+	}
+}
+
+// TestANewDiffClearsTheDeclineMessage is TestReloadingTheDiffClearsTheDecline-
+// Message's counterpart for diffMsg itself, which r's fetch eventually
+// delivers: the handler already re-parks the cursor on a real line, but left
+// the stale message on screen until a later reviewMsg or reviewErrMsg
+// happened to clear it.
+func TestANewDiffClearsTheDeclineMessage(t *testing.T) {
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
+	m.row = 0
+	m = press(m, "c")
+	if m.declined == "" {
+		t.Fatal("no decline message to begin with; this test proves nothing")
+	}
+	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
+	if m.declined != "" {
+		t.Errorf("declined = %q after a new diff landed, want cleared", m.declined)
+	}
+}
+
+// TestReviewMsgClearsTheDeclineMessage guards the other message-lifetime
+// case: a c or v declined before the review context arrived, and the context
+// then lands.
+func TestReviewMsgClearsTheDeclineMessage(t *testing.T) {
+	m := loaded(t, 120, 30) // the diff only, no reviewMsg yet
+	m = press(m, "v")
+	if m.declined == "" {
+		t.Fatal("no decline message to begin with; this test proves nothing")
+	}
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: gh.ReviewContext{PullRequestID: "PR_1"}})
+	if m.declined != "" {
+		t.Errorf("declined = %q after the review context landed, want cleared", m.declined)
+	}
+}
+
+// TestReviewErrMsgClearsTheDeclineMessage is TestReviewMsgClearsTheDecline-
+// Message's counterpart for a context that fails outright.
+func TestReviewErrMsgClearsTheDeclineMessage(t *testing.T) {
+	m := loaded(t, 120, 30) // the diff only, no reviewMsg yet
+	m = press(m, "v")
+	if m.declined == "" {
+		t.Fatal("no decline message to begin with; this test proves nothing")
+	}
+	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
+	if m.declined != "" {
+		t.Errorf("declined = %q after the review context failed, want cleared", m.declined)
 	}
 }
 

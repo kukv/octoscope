@@ -236,6 +236,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.file, m.top, m.fileTop = 0, 0, 0
 		m.rows = m.buildRows()
 		m.row = firstRow(m.rows)
+		m.declined = ""
 		return m.follow(), nil
 	case reviewMsg:
 		// The review context for the pull request the user just left is
@@ -348,6 +349,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r":
 		m.loading = true
 		m.reviewErr = nil
+		m.declined = ""
 		return m, tea.Batch(m.spin.Tick, m.fetch())
 	case "j", "down":
 		return m.moveRow(1), nil
