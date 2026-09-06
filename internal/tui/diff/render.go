@@ -36,7 +36,17 @@ const (
 
 	// composerRows is the line-comment composer's fixed textarea height.
 	composerRows = 3
+
+	// minWidthForSidebar is where the file list stops earning its columns.
+	// Below it the body would be 46 columns, which is 23 Japanese
+	// characters. It matches the width at which the Work board drops its
+	// card borders (spec 4.6).
+	minWidthForSidebar = 100
 )
+
+// showSidebar reports whether the file list is drawn at all. Task 11's hit
+// testing reads this too, so the threshold lives in one place.
+func (m Model) showSidebar() bool { return m.width >= minWidthForSidebar }
 
 func (m Model) View() string {
 	// Before the first WindowSizeMsg there is no width to lay anything out
@@ -238,6 +248,14 @@ func (m Model) sizeLine() string {
 	if n := m.pendingCount(); n > 0 {
 		parts = append(parts, i18n.Tn("diff.pending_note", n))
 	}
+	// The folded sidebar takes the file list with it, so the file being
+	// read is named here instead: a path is GitHub's content, not
+	// translated (.claude/rules/tui.md).
+	if !m.showSidebar() {
+		if path := m.currentPath(); path != "" {
+			parts = append(parts, path)
+		}
+	}
 	return theme.Dim().Render(strings.Join(parts, " · "))
 }
 
@@ -246,8 +264,12 @@ func (m Model) sizeLine() string {
 func (m Model) pendingCount() int { return m.review.PendingCount() }
 
 // filesHeadingLine is the rule that separates the header from the two
-// panes, with the "Files" heading over the sidebar column.
+// panes, with the "Files" heading over the sidebar column. Folded, there is
+// no sidebar column to head, so it is a plain rule the full width.
 func (m Model) filesHeadingLine() string {
+	if !m.showSidebar() {
+		return theme.Rule().Render(strings.Repeat("─", m.width))
+	}
 	left := fit(theme.Heading().Render(i18n.T("diff.files")), sidebarWidth)
 	div := theme.Rule().Render("│")
 	rest := max(m.width-sidebarWidth-ansi.StringWidth(div), 0)
@@ -265,13 +287,23 @@ func (m Model) paneHeight() int {
 }
 
 // body lays the sidebar and the diff pane side by side, the way the Repos
-// tab lays its two panes out.
+// tab lays its two panes out. Folded, there is no sidebar column at all, and
+// the diff pane takes the full width.
 func (m Model) body() []string {
 	h := m.paneHeight()
-	sidebar := m.sidebarLines()
 	pane := m.diffLines()
-	div := theme.Rule().Render("│")
+	if !m.showSidebar() {
+		lines := make([]string, h)
+		for i := range lines {
+			if i < len(pane) {
+				lines[i] = pane[i]
+			}
+		}
+		return lines
+	}
 
+	sidebar := m.sidebarLines()
+	div := theme.Rule().Render("│")
 	lines := make([]string, h)
 	for i := range lines {
 		left := ""
@@ -289,12 +321,15 @@ func (m Model) body() []string {
 
 // sidebarLines draws the file list: a path per file, truncated from the
 // right when it does not fit, and the size of that file's change under it.
+// It starts at m.fileTop, which followSidebar keeps in step with the
+// selected file, the same way m.top keeps the diff pane's cursor on screen.
 func (m Model) sidebarLines() []string {
 	if len(m.files) == 0 {
 		return nil
 	}
-	lines := make([]string, 0, len(m.files)*2)
-	for i, f := range m.files {
+	lines := make([]string, 0, (len(m.files)-m.fileTop)*2)
+	for i := m.fileTop; i < len(m.files); i++ {
+		f := m.files[i]
 		path := clip(f.Path, sidebarWidth)
 		plainSize := fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)
 		selected := i == m.file && m.sidebar
@@ -315,7 +350,10 @@ func (m Model) sidebarLines() []string {
 // paneHeight of them. Only the pane the cursor is in scrolls (follow), so
 // this always starts at m.top.
 func (m Model) diffLines() []string {
-	width := max(m.width-sidebarWidth-1, 0)
+	width := m.width
+	if m.showSidebar() {
+		width = max(m.width-sidebarWidth-1, 0)
+	}
 	end := min(m.top+m.paneHeight(), len(m.rows))
 	lines := make([]string, 0, end-m.top)
 	for i := m.top; i < end; i++ {

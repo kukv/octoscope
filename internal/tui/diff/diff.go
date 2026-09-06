@@ -96,8 +96,9 @@ type Model struct {
 	loading bool
 	spin    spinner.Model
 
-	files []gh.FileDiff
-	file  int
+	files   []gh.FileDiff
+	file    int
+	fileTop int // the first file drawn in the sidebar
 
 	// review is the review context: the header's title and branches, and the
 	// threads already on the diff. It arrives separately from files (fetch),
@@ -205,6 +206,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// Below minWidthForSidebar the file list is not drawn at all; a
+		// cursor left pointing at it would be on a pane that no longer
+		// exists.
+		if !m.showSidebar() {
+			m.sidebar = false
+		}
 		m.textarea.SetWidth(max(m.width, 0))
 		if m.submit.Active() {
 			m.submit, _ = m.submit.Update(msg)
@@ -218,7 +225,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.loading = false
 		m.files = msg.files
-		m.file, m.row, m.top = 0, 0, 0
+		m.file, m.row, m.top, m.fileTop = 0, 0, 0, 0
 		m.rows = m.buildRows()
 		return m, nil
 	case reviewMsg:
@@ -340,7 +347,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "{":
 		return m.moveHunk(-1), nil
 	case "h":
-		m.sidebar = true
+		// There is nowhere to move to once the sidebar is folded.
+		if m.showSidebar() {
+			m.sidebar = true
+		}
 		return m, nil
 	case "l":
 		m.sidebar = false
@@ -427,6 +437,22 @@ func (m Model) moveFile(delta int) Model {
 	m.file = clamp(m.file+delta, len(m.files)-1)
 	m.row, m.top = 0, 0
 	m.rows = m.buildRows()
+	return m.followSidebar()
+}
+
+// followSidebar scrolls the file list so the selected file stays visible,
+// the same way follow keeps the diff pane's cursor on screen. Each file
+// takes two lines (its path and its size), so the window is counted in
+// files, not lines.
+func (m Model) followSidebar() Model {
+	visible := max(m.paneHeight()/2, 1)
+	if m.file < m.fileTop {
+		m.fileTop = m.file
+	}
+	if m.file >= m.fileTop+visible {
+		m.fileTop = m.file - visible + 1
+	}
+	m.fileTop = max(m.fileTop, 0)
 	return m
 }
 

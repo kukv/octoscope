@@ -3,6 +3,7 @@ package diff
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -317,5 +318,98 @@ func TestTheDiffFitsTheTerminalWithAReviewFailure(t *testing.T) {
 				t.Errorf("the key bar was pushed off the screen:\n%s", ansi.Strip(out))
 			}
 		}
+	}
+}
+
+func TestTheSidebarFoldsAtNarrowWidths(t *testing.T) {
+	tests := []struct {
+		name    string
+		width   int
+		sidebar bool
+	}{
+		{"wide enough for both", 120, true},
+		{"exactly at the threshold", 100, true},
+		{"one column short", 99, false},
+		{"the narrowest terminal", 80, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := loaded(t, tt.width, 30)
+			if got := m.showSidebar(); got != tt.sidebar {
+				t.Errorf("showSidebar() = %v at %d columns, want %v", got, tt.width, tt.sidebar)
+			}
+			out := ansi.Strip(m.View())
+			// The file being read is named either way: in the list when
+			// there is one, in the header when there is not.
+			if !strings.Contains(out, "graph/walk.go") {
+				t.Errorf("the file being read is not named at %d columns:\n%s", tt.width, out)
+			}
+			if !tt.sidebar && strings.Contains(out, "logo.png") {
+				t.Errorf("the folded sidebar still lists other files at %d columns:\n%s", tt.width, out)
+			}
+		})
+	}
+}
+
+// TestHAndLDoNotSelectAFoldedSidebar guards the "nowhere to move to" rule:
+// below the threshold h must not put the cursor in a pane that is not drawn.
+func TestHAndLDoNotSelectAFoldedSidebar(t *testing.T) {
+	m := press(loaded(t, 80, 30), "h")
+	if m.sidebar {
+		t.Error("h selected the sidebar even though it is folded at 80 columns")
+	}
+}
+
+// TestNarrowingTheTerminalLeavesTheSidebar covers the resize case: a cursor
+// already in the sidebar above the threshold must not be left pointing at a
+// pane that stops being drawn once the terminal narrows.
+func TestNarrowingTheTerminalLeavesTheSidebar(t *testing.T) {
+	m := press(loaded(t, 120, 30), "h")
+	if !m.sidebar {
+		t.Fatal("h did not select the sidebar at 120 columns")
+	}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	if m.sidebar {
+		t.Error("the cursor is still in the sidebar after narrowing below the threshold")
+	}
+}
+
+// manyFilesFixture is more files than a typical terminal's sidebar has room
+// for, so moving the selection past the bottom exercises the sidebar's own
+// scroll.
+func manyFilesFixture() []gh.FileDiff {
+	files := make([]gh.FileDiff, 20)
+	for i := range files {
+		files[i] = gh.FileDiff{
+			Path: fmt.Sprintf("pkg/file%02d.go", i), Status: gh.FileModified,
+			Additions: 1,
+			Hunks: []gh.Hunk{{
+				Header: "@@ -1,1 +1,1 @@",
+				Lines:  []gh.DiffLine{{Kind: gh.LineAdded, NewLine: 1, Text: "x"}},
+			}},
+		}
+	}
+	return files
+}
+
+// TestTheSidebarScrollsToKeepTheSelectionVisible is the sidebar's own
+// follow, deferred from Task 5: on a pull request touching more files than
+// fit, moving the selection past the bottom must not run it off screen.
+func TestTheSidebarScrollsToKeepTheSelectionVisible(t *testing.T) {
+	files := manyFilesFixture()
+	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 15})
+	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
+	m.sidebar = true
+	for range files {
+		m = press(m, "]")
+	}
+	if m.file != len(files)-1 {
+		t.Fatalf("file = %d, want %d", m.file, len(files)-1)
+	}
+	out := ansi.Strip(m.View())
+	want := files[len(files)-1].Path
+	if !strings.Contains(out, want) {
+		t.Errorf("the selected file %q scrolled off screen:\n%s", want, out)
 	}
 }
