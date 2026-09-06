@@ -64,10 +64,7 @@ type reviewContextResponse struct {
 				Deletions   int    `json:"deletions"`
 				Reviews     struct {
 					Nodes []struct {
-						ID       string `json:"id"`
-						Comments struct {
-							Nodes []pendingCommentNode `json:"nodes"`
-						} `json:"comments"`
+						ID string `json:"id"`
 					} `json:"nodes"`
 				} `json:"reviews"`
 				ReviewThreads struct {
@@ -129,58 +126,13 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		Additions:     pr.Additions,
 		Deletions:     pr.Deletions,
 	}
-	placed := map[string]bool{}
 	for _, n := range pr.ReviewThreads.Nodes {
-		t := n.toDomain()
-		if t.Pending() {
-			placed[threadPosition(t)] = true
-		}
-		rc.Threads = append(rc.Threads, t)
+		rc.Threads = append(rc.Threads, n.toDomain())
 	}
 	if len(pr.Reviews.Nodes) > 0 {
 		rc.PendingID = pr.Reviews.Nodes[0].ID
-		// The unsubmitted review's own comments are asked for as well as
-		// read out of reviewThreads. They should be the same set -- a pending
-		// comment does come back in both -- but the whole point of keeping the
-		// review on GitHub is that a comment written here is still there
-		// later, and a design that rests on one field's behaviour deserves
-		// the second source. Anything reviewThreads did not carry is added.
-		for _, c := range pr.Reviews.Nodes[0].Comments.Nodes {
-			if t, ok := c.toThread(); ok && !placed[threadPosition(t)] {
-				rc.Threads = append(rc.Threads, t)
-			}
-		}
 	}
 	return rc, nil
-}
-
-// threadPosition names where a thread sits, for deduplicating the same
-// comment arriving from two fields of the same query.
-func threadPosition(t gh.ReviewThread) string {
-	return fmt.Sprintf("%s:%d:%d", t.Path, t.Line, t.Side)
-}
-
-// pendingCommentNode is one comment of the unsubmitted review, read straight
-// off the review rather than out of reviewThreads.
-type pendingCommentNode struct {
-	Path     string `json:"path"`
-	Line     *int   `json:"line"`
-	DiffSide string `json:"diffSide"`
-	Body     string `json:"body"`
-}
-
-// toThread turns it into a one-comment thread. A comment with no line has
-// nowhere to be drawn, so it is skipped rather than landing on line 0.
-func (c pendingCommentNode) toThread() (gh.ReviewThread, bool) {
-	if c.Line == nil {
-		return gh.ReviewThread{}, false
-	}
-	t := gh.ReviewThread{Path: c.Path, Line: *c.Line}
-	if c.DiffSide == "LEFT" {
-		t.Side = gh.SideLeft
-	}
-	t.Comments = []gh.ThreadComment{{Body: c.Body, Pending: true}}
-	return t, true
 }
 
 func (n threadNode) toDomain() gh.ReviewThread {

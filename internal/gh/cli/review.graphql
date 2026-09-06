@@ -7,17 +7,14 @@ query ($owner: String!, $name: String!, $number: Int!) {
       baseRefName
       additions
       deletions
+      # Only the id is taken from the unsubmitted review. Its comments are
+      # not selectable with a side: PullRequestReviewComment has neither
+      # diffSide nor side. They arrive through reviewThreads instead, which
+      # does carry diffSide and does list a pending thread (measured against
+      # kukv/octoscope#55 on 2026-09-07).
       reviews(states: [PENDING], first: 1) {
         nodes {
           id
-          comments(first: 100) {
-            nodes {
-              path
-              line
-              diffSide
-              body
-            }
-          }
         }
       }
       reviewThreads(first: 100) {
