@@ -221,12 +221,40 @@ func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 	}
 }
 
+// TestCDoesNothingOnAHunkHeader has to be built with loadedWith, not loaded:
+// with loaded, m.review.PullRequestID is always "" (no reviewMsg ever
+// arrives), so the r.kind != rowLine clause is not what makes the test pass
+// -- the PullRequestID guard alone already suppresses composing regardless of
+// the cursor. Deleting r.kind != rowLine must make this fail; it did not
+// against the old loaded-based version.
 func TestCDoesNothingOnAHunkHeader(t *testing.T) {
-	m := loaded(t, 120, 40)
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
 	m.row = 0 // the first row of the fixture is a hunk header
 	m = press(m, "c")
 	if m.composing {
 		t.Error("c opened the composer on a hunk header")
+	}
+}
+
+// TestCDoesNothingOnAThreadRow is rowLine's other neighbour: a thread has no
+// line of its own to comment on either.
+func TestCDoesNothingOnAThreadRow(t *testing.T) {
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
+	found := false
+	for i, r := range m.rows {
+		if r.kind == rowThread {
+			m.row = i
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no rowThread in the fixture; this test proves nothing")
+	}
+	m = press(m, "c")
+	if m.composing {
+		t.Error("c opened the composer on a thread row")
 	}
 }
 
@@ -298,7 +326,7 @@ func TestAFailedPostKeepsTheDraftAndShowsTheError(t *testing.T) {
 	m = typeInto(m, "why not 2?")
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
 
-	m, _ = m.Update(commentErrorMsg{err: errors.New("422: line not part of the diff")})
+	m, _ = m.Update(commentErrorMsg{ref: m.ref, err: errors.New("422: line not part of the diff")})
 	if !m.composing {
 		t.Error("composing = false after a failed post, want still composing")
 	}
@@ -401,7 +429,7 @@ func TestARetryAfterAFailedPostStillTargetsTheCapturedLine(t *testing.T) {
 	m = typeInto(m, "retry me")
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
 
-	m, _ = m.Update(commentErrorMsg{err: errors.New("500")})
+	m, _ = m.Update(commentErrorMsg{ref: m.ref, err: errors.New("500")})
 	if !m.composing {
 		t.Fatal("composing = false after a failed post, want still composing")
 	}
@@ -432,4 +460,25 @@ func TestARefetchReclampsTheCursorIntoRange(t *testing.T) {
 		t.Fatalf("row = %d out of range for %d rows", m.row, len(m.rows))
 	}
 	_ = m.View() // must not panic
+}
+
+// TestACommentErrorForAnotherPullRequestIsDropped mirrors
+// TestAReviewFailureForAnotherPullRequestIsDropped: a post for the pull
+// request the user has since left must not surface here.
+func TestACommentErrorForAnotherPullRequestIsDropped(t *testing.T) {
+	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
+	m := loadedWith(t, src)
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	m = typeInto(m, "why not 2?")
+	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
+
+	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	m, _ = m.Update(commentErrorMsg{ref: other, err: errors.New("boom")})
+	if !m.posting {
+		t.Error("posting = false after an error for another pull request, want still posting")
+	}
+	if m.postErr != "" {
+		t.Errorf("postErr = %q after an error for another pull request, want empty", m.postErr)
+	}
 }

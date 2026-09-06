@@ -61,3 +61,25 @@ func TestTheKeyBarShowsOnlyEscWhenNarrow(t *testing.T) {
 		t.Errorf("key bar at %d columns = %q, want only the esc hint %q", narrow, bar, i18n.T("footer.diff.esc"))
 	}
 }
+
+// TestTheKeyBarClipsEscWhenNarrowerThanTheHintItself covers fitKeyBar's last
+// resort: below "esc:戻る"'s own 8 columns, even hints[:1] does not fit.
+// esc must never be dropped, but it may be clipped -- the old fallback
+// returned it unclipped and let the bar overrun the width budget.
+func TestTheKeyBarClipsEscWhenNarrowerThanTheHintItself(t *testing.T) {
+	const narrower = 5 // "esc:back" and "esc:戻る" are both wider than this
+	for _, lang := range goldenLanguages {
+		t.Run(lang.name, func(t *testing.T) {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			m := loaded(t, narrower, 30)
+			bar := ansi.Strip(m.keyBar())
+			if got := ansi.StringWidth(bar); got > narrower {
+				t.Errorf("key bar is %d columns wide at %d: %q", got, narrower, bar)
+			}
+			if bar == "" {
+				t.Error("esc was dropped instead of clipped")
+			}
+		})
+	}
+}

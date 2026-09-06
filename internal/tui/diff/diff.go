@@ -231,6 +231,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.review.PendingID = msg.reviewID
 		return m, m.fetchReview()
 	case commentErrorMsg:
+		if msg.ref != m.ref {
+			return m, nil
+		}
 		m.posting = false
 		m.composing = true
 		m.postErr = msg.err.Error()

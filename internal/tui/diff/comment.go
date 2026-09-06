@@ -17,7 +17,10 @@ type (
 		ref      gh.ItemRef
 		reviewID string
 	}
-	commentErrorMsg struct{ err error }
+	commentErrorMsg struct {
+		ref gh.ItemRef
+		err error
+	}
 )
 
 // startComposing opens the composer on the line under the cursor.
@@ -68,12 +71,12 @@ func (m Model) post() (Model, tea.Cmd) {
 		if reviewID == "" {
 			id, err := src.StartReview(pullRequestID)
 			if err != nil {
-				return commentErrorMsg{err}
+				return commentErrorMsg{ref: ref, err: err}
 			}
 			reviewID = id
 		}
 		if err := src.AddReviewThread(reviewID, comment); err != nil {
-			return commentErrorMsg{err}
+			return commentErrorMsg{ref: ref, err: err}
 		}
 		return commentPostedMsg{ref: ref, reviewID: reviewID}
 	}

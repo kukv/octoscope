@@ -85,7 +85,8 @@ func diffHints() []string {
 // tail of the slice) until the joined line fits width. No ellipsis: a bar
 // that shows fewer hints cleanly beats one that shows more but cuts one off
 // mid-word. hints[0] is always kept, so as long as the caller orders esc
-// first, esc is what survives when only one hint fits.
+// first, esc is what survives when only one hint fits -- clipped, if even it
+// does not fit, rather than left to overrun the width budget.
 func fitKeyBar(hints []string, width int) string {
 	for n := len(hints); n > 0; n-- {
 		joined := strings.Join(hints[:n], "  ")
@@ -93,7 +94,7 @@ func fitKeyBar(hints []string, width int) string {
 			return joined
 		}
 	}
-	return hints[0]
+	return clip(hints[0], width)
 }
 
 // composerLines draws the line-comment composer: a blank separator, the
