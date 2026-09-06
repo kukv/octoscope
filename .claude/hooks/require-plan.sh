@@ -14,7 +14,14 @@ case "$rel" in
   *) exit 0 ;;
 esac
 
-if [ -f "$transcript" ] && grep -q 'docs/superpowers/\(specs\|plans\)/[^"]*\.md' "$transcript"; then
+# The pattern has to name a file, not a directory. CLAUDE.md points at
+# docs/superpowers/specs/ and docs/superpowers/plans/ as places to look, and
+# the whole of CLAUDE.md arrives as one JSONL line -- so a looser pattern
+# matched that directory here and some unrelated .md later on the same line,
+# and the gate passed in every session. Only [A-Za-z0-9._-] may follow the
+# directory, which stops at the backtick CLAUDE.md puts there.
+if [ -f "$transcript" ] &&
+  grep -qE 'docs/superpowers/(specs|plans)/[A-Za-z0-9._-]+\.md' "$transcript"; then
   exit 0
 fi
 
