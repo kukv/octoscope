@@ -2,7 +2,8 @@
 
 [日本語](README.ja.md)
 
-A terminal dashboard for GitHub pull requests and issues.
+A terminal dashboard for GitHub pull requests and issues. Browse a diff,
+comment on a line, and submit a review without leaving the terminal.
 
 octoscope = **Octo**cat + **-scope**: a telescope for looking over your GitHub work.
 
@@ -77,19 +78,28 @@ the font in use nor its coverage — so the default is the set that needs none.
 
 ### Keys
 
-| Key | List | Detail |
-|---|---|---|
-| `j` / `k` | move cursor | scroll |
-| `enter` | open detail | — |
-| `tab` | switch PRs / Issues | — |
-| `r` | refresh | refresh |
-| `o` | open in browser | open in browser |
-| `c` | — | comment (`Ctrl+S` send / `Esc` cancel) |
-| `x` | — | close / reopen (`y` confirm / `n` cancel) |
-| `l` | — | edit labels (`space` toggle / `enter` apply) |
-| `a` | — | edit assignees (`space` toggle / `enter` apply) |
-| `esc` | — | back to list |
-| `q` | quit | back to list |
+| Key | List | Detail | Diff |
+|---|---|---|---|
+| `j` / `k` | move cursor | scroll | move line |
+| `enter` | open detail | — | open a collapsed thread |
+| `tab` | switch PRs / Issues | — | — |
+| `r` | refresh | refresh | refresh |
+| `o` | open in browser | open in browser | — |
+| `d` | open diff | open diff | — |
+| `c` | — | comment (`Ctrl+S` send / `Esc` cancel) | comment on this line (`Ctrl+S` send / `Esc` cancel) |
+| `v` | — | open the review popup | open the review popup |
+| `X` | — | — | discard the pending review (`y` confirm / `n` cancel) |
+| `x` | — | close / reopen (`y` confirm / `n` cancel) | — |
+| `l` | — | edit labels (`space` toggle / `enter` apply) | — |
+| `a` | — | edit assignees (`space` toggle / `enter` apply) | — |
+| `[` / `]` | — | — | move file |
+| `{` / `}` | — | — | move hunk |
+| `h` / `l` | — | — | move pane |
+| `esc` | — | back to list | back |
+| `q` | quit | back to list | back |
+
+The review popup submits with `Ctrl+S` after picking an event (approve /
+request changes / comment).
 
 ### Mouse
 
