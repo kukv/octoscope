@@ -372,8 +372,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.errText != "" {
-		if k := msg.String(); k == "q" || k == "esc" {
+		switch msg.String() {
+		case "q":
 			return m, m.quit()
+		case "esc":
+			// Nothing to go back to at start-up (gh not on PATH, say): both
+			// keys still quit. Once an overlay is on the stack, esc takes the
+			// view that just failed off it and returns to whatever is
+			// underneath, rather than costing the whole session over one
+			// diff that would not load.
+			if len(m.stack) == 0 {
+				return m, m.quit()
+			}
+			m.errText = ""
+			m.stack = m.stack[:len(m.stack)-1]
+			return m, nil
 		}
 		return m, nil
 	}

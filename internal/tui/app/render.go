@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -103,7 +104,17 @@ func (m Model) summary() string {
 func (m Model) errorView() string {
 	return theme.Error().Bold(true).Render(i18n.T("app.error_title")) + "\n\n" +
 		wrap(m.errText, m.width) + "\n\n" +
-		theme.Dim().Render(i18n.T("footer.error"))
+		theme.Dim().Render(layout.FitKeyBar(m.errorHints(), m.width))
+}
+
+// errorHints is the error screen's key bar, most important hint first. esc
+// only appears once the stack holds a view to go back to (see handleKey);
+// with nothing behind it, q:quit is the only key on offer.
+func (m Model) errorHints() []string {
+	if len(m.stack) == 0 {
+		return []string{i18n.T("footer.error.quit")}
+	}
+	return []string{i18n.T("footer.error.esc"), i18n.T("footer.error.quit")}
 }
 
 // wrap folds s to w display columns, breaking a word that has to be broken.

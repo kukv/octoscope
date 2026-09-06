@@ -482,6 +482,93 @@ func TestErrorScreenKeysQuit(t *testing.T) {
 	}
 }
 
+// TestEscGoesBackFromAnErrorOverAnOverlay covers the diff view failing on a
+// pull request too large for gh: esc must return to what was underneath
+// rather than quitting the whole session (the bug the user hit).
+func TestEscGoesBackFromAnErrorOverAnOverlay(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(diff.ErrorMsg{Err: errors.New("boom")})
+	m = next.(Model)
+	if m.errText == "" {
+		t.Fatal("the error screen did not show")
+	}
+
+	next, cmd := m.Update(key("esc"))
+	m = next.(Model)
+	if isQuit(cmd) {
+		t.Fatal("esc quit the app instead of going back")
+	}
+	if m.errText != "" {
+		t.Error("esc did not clear the error")
+	}
+	if len(m.stack) != 0 {
+		t.Errorf("stack = %v, want empty: the failed diff view must come off it", m.stack)
+	}
+}
+
+// TestEscGoesBackToTheDetailViewFromAnErrorOverIt is the deeper case: a diff
+// opened over the detail view fails, and esc must land back on the detail
+// view, not on the tabs.
+func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
+	m = next.(Model)
+	next, _ = m.Update(diff.ErrorMsg{Err: errors.New("boom")})
+	m = next.(Model)
+
+	next, _ = m.Update(key("esc"))
+	m = next.(Model)
+	if m.errText != "" {
+		t.Error("esc did not clear the error")
+	}
+	if len(m.stack) != 1 || m.stack[0] != overlayDetail {
+		t.Errorf("stack = %v, want just the detail view", m.stack)
+	}
+}
+
+// TestEscStillQuitsWithNoOverlay is the start-up case: gh not being on PATH
+// fails before anything is on the stack, and there is nowhere for esc to go
+// back to, so it must keep quitting like q does.
+func TestEscStillQuitsWithNoOverlay(t *testing.T) {
+	next, _ := newTestModel(Options{HasRepo: true}).
+		Update(work.ErrorMsg{Err: errors.New("boom")})
+	m := next.(Model)
+	if len(m.stack) != 0 {
+		t.Fatalf("stack = %v, want empty for this case", m.stack)
+	}
+	_, cmd := m.Update(key("esc"))
+	if !isQuit(cmd) {
+		t.Error("esc did not quit with nothing to go back to")
+	}
+}
+
+// TestErrorScreenKeyBarNamesWhatIsAvailable guards the footer: it must say
+// esc:back only when there is something to go back to.
+func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	next, _ = next.(Model).Update(diff.ErrorMsg{Err: errors.New("boom")})
+
+	view := content(next.(Model))
+	if !strings.Contains(view, i18n.T("footer.error.esc")) {
+		t.Errorf("key bar does not offer esc:back with an overlay open:\n%s", view)
+	}
+
+	noOverlay, _ := newTestModel(Options{HasRepo: true}).
+		Update(work.ErrorMsg{Err: errors.New("boom")})
+	view = content(noOverlay.(Model))
+	if strings.Contains(view, i18n.T("footer.error.esc")) {
+		t.Errorf("key bar offers esc:back with nothing to go back to:\n%s", view)
+	}
+	if !strings.Contains(view, i18n.T("footer.error.quit")) {
+		t.Errorf("key bar does not offer q:quit:\n%s", view)
+	}
+}
+
 func TestQQuitsOnTheTabs(t *testing.T) {
 	_, cmd := pressCmd(newTestModel(Options{HasRepo: true}), "q")
 	if !isQuit(cmd) {

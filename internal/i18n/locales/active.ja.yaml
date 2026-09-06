@@ -154,7 +154,10 @@ footer:
   compose:
     other: "ctrl+s:送信  esc:中止"
   error:
-    other: "q:終了"
+    esc:
+      other: "esc:戻る"
+    quit:
+      other: "q:終了"
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
   # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、

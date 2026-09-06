@@ -159,7 +159,10 @@ footer:
   compose:
     other: "ctrl+s:send  esc:cancel"
   error:
-    other: "q:quit"
+    esc:
+      other: "esc:back"
+    quit:
+      other: "q:quit"
   work:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
   # detail's key bar is built from these, most important first, and dropped
