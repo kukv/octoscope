@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -315,6 +316,43 @@ func TestTheQueryCarriesEveryAliasWeReadBack(t *testing.T) {
 	for _, s := range workSearches {
 		if !strings.Contains(workQuery, s.alias+": search(") {
 			t.Errorf("the query has no search aliased %q", s.alias)
+		}
+	}
+}
+
+// A label connection asked for 10 silently drops the eleventh label, and a
+// Work card is where labels are read. GitHub caps first at 100, so there is
+// no reason to ask for less.
+func TestWorkQueryAsksForAsManyLabelsAsGitHubAllows(t *testing.T) {
+	t.Parallel()
+
+	if strings.Contains(workQuery, "labels(first: 10)") {
+		t.Error("work.graphql still asks for 10 labels; GitHub allows 100")
+	}
+	if n := strings.Count(workQuery, "labels(first: 100)"); n != 2 {
+		t.Errorf("labels(first: 100) appears %d times, want 2 (PullRequest and Issue)", n)
+	}
+}
+
+// Every connection GitHub caps at 100 must ask for no more: 101 is refused
+// outright with EXCESSIVE_PAGINATION, which fails the whole document.
+func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
+	t.Parallel()
+
+	docs := map[string]string{
+		"work.graphql":   workQuery,
+		"review.graphql": reviewContextQuery,
+	}
+	re := regexp.MustCompile(`first:\s*(\d+)`)
+	for name, doc := range docs {
+		for _, m := range re.FindAllStringSubmatch(doc, -1) {
+			n, err := strconv.Atoi(m[1])
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if n > 100 {
+				t.Errorf("%s: %s exceeds GitHub's cap of 100", name, m[0])
+			}
 		}
 	}
 }

@@ -204,6 +204,10 @@ func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error
 // ListAssignees returns the logins of users assignable on the repository.
 // gh api substitutes {owner}/{repo} from the current directory's repo; for an
 // override we build the explicit path (gh api takes no --repo).
+//
+// per_page=100 is REST's maximum and the request is not paged. A repository
+// with more than 100 assignable users gives the picker a list nobody can pick
+// from, so paging would add requests without adding an answer.
 func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, error) {
 	path := "repos/{owner}/{repo}/assignees?per_page=100"
 	if r := c.effectiveRepo(repo); r != "" {
