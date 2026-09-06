@@ -172,7 +172,10 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 		"submitting":       submittingModel,
 		"discarding":       discardingModel,
 	}
-	for _, w := range goldenWidths {
+	// 99 and 100 straddle minWidthForSidebar, the one width where the layout
+	// itself changes; goldenWidths never lands on it.
+	widths := append([]int{99, 100}, goldenWidths...)
+	for _, w := range widths {
 		for _, lang := range goldenLanguages {
 			for name, model := range models {
 				t.Run(fmt.Sprintf("%s_%s_%d", name, lang.name, w), func(t *testing.T) {
