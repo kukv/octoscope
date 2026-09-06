@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -385,5 +387,63 @@ func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
 	// the one thing the old query could not ask for.
 	if !sides[gh.SideLeft] || !sides[gh.SideRight] {
 		t.Errorf("threads land on %v, want both sides", sides)
+	}
+}
+
+// fakeSeq answers each call with the next canned output, so a test can watch
+// a paging loop walk more than one page. It records every argument list.
+type fakeSeq struct {
+	outs  []string
+	calls [][]string
+}
+
+func (f *fakeSeq) run(_ context.Context, _ string, args ...string) ([]byte, error) {
+	f.calls = append(f.calls, args)
+	i := len(f.calls) - 1
+	if i >= len(f.outs) {
+		return nil, fmt.Errorf("unexpected call %d: %v", i, args)
+	}
+	return []byte(f.outs[i]), nil
+}
+
+// GraphQL connections cap first at 100 (101 is refused with
+// EXCESSIVE_PAGINATION), so a pull request with more review threads than
+// that needs a second request. Without one the extra threads vanish with no
+// error, which is the failure mode this whole remediation is about.
+func TestPRReviewContextWalksEveryPageOfThreads(t *testing.T) {
+	page1 := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
+		`"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"},` +
+		`"nodes":[{"path":"a.go","originalLine":1,"diffSide":"RIGHT"}]}}}}}`
+	page2 := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
+		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"CUR2"},` +
+		`"nodes":[{"path":"b.go","originalLine":2,"diffSide":"RIGHT"}]}}}}}`
+
+	f := &fakeSeq{outs: []string{page1, page2}}
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+
+	rc, err := c.PRReviewContext(t.Context(), "", 55)
+	if err != nil {
+		t.Fatalf("PRReviewContext: %v", err)
+	}
+	if len(rc.Threads) != 2 {
+		t.Fatalf("threads = %d, want 2 (both pages)", len(rc.Threads))
+	}
+	if rc.Threads[0].Path != "a.go" || rc.Threads[1].Path != "b.go" {
+		t.Errorf("threads = %+v, want a.go then b.go in order", rc.Threads)
+	}
+	if len(f.calls) != 2 {
+		t.Fatalf("calls = %d, want 2", len(f.calls))
+	}
+	// The second request has to carry the first page's cursor, or it just
+	// asks for page one again and the loop never ends.
+	if !slices.Contains(f.calls[1], "after=CUR1") {
+		t.Errorf("second call = %v, want it to carry after=CUR1", f.calls[1])
+	}
+	// The first request must not: a null cursor is what "from the start"
+	// means to GraphQL.
+	if slices.ContainsFunc(f.calls[0], func(s string) bool {
+		return strings.HasPrefix(s, "after=")
+	}) {
+		t.Errorf("first call = %v, want no cursor", f.calls[0])
 	}
 }

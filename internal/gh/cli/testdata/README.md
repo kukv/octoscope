@@ -38,7 +38,7 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","PageInfo"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/cli/testdata/schema.json
 ```
 

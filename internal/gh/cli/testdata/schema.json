@@ -517,6 +517,16 @@
       "verifyVerifiableDomain": "VerifyVerifiableDomainPayload"
     }
   },
+  "PageInfo": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "endCursor": "String",
+      "hasNextPage": "Boolean",
+      "hasPreviousPage": "Boolean",
+      "startCursor": "String"
+    }
+  },
   "PullRequest": {
     "kind": "OBJECT",
     "possibleTypes": [],
