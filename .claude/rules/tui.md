@@ -66,6 +66,7 @@ const (
 
 エラー文字列も mode ごとに分けて持たない。どこに描くかは mode が決める。
 
+<!-- TRANSIENT(Part2 作業順 6): bool を enum に畳んだらこの注記を消す -->
 > **2026-09-07 時点で `detail` と `diff` がこれを破っている。**
 > `detail.Model` は bool 10 個 + エラー文字列 3 本を持つ。畳む作業は
 > Phase 2 立て直しの作業順 6（Part 2 の実装計画で扱う）。

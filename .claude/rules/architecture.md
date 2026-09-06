@@ -9,6 +9,7 @@ paths:
 
 ## 依存の向き
 
+<!-- TRANSIENT(Part1 Task 7): internal/usecase ができたらこの注記を消す -->
 > **`internal/usecase` はまだ存在しない。** 導入する判断は済んでおり（「層を足す前に」
 > 参照）、この図はその**到達点**である。作る作業は
 > `docs/superpowers/plans/2026-09-07-phase2-remediation-part1.md` の Task 5〜7 にある。
@@ -68,6 +69,7 @@ embed した interface のメソッドは数に含めない — embed 先が同�
 スタブをいくつ書かされたかを見る。6 を超えたら、その interface は
 「1 つの画面が使う分」より大きい。
 
+<!-- TRANSIENT(Part1 Task 7): detail.Source が 6 メソッドになったらこの注記を消す -->
 > **2026-09-07 時点で `internal/tui/detail` がこれを破っている。**
 > `prSource` 7 / `issueSource` 6 で、同じ操作を PR と Issue で 2 本ずつ持っている
 > だけである。`gh.ItemRef` は既に `Kind` を持つので、この振り分けは View の
@@ -107,6 +109,7 @@ TUI の都合ではない。ビューが知るべきなのは「行コメント�
 同じことが「種別（PR / Issue）で呼ぶものが変わる」にも当てはまる。
 `gh.ItemRef.Kind` を View で `switch` しない。
 
+<!-- TRANSIENT(Part1 Task 7): 呼び出し順序と振り分けを usecase に移したらこの注記を消す -->
 > **2026-09-07 時点で `diff` と `review` と `detail` がこれを破っている。**
 > `diff/comment.go` の `post()` が `StartReview` → `AddReviewThread` を、
 > `review/review.go` の `submit()` が pending の有無で呼び分けを、
@@ -119,6 +122,7 @@ TUI の都合ではない。ビューが知るべきなのは「行コメント�
 `usecase.Item` は PR と Issue の合流点であって DTO ではない。
 **ここは UI の都合が下の層に漏れる唯一の穴**なので、太らせない。
 
+<!-- TRANSIENT(Part1 Task 5): usecase.Item ができたらこの注記を消す -->
 > **`usecase.Item` もまだ存在しない。** 作るのは上の実装計画の Task 5 で、
 > この節はそのときに従う規則である。
 
@@ -128,6 +132,7 @@ TUI の都合ではない。ビューが知るべきなのは「行コメント�
 - 「画面に出したいものが `Item` に無い」と思ったら、まず `internal/gh` の
   ドメイン型に無いのではないかを疑う。`gh.Issue` の公開フィールドは 10 個あり、
   `Item` はその全部を持つように作る（2026-09-07 に数えた）
+  <!-- TRANSIENT(Part1 Task 5): 「作る」を「持っている」に直す -->
 
 この規則があるかぎり、UI だけの修正（色・桁・文言・キー・状態遷移・
 何を描くかの選び方）は `internal/usecase` に波及しない。波及するのは
@@ -146,6 +151,7 @@ GitHub への**新しい操作**を足すときだけで、それは元から UI
 DI コンテナ、ドメインモデルとインフラモデルの二重定義、Input/Output DTO は
 **入れていない**。
 
+<!-- TRANSIENT(Part1 Task 5): 「（パッケージ自体はまだ無い）」だけ消す。日付は残す -->
 **`internal/usecase` を入れる判断を 2026-09-07 にした（パッケージ自体はまだ無い）。**
 それまでは「Web サービス向けの構造だから入れない」という一般論で退けていたが、
 その判断は `internal/tui` が 1 行も存在しない時点（Phase 0、`67ba0de`）に書かれ、
