@@ -83,6 +83,8 @@ work:
     other: "(nothing here)"
   checks_summary:
     other: "{{.Passed}}/{{.Total}} checks passed, {{.Failed}} failed, {{.Running}} running"
+  draft:
+    other: "draft"
   no_checks:
     other: "no checks"
   checks_more:

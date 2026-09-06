@@ -102,9 +102,8 @@ func TestClickingAHeadingOrTheGapSelectsNothing(t *testing.T) {
 	colW := m.columnWidth(m.columns())
 	for name, point := range map[string][2]int{
 		"the heading":             {2, 0},
-		"the rule":                {2, 1},
 		"the gap between columns": {colW, 2},
-		"below the last card":     {2, 40},
+		"below the last card":     {2, 39},
 	} {
 		after, cmd := m.Update(click(point[0], point[1]))
 		got, _ := after.SelectedRef()

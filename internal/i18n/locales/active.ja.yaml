@@ -83,6 +83,8 @@ work:
     other: "（なし）"
   checks_summary:
     other: "checks {{.Total}} 件中 {{.Passed}} 件成功 / {{.Failed}} 件失敗 / {{.Running}} 件実行中"
+  draft:
+    other: "draft"
   no_checks:
     other: "checks なし"
   checks_more:

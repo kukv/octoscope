@@ -41,6 +41,10 @@ type searchNode struct {
 	BodyText       string    `json:"bodyText"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 	ReviewDecision string    `json:"reviewDecision"`
+	HeadRefName    string    `json:"headRefName"`
+	BaseRefName    string    `json:"baseRefName"`
+	Additions      int       `json:"additions"`
+	Deletions      int       `json:"deletions"`
 	Author         struct {
 		Login string `json:"login"`
 	} `json:"author"`
@@ -126,6 +130,10 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 	item.Ref.Kind = gh.ItemPR
 	item.IsDraft = n.IsDraft
 	item.Review = gh.ParseReviewDecision(n.ReviewDecision)
+	item.Head = n.HeadRefName
+	item.Base = n.BaseRefName
+	item.Additions = n.Additions
+	item.Deletions = n.Deletions
 	item.Checks = n.checks()
 	return item
 }

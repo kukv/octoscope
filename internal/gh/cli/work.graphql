@@ -29,6 +29,10 @@ fragment WorkItem on SearchResultItem {
     updatedAt
     bodyText
     reviewDecision
+    headRefName
+    baseRefName
+    additions
+    deletions
     author {
       login
     }

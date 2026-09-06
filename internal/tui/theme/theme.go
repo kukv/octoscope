@@ -50,8 +50,40 @@ func attention() lipgloss.Style { return fg("#9a6700", "#d29922") }
 func accent() lipgloss.Style    { return fg("#0969da", "#58a6ff") }
 func muted() lipgloss.Style     { return fg("#57606a", "#8b949e") }
 
-// Heading styles a column or section heading.
-func Heading() lipgloss.Style { return lipgloss.NewStyle().Bold(true) }
+// Heading styles a column or section heading. The mockup letter-spaces and
+// upper-cases them; a terminal cannot letter-space, and upper-casing does
+// nothing to Japanese, so the heading is set apart by weight instead.
+func Heading() lipgloss.Style { return muted().Bold(true) }
+
+// Rule styles the lines that divide the screen: the vertical rules between
+// board columns and the horizontal one above the drawer.
+func Rule() lipgloss.Style { return fg("#d9dee4", "#262d39") }
+
+// Card is the box one Work card is drawn in. The selected one takes the
+// accent border and a filled background, which is what marks the selection
+// once a card has a box of its own.
+func Card(selected bool) lipgloss.Style {
+	s := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
+	if selected {
+		return s.BorderForeground(pick("#0e6f78", "#5bb4f5")).
+			Background(pick("#e8eef5", "#1d2735"))
+	}
+	return s.BorderForeground(pick("#d9dee4", "#262d39"))
+}
+
+// Selected styles a selected row in a list that has no box to fill.
+func Selected() lipgloss.Style {
+	return lipgloss.NewStyle().Background(pick("#e8eef5", "#1d2735"))
+}
+
+// Count styles the tally beside a column heading. A column that wants
+// attention says so in its own colour rather than only by being long.
+func Count(attention bool) lipgloss.Style {
+	if attention {
+		return danger()
+	}
+	return muted()
+}
 
 // Dim styles text that is present but secondary: repository names, hints,
 // footers, the empty-column note.
@@ -69,6 +101,14 @@ func Title() lipgloss.Style { return lipgloss.NewStyle().Bold(true) }
 
 // Error styles a failure.
 func Error() lipgloss.Style { return danger() }
+
+// Accent styles a branch name or anything else the eye should land on inside
+// a line of otherwise muted metadata.
+func Accent() lipgloss.Style { return accent() }
+
+// Added and Removed style the two halves of a diff's size.
+func Added() lipgloss.Style   { return success() }
+func Removed() lipgloss.Style { return danger() }
 
 // Review styles the marker for a pull request's review state. A draft is
 // muted whatever its review says, because nobody is being asked to look yet.

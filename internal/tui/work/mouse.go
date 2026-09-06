@@ -75,19 +75,24 @@ func (m Model) columnAt(x int) (int, bool) {
 	return i, true
 }
 
-// cardAt maps a point onto the card under it. ok is false over a heading, a
-// rule, the drawer, the footer, or past the last card of a column.
+// cardAt maps a point onto the card under it. ok is false over a heading, the
+// drawer, the footer, or past the last card a column has drawn.
+//
+// The scrolled column starts at its own offset, so the card under the pointer
+// is not the nth card of the column but the nth card of what is on screen.
 func (m Model) cardAt(x, y int) (col, row int, ok bool) {
 	col, ok = m.columnAt(x)
 	if !ok {
 		return 0, 0, false
 	}
-	y -= m.boardTop() + cardRowsTop
-	if y < 0 {
+	y -= m.boardTop() + headingHeight
+	height := m.boardHeight()
+	if y < 0 || y >= height-headingHeight {
 		return 0, 0, false
 	}
-	row = y / cardLineCount
-	if row >= len(m.work[gh.WorkSections()[col]]) {
+	section := gh.WorkSections()[col]
+	row = m.cardWindow(section, height) + y/m.cardHeight()
+	if row >= len(m.work[section]) {
 		return 0, 0, false
 	}
 	return col, row, true

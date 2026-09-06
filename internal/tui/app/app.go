@@ -119,7 +119,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// broadcast skips the list until this point, so it never saw the
 		// WindowSizeMsg that told the others how wide they are: an unsized
 		// list clips nothing and runs off the terminal.
-		m.repo, _ = m.repo.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
+			Width:  m.width,
+			Height: max(m.height-tabRowHeight, 1),
+		})
 		return m, m.repo.Init()
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
@@ -170,9 +173,21 @@ func (m Model) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width, m.height = msg.Width, msg.Height
 
-	next, cmd := m.broadcast(msg)
+	// A tab is told how much room is left under the tab row, not how big the
+	// terminal is: it lays its own contents out to fit, and a tab that
+	// measured the whole screen would push the last of them off the bottom.
+	// The detail view is drawn from the top and gets the whole thing.
+	next, cmd := m.broadcast(tea.WindowSizeMsg{
+		Width:  msg.Width,
+		Height: max(msg.Height-tabRowHeight, 1),
+	})
 	m = next.(Model)
 	cmds := []tea.Cmd{cmd}
+	if m.showingDetail {
+		var detailCmd tea.Cmd
+		m.detail, detailCmd = m.detail.Update(msg)
+		cmds = append(cmds, detailCmd)
+	}
 
 	if !m.started {
 		m.started = true

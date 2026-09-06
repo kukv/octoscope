@@ -51,7 +51,7 @@ func TestViewShowsEveryColumnHeading(t *testing.T) {
 }
 
 func TestViewShowsTheSelectedCardInTheDrawer(t *testing.T) {
-	if out := press(loaded(), "j").View(); !strings.Contains(out, "kukv/koto#3") {
+	if out := press(loaded(), "j").View(); !strings.Contains(out, "kukv/koto #3") {
 		t.Errorf("drawer does not name the selected card:\n%s", out)
 	}
 }
@@ -70,7 +70,7 @@ func TestTheDrawerOnlyReportsChecksForPullRequests(t *testing.T) {
 		t.Fatal("no card is selected in the Assigned column")
 	}
 	out := issue.View()
-	if !strings.Contains(out, "kukv/octoscope#7") {
+	if !strings.Contains(out, "kukv/octoscope #7") {
 		t.Fatalf("the drawer does not show the issue:\n%s", out)
 	}
 	if strings.Contains(out, i18n.T("work.no_checks")) {
@@ -104,14 +104,17 @@ func TestTheDrawerShowsTheBodyAndEachCheck(t *testing.T) {
 // to look at the list at all, and the budget cuts the tail off.
 func TestFailingChecksComeFirst(t *testing.T) {
 	m := loaded()
-	lines := m.checkLines(gh.Checks{
-		Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
-		Runs: []gh.CheckRun{
-			{Name: "build", State: gh.CheckSuccess},
-			{Name: "lint", State: gh.CheckRunning},
-			{Name: "test", State: gh.CheckFailure},
+	lines := m.checksPane(gh.WorkItem{
+		Ref: gh.ItemRef{Kind: gh.ItemPR},
+		Checks: gh.Checks{
+			Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
+			Runs: []gh.CheckRun{
+				{Name: "build", State: gh.CheckSuccess},
+				{Name: "lint", State: gh.CheckRunning},
+				{Name: "test", State: gh.CheckFailure},
+			},
 		},
-	})
+	}, 40)
 	got := ansi.Strip(strings.Join(lines, "\n"))
 	if strings.Index(got, "test") > strings.Index(got, "build") {
 		t.Errorf("the failing check is listed after a passing one:\n%s", got)
@@ -120,57 +123,162 @@ func TestFailingChecksComeFirst(t *testing.T) {
 
 // TestALongChecksListIsCutWithACount keeps the drawer a fixed height: it is
 // drawn under the board, and a repository with thirty checks must not push
-// the footer off the screen.
+// the key bar off the screen.
 func TestALongChecksListIsCutWithACount(t *testing.T) {
 	c := gh.Checks{Total: 12, Passed: 12, State: gh.CheckSuccess}
 	for i := range 12 {
 		c.Runs = append(c.Runs, gh.CheckRun{Name: fmt.Sprintf("job-%d", i), State: gh.CheckSuccess})
 	}
 
-	lines := loaded().checkLines(c)
-	if want := 1 + drawerChecks + 1; len(lines) != want { // summary, the checks, the count
+	lines := loaded().checksPane(gh.WorkItem{Ref: gh.ItemRef{Kind: gh.ItemPR}, Checks: c}, 40)
+	if want := drawerChecks + 2; len(lines) != want { // the checks, the count, the summary
 		t.Errorf("the list is %d lines, want %d:\n%s", len(lines), want, strings.Join(lines, "\n"))
 	}
-	if got := ansi.Strip(lines[len(lines)-1]); !strings.Contains(got, "7") {
-		t.Errorf("the last line does not count what was left out: %q", got)
+	if got := ansi.Strip(lines[drawerChecks]); !strings.Contains(got, "9") {
+		t.Errorf("the line after the list does not count what was left out: %q", got)
 	}
 }
 
-// TestACardIsTwoLines pins spec §4.1: the title and the state marker on the
-// first line, the repository, the checks bar and the elapsed time on the
-// second. Three lines per card is what Phase 1 shipped.
-func TestACardIsTwoLines(t *testing.T) {
-	const w = 40 // wide enough that the repository is not truncated away
-	now := time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
+// TestTheDrawerIsAlwaysTheSameHeight is what keeps the key bar still: the
+// drawer sits under a board whose length depends on the data, and a drawer
+// that grew with its contents would move everything below it.
+func TestTheDrawerIsAlwaysTheSameHeight(t *testing.T) {
+	for name, m := range map[string]Model{
+		"a PR with checks and a body": loaded(),
+		"a PR with neither":           press(loaded(), "j"),
+		"an issue":                    press(press(loaded(), "l"), "l"),
+		"an empty column":             press(loaded(), "l"),
+	} {
+		if got := len(m.drawer()); got != drawerHeight {
+			t.Errorf("%s: the drawer is %d lines, want %d", name, got, drawerHeight)
+		}
+	}
+}
+
+// TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange is the meta line the
+// mockup puts under the title.
+func TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
+	out := ansi.Strip(strings.Join(loaded().drawer(), "\n"))
+	for _, want := range []string{"kukv/octoscope #12", "feat/graph", "main", "+218", "−31"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the drawer is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// boardOf is a loaded board at one width, for the tests that ask a single
+// piece of the drawing what it produced.
+func boardOf(width int) Model {
+	m := New(&fakeSource{work: sampleWork()})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	m, _ = m.Update(workMsg(sampleWork()))
+	m.fetchedAt = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
+	return m
+}
+
+// TestABoxedCardIsFourLines pins the shape the mockup draws: two lines of
+// text inside a box of its own.
+func TestABoxedCardIsFourLines(t *testing.T) {
+	const w = 34
+	m := boardOf(160)
 	it := sampleWork()[gh.SectionReviewRequested][0] // a PR with failing checks
 
-	lines := cardLines(it, w, false, now)
-	if len(lines) != 2 {
-		t.Fatalf("a card is %d lines, want 2:\n%s", len(lines), strings.Join(lines, "\n"))
+	lines := m.card(it, w, false)
+	if len(lines) != m.cardHeight() || len(lines) != 4 {
+		t.Fatalf("a boxed card is %d lines, want 4:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 	for i, line := range lines {
 		if got := ansi.StringWidth(line); got != w {
 			t.Errorf("line %d is %d columns, want %d: %q", i+1, got, w, ansi.Strip(line))
 		}
 	}
-
-	title, meta := ansi.Strip(lines[0]), ansi.Strip(lines[1])
-	if !strings.Contains(title, it.Title) {
-		t.Errorf("the first line does not carry the title: %q", title)
+	if !strings.HasPrefix(ansi.Strip(lines[0]), "╭") || !strings.HasPrefix(ansi.Strip(lines[3]), "╰") {
+		t.Errorf("the card has no box:\n%s", ansi.Strip(strings.Join(lines, "\n")))
 	}
-	for _, want := range []string{it.Ref.Repo, "▰", "3h ago"} {
+	if title := ansi.Strip(lines[1]); !strings.Contains(title, "#12") ||
+		!strings.Contains(title, it.Title) {
+		t.Errorf("the first line wants the number and the title: %q", title)
+	}
+}
+
+// TestANarrowCardLosesItsBox is the degradation step the boxes forced: at
+// eighty columns a column is seventeen wide, and a border would take two of
+// them (spec 4.6).
+func TestANarrowCardLosesItsBox(t *testing.T) {
+	const w = 17
+	m := boardOf(80)
+	it := sampleWork()[gh.SectionReviewRequested][0]
+
+	lines := m.card(it, w, false)
+	if len(lines) != m.cardHeight() || len(lines) != 2 {
+		t.Fatalf("an unboxed card is %d lines, want 2:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	for i, line := range lines {
+		if got := ansi.StringWidth(line); got != w {
+			t.Errorf("line %d is %d columns, want %d: %q", i+1, got, w, ansi.Strip(line))
+		}
+	}
+	if strings.Contains(ansi.Strip(lines[0]), "╭") {
+		t.Error("the card still has a box at seventeen columns")
+	}
+}
+
+// TestTheCardMetaNamesTheRepositoryWithoutItsOwner keeps the second line
+// readable in a column thirty wide: the owner is the same for most of them,
+// and the drawer gives the full reference anyway.
+func TestTheCardMetaNamesTheRepositoryWithoutItsOwner(t *testing.T) {
+	m := boardOf(160)
+	it := sampleWork()[gh.SectionReviewRequested][0] // kukv/octoscope
+
+	meta := ansi.Strip(m.cardMeta(it, 60))
+	if !strings.Contains(meta, "octoscope") {
+		t.Errorf("the repository is missing: %q", meta)
+	}
+	if strings.Contains(meta, "kukv/") {
+		t.Errorf("the owner is still on the card: %q", meta)
+	}
+	for _, want := range []string{"▰", "3h ago"} {
 		if !strings.Contains(meta, want) {
-			t.Errorf("the second line is missing %q: %q", want, meta)
+			t.Errorf("the meta line is missing %q: %q", want, meta)
 		}
 	}
 }
 
-// TestLabelsAreDrawnAsFilledBadges guards spec §4.5: GitHub's own label
-// colour, filled, not just the name in plain text.
+// TestAPullRequestWithoutChecksSaysWhereItsReviewStands is what the mockup
+// puts where the bar would be: a card with nothing running still has to say
+// something about itself.
+func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
+	m := boardOf(160)
+
+	approved := gh.WorkItem{
+		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 43},
+		Title: "docs", Review: gh.ReviewApproved,
+	}
+	if got := ansi.Strip(m.cardMeta(approved, 60)); !strings.Contains(got, i18n.T("review.approved")) {
+		t.Errorf("an approved PR with no checks says nothing: %q", got)
+	}
+
+	draft := approved
+	draft.IsDraft = true
+	if got := ansi.Strip(m.cardMeta(draft, 60)); !strings.Contains(got, i18n.T("work.draft")) {
+		t.Errorf("a draft does not say so: %q", got)
+	}
+
+	issue := gh.WorkItem{Ref: gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/koto", Number: 8}, Title: "an issue"}
+	got := ansi.Strip(m.cardMeta(issue, 60))
+	if strings.Contains(got, i18n.T("review.approved")) || strings.Contains(got, i18n.T("work.draft")) {
+		t.Errorf("an issue was given a review word: %q", got)
+	}
+}
+
+// TestLabelsAreDrawnAsFilledBadges guards spec 4.5: GitHub's own label
+// colour, filled, not just the name in plain text. The mockup puts them on
+// the meta line, beside the repository.
 func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
+	m := boardOf(160)
 	it := sampleWork()[gh.SectionReviewRequested][0] // carries "bug" and "ci"
 
-	line := cardTitle(it, 60, false)
+	line := m.cardMeta(it, 60)
 	for _, l := range it.Labels {
 		if !strings.Contains(ansi.Strip(line), l.Name) {
 			t.Errorf("the label %q is not on the card: %q", l.Name, ansi.Strip(line))
@@ -181,20 +289,25 @@ func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
 	}
 }
 
-// TestABadgeIsDroppedRatherThanCut is the rule that keeps a narrow column
-// readable: half a coloured label says nothing, and the title is worth more.
-func TestABadgeIsDroppedRatherThanCut(t *testing.T) {
-	it := sampleWork()[gh.SectionReviewRequested][0]
+// TestTheColumnHeadingCountsWhatIsInIt is the point of the board: how much
+// has piled up has to be readable even when the column is scrolled.
+func TestTheColumnHeadingCountsWhatIsInIt(t *testing.T) {
+	m := boardOf(160)
 
-	for _, w := range []int{18, 22, 26} {
-		line := cardTitle(it, w, false)
-		if got := ansi.StringWidth(line); got != w {
-			t.Errorf("width %d: the card is %d columns: %q", w, got, ansi.Strip(line))
-		}
-		if strings.Contains(ansi.Strip(line), "…") && strings.Contains(line, "48;2;") {
-			t.Errorf("width %d: a badge was drawn onto a title that had to be cut: %q",
-				w, ansi.Strip(line))
-		}
+	head := ansi.Strip(m.heading(gh.SectionReviewRequested, 3, 30))
+	if !strings.HasSuffix(strings.TrimRight(head, " "), "3") {
+		t.Errorf("the count is not at the end of the heading: %q", head)
+	}
+	if got := ansi.StringWidth(m.heading(gh.SectionReviewRequested, 3, 30)); got != 30 {
+		t.Errorf("the heading is %d columns, want 30", got)
+	}
+	// A column with nothing in it shows no count rather than a zero.
+	if empty := ansi.Strip(m.heading(gh.SectionYourPRs, 0, 30)); strings.Contains(empty, "0") {
+		t.Errorf("an empty column is counted: %q", empty)
+	}
+	// Review requested is the column that wants attention, and says so.
+	if m.heading(gh.SectionReviewRequested, 3, 30) == m.heading(gh.SectionAssigned, 3, 30) {
+		t.Error("a waiting review is coloured like anything else")
 	}
 }
 
@@ -311,6 +424,11 @@ func alignedWork() gh.Work {
 	return w
 }
 
+// TestEveryRowStartsItsColumnsAtTheSameOffset measures where each column
+// actually drew its own token and asks whether the four agree, rather than
+// hard-coding an offset the drawing would have to be read to know. Japanese
+// takes two columns per character, so a column that measured its padding in
+// runes lines up in English and drifts in Japanese.
 func TestEveryRowStartsItsColumnsAtTheSameOffset(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
@@ -322,48 +440,39 @@ func TestEveryRowStartsItsColumnsAtTheSameOffset(t *testing.T) {
 			m, _ = m.Update(workMsg(alignedWork()))
 
 			colW := m.columnWidth(m.columns())
-			measured := 0
-			for _, line := range strings.Split(m.View(), "\n") {
-				s := ansi.Strip(line)
-				// The drawer repeats the selected card's tokens outside the
-				// columns; it is the only line with a "#" in this fixture.
-				if strings.Contains(s, "#") {
-					continue
-				}
+			for _, token := range []string{"title-%d", "repo-%d"} {
+				indent := -1
 				for i := range m.columns() {
-					start := i * (colW + columnGap)
-					// The heading and the repository row sit in the cursor
-					// gutter; a title row also carries the review glyph.
-					measured += checkTokenOffset(t, lang, width, s,
-						i18n.T(sectionTitleIDs[gh.WorkSections()[i]]), start+2)
-					measured += checkTokenOffset(t, lang, width, s, fmt.Sprintf("repo-%d", i), start+2)
-					measured += checkTokenOffset(t, lang, width, s, fmt.Sprintf("title-%d", i), start+4)
+					x, ok := offsetOf(m.board(m.boardHeight()), fmt.Sprintf(token, i))
+					if !ok {
+						t.Errorf("lang %s width %d: %q was never drawn", lang, width, token)
+						continue
+					}
+					got := x - i*(colW+columnGap)
+					if indent < 0 {
+						indent = got
+					}
+					if got != indent {
+						t.Errorf("lang %s width %d: %q sits %d columns into its column, want %d",
+							lang, width, fmt.Sprintf(token, i), got, indent)
+					}
 				}
-			}
-			// One heading, one title and one repository row per column: an
-			// assertion that never found its token would prove nothing.
-			if want := 3 * m.columns(); measured != want {
-				t.Errorf("lang %s width %d: measured %d offsets, want %d",
-					lang, width, measured, want)
 			}
 		}
 	}
 }
 
-// checkTokenOffset fails t when token appears in line at any display column
-// other than want. A line without the token says nothing and is skipped; the
-// return value counts the lines that did carry it.
-func checkTokenOffset(t *testing.T, lang language.Tag, width int, line, token string, want int) int {
-	t.Helper()
-	i := strings.Index(line, token)
-	if i < 0 {
-		return 0
+// offsetOf reports the display column a token was drawn at. It is given the
+// board alone: the drawer repeats the selected card's tokens outside the
+// columns, where an offset means nothing.
+func offsetOf(board []string, token string) (int, bool) {
+	for _, line := range board {
+		s := ansi.Strip(line)
+		if i := strings.Index(s, token); i >= 0 {
+			return ansi.StringWidth(s[:i]), true
+		}
 	}
-	if got := ansi.StringWidth(line[:i]); got != want {
-		t.Errorf("lang %s width %d: %q starts at column %d, want %d: %q",
-			lang, width, token, got, want, line)
-	}
-	return 1
+	return 0, false
 }
 
 func TestNoUnresolvedIDsInTheWorkView(t *testing.T) {

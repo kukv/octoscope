@@ -36,6 +36,7 @@ func sampleWork() gh.Work {
 			// used, and a carriage return left in a drawn line shifts it.
 			Body:   "The renderer dropped every escape.\r\n\r\nThis puts them back.",
 			Labels: []gh.Label{{Name: "bug", Color: "d73a4a"}, {Name: "ci", Color: "d4c5f9"}},
+			Head:   "feat/graph", Base: "main", Additions: 218, Deletions: 31,
 			Checks: gh.Checks{
 				Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
 				Runs: []gh.CheckRun{
