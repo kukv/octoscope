@@ -63,15 +63,14 @@ func goldenModel(width int) Model {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: goldenFixture()})
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: goldenReview()})
-	m = press(m, "j")
 	return m
 }
 
 // composingModel is goldenModel with the composer open on the row the cursor
-// already sits on (a rowLine, per goldenModel's own comment): a row this
-// wide, with the composer's rows taken out of the pane's height budget, is
-// what would first show a composer wide or tall enough to overrun the
-// terminal.
+// already sits on (a rowLine, since the view opens on the first commentable
+// line): a row this wide, with the composer's rows taken out of the pane's
+// height budget, is what would first show a composer wide or tall enough to
+// overrun the terminal.
 func composingModel(width int) Model {
 	return press(goldenModel(width), "c")
 }
