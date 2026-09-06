@@ -27,11 +27,20 @@ type (
 // before the review context has arrived: the diff and the context are fetched
 // in parallel, and starting a review needs the pull request's node id, which
 // only the context carries.
+//
+// The target line and side are captured here, not read again at send time.
+// A refetch that lands mid-composition rebuilds m.rows and can insert thread
+// rows under the very line being commented on, shifting m.row to a different
+// row -- one whose zero gh.DiffLine would otherwise read as line 0. The
+// cursor is guaranteed to be on a real line only right now, when the guard
+// above has just confirmed it.
 func (m Model) startComposing() Model {
 	r := m.currentRow()
 	if r.kind != rowLine || m.review.PullRequestID == "" {
 		return m
 	}
+	line, side := r.line.Line()
+	m.target = gh.PendingComment{Path: m.files[m.file].Path, Line: line, Side: side}
 	m.composing = true
 	m.postErr = ""
 	m.textarea.Reset()
@@ -39,21 +48,17 @@ func (m Model) startComposing() Model {
 	return m
 }
 
-// post sends the composed comment. The review is started here rather than
-// when the view opens: a diff the user only reads must not leave an empty
-// pending review behind on the pull request.
+// post sends the composed comment, against the target startComposing
+// captured -- not whatever row the cursor now sits on. The review is started
+// here rather than when the view opens: a diff the user only reads must not
+// leave an empty pending review behind on the pull request.
 func (m Model) post() (Model, tea.Cmd) {
 	body := m.textarea.Value()
 	if body == "" {
 		return m, nil
 	}
-	line, side := m.currentRow().line.Line()
-	comment := gh.PendingComment{
-		Path: m.files[m.file].Path,
-		Line: line,
-		Side: side,
-		Body: body,
-	}
+	comment := m.target
+	comment.Body = body
 
 	src, ref, pullRequestID, reviewID := m.src, m.ref, m.review.PullRequestID, m.review.PendingID
 	m.composing = false
@@ -85,6 +90,7 @@ func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "esc":
 		m.composing = false
 		m.postErr = ""
+		m.target = gh.PendingComment{}
 		m.textarea.Reset()
 		return m, nil
 	case "ctrl+s":

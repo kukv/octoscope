@@ -342,3 +342,94 @@ func isReviewErrMsg(msg tea.Msg) bool {
 	_, ok := msg.(reviewErrMsg)
 	return ok
 }
+
+// TestARefetchMidComposeDoesNotShiftThePostedTarget is the finding this fix
+// pass is for. The cursor is put on the added line "depth = defaultDepth"
+// (14), c captures that as the target, and only then does a reviewMsg land
+// that inserts one thread row directly under line 13 -- above the cursor,
+// pushing it down by exactly one row. Without a captured target, post() would
+// read whatever row the cursor's raw index now names, which is the inserted
+// thread row: its zero gh.DiffLine reads as line 0, and the comment goes
+// there instead of line 14.
+func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
+	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
+	m := loadedWith(t, src)
+	m = cursorOnLine(t, m, gh.LineAdded, 14)
+	m = press(m, "c")
+	if !m.composing {
+		t.Fatal("c did not open the composer")
+	}
+	m = typeInto(m, "still about line 14")
+
+	shifted := gh.ReviewContext{
+		PullRequestID: "PR_1",
+		Threads: []gh.ReviewThread{
+			{
+				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
+				Comments: []gh.ThreadComment{{Author: gh.Author{Login: "kukv"}, Body: "shifts the row below"}},
+			},
+		},
+	}
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: shifted})
+
+	if got := m.currentRow().kind; got != rowThread {
+		t.Fatalf("the fixture did not shift the cursor onto a thread row (got %v); this test proves nothing", got)
+	}
+
+	_, cmd := m.Update(keyPress("ctrl+s"))
+	runCmd(t, cmd)
+
+	if len(src.comments) != 1 {
+		t.Fatalf("%d comments sent, want 1", len(src.comments))
+	}
+	want := gh.PendingComment{Path: "graph/walk.go", Line: 14, Side: gh.SideRight, Body: "still about line 14"}
+	if got := src.comments[0]; got != want {
+		t.Errorf("sent %+v, want %+v", got, want)
+	}
+}
+
+// TestARetryAfterAFailedPostStillTargetsTheCapturedLine checks that the
+// target survives the error path too. commentErrorMsg reopens the composer
+// (m.composing = true) without going through startComposing again, so if
+// post() cleared m.target on every send rather than only on success, a retry
+// here would post to the zero value instead of line 13.
+func TestARetryAfterAFailedPostStillTargetsTheCapturedLine(t *testing.T) {
+	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
+	m := loadedWith(t, src)
+	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = press(m, "c")
+	m = typeInto(m, "retry me")
+	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
+
+	m, _ = m.Update(commentErrorMsg{err: errors.New("500")})
+	if !m.composing {
+		t.Fatal("composing = false after a failed post, want still composing")
+	}
+
+	_, cmd := m.Update(keyPress("ctrl+s"))
+	runCmd(t, cmd)
+
+	if len(src.comments) != 1 {
+		t.Fatalf("%d comments sent, want 1", len(src.comments))
+	}
+	want := gh.PendingComment{Path: "graph/walk.go", Line: 13, Side: gh.SideRight, Body: "retry me"}
+	if got := src.comments[0]; got != want {
+		t.Errorf("sent %+v, want %+v", got, want)
+	}
+}
+
+// TestARefetchReclampsTheCursorIntoRange: a reviewMsg can shrink m.rows (the
+// viewer's own thread stays until a refetch lands, threads can resolve, and
+// so on). If m.row is left pointing past the end, currentRow and diffLines
+// index out of range.
+func TestARefetchReclampsTheCursorIntoRange(t *testing.T) {
+	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
+	m.row = len(m.rows) - 1 // parked at the end of the widened row set
+
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: gh.ReviewContext{PullRequestID: "PR_1"}}) // threads gone
+	if m.row >= len(m.rows) {
+		t.Fatalf("row = %d out of range for %d rows", m.row, len(m.rows))
+	}
+	_ = m.View() // must not panic
+}

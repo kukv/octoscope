@@ -124,6 +124,11 @@ type Model struct {
 	composing bool
 	posting   bool
 	postErr   string
+
+	// target is the line and side the open (or in-flight) comment was
+	// started against, captured by startComposing at c-time rather than read
+	// again from the cursor at send time (see comment.go).
+	target gh.PendingComment
 }
 
 // New builds the view for one pull request. It takes only what names the
@@ -200,6 +205,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.review = msg.ctx
 		m.reviewErr = nil
 		m.rows = m.buildRows()
+		m.row = clamp(m.row, len(m.rows)-1)
+		m = m.follow()
 		return m, nil
 	case reviewErrMsg:
 		if msg.ref != m.ref {
@@ -220,6 +227,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.posting = false
 		m.postErr = ""
 		m.textarea.Reset()
+		m.target = gh.PendingComment{}
 		m.review.PendingID = msg.reviewID
 		return m, m.fetchReview()
 	case commentErrorMsg:
@@ -292,7 +300,7 @@ func (m Model) toggleCollapsed() Model {
 	}
 	m.expanded[r.key] = !m.expanded[r.key]
 	m.rows = m.buildRows()
-	m.row = clamp(m.row, 0, len(m.rows)-1)
+	m.row = clamp(m.row, len(m.rows)-1)
 	return m.follow()
 }
 
@@ -333,7 +341,7 @@ func (m Model) moveRow(delta int) Model {
 	if m.sidebar {
 		return m.moveFile(delta)
 	}
-	m.row = clamp(m.row+delta, 0, len(m.rows)-1)
+	m.row = clamp(m.row+delta, len(m.rows)-1)
 	return m.follow()
 }
 
@@ -341,7 +349,7 @@ func (m Model) moveFile(delta int) Model {
 	if len(m.files) == 0 {
 		return m
 	}
-	m.file = clamp(m.file+delta, 0, len(m.files)-1)
+	m.file = clamp(m.file+delta, len(m.files)-1)
 	m.row, m.top = 0, 0
 	m.rows = m.buildRows()
 	return m
@@ -387,9 +395,11 @@ func (m Model) currentRow() row {
 	return m.rows[m.row]
 }
 
-func clamp(v, lo, hi int) int {
-	if hi < lo {
-		return lo
+// clamp keeps v within [0, hi]. Every caller clamps a cursor index, which is
+// never negative, so the floor is fixed rather than a parameter.
+func clamp(v, hi int) int {
+	if hi < 0 {
+		return 0
 	}
-	return min(max(v, lo), hi)
+	return min(max(v, 0), hi)
 }
