@@ -22,7 +22,6 @@ import (
 // repo is "owner/repo"; the empty string targets the workspace repository.
 type prSource interface {
 	GetPR(ctx context.Context, repo string, number int) (gh.PR, error)
-	OpenPRWeb(repo string, number int) error
 	AddPRComment(repo string, number int, body string) error
 	ClosePR(repo string, number int) error
 	ReopenPR(repo string, number int) error
@@ -40,7 +39,6 @@ type prSource interface {
 // equivalent that GitHub does not offer.
 type issueSource interface {
 	GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error)
-	OpenIssueWeb(repo string, number int) error
 	AddIssueComment(repo string, number int, body string) error
 	CloseIssue(repo string, number int) error
 	ReopenIssue(repo string, number int) error
@@ -60,10 +58,18 @@ type candidateSource interface {
 // take the whole. review.Source is embedded rather than repeated: the
 // submission popup this view holds needs exactly those two methods, and
 // review already declares them for exactly this purpose.
+// webOpener shows the item in a browser. It takes the URL GitHub gave the
+// item rather than a reference to it, so that nothing here has to know how
+// GitHub spells an address.
+type webOpener interface {
+	OpenWeb(url string) error
+}
+
 type Source interface {
 	prSource
 	issueSource
 	candidateSource
+	webOpener
 	review.Source
 }
 
@@ -129,6 +135,7 @@ type Model struct {
 	body    viewport.Model
 	title   string
 	state   gh.ItemState
+	url     string
 
 	textarea  textarea.Model
 	composing bool
@@ -216,15 +223,9 @@ func fetchReviewContext(src prSource, ref gh.ItemRef) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, ref gh.ItemRef) tea.Cmd {
+func openWeb(src Source, ref gh.ItemRef, url string) tea.Cmd {
 	return func() tea.Msg {
-		var err error
-		if ref.Kind == gh.ItemPR {
-			err = src.OpenPRWeb(ref.Repo, ref.Number)
-		} else {
-			err = src.OpenIssueWeb(ref.Repo, ref.Number)
-		}
-		if err != nil {
+		if err := src.OpenWeb(url); err != nil {
 			return errMsg{ref, err}
 		}
 		return nil
@@ -350,6 +351,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.actionErr = ""
 		m.labels = labelNames(pr.Labels)
 		m.assignees = authorLogins(pr.Assignees)
+		m.url = pr.URL
 		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": pr.Number, "Title": pr.Title})
 		m.setContent(prMarkdown(pr))
 		return m, nil
@@ -363,6 +365,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.actionErr = ""
 		m.labels = labelNames(issue.Labels)
 		m.assignees = authorLogins(issue.Assignees)
+		m.url = issue.URL
 		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": issue.Number, "Title": issue.Title})
 		m.setContent(issueMarkdown(issue))
 		return m, nil
@@ -505,7 +508,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "q", "esc":
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "o":
-		return m, openWeb(m.src, m.ref)
+		// Before the item lands there is no address to open.
+		if m.url == "" {
+			return m, nil
+		}
+		return m, openWeb(m.src, m.ref, m.url)
 	case "d":
 		// An issue has no diff. Opening an empty diff view would be a worse
 		// answer than doing nothing.

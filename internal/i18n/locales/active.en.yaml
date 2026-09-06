@@ -13,6 +13,8 @@ common:
 error:
   gh_not_found:
     other: "gh CLI not found; install it and run: gh auth login"
+  no_browser:
+    other: "No browser could be started. Open this address by hand:\n{{.URL}}"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same

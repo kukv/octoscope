@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
@@ -383,9 +384,13 @@ func (m Model) failOverlay(err error, o overlay) (tea.Model, tea.Cmd) {
 // failures are translated; anything GitHub said is shown as it said it
 // (.claude/rules/errors.md).
 func (m Model) showError(err error) (tea.Model, tea.Cmd) {
-	if errors.Is(err, gh.ErrGhNotFound) {
+	var noBrowser *browser.NoneError
+	switch {
+	case errors.Is(err, gh.ErrGhNotFound):
 		m.errText = i18n.T("error.gh_not_found")
-	} else {
+	case errors.As(err, &noBrowser):
+		m.errText = i18n.Tf("error.no_browser", map[string]any{"URL": noBrowser.URL})
+	default:
 		m.errText = err.Error()
 	}
 	return m, nil

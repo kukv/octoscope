@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 )
 
@@ -148,14 +149,13 @@ func (c *Client) RepoName(ctx context.Context) (string, error) {
 	return v.NameWithOwner, nil
 }
 
-func (c *Client) OpenPRWeb(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"pr", "view", strconv.Itoa(number), "--web"}, c.effectiveRepo(repo))...)
-	return err
-}
-
-func (c *Client) OpenIssueWeb(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"issue", "view", strconv.Itoa(number), "--web"}, c.effectiveRepo(repo))...)
-	return err
+// OpenWeb shows the item in a browser. It does not go through gh: `gh ... --web`
+// looks only for xdg-open, x-www-browser, www-browser and wslview, and a WSL
+// machine has none of them -- wslu, which provides wslview, is no longer
+// packaged for Ubuntu. GitHub gives every item its URL, so there is nothing
+// gh would add here.
+func (c *Client) OpenWeb(url string) error {
+	return browser.Open(url)
 }
 
 func (c *Client) AddPRComment(repo string, number int, body string) error {

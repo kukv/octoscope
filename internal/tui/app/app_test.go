@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/detail"
@@ -52,8 +53,7 @@ func (f *fakeSource) GetPR(context.Context, string, int) (gh.PR, error) { return
 func (f *fakeSource) GetIssue(context.Context, string, int) (gh.Issue, error) {
 	return gh.Issue{}, nil
 }
-func (f *fakeSource) OpenPRWeb(string, int) error               { return nil }
-func (f *fakeSource) OpenIssueWeb(string, int) error            { return nil }
+func (f *fakeSource) OpenWeb(string) error                      { return nil }
 func (f *fakeSource) AddPRComment(string, int, string) error    { return nil }
 func (f *fakeSource) AddIssueComment(string, int, string) error { return nil }
 func (f *fakeSource) ClosePR(string, int) error                 { return nil }
@@ -466,6 +466,19 @@ func TestGhNotFoundIsTranslated(t *testing.T) {
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.gh_not_found")) {
 		t.Errorf("gh_not_found was not translated:\n%s", view)
+	}
+}
+
+// TestNoBrowserShowsTheAddress is the whole point of the error carrying the
+// URL: a machine with nothing to open it with can still be read off the
+// screen and typed in by hand.
+func TestNoBrowserShowsTheAddress(t *testing.T) {
+	const url = "https://github.com/kukv/octoscope/pull/55"
+	next, _ := newTestModel(Options{HasRepo: true}).
+		Update(work.ErrorMsg{Err: &browser.NoneError{URL: url}})
+	view := content(next.(Model))
+	if !strings.Contains(view, url) {
+		t.Errorf("the error screen does not carry the address:\n%s", view)
 	}
 }
 

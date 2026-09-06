@@ -138,28 +138,6 @@ func TestRepoName(t *testing.T) {
 	}
 }
 
-func TestOpenPRWebWithRepoOverride(t *testing.T) {
-	c, f := newTestClient("", nil)
-	if err := c.OpenPRWeb("octo/hello", 7); err != nil {
-		t.Fatalf("OpenPRWeb: %v", err)
-	}
-	wantArgs := []string{"pr", "view", "7", "--web", "--repo", "octo/hello"}
-	if !reflect.DeepEqual(f.args, wantArgs) {
-		t.Errorf("args = %v, want %v", f.args, wantArgs)
-	}
-}
-
-func TestOpenIssueWebWithRepoOverride(t *testing.T) {
-	c, f := newTestClient("", nil)
-	if err := c.OpenIssueWeb("octo/hello", 3); err != nil {
-		t.Fatalf("OpenIssueWeb: %v", err)
-	}
-	wantArgs := []string{"issue", "view", "3", "--web", "--repo", "octo/hello"}
-	if !reflect.DeepEqual(f.args, wantArgs) {
-		t.Errorf("args = %v, want %v", f.args, wantArgs)
-	}
-}
-
 func TestRunErrorPassesThrough(t *testing.T) {
 	wantErr := errors.New("gh pr: no git remotes found")
 	c, _ := newTestClient("", wantErr)

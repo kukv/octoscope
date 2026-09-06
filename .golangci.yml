@@ -32,6 +32,19 @@ linters:
               desc: internal/i18n must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/config
               desc: internal/i18n must not depend on other internal packages
+        # Opening a URL is a leaf: it depends on nothing of ours.
+        browser-layer:
+          files:
+            - "**/internal/browser/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/gh
+              desc: internal/browser must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/tui
+              desc: internal/browser must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: internal/browser must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/config
+              desc: internal/browser must not depend on other internal packages
         # Views are siblings: a view must not reach into another view's model,
         # and no child may import its parent.
         tui-work:
@@ -175,6 +188,14 @@ linters:
       # rule matches on. Excluding it here keeps the exception in one place
       # instead of a scattered //nolint.
       - path: internal/gh/cli/cli\.go
+        linters:
+          - gosec
+        text: "G204"
+      # Same shape in internal/browser: which program opens a URL is decided
+      # at run time, from a fixed table per platform or from the browser the
+      # user named in $BROWSER. The URL is a separate argument and no shell
+      # is involved, so there is nothing for the rule to protect against.
+      - path: internal/browser/browser\.go
         linters:
           - gosec
         text: "G204"

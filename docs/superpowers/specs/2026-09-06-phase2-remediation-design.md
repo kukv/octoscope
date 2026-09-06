@@ -240,6 +240,9 @@ xdg-open        なし
 
 **方針**: `gh ... --web` に任せるのをやめ、octoscope が自分で URL を開く。
 `gh.PR.URL` / `gh.Issue.URL` は既に取得済みで、`--web` を使う理由が無い。
+そのため `OpenWeb` は ref ではなく **URL を受け取る**。Repos タブの `SelectedRef` は
+`Repo` を空のままにする設計であり、ref から URL を組み立てると `gh repo view` の
+往復と GitHub の URL 体系の直書きが UI 側に生まれる。
 
 | 環境 | 起動方法 |
 |---|---|
@@ -317,7 +320,7 @@ type Item struct {
 }
 
 func (u *Usecase) GetItem(ctx context.Context, ref gh.ItemRef) (Item, error)
-func (u *Usecase) OpenWeb(ref gh.ItemRef) error
+func (u *Usecase) OpenWeb(url string) error
 func (u *Usecase) AddComment(ref gh.ItemRef, body string) error
 func (u *Usecase) SetState(ref gh.ItemRef, closing bool) error
 func (u *Usecase) EditLabels(ref gh.ItemRef, add, remove []string) error
@@ -354,7 +357,7 @@ func (u *Usecase) SubmitReview(ctx context.Context, t ReviewTarget, event gh.Rev
 // internal/tui/detail/detail.go
 type Source interface {
     GetItem(ctx context.Context, ref gh.ItemRef) (usecase.Item, error)
-    OpenWeb(ref gh.ItemRef) error
+    OpenWeb(url string) error
     AddComment(ref gh.ItemRef, body string) error
     SetState(ref gh.ItemRef, closing bool) error
     EditLabels(ref gh.ItemRef, add, remove []string) error
