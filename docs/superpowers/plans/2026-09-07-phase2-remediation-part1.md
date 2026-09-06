@@ -2436,13 +2436,30 @@ grep -rn 'ItemPR' internal/tui/ | grep -v '_test.go'
 残ってはいけないのは「PR なら `GetPR`、Issue なら `GetIssue`」という
 **呼び分け**である。区別がつかない行が出てきたら止めて相談する。
 
-- [ ] **Step 5: `Part1` のマーカーが 1 つも残っていないことを確認**
+- [ ] **Step 5: `Part1` が消え、`Part2` が残っていることを両方確認**
+
+**片方だけでは足りない。** `Part1` の不在だけを見ると、`Part2` の 2 つを
+巻き添えで消しても通ってしまう。その 2 つは Part 2 への引き継ぎそのもので、
+消えれば作業順 6 と 8 のあとに規約を直す約束が黙って失われる。
 
 ```bash
-grep -rn 'TRANSIENT(Part1' .claude/rules .golangci.yml
+grep -rho 'TRANSIENT([^)]*)' .claude/rules .golangci.yml | sort | uniq -c
 ```
 
-Expected: 出力なし（`Part2` のものだけが残る）
+Expected: **`Part1` の行が 1 つも無く、下の 2 行だけが残る。**
+
+```
+      1 TRANSIENT(Part2 作業順 6)
+      1 TRANSIENT(Part2 作業順 8)
+```
+
+`Part2` の行が減っていたら、消しすぎている。Step 2〜3 で触った差分を見て戻す。
+
+```bash
+git diff -- .claude/rules .golangci.yml | grep '^-.*TRANSIENT'
+```
+
+ここに `Part2` のものが出てきたら、それは消してはいけなかったものである。
 
 - [ ] **Step 6: `make check` とコミット**
 
