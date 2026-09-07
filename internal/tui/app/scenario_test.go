@@ -196,10 +196,12 @@ func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 	}
 }
 
-// TestCommentingOnADiffLineShowsTheThread is the scenario the whole
-// remediation started from: the line comment that never worked. It crosses
-// three views (board, detail, diff) on key presses alone.
-func TestCommentingOnADiffLineShowsTheThread(t *testing.T) {
+// TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread is the scenario the
+// whole remediation started from: the line comment that never worked. It
+// starts where a user starts -- the Work board, which is the tab the root
+// opens on -- and crosses three views (board, detail, diff) on key presses
+// alone.
+func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	f := &scenarioSource{
 		pr: scenarioPR(),
 		files: []gh.FileDiff{{
@@ -214,8 +216,18 @@ func TestCommentingOnADiffLineShowsTheThread(t *testing.T) {
 	}
 	m := scenarioModel(t, f)
 
-	m = run(t, m, "2", "enter", "d") // Repos -> the detail view -> the diff
-	m = run(t, m, "j")               // onto a line that can carry a comment
+	// The board's own d opens the diff too, so enter is checked on its own:
+	// without this the scenario would still reach the diff with the card's
+	// detail view never having opened.
+	m = run(t, m, "enter") // the card under the cursor -> the detail view
+	// The card itself carries the number, so the number is no evidence the
+	// detail view opened. The state line is drawn by nothing else here.
+	if !strings.Contains(content(m), "state: open") {
+		t.Fatalf("the detail view did not open:\n%s", content(m))
+	}
+
+	m = run(t, m, "d") // the detail view -> the diff
+	m = run(t, m, "j") // onto a line that can carry a comment
 	// "n" is one character of body: an empty one is not sent. key() puts a
 	// single character in Text, which is what the textarea inserts.
 	m = run(t, m, "c", "n", "ctrl+s")
