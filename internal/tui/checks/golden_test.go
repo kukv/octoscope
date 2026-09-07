@@ -68,6 +68,57 @@ func checksLoadingModel(width int) Model {
 	return m
 }
 
+// mixed is one of each kind of check GitHub reports, in a list long enough to
+// scroll: a failing workflow, a green one, a check run an App created (those
+// come back with no workflow run behind them), and a StatusContext.
+func mixed() gh.Checks {
+	start := time.Date(2026, 9, 7, 10, 12, 0, 0, time.UTC)
+	run := func(name string, state gh.CheckState, workflow string, runNumber int, jobID, runID int64, took time.Duration) gh.CheckRun {
+		return gh.CheckRun{
+			Name: name, State: state, Kind: gh.CheckKindRun,
+			Workflow: workflow, RunNumber: runNumber, JobID: jobID, RunID: runID,
+			URL:       "https://github.example/job",
+			StartedAt: start, CompletedAt: start.Add(took),
+		}
+	}
+	return gh.Checks{
+		Total: 9, Passed: 7, Failed: 1, Running: 1, State: gh.CheckFailure,
+		Runs: []gh.CheckRun{
+			run("build", gh.CheckSuccess, "CI", 88, 1, 10, 3*time.Minute+7*time.Second),
+			run("lint", gh.CheckSuccess, "CI", 88, 2, 10, 62*time.Second),
+			run("test", gh.CheckSuccess, "CI", 88, 3, 10, 2*time.Minute+14*time.Second),
+			run("sca", gh.CheckFailure, "security", 116, 4, 20, 48*time.Second),
+			run("audit", gh.CheckSuccess, "security", 116, 5, 20, 31*time.Second),
+			run("secrets", gh.CheckSuccess, "security", 116, 6, 20, 9*time.Second),
+			run("deps", gh.CheckSuccess, "security", 116, 7, 20, 12*time.Second),
+			// An App's own check run: no workflow, no run id, so no heading
+			// over it and nothing for R to rerun.
+			{
+				Name: "codecov/patch", State: gh.CheckSuccess, Kind: gh.CheckKindRun,
+				JobID: 8, URL: "https://codecov.example/1",
+				StartedAt: start, CompletedAt: start.Add(6 * time.Second),
+			},
+			{Name: "ci/circleci", State: gh.CheckRunning, Kind: gh.CheckKindStatus, URL: "https://circleci.example/1"},
+		},
+	}
+}
+
+// checksMixedModel parks the cursor on the App-created check, far enough down
+// a scrolled list that the first workflow's heading is off the top: j to the
+// bottom, then one k, which leaves the window where it is.
+func checksMixedModel(width int) Model {
+	m := New(&fakeSource{checks: mixed()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 12})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: mixed()})
+	for range 8 {
+		m = press(m, "j")
+	}
+	for range 4 {
+		m = press(m, "k")
+	}
+	return m
+}
+
 // checksNoneModel is a pull request whose checks came back empty.
 func checksNoneModel(width int) Model {
 	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
@@ -86,6 +137,7 @@ var goldenStates = []struct {
 	{"checks_rerun", checksRerunModel},
 	{"checks_loading", checksLoadingModel},
 	{"checks_none", checksNoneModel},
+	{"checks_mixed", checksMixedModel},
 }
 
 func TestGolden(t *testing.T) {
