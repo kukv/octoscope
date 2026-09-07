@@ -227,12 +227,14 @@ func (m Model) allRows() []string {
 }
 
 // hasHeading reports whether the list draws a workflow heading above
-// order[i]. A StatusContext belongs to no workflow, and arrange keeps the
-// checks of one workflow together, so the row before is enough to tell a new
-// group from a continuing one.
+// order[i]. A StatusContext belongs to no workflow, and neither does a check
+// run an App created: GitHub reports those with a null workflowRun, leaving
+// RunID zero and the workflow's name empty. arrange keeps the checks of one
+// workflow together, so the row before is enough to tell a new group from a
+// continuing one.
 func (m Model) hasHeading(i int) bool {
 	r := m.order[i]
-	if r.Kind != gh.CheckKindRun {
+	if r.Kind != gh.CheckKindRun || r.RunID == 0 {
 		return false
 	}
 	if i == 0 {

@@ -77,6 +77,22 @@ func TestEscLeavesTheRerunPopupWithoutSending(t *testing.T) {
 	}
 }
 
+func TestRerunOnACheckWithNoWorkflowRunSaysWhyItCannot(t *testing.T) {
+	t.Parallel()
+
+	src := &recordingSource{fakeSource: fakeSource{checks: appCheck()}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: appCheck()})
+	m = press(m, "R")
+	if m.mode == modeRerun {
+		t.Error("the rerun popup opened for a check with no workflow run behind it")
+	}
+	if view := m.View(); !strings.Contains(view, i18n.T("checks.decline_rerun_status_context")) {
+		t.Errorf("R on a check with no workflow run said nothing:\n%s", view)
+	}
+}
+
 func TestRerunOnAStatusContextSaysWhyItCannot(t *testing.T) {
 	t.Parallel()
 

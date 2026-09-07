@@ -281,6 +281,37 @@ func TestAStatusContextSaysWhyItHasNoLog(t *testing.T) {
 	}
 }
 
+// appCheck is one check run an App created: GitHub reports those with a null
+// checkSuite.workflowRun, so there is no workflow behind them to name or to
+// rerun (Codecov, Sonar and deploy checks are all this shape).
+func appCheck() gh.Checks {
+	return gh.Checks{
+		Total: 1, Passed: 1, State: gh.CheckSuccess,
+		Runs: []gh.CheckRun{
+			{Name: "codecov/patch", State: gh.CheckSuccess, Kind: gh.CheckKindRun, JobID: 7},
+		},
+	}
+}
+
+func openChecks(t *testing.T, c gh.Checks, width, height int) Model {
+	t.Helper()
+
+	m := New(&fakeSource{checks: c}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: c})
+	return m
+}
+
+func TestACheckWithNoWorkflowRunGetsNoHeading(t *testing.T) {
+	t.Parallel()
+
+	m := openChecks(t, appCheck(), 120, 30)
+	if rows := m.allRows(); len(rows) != 1 {
+		t.Errorf("the list drew %d lines, want 1: a check with no workflow run has no heading:\n%s",
+			len(rows), strings.Join(rows, "\n"))
+	}
+}
+
 func TestTheLogDoesNotWrap(t *testing.T) {
 	t.Parallel()
 
