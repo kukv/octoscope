@@ -169,6 +169,17 @@ gh run view -R kukv/octoscope --job 88970766114 --log-failed > $D/job_log_failed
 gh run view -R kukv/octoscope --job 101635448466 --log | head -40 > $D/job_log.txt
 ```
 
+## `job_log_in_progress.txt`
+
+stderr of `gh run view --job <id> --log`（`--log-failed` も同じ文言）を、実際に
+進行中のジョブに対して録ったもの。録った日: 2026-09-07、対象: `kukv/octoscope`
+のジョブ 101759970990。標準出力には何も出ず、終了コードは 1。
+
+```bash
+gh run view -R kukv/octoscope --job <実行中のジョブ id> --log 2> \
+  internal/gh/cli/testdata/job_log_in_progress.txt
+```
+
 ## `sample.diff`
 
 `git diff` 形式のパース用。unified diff の hunk ヘッダ、追加、削除、文脈行を含む。

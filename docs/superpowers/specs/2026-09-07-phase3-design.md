@@ -29,9 +29,15 @@
 | 成功ジョブに `--log-failed` | **出力が空・終了コード 0。** エラーではない |
 | `gh run rerun --job` が要る id | Web の URL に出る番号ではなく `databaseId`（`gh` 自身が help で注意している）。§2 の 1 行目の値と同じ |
 
-進行中の run に `gh run view --log` を投げたときの挙動は**まだ測っていない**。
-実装のときに実物で測り、その stderr を fixture に録って専用の文言を出す。
-測るまで文言を決め打ちしない。
+進行中のジョブに `gh run view --job <id> --log-failed` / `--log` を投げたときの挙動
+（2026-09-07、kukv/octoscope の実行中ジョブに対して実測）。
+
+- 終了コードは両方とも 1
+- stderr は両方とも同じ文言: `job <id> is still in progress; logs will be available when it is complete`
+- 標準出力には何も出ない
+
+`JobLog` はこのエラーをそのまま返す（追加の分岐は無い）。TUI 側（Task 7）は
+ログ欄にこの stderr の文言をそのまま出す。
 
 ## 3. バックエンドの取り方
 

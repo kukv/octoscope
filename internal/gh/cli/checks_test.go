@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -167,6 +169,26 @@ func TestAJobThatDidNotFailReturnsNoLines(t *testing.T) {
 	}
 	if len(lines) != 0 {
 		t.Errorf("lines = %v, want none", lines)
+	}
+}
+
+// A job still running has no log to give: gh exits 1 and explains why on
+// stderr instead of printing anything. JobLog must hand that error back
+// unchanged so the checks view can show it as-is.
+func TestJobLogPassesAnInProgressJobsErrorThroughUnchanged(t *testing.T) {
+	t.Parallel()
+
+	stderr, err := os.ReadFile("testdata/job_log_in_progress.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantErr := fmt.Errorf("gh %s: %s", "run", strings.TrimSpace(string(stderr)))
+	c := &Client{repo: "kukv/octoscope", run: func(context.Context, string, ...string) ([]byte, error) {
+		return nil, wantErr
+	}}
+	_, err = c.JobLog(context.Background(), "", 101759970990, false)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("err = %v, want %v", err, wantErr)
 	}
 }
 
