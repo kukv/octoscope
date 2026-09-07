@@ -83,6 +83,27 @@ type row struct {
 	key     string
 }
 
+// mode is which overlay is on screen (.claude/rules/tui.md). loading is not
+// one of these: c, v and X are gated on the review context, not on the diff,
+// so an overlay can be open while the files are still on their way.
+type mode uint8
+
+const (
+	modeView mode = iota
+	modeCompose
+	modeSubmit
+	modeDiscard
+)
+
+// phase is where the current mode is in its round trip. There is no loading
+// phase: what an overlay needs is on the model before its key is accepted.
+type phase uint8
+
+const (
+	phaseIdle    phase = iota
+	phaseWorking       // sending
+)
+
 type Model struct {
 	src Source
 	ref gh.ItemRef
@@ -122,12 +143,15 @@ type Model struct {
 	// file list. h and l move between them.
 	sidebar bool
 
-	// textarea, composing and posting are the line-comment composer. It is
-	// the same shape as detail's: ctrl+s sends, esc discards the draft.
-	textarea  textarea.Model
-	composing bool
-	posting   bool
-	postErr   string
+	mode  mode
+	phase phase
+
+	// errText is the last failure of whichever overlay is up. modeView
+	// draws it nowhere -- the diff's own failures go to reviewErr and
+	// declined -- so c, v and X each clear it before they open.
+	errText string
+
+	textarea textarea.Model
 
 	// target is the line and side the open (or in-flight) comment was
 	// started against, captured by startComposing at c-time rather than read
@@ -142,27 +166,16 @@ type Model struct {
 	// second message would only repeat it.
 	declined string
 
-	// submit is the review submission popup (v), a small window drawn over
-	// this view rather than a view of its own (see review.go). submitErr is
-	// a failed submission's text, kept here rather than in submit itself so
-	// the popup's own fields stay just its event and its note.
-	submit     review.Model
-	submitting bool
-	submitErr  string
-
-	// discarding asks before X throws the pending review away.
-	// discardWorking is separate from discarding so a second y sent before
-	// DiscardReview's answer lands cannot fire the call twice.
-	discarding     bool
-	discardWorking bool
-	discardErr     string
+	// submit is the popup drawn over this view rather than a view of its
+	// own (see review.go).
+	submit review.Model
 }
 
 // New builds the view for one pull request. It takes only what names the
 // pull request: the title, the branches and the size of the change arrive
-// with the review context (Task 7), because a Work card and a Repos row know
-// different amounts about a pull request and neither knows all of it. It also
-// keeps the argument list to two (.claude/rules/go-style.md).
+// with the review context, because a Work card and a Repos row know different
+// amounts about a pull request and neither knows all of it. It also keeps the
+// argument list to two (.claude/rules/go-style.md).
 func New(src Source, ref gh.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -209,112 +222,27 @@ func (m Model) fetchReview() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-		// Below minWidthForSidebar the file list is not drawn at all; a
-		// cursor left pointing at it would be on a pane that no longer
-		// exists.
-		if !m.showSidebar() {
-			m.sidebar = false
-		}
-		m.textarea.SetWidth(max(m.width, 0))
-		if m.submit.Active() {
-			m.submit, _ = m.submit.Update(msg)
-		}
-		return m, nil
+		return m.resize(msg), nil
 	case diffMsg:
-		// The request for the pull request the user just left is still in
-		// flight; its answer must not replace this one's.
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.loading = false
-		m.files = msg.files
-		m.file, m.top, m.fileTop = 0, 0, 0
-		m.rows = m.buildRows()
-		m.row = firstRow(m.rows)
-		m.declined = ""
-		return m.follow(), nil
+		return m.filesArrived(msg), nil
 	case reviewMsg:
-		// The review context for the pull request the user just left is
-		// still in flight; its answer must not land here.
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.review = msg.ctx
-		m.reviewErr = nil
-		m.declined = ""
-		m.rows = m.buildRows()
-		m.row = clamp(m.row, len(m.rows)-1)
-		m = m.follow()
-		return m, nil
+		return m.reviewArrived(msg), nil
 	case reviewErrMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.reviewErr = msg.err
-		m.declined = ""
-		return m, nil
+		return m.reviewFailed(msg), nil
 	case errMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.loading = false
-		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+		return m.fetchFailed(msg)
 	case commentPostedMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.posting = false
-		m.postErr = ""
-		m.textarea.Reset()
-		m.target = gh.PendingComment{}
-		m.review.PendingID = msg.reviewID
-		return m, m.fetchReview()
+		return m.commentPosted(msg)
 	case commentErrorMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.posting = false
-		m.composing = true
-		m.postErr = msg.err.Error()
-		return m, nil
+		return m.commentFailed(msg), nil
 	case review.CancelledMsg:
-		// Also reaches here when the diff is drawn over the detail view and
-		// the submission was detail's own (broadcast hands the message to
-		// both); only the one that actually opened the popup acts on it.
-		if !m.submitting {
-			return m, nil
-		}
-		m.submitting = false
-		return m, nil
+		return m.submitCancelled(), nil
 	case review.SubmittedMsg:
-		if !m.submitting {
-			return m, nil
-		}
-		m.submitting = false
-		m.submitErr = ""
-		m.review.PendingID = ""
-		return m, m.fetchReview()
+		return m.submitDone()
 	case review.ErrorMsg:
-		if !m.submitting {
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.submit, cmd = m.submit.Update(msg)
-		m.submitErr = msg.Err.Error()
-		return m, cmd
+		return m.submitFailed(msg)
 	case discardedMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.discardWorking = false
-		if msg.err != nil {
-			m.discardErr = msg.err.Error()
-			return m, nil
-		}
-		m.discarding = false
-		m.review.PendingID = ""
-		return m, m.fetchReview()
+		return m.discarded(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
@@ -322,22 +250,156 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spin, cmd = m.spin.Update(msg)
-		return m, cmd
+		return m.tick(msg)
 	}
 	return m, nil
 }
 
+func (m Model) resize(msg tea.WindowSizeMsg) Model {
+	m.width, m.height = msg.Width, msg.Height
+	// Below minWidthForSidebar the file list is not drawn at all; a
+	// cursor left pointing at it would be on a pane that no longer
+	// exists.
+	if !m.showSidebar() {
+		m.sidebar = false
+	}
+	m.textarea.SetWidth(max(m.width, 0))
+	if m.submit.Active() {
+		m.submit, _ = m.submit.Update(msg)
+	}
+	return m
+}
+
+func (m Model) filesArrived(msg diffMsg) Model {
+	// The request for the pull request the user just left is still in
+	// flight; its answer must not replace this one's.
+	if msg.ref != m.ref {
+		return m
+	}
+	m.loading = false
+	m.files = msg.files
+	m.file, m.top, m.fileTop = 0, 0, 0
+	m.rows = m.buildRows()
+	m.row = firstRow(m.rows)
+	m.declined = ""
+	return m.follow()
+}
+
+func (m Model) reviewArrived(msg reviewMsg) Model {
+	// The review context for the pull request the user just left is
+	// still in flight; its answer must not land here.
+	if msg.ref != m.ref {
+		return m
+	}
+	m.review = msg.ctx
+	m.reviewErr = nil
+	m.declined = ""
+	m.rows = m.buildRows()
+	m.row = clamp(m.row, len(m.rows)-1)
+	m = m.follow()
+	return m
+}
+
+func (m Model) reviewFailed(msg reviewErrMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.reviewErr = msg.err
+	m.declined = ""
+	return m
+}
+
+func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.loading = false
+	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+}
+
+func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.textarea.Reset()
+	m.target = gh.PendingComment{}
+	m.review.PendingID = msg.reviewID
+	return m, m.fetchReview()
+}
+
+func (m Model) commentFailed(msg commentErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.phase = phaseIdle
+	m.errText = msg.err.Error()
+	return m
+}
+
+func (m Model) submitCancelled() Model {
+	// Also reaches here when the diff is drawn over the detail view and
+	// the submission was detail's own (broadcast hands the message to
+	// both); only the one that actually opened the popup acts on it.
+	if m.mode != modeSubmit {
+		return m
+	}
+	// A failed submission's text is left on errText: nothing outside the
+	// popup draws it, and c, v and X each clear it before they open.
+	m.mode, m.phase = modeView, phaseIdle
+	return m
+}
+
+func (m Model) submitDone() (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.review.PendingID = ""
+	return m, m.fetchReview()
+}
+
+func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.submit, cmd = m.submit.Update(msg)
+	m.errText = msg.Err.Error()
+	return m, cmd
+}
+
+func (m Model) discarded(msg discardedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.phase = phaseIdle
+	if msg.err != nil {
+		m.errText = msg.err.Error()
+		return m, nil
+	}
+	m.mode = modeView
+	m.review.PendingID = ""
+	return m, m.fetchReview()
+}
+
+func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spin, cmd = m.spin.Update(msg)
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.composing || m.posting {
+	switch m.mode {
+	case modeCompose:
 		return m.handleComposeKey(msg)
-	}
-	if m.submitting {
+	case modeSubmit:
 		return m.handleSubmitKey(msg)
-	}
-	if m.discarding {
+	case modeDiscard:
 		return m.handleDiscardKey(msg)
+	case modeView:
 	}
 	switch msg.String() {
 	case "esc", "q":

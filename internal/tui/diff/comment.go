@@ -62,8 +62,8 @@ func (m Model) startComposing() Model {
 	m.declined = ""
 	line, side := r.line.Line()
 	m.target = gh.PendingComment{Path: m.files[m.file].Path, Line: line, Side: side}
-	m.composing = true
-	m.postErr = ""
+	m.mode, m.phase = modeCompose, phaseIdle
+	m.errText = ""
 	m.textarea.Reset()
 	m.textarea.Focus()
 	return m
@@ -84,9 +84,8 @@ func (m Model) post() (Model, tea.Cmd) {
 		PullRequestID: m.review.PullRequestID,
 		PendingID:     m.review.PendingID,
 	}
-	m.composing = false
-	m.posting = true
-	m.postErr = ""
+	m.phase = phaseWorking
+	m.errText = ""
 	return m, func() tea.Msg {
 		id, err := src.PostLineComment(target, comment)
 		if err != nil {
@@ -100,13 +99,13 @@ func (m Model) post() (Model, tea.Cmd) {
 // detail's: ctrl+s sends, esc discards the draft, everything else goes to
 // the textarea.
 func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.posting {
+	if m.phase == phaseWorking {
 		return m, nil // ignore every other key while the comment is in flight
 	}
 	switch msg.String() {
 	case "esc":
-		m.composing = false
-		m.postErr = ""
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		m.target = gh.PendingComment{}
 		m.textarea.Reset()
 		return m, nil

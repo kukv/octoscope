@@ -26,7 +26,7 @@ func (m Model) View() tea.View {
 	v := tea.NewView(content)
 	v.AltScreen = true
 	// Nothing else turns the mouse on: without this the terminal reports no
-	// clicks and no wheel at all (spec 4).
+	// clicks and no wheel at all.
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
@@ -39,9 +39,8 @@ func (m Model) activeTab() string {
 }
 
 // tabLabels names the tabs on offer, in display order. Without a target
-// repository the Repos tab is not offered at all (spec 3.4). Both the tab row
-// and the mouse hit-test read this, so they cannot disagree about where a
-// label sits.
+// repository the Repos tab is not offered at all. Both the tab row and the
+// mouse hit-test read this, so they cannot disagree about where a label sits.
 func (m Model) tabLabels() []string {
 	labels := []string{"1 " + i18n.T("tab.work")}
 	if m.opts.HasRepo {

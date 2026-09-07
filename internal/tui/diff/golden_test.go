@@ -122,9 +122,22 @@ func TestGolden(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
 				golden.Assert(t, fmt.Sprintf("diff_%s_%d", lang.name, w), goldenModel(w).View())
+				golden.Assert(t, fmt.Sprintf("diff_compose_%s_%d", lang.name, w), composingModel(w).View())
+				golden.Assert(t, fmt.Sprintf("diff_submit_%s_%d", lang.name, w), submittingModel(w).View())
+				golden.Assert(t, fmt.Sprintf("diff_discard_%s_%d", lang.name, w), discardingModel(w).View())
+				golden.Assert(t, fmt.Sprintf("diff_loading_%s_%d", lang.name, w), loadingModel(w).View())
 			})
 		}
 	}
+}
+
+// loadingModel is the diff before either its files or its review context
+// has arrived.
+func loadingModel(width int) Model {
+	m := New(&fakeSource{files: goldenFixture()},
+		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	return m
 }
 
 // TestNoLineIsWiderThanTheTerminal is what catches a tab in a diff line
@@ -146,8 +159,8 @@ func reviewFailureModel(width int) Model {
 	return m
 }
 
-// submittingModel is goldenModel with the review popup open, a pending
-// review already on the diff so the popup has a line comment to count.
+// submittingModel is goldenModel with the review popup open. goldenReview's
+// thread comment is not pending, so the popup counts no line comments.
 func submittingModel(width int) Model {
 	m := goldenModel(width)
 	m.review.PendingID = "PRR_1"

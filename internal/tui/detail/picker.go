@@ -27,8 +27,7 @@ type picker struct {
 	items    []pickItem
 	original map[string]bool // what was applied when the picker opened
 	cursor   int
-	offset   int    // index of the first row in the scroll window
-	err      string // the most recent apply failure
+	offset   int // index of the first row in the scroll window
 }
 
 // newPicker builds a picker whose items are the union of candidates and the
@@ -95,7 +94,7 @@ func (p picker) diff() (add, remove []string) {
 	return add, remove
 }
 
-func (p picker) listView(height, width int) string {
+func (p picker) listView(height, width int, errText string) string {
 	var b strings.Builder
 	b.WriteString(layout.ClipLines(theme.Title().Render(p.title), width) + "\n\n")
 	if len(p.items) == 0 {
@@ -118,8 +117,8 @@ func (p picker) listView(height, width int) string {
 		}
 		b.WriteString(layout.ClipLines(cursorPrefix(i == p.cursor)+box+" "+name, width) + "\n")
 	}
-	if p.err != "" {
-		b.WriteString("\n" + wrapErr(p.err, width) + "\n")
+	if errText != "" {
+		b.WriteString("\n" + wrapErr(errText, width) + "\n")
 	}
 	return b.String()
 }

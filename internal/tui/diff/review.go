@@ -38,8 +38,8 @@ func (m Model) openSubmit() Model {
 	}
 	m.submit = review.New(m.src, target)
 	m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-	m.submitting = true
-	m.submitErr = ""
+	m.mode, m.phase = modeSubmit, phaseIdle
+	m.errText = ""
 	return m
 }
 
@@ -71,21 +71,23 @@ func (m Model) startDiscard() Model {
 		return m
 	}
 	m.declined = ""
-	m.discarding = true
-	m.discardErr = ""
+	m.mode, m.phase = modeDiscard, phaseIdle
+	m.errText = ""
 	return m
 }
 
+// handleDiscardKey swallows every key while the discard is in flight, which
+// is what keeps a second y from firing DiscardReview twice.
 func (m Model) handleDiscardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.discardWorking {
-		return m, nil // ignore every other key while the discard is in flight
+	if m.phase == phaseWorking {
+		return m, nil
 	}
 	switch msg.String() {
 	case "y":
 		return m.discard()
 	case "n", "esc":
-		m.discarding = false
-		m.discardErr = ""
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		return m, nil
 	}
 	return m, nil
@@ -93,8 +95,8 @@ func (m Model) handleDiscardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func (m Model) discard() (Model, tea.Cmd) {
 	src, ref, reviewID := m.src, m.ref, m.review.PendingID
-	m.discardWorking = true
-	m.discardErr = ""
+	m.phase = phaseWorking
+	m.errText = ""
 	return m, func() tea.Msg {
 		return discardedMsg{ref: ref, err: src.DiscardReview(reviewID)}
 	}

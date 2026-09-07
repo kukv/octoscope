@@ -97,7 +97,7 @@ func TestPickerCursorAndScroll(t *testing.T) {
 
 func TestPickerListViewShowsItems(t *testing.T) {
 	p := newPicker(pickLabels, "Labels", []string{"bug", "wip"}, nil, []string{"bug"})
-	view := p.listView(20, 80)
+	view := p.listView(20, 80, "")
 	for _, want := range []string{"Labels", "[x] bug", "[ ] wip"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("listView missing %q:\n%s", want, view)
@@ -124,12 +124,13 @@ func TestLOpensLabelPickerPrechecked(t *testing.T) {
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("l"))
-	if !m.pickerLoading || cmd == nil {
-		t.Fatalf("pickerLoading = %v, cmd = %v; want loading with fetch cmd", m.pickerLoading, cmd)
+	if m.mode != modePick || m.phase != phaseLoading || cmd == nil {
+		t.Fatalf("mode/phase = %v/%v, cmd = %v; want the candidates in flight",
+			m.mode, m.phase, cmd)
 	}
 	m, _ = m.Update(cmd()) // pickerCandidatesMsg
-	if !m.picking || m.pickerLoading {
-		t.Fatalf("picking = %v, pickerLoading = %v; want picking", m.picking, m.pickerLoading)
+	if m.mode != modePick || m.phase != phaseIdle {
+		t.Fatalf("mode/phase = %v/%v; want the picker open", m.mode, m.phase)
 	}
 	if m.picker.kind != pickLabels || len(m.picker.items) != 2 {
 		t.Fatalf("picker = %+v, want 2 label items", m.picker)
@@ -145,7 +146,7 @@ func TestAOpensAssigneePicker(t *testing.T) {
 		users: []string{"alice", "bob"},
 	}
 	m := openPicker(t, f, prRef(), "a")
-	if !m.picking || m.picker.kind != pickAssignees || len(m.picker.items) != 2 {
+	if m.mode != modePick || m.picker.kind != pickAssignees || len(m.picker.items) != 2 {
 		t.Fatalf("picker = %+v, want 2 assignee items", m.picker)
 	}
 }
@@ -161,8 +162,8 @@ func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 	m, _ = m.Update(key("j"))
 	m, _ = m.Update(key("space"))
 	m, cmd := m.Update(key("enter"))
-	if !m.applying || cmd == nil {
-		t.Fatalf("applying = %v, cmd = %v; want applying with edit cmd", m.applying, cmd)
+	if m.phase != phaseWorking || cmd == nil {
+		t.Fatalf("phase = %v, cmd = %v; want the edit in flight", m.phase, cmd)
 	}
 	msg := cmd()
 	if _, ok := msg.(pickerAppliedMsg); !ok {
@@ -172,9 +173,9 @@ func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 		t.Fatalf("editCalls = %v, want [pr:labels::1:add=wip:remove=bug]", f.editCalls)
 	}
 	m, cmd = m.Update(msg)
-	if m.picking || m.applying || !m.loading || cmd == nil {
-		t.Errorf("after applied: picking=%v applying=%v loading=%v cmd=%v; want false,false,true,non-nil",
-			m.picking, m.applying, m.loading, cmd)
+	if m.mode != modeView || m.phase != phaseLoading || cmd == nil {
+		t.Errorf("after applied: mode/phase = %v/%v, cmd = %v; want the body reloading",
+			m.mode, m.phase, cmd)
 	}
 }
 
@@ -185,8 +186,8 @@ func TestPickerNoChangeClosesWithoutEdit(t *testing.T) {
 	}
 	m := openPicker(t, f, prRef(), "l")
 	m, cmd := m.Update(key("enter")) // no toggle
-	if m.picking {
-		t.Errorf("picking = true, want closed after empty-diff enter")
+	if m.mode != modeView {
+		t.Errorf("mode = %v, want the picker closed after an empty-diff enter", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil, want nil for empty diff")
@@ -204,8 +205,8 @@ func TestPickerEscCancels(t *testing.T) {
 	m := openPicker(t, f, prRef(), "l")
 	m, _ = m.Update(key("space")) // change something
 	m, cmd := m.Update(key("esc"))
-	if m.picking {
-		t.Errorf("picking = true after esc, want false")
+	if m.mode != modeView {
+		t.Errorf("mode = %v after esc, want the body back", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil after esc, want nil (esc closes the picker, not the view)")
@@ -225,14 +226,12 @@ func TestPickerApplyErrorKeepsPicker(t *testing.T) {
 	m, _ = m.Update(key("space")) // toggle bug off -> a diff
 	m, cmd := m.Update(key("enter"))
 	m, _ = m.Update(cmd()) // pickErrorMsg
-	if !m.picking {
-		t.Errorf("picking = false, want still picking after apply error")
+	if m.mode != modePick || m.phase != phaseIdle {
+		t.Errorf("mode/phase = %v/%v, want the picker up and no longer applying",
+			m.mode, m.phase)
 	}
-	if m.applying {
-		t.Errorf("applying = true, want false after error")
-	}
-	if !strings.Contains(m.picker.err, "403") {
-		t.Errorf("picker.err = %q, want to contain 403", m.picker.err)
+	if !strings.Contains(m.errText, "403") {
+		t.Errorf("errText = %q, want to contain 403", m.errText)
 	}
 	if !strings.Contains(m.View(), "403") {
 		t.Errorf("picker view missing error text:\n%s", m.View())
@@ -246,15 +245,16 @@ func TestPickerFetchErrorInlineOnDetail(t *testing.T) {
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("l"))
-	m, cmd = m.Update(cmd()) // pickErrorMsg (picking was never set)
-	if m.picking || m.pickerLoading {
-		t.Errorf("picking/pickerLoading = %v/%v, want false", m.picking, m.pickerLoading)
+	m, cmd = m.Update(cmd()) // pickErrorMsg (the picker never opened)
+	if m.mode != modeView || m.phase != phaseIdle {
+		t.Errorf("mode/phase = %v/%v, want the body back with nothing in flight",
+			m.mode, m.phase)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil, want nil (a candidate fetch failure stays inline)")
 	}
-	if !strings.Contains(m.actionErr, "403") {
-		t.Errorf("actionErr = %q, want to contain 403", m.actionErr)
+	if !strings.Contains(m.errText, "403") {
+		t.Errorf("errText = %q, want to contain 403", m.errText)
 	}
 }
 
@@ -282,16 +282,16 @@ func TestPickerLoadingIgnoresKeys(t *testing.T) {
 	}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("l"))
-	if !m.pickerLoading {
-		t.Fatalf("pickerLoading = false, want true right after pressing l")
+	if m.mode != modePick || m.phase != phaseLoading {
+		t.Fatalf("mode/phase = %v/%v right after pressing l, want the candidates in flight",
+			m.mode, m.phase)
 	}
 	m, cmd := m.Update(key("x")) // fetch still in flight; must be a no-op
 	if cmd != nil {
-		t.Errorf("cmd = %v, want nil while pickerLoading", cmd)
+		t.Errorf("cmd = %v, want nil while the candidates are in flight", cmd)
 	}
-	if m.confirming || m.composing || m.picking {
-		t.Errorf("confirming=%v composing=%v picking=%v, want all false while pickerLoading",
-			m.confirming, m.composing, m.picking)
+	if m.mode != modePick || m.phase != phaseLoading {
+		t.Errorf("mode/phase = %v/%v, want x to have changed nothing", m.mode, m.phase)
 	}
 }
 
@@ -302,16 +302,17 @@ func TestPickerIgnoresKeysWhileApplying(t *testing.T) {
 	}
 	m := openPicker(t, f, prRef(), "l")
 	m, _ = m.Update(key("space"))
-	m, _ = m.Update(key("enter")) // applying == true (the cmd is deliberately not run)
-	if !m.applying {
-		t.Fatalf("precondition: applying = false, want true")
+	m, _ = m.Update(key("enter")) // the edit cmd is deliberately not run
+	if m.phase != phaseWorking {
+		t.Fatalf("precondition: phase = %v, want the edit in flight", m.phase)
 	}
 	m, cmd := m.Update(key("esc"))
 	if cmd != nil {
 		t.Errorf("cmd = non-nil while applying, want nil")
 	}
-	if !m.applying || !m.picking {
-		t.Errorf("applying/picking changed while applying: applying=%v picking=%v", m.applying, m.picking)
+	if m.mode != modePick || m.phase != phaseWorking {
+		t.Errorf("mode/phase = %v/%v, want pick/working while the edit is in flight",
+			m.mode, m.phase)
 	}
 }
 
@@ -327,4 +328,41 @@ func TestPickerViewShowsItemsAndHelp(t *testing.T) {
 			t.Errorf("picker view missing %q:\n%s", want, view)
 		}
 	}
+}
+
+// TestLeavingThePickerTakesItsErrorWithIt guards the one string that carries
+// every failure: once the picker is gone the body must not go on showing its
+// error. Both ways out are covered: esc, and the enter that closes because
+// nothing is left to apply.
+func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
+	failedApply := func(t *testing.T) Model {
+		t.Helper()
+		f := &fakeSource{
+			pr:      gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
+			labels:  []gh.Label{{Name: "bug"}, {Name: "wip"}},
+			editErr: errors.New("gh pr: HTTP 403 forbidden"),
+		}
+		m := openPicker(t, f, prRef(), "l")
+		m, _ = m.Update(key("space")) // toggle bug off -> a diff to apply
+		m, cmd := m.Update(key("enter"))
+		m, _ = m.Update(cmd()) // pickErrorMsg
+		return m
+	}
+
+	t.Run("esc", func(t *testing.T) {
+		m := failedApply(t)
+		m, _ = m.Update(key("esc"))
+		if strings.Contains(m.View(), "403") {
+			t.Errorf("the picker's error is still on the body after esc:\n%s", m.View())
+		}
+	})
+
+	t.Run("enter with nothing to apply", func(t *testing.T) {
+		m := failedApply(t)
+		m, _ = m.Update(key("space")) // toggle bug back on -> an empty diff
+		m, _ = m.Update(key("enter"))
+		if strings.Contains(m.View(), "403") {
+			t.Errorf("the picker's error is still on the body after an empty-diff enter:\n%s", m.View())
+		}
+	})
 }

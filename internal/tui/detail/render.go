@@ -15,26 +15,25 @@ import (
 )
 
 func (m Model) View() string {
-	if m.composing {
-		return m.composeView()
-	}
-	if m.confirming {
-		return m.confirmView()
-	}
-	if m.submitting {
-		return m.submitView()
-	}
-	if m.picking {
-		return m.pickerView()
-	}
-	if m.loading || m.pickerLoading || m.openingReview {
+	if m.phase == phaseLoading {
 		return layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
+	}
+	switch m.mode {
+	case modeCompose:
+		return m.composeView()
+	case modeConfirm:
+		return m.confirmView()
+	case modeSubmit:
+		return m.submitView()
+	case modePick:
+		return m.pickerView()
+	case modeView:
 	}
 	header := theme.Title().Render(m.title)
 	footer := theme.Dim().Render(m.footer())
 	body := layout.ClipLines(header, m.width) + "\n" + m.body.View() + "\n"
-	if m.actionErr != "" {
-		body += wrapErr(m.actionErr, m.width) + "\n"
+	if m.errText != "" {
+		body += wrapErr(m.errText, m.width) + "\n"
 	}
 	return body + layout.ClipLines(footer, m.width)
 }
@@ -77,8 +76,8 @@ func (m Model) footerHints() []string {
 func (m Model) submitView() string {
 	body := layout.ClipLines(theme.Title().Render(m.title), m.width) + "\n\n"
 	body += m.submit.View() + "\n"
-	if m.submitErr != "" {
-		body += wrapErr(m.submitErr, m.width) + "\n"
+	if m.errText != "" {
+		body += wrapErr(m.errText, m.width) + "\n"
 	}
 	return body + layout.ClipLines(theme.Dim().Render(i18n.T("footer.submit")), m.width)
 }
@@ -95,8 +94,8 @@ func wrapErr(text string, w int) string {
 }
 
 func (m Model) pickerView() string {
-	body := m.picker.listView(m.height, m.width)
-	if m.applying {
+	body := m.picker.listView(m.height, m.width, m.errText)
+	if m.phase == phaseWorking {
 		return body + "\n" + layout.ClipLines(m.spin.View()+" "+i18n.T("picker.applying"), m.width) + "\n"
 	}
 	return body + "\n" + layout.ClipLines(theme.Dim().Render(i18n.T("footer.picker")), m.width)
@@ -132,7 +131,7 @@ func (m Model) confirmView() string {
 	var b strings.Builder
 	b.WriteString(layout.ClipLines(header, m.width) + "\n\n")
 	b.WriteString(i18n.T(id))
-	if m.working {
+	if m.phase == phaseWorking {
 		b.WriteString(m.spin.View() + " " + i18n.T("confirm.working") + "\n")
 	} else {
 		b.WriteString(theme.Dim().Render(i18n.T("confirm.yes_no")))
@@ -145,10 +144,10 @@ func (m Model) composeView() string {
 	title := theme.Title().Render(i18n.Tf("compose.title", map[string]any{"Title": m.title}))
 	b.WriteString(layout.ClipLines(title, m.width) + "\n\n")
 	b.WriteString(m.textarea.View() + "\n\n")
-	if m.postErr != "" {
-		b.WriteString(wrapErr(m.postErr, m.width) + "\n\n")
+	if m.errText != "" {
+		b.WriteString(wrapErr(m.errText, m.width) + "\n\n")
 	}
-	if m.posting {
+	if m.phase == phaseWorking {
 		b.WriteString(layout.ClipLines(m.spin.View()+" "+i18n.T("compose.posting"), m.width) + "\n")
 	} else {
 		b.WriteString(layout.ClipLines(theme.Dim().Render(i18n.T("footer.compose")), m.width))
@@ -194,7 +193,7 @@ func issueMarkdown(it usecase.Item) string {
 
 // stateText and reviewText name a state in the reader's language. GitHub's
 // own spelling stopped at the access layer (.claude/rules/architecture.md),
-// and a state word is ours to translate (spec 6.1).
+// and a state word is ours to translate.
 func stateText(s gh.ItemState) string {
 	switch s {
 	case gh.StateOpen:

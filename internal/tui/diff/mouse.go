@@ -3,7 +3,7 @@ package diff
 import tea "charm.land/bubbletea/v2"
 
 // The mouse handling below reads the same geometry render.go draws with --
-// showSidebar, sidebarWidth, m.gutter, headerHeight, paneHeight and m.top --
+// showSidebar, sidebarWidth, headerHeight, paneHeight and m.top --
 // because a hit-test that computes the layout a second time is a hit-test
 // that drifts.
 
@@ -14,7 +14,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
-	if m.composing || m.posting || m.submitting || m.discarding {
+	if m.mode != modeView {
 		return m, nil
 	}
 	if m.showSidebar() && msg.X < sidebarWidth {
@@ -36,9 +36,8 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	// Clicking the selected row opens it -- if it has anything to open.
-	// There is no double click to detect (spec 4.0): Bubble Tea does not
-	// report one, and timing two clicks ourselves would put a clock in
-	// Update.
+	// There is no double click to detect: Bubble Tea does not report one,
+	// and timing two clicks ourselves would put a clock in Update.
 	if i == m.row && !m.sidebar {
 		return m.toggleCollapsed(), nil
 	}
@@ -51,7 +50,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 // handleMouseWheel moves whatever is under the pointer: the file list over
 // the sidebar, the diff pane otherwise.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
-	if m.composing || m.posting || m.submitting || m.discarding {
+	if m.mode != modeView {
 		return m, nil
 	}
 	delta := 1

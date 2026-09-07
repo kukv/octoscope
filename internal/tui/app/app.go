@@ -36,7 +36,7 @@ type Options struct {
 	// the working directory is a subprocess, and doing it before the UI
 	// started left the terminal blank for as long as it took. The root asks
 	// as soon as it has a size, and the Repos tab appears when the answer
-	// arrives (spec 3.4).
+	// arrives.
 	HasRepo bool
 }
 
@@ -166,19 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 	case repoResolvedMsg:
-		if !msg.found {
-			m.repoLookupTimedOut = msg.timedOut
-			return m, nil
-		}
-		m.opts.HasRepo = true
-		// broadcast skips the list until this point, so it never saw the
-		// WindowSizeMsg that told the others how wide they are: an unsized
-		// list clips nothing and runs off the terminal.
-		m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
-			Width:  m.width,
-			Height: max(m.height-tabRowHeight, 1),
-		})
-		return m, m.repo.Init()
+		return m.repoResolved(msg)
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
@@ -200,38 +188,65 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case repo.ErrorMsg:
 		return m.fail(msg.Err)
 	case detail.ErrorMsg:
-		// The detail view keeps requests in flight after the user leaves it.
-		// Their failures must not drag a closed view's error onto the screen.
-		if !m.has(overlayDetail) {
-			return m, nil
-		}
-		return m.failOverlay(msg.Err, overlayDetail)
+		return m.detailFailed(msg)
 	case diff.ErrorMsg:
-		// Same rule as detail.ErrorMsg: a request outlives the view that
-		// started it, and its failure must not reach the error screen once
-		// the diff is no longer on the stack.
-		if !m.has(overlayDiff) {
-			return m, nil
-		}
-		return m.failOverlay(msg.Err, overlayDiff)
+		return m.diffFailed(msg)
 	case review.SubmittedMsg:
-		// detail and diff each refetch their own PR when a review goes out
-		// (broadcast below reaches them); the board and the Repos list have
-		// no popup of their own to notice from, so the root refreshes them
-		// (spec 4.4.2).
-		next, cmd := m.broadcast(msg)
-		m = next.(Model)
-		var workCmd tea.Cmd
-		m.work, workCmd = m.work.Refresh()
-		cmds := []tea.Cmd{cmd, workCmd}
-		if m.opts.HasRepo {
-			var repoCmd tea.Cmd
-			m.repo, repoCmd = m.repo.Refresh()
-			cmds = append(cmds, repoCmd)
-		}
-		return m, tea.Batch(cmds...)
+		return m.reviewSubmitted(msg)
 	}
 	return m.broadcast(msg)
+}
+
+func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
+	if !msg.found {
+		m.repoLookupTimedOut = msg.timedOut
+		return m, nil
+	}
+	m.opts.HasRepo = true
+	// broadcast skips the list until this point, so it never saw the
+	// WindowSizeMsg that told the others how wide they are: an unsized
+	// list clips nothing and runs off the terminal.
+	m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
+		Width:  m.width,
+		Height: max(m.height-tabRowHeight, 1),
+	})
+	return m, m.repo.Init()
+}
+
+// The detail view keeps requests in flight after the user leaves it.
+// Their failures must not drag a closed view's error onto the screen.
+func (m Model) detailFailed(msg detail.ErrorMsg) (tea.Model, tea.Cmd) {
+	if !m.has(overlayDetail) {
+		return m, nil
+	}
+	return m.failOverlay(msg.Err, overlayDetail)
+}
+
+// Same rule as detail.ErrorMsg: a request outlives the view that
+// started it, and its failure must not reach the error screen once
+// the diff is no longer on the stack.
+func (m Model) diffFailed(msg diff.ErrorMsg) (tea.Model, tea.Cmd) {
+	if !m.has(overlayDiff) {
+		return m, nil
+	}
+	return m.failOverlay(msg.Err, overlayDiff)
+}
+
+// detail and diff each refetch their own PR when a review goes out
+// (broadcast below reaches them); the board and the Repos list have
+// no popup of their own to notice from, so the root refreshes them.
+func (m Model) reviewSubmitted(msg review.SubmittedMsg) (tea.Model, tea.Cmd) {
+	next, cmd := m.broadcast(msg)
+	m = next.(Model)
+	var workCmd tea.Cmd
+	m.work, workCmd = m.work.Refresh()
+	cmds := []tea.Cmd{cmd, workCmd}
+	if m.opts.HasRepo {
+		var repoCmd tea.Cmd
+		m.repo, repoCmd = m.repo.Refresh()
+		cmds = append(cmds, repoCmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // has reports whether o is anywhere on the stack, not only on top: the

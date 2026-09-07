@@ -15,21 +15,21 @@ import (
 )
 
 const (
-	// sidebarWidth is the file list's fixed width. Task 10's width
-	// degradation reads this same constant rather than a second copy of it.
+	// sidebarWidth is the file list's fixed width. The drawing and the mouse
+	// hit-test read this same constant rather than a second copy of it.
 	sidebarWidth = 22
 
 	// gutterWidth is the floor: the old line number (4), a space, the new
 	// line number (4), the +/- marker (1) and the space that separates it
 	// from the text (1). It is a floor, not a fixed size: a file whose line
 	// numbers run to five digits or more needs a wider gutter, computed by
-	// Model.gutter, which both the drawing and Task 11's hit-test read.
+	// Model.gutter, which the drawing reads to know how much width the text
+	// beside it has left.
 	gutterWidth = 11
 
 	// headerHeight is the two header lines plus the rule and "Files" heading
 	// under them. It is a constant, not a computed length, so the mouse
-	// hit-test (Task 11) can read it without laying the screen out a second
-	// time.
+	// hit-test can read it without laying the screen out a second time.
 	headerHeight = 3
 
 	// keyBarHeight is the single line at the bottom of the screen.
@@ -41,12 +41,12 @@ const (
 	// minWidthForSidebar is where the file list stops earning its columns.
 	// Below it the body would be 46 columns, which is 23 Japanese
 	// characters. It matches the width at which the Work board drops its
-	// card borders (spec 4.6).
+	// card borders.
 	minWidthForSidebar = 100
 )
 
-// showSidebar reports whether the file list is drawn at all. Task 11's hit
-// testing reads this too, so the threshold lives in one place.
+// showSidebar reports whether the file list is drawn at all. The mouse
+// hit-test reads this too, so the threshold lives in one place.
 func (m Model) showSidebar() bool { return m.width >= minWidthForSidebar }
 
 func (m Model) View() string {
@@ -66,25 +66,25 @@ func (m Model) View() string {
 	if m.declined != "" {
 		lines = append(lines, m.declinedLine())
 	}
-	if m.composing || m.posting {
+	if m.mode == modeCompose {
 		lines = append(lines, m.composerLines()...)
 	}
-	if m.submitting {
+	if m.mode == modeSubmit {
 		lines = append(lines, m.submitLines()...)
 	}
-	if m.discarding {
+	if m.mode == modeDiscard {
 		lines = append(lines, m.discardLines()...)
 	}
 	return strings.Join(append(lines, m.keyBar()), "\n")
 }
 
 func (m Model) keyBar() string {
-	switch {
-	case m.composing || m.posting:
+	switch m.mode {
+	case modeCompose:
 		return theme.Dim().Render(clip(i18n.T("footer.diff_comment"), m.width))
-	case m.submitting:
+	case modeSubmit:
 		return theme.Dim().Render(clip(i18n.T("footer.submit"), m.width))
-	case m.discarding:
+	case modeDiscard:
 		return theme.Dim().Render(clip(i18n.T("footer.discard"), m.width))
 	default:
 		return theme.Dim().Render(layout.FitKeyBar(diffHints(), m.width))
@@ -118,8 +118,8 @@ func diffHints() []string {
 // there for a retry (.claude/rules/errors.md).
 func (m Model) submitLines() []string {
 	lines := append([]string{""}, strings.Split(m.submit.View(), "\n")...)
-	if m.submitErr != "" {
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.submitErr), m.width))
+	if m.errText != "" {
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
 	}
 	return lines
 }
@@ -128,11 +128,11 @@ func (m Model) submitLines() []string {
 // same way composerHeight is, so the popup never pushes the key bar off the
 // bottom.
 func (m Model) submitHeight() int {
-	if !m.submitting {
+	if m.mode != modeSubmit {
 		return 0
 	}
 	h := 1 + len(strings.Split(m.submit.View(), "\n"))
-	if m.submitErr != "" {
+	if m.errText != "" {
 		h++
 	}
 	return h
@@ -143,9 +143,9 @@ func (m Model) submitHeight() int {
 func (m Model) discardLines() []string {
 	lines := []string{"", clip(theme.Error().Render(i18n.T("submit.discard_confirm")), m.width)}
 	switch {
-	case m.discardErr != "":
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.discardErr), m.width))
-	case m.discardWorking:
+	case m.errText != "":
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+	case m.phase == phaseWorking:
 		lines = append(lines, clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
 	}
 	return lines
@@ -154,11 +154,11 @@ func (m Model) discardLines() []string {
 // discardHeight is what discardLines takes, out of the pane's height budget
 // the same way submitHeight is.
 func (m Model) discardHeight() int {
-	if !m.discarding {
+	if m.mode != modeDiscard {
 		return 0
 	}
 	h := 2
-	if m.discardErr != "" || m.discardWorking {
+	if m.errText != "" || m.phase == phaseWorking {
 		h++
 	}
 	return h
@@ -172,9 +172,9 @@ func (m Model) discardHeight() int {
 func (m Model) composerLines() []string {
 	lines := append([]string{""}, strings.Split(m.textarea.View(), "\n")...)
 	switch {
-	case m.postErr != "":
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.postErr), m.width))
-	case m.posting:
+	case m.errText != "":
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+	case m.phase == phaseWorking:
 		lines = append(lines, clip(m.spin.View()+" "+i18n.T("diff.posting"), m.width))
 	}
 	return lines
@@ -184,11 +184,11 @@ func (m Model) composerLines() []string {
 // budget the same way reviewErrHeight is, so the composer never pushes the
 // key bar off the bottom.
 func (m Model) composerHeight() int {
-	if !m.composing && !m.posting {
+	if m.mode != modeCompose {
 		return 0
 	}
 	h := 1 + composerRows
-	if m.postErr != "" || m.posting {
+	if m.errText != "" || m.phase == phaseWorking {
 		h++
 	}
 	return h
@@ -344,9 +344,9 @@ func (m Model) body() []string {
 
 // sidebarLines draws the file list: a path per file, truncated from the
 // right when it does not fit, and the size of that file's change under it,
-// followed by the count of review threads on that file (spec 4.4.1). It
-// starts at m.fileTop, which followSidebar keeps in step with the selected
-// file, the same way m.top keeps the diff pane's cursor on screen.
+// followed by the count of review threads on that file. It starts at
+// m.fileTop, which followSidebar keeps in step with the selected file, the
+// same way m.top keeps the diff pane's cursor on screen.
 func (m Model) sidebarLines() []string {
 	if len(m.files) == 0 {
 		return nil
@@ -483,8 +483,7 @@ func (m Model) diffTextLine(l gh.DiffLine, width int) string {
 
 // gutter is the columns the line numbers and marker occupy: two
 // lineNumberWidth fields, the space between them, the marker and the space
-// that separates it from the text. The drawing and Task 11's hit-test both
-// read this method, so neither can drift from the other (spec 4.0).
+// that separates it from the text.
 func (m Model) gutter() int { return 2*m.lineNumberWidth() + 3 }
 
 // lineNumberWidth is how many columns the widest line number in the file

@@ -14,8 +14,8 @@ import (
 )
 
 // The drawer is two panes side by side: what the item is on the left, how its
-// checks are doing on the right (spec 4.1). Its height is fixed — see
-// drawerHeight — so the panes are cut to a budget rather than allowed to grow.
+// checks are doing on the right. Its height is fixed — see drawerHeight — so
+// the panes are cut to a budget rather than allowed to grow.
 const (
 	drawerRows   = drawerHeight - 1 // the rule above it takes the other line
 	drawerGap    = 3

@@ -21,8 +21,7 @@ const (
 	// drawerMinColumns is also cardBoxMinColumns: under a hundred columns a
 	// column is about seventeen wide, and a card's own box would eat two of
 	// them and leave the title with almost nothing. Both the drawer and the
-	// boxes go at the same width, so there is one number to remember
-	// (spec 4.6).
+	// boxes go at the same width, so there is one number to remember.
 	drawerMinColumns  = 100
 	singleColumnBelow = 60
 
@@ -118,7 +117,7 @@ func (m Model) boardTop() int {
 }
 
 // headingHeight is the column heading. There is no rule under it: the columns
-// are divided by the vertical rules between them (spec 4.1).
+// are divided by the vertical rules between them.
 const headingHeight = 1
 
 // board lays the columns side by side, separated by a vertical rule. Every
@@ -215,9 +214,9 @@ func (m Model) cardWindow(s gh.WorkSection, height int) int {
 }
 
 // card draws one card: what it is on the first line, where it lives and how
-// it is doing on the second (spec 4.1). Wide enough, each card gets a box of
-// its own and the selection is the box's colour; narrow, the box is dropped
-// and the cursor gutter marks the selection instead.
+// it is doing on the second. Wide enough, each card gets a box of its own and
+// the selection is the box's colour; narrow, the box is dropped and the cursor
+// gutter marks the selection instead.
 func (m Model) card(it gh.WorkItem, w int, selected bool) []string {
 	if !m.boxed() {
 		return []string{
@@ -299,8 +298,8 @@ func shortRepo(repo string) string {
 }
 
 // badges draws the labels that fit in room columns, in the colours GitHub
-// gave them (spec 4.5). A label that would be cut in half is left out
-// altogether rather than shown as a coloured fragment.
+// gave them. A label that would be cut in half is left out altogether rather
+// than shown as a coloured fragment.
 func badges(labels []gh.Label, room int) string {
 	var b strings.Builder
 	for _, l := range labels {

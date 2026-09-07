@@ -1,6 +1,7 @@
 package detail
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -46,6 +47,7 @@ func goldenModel(width int) Model {
 	// it will be drawn at.
 	f := &fakeSource{
 		pr:        goldenPR(),
+		labels:    []gh.Label{{Name: "bug", Color: "d73a4a"}},
 		reviewCtx: gh.ReviewContext{PullRequestID: "PR_128", PendingID: "PRR_1"},
 	}
 	m := New(f, prRef())
@@ -64,13 +66,30 @@ func TestGolden(t *testing.T) {
 				m := goldenModel(w)
 				golden.Assert(t, fmt.Sprintf("detail_%s_%d", lang.name, w), m.View())
 
-				confirming := m
-				confirming.confirming = true
+				// Every state below is reached by the key that opens it:
+				// a recording of an unreachable state guards nothing.
+				confirming, _ := m.Update(key("x"))
 				golden.Assert(t, fmt.Sprintf("detail_confirm_%s_%d", lang.name, w), confirming.View())
 
-				opening, cmd := m.Update(key("v"))
-				submitting, _ := opening.Update(cmd())
+				composing, _ := m.Update(key("c"))
+				golden.Assert(t, fmt.Sprintf("detail_compose_%s_%d", lang.name, w), composing.View())
+
+				opening, cmd := m.Update(key("l"))
+				golden.Assert(t, fmt.Sprintf("detail_picker_loading_%s_%d", lang.name, w), opening.View())
+				picking, _ := opening.Update(cmd())
+				golden.Assert(t, fmt.Sprintf("detail_picker_%s_%d", lang.name, w), picking.View())
+
+				openingReview, cmd := m.Update(key("v"))
+				submitting, _ := openingReview.Update(cmd())
 				golden.Assert(t, fmt.Sprintf("detail_submit_%s_%d", lang.name, w), submitting.View())
+
+				loading := New(&fakeSource{pr: goldenPR()}, prRef())
+				loading, _ = loading.Update(tea.WindowSizeMsg{Width: w, Height: 40})
+				golden.Assert(t, fmt.Sprintf("detail_loading_%s_%d", lang.name, w), loading.View())
+
+				// No other recording covers the error line.
+				failed, _ := m.Update(stateErrorMsg{err: errors.New("boom")})
+				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())
 			})
 		}
 	}
