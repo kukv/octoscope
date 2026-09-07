@@ -254,6 +254,32 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+func TestSAsksForTheChecks(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	m := loaded(f, prRef())
+	_, cmd := m.Update(key("s"))
+	if cmd == nil {
+		t.Fatal("s produced no command")
+	}
+	msg, ok := cmd().(OpenChecksMsg)
+	if !ok {
+		t.Fatalf("got %T, want OpenChecksMsg", cmd())
+	}
+	if msg.Ref != prRef() {
+		t.Errorf("Ref = %+v, want %+v", msg.Ref, prRef())
+	}
+}
+
+// TestSDoesNothingOnAnIssue is what stops the checks view opening on
+// something that has no checks.
+func TestSDoesNothingOnAnIssue(t *testing.T) {
+	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	m := loaded(f, issueRef())
+	if _, cmd := m.Update(key("s")); cmd != nil {
+		t.Errorf("s on an issue produced %T", cmd())
+	}
+}
+
 // TestOOpensTheShownItemsOwnURL pins that o opens the address GitHub gave
 // the item, rather than one octoscope spelled out itself.
 func TestOOpensTheShownItemsOwnURL(t *testing.T) {

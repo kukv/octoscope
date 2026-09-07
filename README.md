@@ -86,6 +86,7 @@ the font in use nor its coverage — so the default is the set that needs none.
 | `r` | refresh | refresh | refresh |
 | `o` | open in browser | open in browser | — |
 | `d` | open diff | open diff | — |
+| `s` | open checks | open checks | — |
 | `c` | — | comment (`Ctrl+S` send / `Esc` cancel) | comment on this line (`Ctrl+S` send / `Esc` cancel) |
 | `v` | — | open the review popup | open the review popup |
 | `X` | — | — | discard the pending review (`y` confirm / `n` cancel) |

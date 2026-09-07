@@ -15,6 +15,7 @@ import (
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/checks"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/diff"
 	"github.com/kukv/octoscope/internal/tui/repo"
@@ -34,6 +35,8 @@ type fakeSource struct {
 	labels    []gh.Label
 	files     []gh.FileDiff
 	diffErr   error
+	checks    gh.Checks
+	checksErr error
 	workCalls int
 	prCalls   int
 }
@@ -94,6 +97,18 @@ func (f *fakeSource) PostLineComment(usecase.ReviewTarget, gh.PendingComment) (s
 func (f *fakeSource) DiscardReview(string) error { return nil }
 
 func (f *fakeSource) SubmitReview(usecase.ReviewTarget, gh.ReviewEvent, string) error { return nil }
+
+func (f *fakeSource) PRChecks(context.Context, string, int) (gh.Checks, error) {
+	return f.checks, f.checksErr
+}
+
+func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine, error) {
+	return nil, nil
+}
+
+func (f *fakeSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error {
+	return nil
+}
 
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
@@ -367,6 +382,26 @@ func TestEscTakesTheDiffOffAndLeavesTheDetailView(t *testing.T) {
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
 	next, _ = next.(Model).Update(diff.ClosedMsg{})
+	got := next.(Model)
+	if len(got.stack) != 1 || got.stack[0] != overlayDetail {
+		t.Errorf("stack = %v, want just the detail view", got.stack)
+	}
+}
+
+func TestSFromTheBoardOpensTheChecksOnItsOwn(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenChecksMsg{Ref: someRef})
+	got := next.(Model)
+	if len(got.stack) != 1 || got.stack[0] != overlayChecks {
+		t.Errorf("stack = %v, want just the checks", got.stack)
+	}
+}
+
+func TestEscTakesTheChecksOffAndLeavesTheDetailView(t *testing.T) {
+	m := newTestModel(Options{HasRepo: true})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ = next.(Model).Update(detail.OpenChecksMsg{Ref: someRef})
+	next, _ = next.(Model).Update(checks.ClosedMsg{})
 	got := next.(Model)
 	if len(got.stack) != 1 || got.stack[0] != overlayDetail {
 		t.Errorf("stack = %v, want just the detail view", got.stack)

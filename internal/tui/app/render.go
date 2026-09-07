@@ -18,6 +18,8 @@ func (m Model) View() tea.View {
 		content = m.errorView()
 	case ok && top == overlayDiff:
 		content = m.diff.View()
+	case ok && top == overlayChecks:
+		content = m.checks.View()
 	case ok:
 		content = m.detail.View()
 	default:

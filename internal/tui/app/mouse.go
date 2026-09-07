@@ -28,6 +28,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch top {
 		case overlayDiff:
 			m.diff, cmd = m.diff.Update(msg)
+		case overlayChecks:
+			m.checks, cmd = m.checks.Update(msg)
 		default:
 			m.detail, cmd = m.detail.Update(msg)
 		}
