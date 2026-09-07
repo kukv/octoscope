@@ -328,8 +328,11 @@ func (m Model) logRows() []string {
 		return []string{m.spin.View() + " " + i18n.T("checks.log_loading")}
 	}
 	if len(m.log) == 0 {
-		if m.logJob != 0 && m.logJob == m.selectedJobID() && m.failedOnly {
-			return []string{theme.Dim().Render(i18n.T("checks.log_empty_failed"))}
+		if m.logJob != 0 && m.logJob == m.selectedJobID() {
+			if m.failedOnly {
+				return []string{theme.Dim().Render(i18n.T("checks.log_empty_failed"))}
+			}
+			return []string{theme.Dim().Render(i18n.T("checks.log_empty_full"))}
 		}
 		return nil
 	}

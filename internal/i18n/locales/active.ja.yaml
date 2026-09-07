@@ -266,6 +266,8 @@ checks:
     other: "ログを読み込み中..."
   log_empty_failed:
     other: "このジョブに失敗したステップはありません"
+  log_empty_full:
+    other: "このジョブはログを出力していません"
   log_full:
     other: "全ログ"
   log_failed_only:

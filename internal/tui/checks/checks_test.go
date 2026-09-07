@@ -287,6 +287,23 @@ func TestASucceededJobSaysNoStepFailed(t *testing.T) {
 	}
 }
 
+// TestAnEmptyFullLogSaysSo is the other half of the empty-log pair: the
+// failed-steps view says no step failed, and a full log that came back empty
+// left the pane blank with nothing saying whether it had even been asked for.
+func TestAnEmptyFullLogSaysSo(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture()} // JobLog answers with no lines
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("L"))
+	m, _ = m.Update(cmd())
+	if view := m.View(); !strings.Contains(view, i18n.T("checks.log_empty_full")) {
+		t.Errorf("an empty full log said nothing:\n%s", view)
+	}
+}
+
 func TestAStatusContextSaysWhyItHasNoLog(t *testing.T) {
 	t.Parallel()
 

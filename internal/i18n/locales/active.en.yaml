@@ -275,6 +275,8 @@ checks:
     other: "loading the log..."
   log_empty_failed:
     other: "no step of this job failed"
+  log_empty_full:
+    other: "this job wrote no log"
   log_full:
     other: "full log"
   log_failed_only:
