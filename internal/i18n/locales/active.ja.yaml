@@ -226,6 +226,30 @@ footer:
       other: "r:再取得"
   diff_comment:
     other: "ctrl+s:送信  esc:取消"
+  # diff の下と同じ仕組み（internal/tui/layout.FitKeyBar）で、checks の
+  # キーバーはこの並びから組み立てる。esc は先頭に置く — 落としてはいけない
+  # 唯一の出口だから。
+  checks:
+    esc:
+      other: "esc:戻る"
+    move:
+      other: "j/k:移動"
+    refresh:
+      other: "r:再取得"
+
+checks:
+  title:
+    other: "Checks"
+  none:
+    other: "この PR には check がありません"
+  loading:
+    other: "checks を読み込み中..."
+  summary:
+    other: "失敗 {{.Failing}} · 実行中 {{.Running}}"
+  decline_status_context:
+    other: "この check は GitHub Actions の外から報告されています。o で開けます"
+  decline_loading:
+    other: "checks を読み込み中です。少し待ってからもう一度"
 
 md:
   author:

@@ -1,0 +1,165 @@
+package checks
+
+import (
+	"context"
+	"slices"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/kukv/octoscope/internal/gh"
+)
+
+// Task 7 と Task 8 のテストは i18n.T と ansi.StringWidth も使う。import は
+// テストを足すときに増やす（golangci-lint が余った import を落とす)。
+
+type fakeSource struct {
+	checks gh.Checks
+	log    []gh.LogLine
+}
+
+func (f *fakeSource) PRChecks(context.Context, string, int) (gh.Checks, error) {
+	return f.checks, nil
+}
+
+func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine, error) {
+	return f.log, nil
+}
+
+func (f *fakeSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error { return nil }
+
+func (f *fakeSource) OpenWeb(string) error { return nil }
+
+// fixture is two workflows, the failing one recorded second on purpose: the
+// view has to move it to the top.
+func fixture() gh.Checks {
+	return gh.Checks{
+		Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
+		Runs: []gh.CheckRun{
+			{Name: "lint", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
+			{Name: "sca", State: gh.CheckFailure, Kind: gh.CheckKindRun, Workflow: "security", JobID: 2, RunID: 20},
+			{Name: "ci/circleci", State: gh.CheckRunning, Kind: gh.CheckKindStatus, URL: "https://circleci.example/1"},
+		},
+	}
+}
+
+func open(t *testing.T, width int) Model {
+	t.Helper()
+
+	m := New(&fakeSource{checks: fixture()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	return m
+}
+
+// key builds the KeyPressMsg for a key name, matching the shape the app uses.
+func key(s string) tea.KeyMsg {
+	switch s {
+	case "esc":
+		return tea.KeyPressMsg{Code: tea.KeyEscape}
+	case "enter":
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	default:
+		return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
+	}
+}
+
+func keyPress(s string) tea.KeyMsg { return key(s) }
+
+func press(m Model, k string) Model {
+	m, _ = m.Update(key(k))
+	return m
+}
+
+func TestTheFailingWorkflowComesFirst(t *testing.T) {
+	t.Parallel()
+
+	view := open(t, 120).View()
+	failing, passing := strings.Index(view, "sca"), strings.Index(view, "lint")
+	if failing < 0 || passing < 0 {
+		t.Fatalf("both checks should be drawn:\n%s", view)
+	}
+	if failing > passing {
+		t.Errorf("the failing check is drawn below the passing one:\n%s", view)
+	}
+}
+
+func TestTheHeaderCountsWhatIsWrong(t *testing.T) {
+	t.Parallel()
+
+	if view := open(t, 120).View(); !strings.Contains(view, "1 failing") {
+		t.Errorf("header does not count the failures:\n%s", view)
+	}
+}
+
+// interleaved is two green workflows whose checks GitHub listed alternately.
+// Ranking alone cannot separate them, so this is what catches a comparator
+// that only sorts by state.
+func interleaved() gh.Checks {
+	return gh.Checks{
+		Total: 4, Passed: 4, State: gh.CheckSuccess,
+		Runs: []gh.CheckRun{
+			{Name: "a", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
+			{Name: "b", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "release", JobID: 2, RunID: 20},
+			{Name: "c", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 3, RunID: 10},
+			{Name: "d", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "release", JobID: 4, RunID: 20},
+		},
+	}
+}
+
+func TestChecksOfOneWorkflowStayTogether(t *testing.T) {
+	t.Parallel()
+
+	m := New(&fakeSource{checks: interleaved()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: interleaved()})
+	var got []string
+	for _, r := range m.order {
+		got = append(got, r.Workflow)
+	}
+	want := []string{"CI", "CI", "release", "release"}
+	if !slices.Equal(got, want) {
+		t.Errorf("workflows in order = %v, want %v", got, want)
+	}
+}
+
+func TestEscLeavesTheView(t *testing.T) {
+	t.Parallel()
+
+	_, cmd := open(t, 120).Update(keyPress("esc"))
+	if cmd == nil {
+		t.Fatal("esc produced no command, want ClosedMsg")
+	}
+	if _, ok := cmd().(ClosedMsg); !ok {
+		t.Errorf("esc sent %T, want ClosedMsg", cmd())
+	}
+}
+
+// TestJMovesTheCursorDownTheList guards the list's own navigation: j/k are
+// what the design table gives the row, and this task builds the list they
+// move over.
+func TestJMovesTheCursorDownTheList(t *testing.T) {
+	t.Parallel()
+
+	m := open(t, 120)
+	before := m.row
+	m = press(m, "j")
+	if m.row == before {
+		t.Errorf("j did not move the cursor off row %d", before)
+	}
+}
+
+// TestNoLineIsWiderThanTheTerminal guards the narrowest width the project
+// promises to fit (.claude/rules/tui.md): every line of the view, including
+// the key bar, must stay within the terminal's own column budget.
+func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
+	t.Parallel()
+
+	for _, line := range strings.Split(open(t, 80).View(), "\n") {
+		if w := ansi.StringWidth(line); w > 80 {
+			t.Errorf("line is %d columns wide, want at most 80:\n%s", w, line)
+		}
+	}
+}

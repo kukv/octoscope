@@ -233,6 +233,32 @@ footer:
       other: "r:refresh"
   diff_comment:
     other: "ctrl+s:send  esc:cancel"
+  # checks' key bar is built from these, most important first, and dropped
+  # from the end when the terminal is too narrow for all of them (see
+  # internal/tui/layout.FitKeyBar, the same mechanism as diff's above). esc
+  # is first because it must never be the one dropped: it is the only way
+  # out of the view.
+  checks:
+    esc:
+      other: "esc:back"
+    move:
+      other: "j/k:move"
+    refresh:
+      other: "r:refresh"
+
+checks:
+  title:
+    other: "Checks"
+  none:
+    other: "no checks on this pull request"
+  loading:
+    other: "loading checks..."
+  summary:
+    other: "{{.Failing}} failing · {{.Running}} running"
+  decline_status_context:
+    other: "this check reports from outside GitHub Actions; press o to open it"
+  decline_loading:
+    other: "still loading the checks; try again in a moment"
 
 md:
   author:
