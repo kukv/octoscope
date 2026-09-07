@@ -34,23 +34,31 @@ func TestTheWheelScrollsTheBody(t *testing.T) {
 }
 
 // TestTheWheelIsIgnoredUnderAnOverlay keeps the wheel from scrolling text
-// nobody can see: the composer, the confirmation and the picker are drawn
-// over the body.
+// nobody can see: the composer, the confirmation, the picker and the submit
+// popup are drawn over the body. Each overlay is reached by the key that
+// opens it, so a state the keys cannot reach cannot creep into the table.
 func TestTheWheelIsIgnoredUnderAnOverlay(t *testing.T) {
-	base := loaded(&fakeSource{pr: longPR()}, prRef())
-	base, _ = base.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-
-	composing, confirming, picking, submitting := base, base, base, base
-	composing.composing = true
-	confirming.confirming = true
-	picking.picking = true
-	submitting.submitting = true
+	open := func(t *testing.T, k string, settle bool) Model {
+		t.Helper()
+		f := &fakeSource{
+			pr:        longPR(),
+			labels:    []gh.Label{{Name: "bug"}},
+			reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		}
+		m := loaded(f, prRef())
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+		m, cmd := m.Update(key(k))
+		if settle { // the overlay only opens once its own fetch answers
+			m, _ = m.Update(cmd())
+		}
+		return m
+	}
 
 	for name, m := range map[string]Model{
-		"the composer":     composing,
-		"the confirmation": confirming,
-		"the picker":       picking,
-		"the submit popup": submitting,
+		"the composer":     open(t, "c", false),
+		"the confirmation": open(t, "x", false),
+		"the picker":       open(t, "l", true),
+		"the submit popup": open(t, "v", true),
 	} {
 		before := m.body.View()
 		after, _ := m.Update(wheelDown())

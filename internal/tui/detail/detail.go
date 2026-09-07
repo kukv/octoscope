@@ -96,44 +96,57 @@ type (
 	}
 )
 
+// mode is which overlay is on screen. Parallel bools made 2^n nominal states
+// out of the eight this view actually has, and Update, handleKey and View
+// each assumed a different subset of them (.claude/rules/tui.md).
+type mode uint8
+
+const (
+	modeView    mode = iota // the body on its own
+	modeCompose             // the comment composer
+	modeConfirm             // the close/reopen confirmation
+	modePick                // the label/assignee picker
+	modeSubmit              // the review submission popup
+)
+
+// phase is where the current mode is in its own round trip.
+type phase uint8
+
+const (
+	phaseIdle    phase = iota
+	phaseLoading       // fetching what the mode needs to open
+	phaseWorking       // sending
+)
+
 type Model struct {
 	src Source
 	ref gh.ItemRef
 
 	width, height int
 
-	loading bool
-	spin    spinner.Model
-	body    viewport.Model
-	title   string
-	state   gh.ItemState
-	url     string
+	mode  mode
+	phase phase
 
-	textarea  textarea.Model
-	composing bool
-	posting   bool
-	postErr   string
+	// errText is the last failure, whatever produced it. Which mode is on
+	// screen decides where it is drawn, so there is nothing to gain from
+	// keeping one string per kind.
+	errText string
 
-	confirming bool
-	working    bool
-	actionErr  string
+	spin  spinner.Model
+	body  viewport.Model
+	title string
+	state gh.ItemState
+	url   string
 
-	picking       bool
-	pickerLoading bool
-	applying      bool
-	picker        picker
-	labels        []string
-	assignees     []string
+	textarea textarea.Model
+
+	picker    picker
+	labels    []string
+	assignees []string
 
 	// submit is the review submission popup (v), a small window drawn over
-	// this view rather than a view of its own. openingReview is set between
-	// pressing v and the review context it needs arriving; submitErr is a
-	// failed submission's text, kept here rather than in submit itself so
-	// the popup's own fields stay just its event and its note.
-	submit        review.Model
-	submitting    bool
-	openingReview bool
-	submitErr     string
+	// this view rather than a view of its own.
+	submit review.Model
 }
 
 func New(src Source, ref gh.ItemRef) Model {
@@ -145,7 +158,7 @@ func New(src Source, ref gh.ItemRef) Model {
 	return Model{
 		src:      src,
 		ref:      ref,
-		loading:  true,
+		phase:    phaseLoading,
 		spin:     s,
 		body:     newBody(),
 		textarea: ta,
@@ -210,7 +223,7 @@ func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 // fetched yet is not a state of its own: loading is, and every caller checks
 // it first.
 func (m Model) stateAction() (closing bool, ok bool) {
-	if m.loading {
+	if m.phase == phaseLoading {
 		return false, false
 	}
 	switch m.state {
@@ -288,9 +301,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil // an answer for an item the user has already left
 		}
 		it := msg.item
-		m.loading = false
+		m.phase = phaseIdle
 		m.state = it.State
-		m.actionErr = ""
+		m.errText = ""
 		m.labels = labelNames(it.Labels)
 		m.assignees = authorLogins(it.Assignees)
 		m.url = it.URL
@@ -303,29 +316,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case commentPostedMsg:
-		m.composing = false
-		m.posting = false
-		m.postErr = ""
+		m.errText = ""
 		m.textarea.Reset()
-		m.loading = true
+		m.mode, m.phase = modeView, phaseLoading
 		return m, fetch(m.src, m.ref)
 	case commentErrorMsg:
-		m.posting = false
-		m.postErr = msg.err.Error()
+		m.phase = phaseIdle
+		m.errText = msg.err.Error()
 		return m, nil
 	case stateChangedMsg:
-		m.confirming = false
-		m.working = false
-		m.actionErr = ""
-		m.loading = true
+		m.errText = ""
+		m.mode, m.phase = modeView, phaseLoading
 		return m, fetch(m.src, m.ref)
 	case stateErrorMsg:
-		m.confirming = false
-		m.working = false
-		m.actionErr = msg.err.Error()
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = msg.err.Error()
 		return m, nil
 	case pickerCandidatesMsg:
-		m.pickerLoading = false
 		if msg.kind == pickLabels {
 			names := make([]string, len(msg.labels))
 			colors := make(map[string]string, len(msg.labels))
@@ -337,27 +344,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		} else {
 			m.picker = newPicker(pickAssignees, i18n.T("picker.assignees"), msg.users, nil, m.assignees)
 		}
-		m.picking = true
+		m.phase = phaseIdle
 		return m, nil
 	case pickerAppliedMsg:
-		m.picking = false
-		m.applying = false
-		m.loading = true
+		m.mode, m.phase = modeView, phaseLoading
 		return m, fetch(m.src, m.ref)
 	case pickErrorMsg:
-		if m.picking {
-			m.applying = false
-			m.picker.err = msg.err.Error()
-		} else {
-			m.pickerLoading = false
-			m.actionErr = msg.err.Error()
+		if m.phase == phaseWorking { // the apply failed; the picker stays up
+			m.phase = phaseIdle
+		} else { // the candidates never arrived; there is no picker to show
+			m.mode, m.phase = modeView, phaseIdle
 		}
+		m.errText = msg.err.Error()
 		return m, nil
 	case reviewContextMsg:
 		if msg.ref != m.ref {
 			return m, nil // an answer for an item the user has already left
 		}
-		m.openingReview = false
 		target := review.Target{
 			PullRequestID:   msg.ctx.PullRequestID,
 			PendingID:       msg.ctx.PendingID,
@@ -365,53 +368,51 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.submit = review.New(m.src, target)
 		m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		m.submitting = true
-		m.submitErr = ""
+		m.phase = phaseIdle
+		m.errText = ""
 		return m, nil
 	case reviewContextErrMsg:
 		if msg.ref != m.ref {
 			return m, nil
 		}
-		m.openingReview = false
-		m.actionErr = msg.err.Error()
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = msg.err.Error()
 		return m, nil
 	case review.CancelledMsg:
-		if !m.submitting {
+		if m.mode != modeSubmit {
 			return m, nil
 		}
-		m.submitting = false
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		return m, nil
 	case review.SubmittedMsg:
-		if !m.submitting {
+		if m.mode != modeSubmit {
 			return m, nil
 		}
-		m.submitting = false
-		m.submitErr = ""
-		m.loading = true
+		m.errText = ""
+		m.mode, m.phase = modeView, phaseLoading
 		return m, fetch(m.src, m.ref)
 	case review.ErrorMsg:
-		if !m.submitting {
+		if m.mode != modeSubmit {
 			return m, nil
 		}
 		var cmd tea.Cmd
 		m.submit, cmd = m.submit.Update(msg)
-		m.submitErr = msg.Err.Error()
+		m.errText = msg.Err.Error()
 		return m, cmd
 	case errMsg:
 		if msg.ref != m.ref {
 			return m, nil
 		}
-		m.loading = false
+		m.phase = phaseIdle
 		err := msg.err
 		return m, func() tea.Msg { return ErrorMsg{err} }
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseWheelMsg:
-		// The body is the only thing here that scrolls. The composer, the
-		// confirmation, the picker and the submit popup are drawn over it,
-		// and a wheel that moved the text underneath them would be
-		// scrolling what nobody can see.
-		if m.composing || m.confirming || m.picking || m.loading || m.submitting {
+		// The body is the only thing here that scrolls, and it is only on
+		// screen with nothing over it and nothing in flight.
+		if m.mode != modeView || m.phase != phaseIdle {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -422,20 +423,22 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.composing {
+	// Nothing an overlay's keys could act on is on screen until what it was
+	// opened for arrives. modeView is the exception: the body is drawn, and
+	// q still leaves.
+	if m.mode != modeView && m.phase == phaseLoading {
+		return m, nil
+	}
+	switch m.mode {
+	case modeCompose:
 		return m.handleComposeKey(msg)
-	}
-	if m.confirming {
+	case modeConfirm:
 		return m.handleConfirmKey(msg)
-	}
-	if m.picking {
+	case modePick:
 		return m.handlePickerKey(msg)
-	}
-	if m.submitting {
+	case modeSubmit:
 		return m.handleSubmitKey(msg)
-	}
-	if m.pickerLoading || m.openingReview {
-		return m, nil // ignore keys while the candidates/review are being fetched
+	case modeView:
 	}
 	switch msg.String() {
 	case "q", "esc":
@@ -455,51 +458,51 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ref := m.ref
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "r":
-		m.loading = true
+		m.phase = phaseLoading
 		return m, fetch(m.src, m.ref)
 	case "c":
-		if m.loading {
+		if m.phase == phaseLoading {
 			return m, nil
 		}
-		m.composing = true
-		m.postErr = ""
+		m.mode, m.phase = modeCompose, phaseIdle
+		m.errText = ""
 		m.textarea.Reset()
 		m.textarea.Focus()
 		return m, textarea.Blink
 	case "x":
-		if m.loading {
+		if m.phase == phaseLoading {
 			return m, nil
 		}
 		if _, ok := m.stateAction(); !ok {
 			return m, nil // merged and the like: no action
 		}
-		m.confirming = true
-		m.actionErr = ""
+		m.mode, m.phase = modeConfirm, phaseIdle
+		m.errText = ""
 		return m, nil
 	case "v":
 		// An issue has no review. detail has no diff of its own, so unlike
 		// the diff view's v this always needs a fetch first -- there is no
 		// review context already sitting on the model to open the popup
 		// against.
-		if m.loading || m.ref.Kind != gh.ItemPR {
+		if m.phase == phaseLoading || m.ref.Kind != gh.ItemPR {
 			return m, nil
 		}
-		m.openingReview = true
-		m.actionErr = ""
+		m.mode, m.phase = modeSubmit, phaseLoading
+		m.errText = ""
 		return m, fetchReviewContext(m.src, m.ref)
 	case "l":
-		if m.loading {
+		if m.phase == phaseLoading {
 			return m, nil
 		}
-		m.pickerLoading = true
-		m.actionErr = ""
+		m.mode, m.phase = modePick, phaseLoading
+		m.errText = ""
 		return m, fetchLabelPicker(m.src, m.ref)
 	case "a":
-		if m.loading {
+		if m.phase == phaseLoading {
 			return m, nil
 		}
-		m.pickerLoading = true
-		m.actionErr = ""
+		m.mode, m.phase = modePick, phaseLoading
+		m.errText = ""
 		return m, fetchAssigneePicker(m.src, m.ref)
 	}
 	var cmd tea.Cmd
@@ -508,12 +511,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.applying {
+	if m.phase == phaseWorking {
 		return m, nil // ignore every other key while the edit is in flight
 	}
 	switch msg.String() {
 	case "esc":
-		m.picking = false
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		return m, nil
 	case "j", "down":
 		m.picker.moveDown(visibleRows(m.height))
@@ -527,11 +531,12 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "enter":
 		add, remove := m.picker.diff()
 		if len(add) == 0 && len(remove) == 0 {
-			m.picking = false // nothing changed: just close
+			m.mode, m.phase = modeView, phaseIdle // nothing changed: just close
+			m.errText = ""
 			return m, nil
 		}
-		m.applying = true
-		m.picker.err = ""
+		m.phase = phaseWorking
+		m.errText = ""
 		return m, applyPicker(m.src, m.ref, m.picker.kind, add, remove)
 	}
 	return m, nil
@@ -544,43 +549,43 @@ func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.working {
+	if m.phase == phaseWorking {
 		return m, nil // ignore every other key while the change is in flight
 	}
 	switch msg.String() {
 	case "y":
 		closing, ok := m.stateAction()
 		if !ok {
-			m.confirming = false
+			m.mode, m.phase = modeView, phaseIdle
 			return m, nil
 		}
-		m.working = true
-		m.actionErr = ""
+		m.phase = phaseWorking
+		m.errText = ""
 		return m, setState(m.src, m.ref, closing)
 	case "n", "esc":
-		m.confirming = false
-		m.actionErr = ""
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		return m, nil
 	}
 	return m, nil
 }
 
 func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.posting {
+	if m.phase == phaseWorking {
 		return m, nil // ignore every other key while the comment is in flight
 	}
 	switch msg.String() {
 	case "esc":
-		m.composing = false
-		m.postErr = ""
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		m.textarea.Reset()
 		return m, nil
 	case "ctrl+s":
 		if strings.TrimSpace(m.textarea.Value()) == "" {
 			return m, nil // an empty body is not sent
 		}
-		m.posting = true
-		m.postErr = ""
+		m.phase = phaseWorking
+		m.errText = ""
 		return m, postComment(m.src, m.ref, m.textarea.Value())
 	}
 	var cmd tea.Cmd

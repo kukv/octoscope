@@ -211,8 +211,8 @@ func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 	f := &fakeSource{err: errors.New("gh pr: no git remotes found")}
 	m := New(f, prRef())
 	m, cmd := m.Update(initFetch(t, m)())
-	if m.loading {
-		t.Errorf("loading = true after a failed fetch, want false")
+	if m.phase != phaseIdle {
+		t.Errorf("phase = %v after a failed fetch, want the wait to be over", m.phase)
 	}
 	if cmd == nil {
 		t.Fatal("cmd = nil after a failed fetch, want ErrorMsg cmd")
@@ -282,8 +282,8 @@ func TestDetailRefetchesOnR(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("r"))
-	if !m.loading || cmd == nil {
-		t.Errorf("loading = %v, cmd = %v; want loading with fetch cmd", m.loading, cmd)
+	if m.phase != phaseLoading || cmd == nil {
+		t.Errorf("phase = %v, cmd = %v; want a fetch in flight", m.phase, cmd)
 	}
 }
 
@@ -291,8 +291,8 @@ func TestCEntersCompose(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
-	if !m.composing {
-		t.Errorf("composing = false, want true after c")
+	if m.mode != modeCompose {
+		t.Errorf("mode = %v, want the composer after c", m.mode)
 	}
 }
 
@@ -304,8 +304,8 @@ func TestComposeEmptyBodyNotSent(t *testing.T) {
 	if cmd != nil {
 		t.Errorf("cmd = non-nil, want nil for empty body")
 	}
-	if !m.composing {
-		t.Errorf("composing = false, want still composing")
+	if m.mode != modeCompose {
+		t.Errorf("mode = %v, want the composer to stay open", m.mode)
 	}
 	if len(f.commentCalls) != 0 {
 		t.Errorf("commentCalls = %v, want none", f.commentCalls)
@@ -318,8 +318,8 @@ func TestComposeSubmitPostsAndRefetches(t *testing.T) {
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("looks good")
 	m, cmd := m.Update(key("ctrl+s"))
-	if !m.posting || cmd == nil {
-		t.Fatalf("posting = %v, cmd = %v; want posting with post cmd", m.posting, cmd)
+	if m.phase != phaseWorking || cmd == nil {
+		t.Fatalf("phase = %v, cmd = %v; want the post in flight", m.phase, cmd)
 	}
 	msg := cmd()
 	if _, ok := msg.(commentPostedMsg); !ok {
@@ -329,9 +329,9 @@ func TestComposeSubmitPostsAndRefetches(t *testing.T) {
 		t.Fatalf("commentCalls = %v, want [pr::1:looks good]", f.commentCalls)
 	}
 	m, cmd = m.Update(msg)
-	if m.composing || m.posting || !m.loading || cmd == nil {
-		t.Errorf("after posted: composing=%v posting=%v loading=%v cmd=%v; want false,false,true,non-nil",
-			m.composing, m.posting, m.loading, cmd)
+	if m.mode != modeView || m.phase != phaseLoading || cmd == nil {
+		t.Errorf("after posted: mode/phase = %v/%v, cmd = %v; want the body reloading",
+			m.mode, m.phase, cmd)
 	}
 }
 
@@ -341,8 +341,8 @@ func TestComposeEscCancels(t *testing.T) {
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("draft")
 	m, cmd := m.Update(key("esc"))
-	if m.composing {
-		t.Errorf("composing = true after esc, want false")
+	if m.mode != modeView {
+		t.Errorf("mode = %v after esc, want the body back", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil after esc, want nil (esc cancels compose, it does not close the view)")
@@ -359,14 +359,12 @@ func TestComposePostErrorKeepsDraft(t *testing.T) {
 	m.textarea.SetValue("hello")
 	m, cmd := m.Update(key("ctrl+s"))
 	m, _ = m.Update(cmd()) // commentErrorMsg
-	if !m.composing {
-		t.Errorf("composing = false, want still composing after error")
+	if m.mode != modeCompose || m.phase != phaseIdle {
+		t.Errorf("mode/phase = %v/%v, want the composer open and no longer sending",
+			m.mode, m.phase)
 	}
-	if m.posting {
-		t.Errorf("posting = true, want false after error")
-	}
-	if !strings.Contains(m.postErr, "403") {
-		t.Errorf("postErr = %q, want to contain 403", m.postErr)
+	if !strings.Contains(m.errText, "403") {
+		t.Errorf("errText = %q, want to contain 403", m.errText)
 	}
 	if m.textarea.Value() != "hello" {
 		t.Errorf("draft lost: textarea = %q, want hello", m.textarea.Value())
@@ -406,16 +404,17 @@ func TestComposeIgnoresKeysWhilePosting(t *testing.T) {
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("hello")
-	m, _ = m.Update(key("ctrl+s")) // posting == true (the cmd is deliberately not run)
-	if !m.posting {
-		t.Fatalf("precondition: posting = false, want true")
+	m, _ = m.Update(key("ctrl+s")) // the post cmd is deliberately not run
+	if m.phase != phaseWorking {
+		t.Fatalf("precondition: phase = %v, want the post in flight", m.phase)
 	}
 	m, cmd := m.Update(key("esc"))
 	if cmd != nil {
 		t.Errorf("cmd = non-nil while posting, want nil")
 	}
-	if !m.posting || !m.composing {
-		t.Errorf("posting/composing changed while posting: posting=%v composing=%v", m.posting, m.composing)
+	if m.mode != modeCompose || m.phase != phaseWorking {
+		t.Errorf("mode/phase = %v/%v, want compose/working while the post is in flight",
+			m.mode, m.phase)
 	}
 	if m.textarea.Value() != "hello" {
 		t.Errorf("draft changed while posting: %q", m.textarea.Value())
@@ -426,8 +425,8 @@ func TestXEntersConfirmWhenOpen(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
-	if !m.confirming {
-		t.Errorf("confirming = false, want true after x on open item")
+	if m.mode != modeConfirm {
+		t.Errorf("mode = %v, want the confirmation after x on an open item", m.mode)
 	}
 }
 
@@ -435,8 +434,8 @@ func TestXIgnoredWhenMerged(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateMerged}}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("x"))
-	if m.confirming {
-		t.Errorf("confirming = true, want false for merged item")
+	if m.mode != modeView {
+		t.Errorf("mode = %v, want the body untouched for a merged item", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil, want nil for merged item")
@@ -448,8 +447,8 @@ func TestConfirmYClosesAndRefetches(t *testing.T) {
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("y"))
-	if !m.working || cmd == nil {
-		t.Fatalf("working = %v, cmd = %v; want working with state cmd", m.working, cmd)
+	if m.phase != phaseWorking || cmd == nil {
+		t.Fatalf("phase = %v, cmd = %v; want the state change in flight", m.phase, cmd)
 	}
 	msg := cmd()
 	if _, ok := msg.(stateChangedMsg); !ok {
@@ -459,9 +458,9 @@ func TestConfirmYClosesAndRefetches(t *testing.T) {
 		t.Fatalf("stateCalls = %v, want [close:pr::1]", f.stateCalls)
 	}
 	m, cmd = m.Update(msg)
-	if m.confirming || m.working || !m.loading || cmd == nil {
-		t.Errorf("after changed: confirming=%v working=%v loading=%v cmd=%v; want false,false,true,non-nil",
-			m.confirming, m.working, m.loading, cmd)
+	if m.mode != modeView || m.phase != phaseLoading || cmd == nil {
+		t.Errorf("after changed: mode/phase = %v/%v, cmd = %v; want the body reloading",
+			m.mode, m.phase, cmd)
 	}
 }
 
@@ -486,8 +485,8 @@ func TestConfirmNCancels(t *testing.T) {
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("n"))
-	if m.confirming {
-		t.Errorf("confirming = true after n, want false")
+	if m.mode != modeView {
+		t.Errorf("mode = %v after n, want the body back", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil after n, want nil")
@@ -502,8 +501,8 @@ func TestConfirmEscCancels(t *testing.T) {
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("esc"))
-	if m.confirming {
-		t.Errorf("confirming = true after esc, want false")
+	if m.mode != modeView {
+		t.Errorf("mode = %v after esc, want the body back", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil after esc, want nil (esc cancels the confirmation, it does not close the view)")
@@ -519,17 +518,15 @@ func TestStateErrorStaysOnDetail(t *testing.T) {
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("y"))
 	m, cmd = m.Update(cmd()) // stateErrorMsg
-	if m.confirming {
-		t.Errorf("confirming = true, want false after error")
-	}
-	if m.working {
-		t.Errorf("working = true, want false after error")
+	if m.mode != modeView || m.phase != phaseIdle {
+		t.Errorf("mode/phase = %v/%v, want the body back and nothing in flight",
+			m.mode, m.phase)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil, want nil (a state failure stays inline, it is not the parent's error screen)")
 	}
-	if !strings.Contains(m.actionErr, "403") {
-		t.Errorf("actionErr = %q, want to contain 403", m.actionErr)
+	if !strings.Contains(m.errText, "403") {
+		t.Errorf("errText = %q, want to contain 403", m.errText)
 	}
 	if !strings.Contains(m.View(), "403") {
 		t.Errorf("detail view missing inline error:\n%s", m.View())
@@ -567,16 +564,17 @@ func TestVFetchesReviewContextAndOpensThePopup(t *testing.T) {
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
-	if !m.openingReview || cmd == nil {
-		t.Fatalf("openingReview = %v, cmd = %v; want opening with a fetch cmd", m.openingReview, cmd)
+	if m.mode != modeSubmit || m.phase != phaseLoading || cmd == nil {
+		t.Fatalf("mode/phase = %v/%v, cmd = %v; want the review context in flight",
+			m.mode, m.phase, cmd)
 	}
 	msg := cmd()
 	if _, ok := msg.(reviewContextMsg); !ok {
 		t.Fatalf("msg = %T, want reviewContextMsg", msg)
 	}
 	m, _ = m.Update(msg)
-	if m.openingReview || !m.submitting {
-		t.Errorf("openingReview = %v, submitting = %v; want the popup open", m.openingReview, m.submitting)
+	if m.mode != modeSubmit || m.phase != phaseIdle {
+		t.Errorf("mode/phase = %v/%v; want the popup open", m.mode, m.phase)
 	}
 }
 
@@ -600,14 +598,14 @@ func TestReviewContextFailureStaysInline(t *testing.T) {
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
 	m, cmd = m.Update(cmd())
-	if m.submitting {
-		t.Error("submitting = true after a failed review-context fetch")
+	if m.mode != modeView {
+		t.Errorf("mode = %v after a failed review-context fetch, want the body back", m.mode)
 	}
 	if cmd != nil {
 		t.Errorf("cmd = non-nil, want nil (a fetch failure stays inline)")
 	}
-	if !strings.Contains(m.actionErr, "403") {
-		t.Errorf("actionErr = %q, want to contain 403", m.actionErr)
+	if !strings.Contains(m.errText, "403") {
+		t.Errorf("errText = %q, want to contain 403", m.errText)
 	}
 }
 
@@ -621,12 +619,12 @@ func TestSubmitEscCancelsThePopup(t *testing.T) {
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
 	m, _ = m.Update(cmd())
-	if !m.submitting {
-		t.Fatal("precondition: submitting = false, want true")
+	if m.mode != modeSubmit {
+		t.Fatalf("precondition: mode = %v, want the popup open", m.mode)
 	}
 	m, cmd = m.Update(key("esc"))
 	m, cmd = m.Update(cmd())
-	if m.submitting {
+	if m.mode != modeView {
 		t.Error("esc did not close the submit popup")
 	}
 	if cmd != nil {
@@ -648,8 +646,8 @@ func TestSubmitSuccessRefetches(t *testing.T) {
 	m, cmd = m.Update(key("ctrl+s"))
 	msg := cmd()
 	m, cmd = m.Update(msg)
-	if m.submitting || !m.loading || cmd == nil {
-		t.Errorf("submitting = %v, loading = %v, cmd = %v; want false, true, non-nil", m.submitting, m.loading, cmd)
+	if m.mode != modeView || m.phase != phaseLoading || cmd == nil {
+		t.Errorf("mode/phase = %v/%v, cmd = %v; want the body reloading", m.mode, m.phase, cmd)
 	}
 	if len(f.submitCalls) != 1 {
 		t.Errorf("submitCalls = %v, want one submission", f.submitCalls)
@@ -667,9 +665,9 @@ func TestDetailFooterShowsStateAndPickerKeys(t *testing.T) {
 	}
 }
 
-// TestActionErrClearedOnReload guards against a stale actionErr surviving a
-// successful reload: a failed close leaves actionErr set, and a subsequent
-// r-triggered refresh must clear it once the new detail arrives.
+// TestActionErrClearedOnReload guards against a stale error surviving a
+// successful reload: a failed close leaves the error text set, and a
+// subsequent r-triggered refresh must clear it once the new detail arrives.
 func TestActionErrClearedOnReload(t *testing.T) {
 	f := &fakeSource{
 		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
@@ -679,17 +677,17 @@ func TestActionErrClearedOnReload(t *testing.T) {
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("y"))
 	m, _ = m.Update(cmd()) // stateErrorMsg
-	if !strings.Contains(m.actionErr, "403") {
-		t.Fatalf("precondition: actionErr = %q, want to contain 403", m.actionErr)
+	if !strings.Contains(m.errText, "403") {
+		t.Fatalf("precondition: errText = %q, want to contain 403", m.errText)
 	}
 
 	m, cmd = m.Update(key("r"))
-	if !m.loading || cmd == nil {
-		t.Fatalf("loading = %v, cmd = %v; want loading with fetch cmd", m.loading, cmd)
+	if m.phase != phaseLoading || cmd == nil {
+		t.Fatalf("phase = %v, cmd = %v; want a fetch in flight", m.phase, cmd)
 	}
 	m, _ = m.Update(cmd())
-	if m.actionErr != "" {
-		t.Errorf("actionErr = %q after reload, want empty", m.actionErr)
+	if m.errText != "" {
+		t.Errorf("errText = %q after reload, want empty", m.errText)
 	}
 	if strings.Contains(m.View(), "403") {
 		t.Errorf("view still shows stale error after reload:\n%s", m.View())
@@ -700,16 +698,17 @@ func TestConfirmIgnoresKeysWhileWorking(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
-	m, _ = m.Update(key("y")) // working == true (the cmd is deliberately not run)
-	if !m.working {
-		t.Fatalf("precondition: working = false, want true")
+	m, _ = m.Update(key("y")) // the state cmd is deliberately not run
+	if m.phase != phaseWorking {
+		t.Fatalf("precondition: phase = %v, want the change in flight", m.phase)
 	}
 	m, cmd := m.Update(key("esc"))
 	if cmd != nil {
 		t.Errorf("cmd = non-nil while working, want nil")
 	}
-	if !m.working || !m.confirming {
-		t.Errorf("working/confirming changed while working: working=%v confirming=%v", m.working, m.confirming)
+	if m.mode != modeConfirm || m.phase != phaseWorking {
+		t.Errorf("mode/phase = %v/%v, want confirm/working while the change is in flight",
+			m.mode, m.phase)
 	}
 }
 
@@ -790,7 +789,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	m := New(&fakeSource{}, prRef())
 
 	next, _ := m.Update(itemMsg{other, prItem(gh.PR{Number: 99, Title: "the previous one"})})
-	if !next.loading {
+	if next.phase != phaseLoading {
 		t.Error("an answer for another item ended the wait for this one")
 	}
 	if next.title != "" {
@@ -799,7 +798,26 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 
 	issue := New(&fakeSource{}, issueRef())
 	next, _ = issue.Update(itemMsg{other, issueItem(gh.Issue{Number: 99, Title: "the previous one"})})
-	if !next.loading || next.title != "" {
+	if next.phase != phaseLoading || next.title != "" {
 		t.Errorf("an issue answer for another item was accepted: %q", next.title)
+	}
+}
+
+// TestTheWheelDoesNotScrollWhatTheSpinnerHides fixes the one behaviour this
+// fold changes on purpose: while the picker's candidates are in flight the
+// view draws a spinner, not the body, and a wheel that moved the text
+// underneath was scrolling what nobody can see.
+func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
+	f := &fakeSource{pr: longPR(), labels: []gh.Label{{Name: "bug"}}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = m.Update(key("l")) // the candidates are now in flight
+
+	before := m.body.YOffset()
+	m, _ = m.Update(wheelDown())
+
+	if m.body.YOffset() != before {
+		t.Errorf("the body scrolled to %d while the fetch was in flight, want %d",
+			m.body.YOffset(), before)
 	}
 }

@@ -44,8 +44,8 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	}
 	m, _ = m.Update(review.ErrorMsg{Err: errors.New("boom from github")})
 
-	if !m.submitting {
-		t.Fatal("submitting = false after a failed submit, want the popup to stay open")
+	if m.mode != modeSubmit {
+		t.Fatalf("mode = %v after a failed submit, want the popup to stay open", m.mode)
 	}
 	out := m.View()
 	if !strings.Contains(ansi.Strip(out), "looks good") {
@@ -55,8 +55,8 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	if !strings.Contains(out, wantSelected) {
 		t.Errorf("the chosen event (approve) was lost after a failed submit:\n%s", ansi.Strip(out))
 	}
-	if m.submitErr == "" {
-		t.Error("submitErr is empty after a failed submit")
+	if m.errText == "" {
+		t.Error("the error text is empty after a failed submit")
 	}
 }
 
@@ -73,8 +73,8 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 	t.Run("reviewContextMsg", func(t *testing.T) {
 		m := loaded(f, prRef())
 		m, _ = m.Update(reviewContextMsg{ref: other, ctx: gh.ReviewContext{PullRequestID: "PR_OTHER"}})
-		if m.submitting {
-			t.Error("submitting = true after a stale reviewContextMsg, want the popup to stay closed")
+		if m.mode == modeSubmit {
+			t.Error("the popup opened on a stale reviewContextMsg, want it to stay closed")
 		}
 		if m.submit.Active() {
 			t.Error("the popup opened against a pull request the user has left")
@@ -83,13 +83,34 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 
 	t.Run("reviewContextErrMsg", func(t *testing.T) {
 		m := loaded(f, prRef())
-		m.openingReview = true
+		m, _ = m.Update(key("v")) // the fetch cmd is deliberately not run
 		m, _ = m.Update(reviewContextErrMsg{ref: other, err: errors.New("boom")})
-		if !m.openingReview {
-			t.Error("openingReview = false after a stale reviewContextErrMsg, want it to still be waiting for its own fetch")
+		if m.mode != modeSubmit || m.phase != phaseLoading {
+			t.Errorf("mode/phase = %v/%v after a stale reviewContextErrMsg, want it still waiting for its own fetch",
+				m.mode, m.phase)
 		}
-		if m.actionErr != "" {
-			t.Errorf("actionErr = %q after a stale reviewContextErrMsg, want empty", m.actionErr)
+		if m.errText != "" {
+			t.Errorf("errText = %q after a stale reviewContextErrMsg, want empty", m.errText)
 		}
 	})
+}
+
+// TestLeavingTheSubmitPopupTakesItsErrorWithIt is the picker's rule for the
+// review popup: a failed submission's text belongs to the popup, and esc
+// must not leave it printed under the body.
+func TestLeavingTheSubmitPopupTakesItsErrorWithIt(t *testing.T) {
+	f := &fakeSource{
+		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+	}
+	m := loaded(f, prRef())
+	m, cmd := m.Update(key("v"))
+	m, _ = m.Update(cmd())
+	m, _ = m.Update(review.ErrorMsg{Err: errors.New("boom from github")})
+
+	m, cmd = m.Update(key("esc"))
+	m, _ = m.Update(cmd()) // review.CancelledMsg
+	if strings.Contains(ansi.Strip(m.View()), "boom from github") {
+		t.Errorf("the popup's error is still on the body after esc:\n%s", ansi.Strip(m.View()))
+	}
 }
