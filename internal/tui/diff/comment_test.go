@@ -109,7 +109,7 @@ func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 	// Put the cursor on the added line "if depth <= 0 {".
 	m = cursorOnLine(t, m, gh.LineAdded, 13)
 	m = press(m, "c")
-	if !m.composing {
+	if m.mode != modeCompose {
 		t.Fatal("c did not open the composer")
 	}
 	m = typeInto(m, "why not 2?")
@@ -180,7 +180,7 @@ func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = cursorOnLine(t, m, gh.LineAdded, 13)
 	m = press(m, "c")
-	if m.composing {
+	if m.mode == modeCompose {
 		t.Error("c opened the composer before the pull request's id was known")
 	}
 }
@@ -188,14 +188,14 @@ func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 // TestCDoesNothingOnAHunkHeader has to be built with loadedWith, not loaded:
 // with loaded, m.review.PullRequestID is always "" (no reviewMsg ever
 // arrives), so the r.kind != rowLine clause is not what makes the test pass
-// -- the PullRequestID guard alone already suppresses composing regardless of
+// -- the PullRequestID guard alone already suppresses the composer regardless of
 // the cursor. Deleting r.kind != rowLine must make this fail; it did not
 // against the old loaded-based version.
 func TestCDoesNothingOnAHunkHeader(t *testing.T) {
 	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
 	m.row = 0 // the first row of the fixture is a hunk header
 	m = press(m, "c")
-	if m.composing {
+	if m.mode == modeCompose {
 		t.Error("c opened the composer on a hunk header")
 	}
 }
@@ -217,7 +217,7 @@ func TestCDoesNothingOnAThreadRow(t *testing.T) {
 		t.Fatal("no rowThread in the fixture; this test proves nothing")
 	}
 	m = press(m, "c")
-	if m.composing {
+	if m.mode == modeCompose {
 		t.Error("c opened the composer on a thread row")
 	}
 }
@@ -230,7 +230,7 @@ func TestCOnAHunkHeaderSaysWhyNothingHappened(t *testing.T) {
 	m := loadedWith(t, &recordingSource{fakeSource: fakeSource{files: fixture()}})
 	m.row = 0 // the first row of the fixture is a hunk header
 	m = press(m, "c")
-	if m.composing {
+	if m.mode == modeCompose {
 		t.Fatal("c opened the composer on a hunk header")
 	}
 	if m.declined != i18n.T("diff.decline_no_line") {
@@ -249,7 +249,7 @@ func TestCBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = cursorOnLine(t, m, gh.LineAdded, 13)
 	m = press(m, "c")
-	if m.composing {
+	if m.mode == modeCompose {
 		t.Fatal("c opened the composer before the pull request's id was known")
 	}
 	if m.declined != i18n.T("diff.decline_loading") {
@@ -272,9 +272,9 @@ func TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived(t *test
 		needsLine bool // c also declines on a non-line row, so it needs the cursor moved first
 		acted     func(m Model) bool
 	}{
-		{name: "c", key: "c", needsLine: true, acted: func(m Model) bool { return m.composing }},
-		{name: "v", key: "v", acted: func(m Model) bool { return m.submitting }},
-		{name: "X", key: "X", acted: func(m Model) bool { return m.discarding }},
+		{name: "c", key: "c", needsLine: true, acted: func(m Model) bool { return m.mode == modeCompose }},
+		{name: "v", key: "v", acted: func(m Model) bool { return m.mode == modeSubmit }},
+		{name: "X", key: "X", acted: func(m Model) bool { return m.mode == modeDiscard }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestCStillWorksAfterASecondReviewContextFetchFails(t *testing.T) {
 	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
 	m = cursorOnLine(t, m, gh.LineAdded, 13)
 	m = press(m, "c")
-	if !m.composing {
+	if m.mode != modeCompose {
 		t.Fatal("c is dead after a review-context refetch failure, though the pull request id is known")
 	}
 	if m.declined != "" {
@@ -339,7 +339,7 @@ func TestEscThrowsTheDraftAway(t *testing.T) {
 	m = press(m, "c")
 	m = typeInto(m, "never mind")
 	m, _ = m.Update(keyPress("esc"))
-	if m.composing {
+	if m.mode == modeCompose {
 		t.Error("esc did not close the composer")
 	}
 	if len(src.comments) != 0 {
@@ -399,11 +399,11 @@ func TestAFailedPostKeepsTheDraftAndShowsTheError(t *testing.T) {
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
 
 	m, _ = m.Update(commentErrorMsg{ref: m.ref, err: errors.New("422: line not part of the diff")})
-	if !m.composing {
-		t.Error("composing = false after a failed post, want still composing")
+	if m.mode != modeCompose {
+		t.Error("the composer closed on a failed post, want it still open")
 	}
-	if m.posting {
-		t.Error("posting = true after a failed post, want false")
+	if m.phase == phaseWorking {
+		t.Error("still sending after a failed post, want the composer editable again")
 	}
 	if got := m.textarea.Value(); got != "why not 2?" {
 		t.Errorf("draft lost: textarea = %q, want %q", got, "why not 2?")
@@ -424,8 +424,8 @@ func TestAFailedPostKeepsTheDraftAndShowsTheError(t *testing.T) {
 func TestAPostedCommentReusesTheReviewIDAndRefetches(t *testing.T) {
 	m := loaded(t, 120, 40)
 	m, cmd := m.Update(commentPostedMsg{ref: m.ref, reviewID: "PRR_1"})
-	if m.composing || m.posting {
-		t.Errorf("composing = %v, posting = %v after commentPostedMsg, want both false", m.composing, m.posting)
+	if m.mode != modeView || m.phase != phaseIdle {
+		t.Errorf("mode = %v, phase = %v after commentPostedMsg, want the composer closed and idle", m.mode, m.phase)
 	}
 	if m.review.PendingID != "PRR_1" {
 		t.Errorf("review.PendingID = %q, want %q", m.review.PendingID, "PRR_1")
@@ -456,7 +456,7 @@ func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 	m := loadedWith(t, src)
 	m = cursorOnLine(t, m, gh.LineAdded, 14)
 	m = press(m, "c")
-	if !m.composing {
+	if m.mode != modeCompose {
 		t.Fatal("c did not open the composer")
 	}
 	m = typeInto(m, "still about line 14")
@@ -489,8 +489,8 @@ func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 }
 
 // TestARetryAfterAFailedPostStillTargetsTheCapturedLine checks that the
-// target survives the error path too. commentErrorMsg reopens the composer
-// (m.composing = true) without going through startComposing again, so if
+// target survives the error path too. commentErrorMsg hands the composer
+// back to the user without going through startComposing again, so if
 // post() cleared m.target on every send rather than only on success, a retry
 // here would post to the zero value instead of line 13.
 func TestARetryAfterAFailedPostStillTargetsTheCapturedLine(t *testing.T) {
@@ -502,8 +502,8 @@ func TestARetryAfterAFailedPostStillTargetsTheCapturedLine(t *testing.T) {
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
 
 	m, _ = m.Update(commentErrorMsg{ref: m.ref, err: errors.New("500")})
-	if !m.composing {
-		t.Fatal("composing = false after a failed post, want still composing")
+	if m.mode != modeCompose {
+		t.Fatal("the composer closed on a failed post, want it still open")
 	}
 
 	_, cmd := m.Update(keyPress("ctrl+s"))
@@ -543,14 +543,14 @@ func TestVOpensThePopupWithOrWithoutAPendingReview(t *testing.T) {
 	m := withThreads(t, 120, 40) // the context has arrived; nothing waiting
 	m.review.PendingID = ""
 	m = press(m, "v")
-	if !m.submitting {
+	if m.mode != modeSubmit {
 		t.Error("v did nothing with no pending review; approving needs no comments")
 	}
 
 	m2 := withThreads(t, 120, 40)
 	m2.review.PendingID = "PRR_9"
 	m2 = press(m2, "v")
-	if !m2.submitting {
+	if m2.mode != modeSubmit {
 		t.Error("v did not open the popup when a review was waiting")
 	}
 }
@@ -561,7 +561,7 @@ func TestVOpensThePopupWithOrWithoutAPendingReview(t *testing.T) {
 func TestVDoesNothingBeforeTheContextArrives(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = press(m, "v")
-	if m.submitting {
+	if m.mode == modeSubmit {
 		t.Error("v opened the popup before the pull request's id was known")
 	}
 }
@@ -571,7 +571,7 @@ func TestVDoesNothingBeforeTheContextArrives(t *testing.T) {
 func TestVBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = press(m, "v")
-	if m.submitting {
+	if m.mode == modeSubmit {
 		t.Fatal("v opened the popup before the pull request's id was known")
 	}
 	if m.declined != i18n.T("diff.decline_loading") {
@@ -586,7 +586,7 @@ func TestVBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 func TestXBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = press(m, "X")
-	if m.discarding {
+	if m.mode == modeDiscard {
 		t.Fatal("X asked to discard before the pull request's id was known")
 	}
 	if m.declined != i18n.T("diff.decline_loading") {
@@ -598,7 +598,7 @@ func TestXWithNoPendingReviewSaysWhyNothingHappened(t *testing.T) {
 	m := withThreads(t, 120, 40)
 	m.review.PendingID = ""
 	m = press(m, "X")
-	if m.discarding {
+	if m.mode == modeDiscard {
 		t.Fatal("X asked to discard with no pending review")
 	}
 	if m.declined != i18n.T("diff.decline_no_pending_review") {
@@ -610,21 +610,22 @@ func TestCapitalXAsksBeforeDiscarding(t *testing.T) {
 	m := withThreads(t, 120, 40)
 	m.review.PendingID = "PRR_9"
 	m = press(m, "X")
-	if !m.discarding {
+	if m.mode != modeDiscard {
 		t.Fatal("X did not ask")
 	}
 	if !strings.Contains(ansi.Strip(m.View()), "Discard") {
 		t.Errorf("the question is not on screen:\n%s", ansi.Strip(m.View()))
 	}
 	m = press(m, "n")
-	if m.discarding {
+	if m.mode == modeDiscard {
 		t.Error("n did not take the question away")
 	}
 }
 
-// TestASecondYWhileDiscardingDoesNotCallDiscardTwice guards discardWorking:
-// once the first y has sent DiscardReview and is waiting on its answer, a
-// second y arriving before that answer lands must not fire a second call.
+// TestASecondYWhileDiscardingDoesNotCallDiscardTwice guards the working
+// phase: once the first y has sent DiscardReview and is waiting on its
+// answer, a second y arriving before that answer lands must not fire a
+// second call.
 func TestASecondYWhileDiscardingDoesNotCallDiscardTwice(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
@@ -694,10 +695,10 @@ func TestACommentErrorForAnotherPullRequestIsDropped(t *testing.T) {
 
 	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
 	m, _ = m.Update(commentErrorMsg{ref: other, err: errors.New("boom")})
-	if !m.posting {
-		t.Error("posting = false after an error for another pull request, want still posting")
+	if m.phase != phaseWorking {
+		t.Error("the send was cut short by an error for another pull request")
 	}
-	if m.postErr != "" {
-		t.Errorf("postErr = %q after an error for another pull request, want empty", m.postErr)
+	if m.errText != "" {
+		t.Errorf("errText = %q after an error for another pull request, want empty", m.errText)
 	}
 }

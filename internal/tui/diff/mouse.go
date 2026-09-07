@@ -14,7 +14,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
-	if m.composing || m.posting || m.submitting || m.discarding {
+	if m.mode != modeView {
 		return m, nil
 	}
 	if m.showSidebar() && msg.X < sidebarWidth {
@@ -51,7 +51,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 // handleMouseWheel moves whatever is under the pointer: the file list over
 // the sidebar, the diff pane otherwise.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
-	if m.composing || m.posting || m.submitting || m.discarding {
+	if m.mode != modeView {
 		return m, nil
 	}
 	delta := 1

@@ -83,6 +83,29 @@ type row struct {
 	key     string
 }
 
+// mode is which overlay is on screen. loading is not one of these: the diff
+// and the review context arrive separately, and c, v and X are gated on the
+// context, not on the diff -- an overlay can be open while the files are
+// still on their way (.claude/rules/tui.md).
+type mode uint8
+
+const (
+	modeView    mode = iota // the diff on its own
+	modeCompose             // the line-comment composer
+	modeSubmit              // the review submission popup
+	modeDiscard             // the discard confirmation
+)
+
+// phase is where the current mode is in its own round trip. There is no
+// loading phase here: what an overlay needs is already on the model by the
+// time the key that opens it is accepted.
+type phase uint8
+
+const (
+	phaseIdle    phase = iota
+	phaseWorking       // sending
+)
+
 type Model struct {
 	src Source
 	ref gh.ItemRef
@@ -122,12 +145,20 @@ type Model struct {
 	// file list. h and l move between them.
 	sidebar bool
 
-	// textarea, composing and posting are the line-comment composer. It is
-	// the same shape as detail's: ctrl+s sends, esc discards the draft.
-	textarea  textarea.Model
-	composing bool
-	posting   bool
-	postErr   string
+	mode  mode
+	phase phase
+
+	// errText is the last failure of whichever overlay is up: the mode
+	// decides where it is drawn. modeView draws it nowhere -- what the diff
+	// itself has to say goes to reviewErr and declined -- and every key that
+	// opens an overlay clears it, so one string cannot carry a failure into
+	// an overlay it has nothing to do with.
+	errText string
+
+	// textarea is the line-comment composer, drawn while the mode is
+	// modeCompose. It is the same shape as detail's: ctrl+s sends, esc
+	// discards the draft.
+	textarea textarea.Model
 
 	// target is the line and side the open (or in-flight) comment was
 	// started against, captured by startComposing at c-time rather than read
@@ -143,19 +174,10 @@ type Model struct {
 	declined string
 
 	// submit is the review submission popup (v), a small window drawn over
-	// this view rather than a view of its own (see review.go). submitErr is
-	// a failed submission's text, kept here rather than in submit itself so
+	// this view rather than a view of its own (see review.go). A failed
+	// submission's text goes to errText rather than into submit itself, so
 	// the popup's own fields stay just its event and its note.
-	submit     review.Model
-	submitting bool
-	submitErr  string
-
-	// discarding asks before X throws the pending review away.
-	// discardWorking is separate from discarding so a second y sent before
-	// DiscardReview's answer lands cannot fire the call twice.
-	discarding     bool
-	discardWorking bool
-	discardErr     string
+	submit review.Model
 }
 
 // New builds the view for one pull request. It takes only what names the
@@ -264,8 +286,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.ref != m.ref {
 			return m, nil
 		}
-		m.posting = false
-		m.postErr = ""
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		m.textarea.Reset()
 		m.target = gh.PendingComment{}
 		m.review.PendingID = msg.reviewID
@@ -274,45 +296,46 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.ref != m.ref {
 			return m, nil
 		}
-		m.posting = false
-		m.composing = true
-		m.postErr = msg.err.Error()
+		m.phase = phaseIdle
+		m.errText = msg.err.Error()
 		return m, nil
 	case review.CancelledMsg:
 		// Also reaches here when the diff is drawn over the detail view and
 		// the submission was detail's own (broadcast hands the message to
 		// both); only the one that actually opened the popup acts on it.
-		if !m.submitting {
+		if m.mode != modeSubmit {
 			return m, nil
 		}
-		m.submitting = false
+		// A failed submission's text is left on errText: nothing outside the
+		// popup draws it, and c, v and X each clear it before they open.
+		m.mode, m.phase = modeView, phaseIdle
 		return m, nil
 	case review.SubmittedMsg:
-		if !m.submitting {
+		if m.mode != modeSubmit {
 			return m, nil
 		}
-		m.submitting = false
-		m.submitErr = ""
+		m.mode, m.phase = modeView, phaseIdle
+		m.errText = ""
 		m.review.PendingID = ""
 		return m, m.fetchReview()
 	case review.ErrorMsg:
-		if !m.submitting {
+		if m.mode != modeSubmit {
 			return m, nil
 		}
 		var cmd tea.Cmd
 		m.submit, cmd = m.submit.Update(msg)
-		m.submitErr = msg.Err.Error()
+		m.errText = msg.Err.Error()
 		return m, cmd
 	case discardedMsg:
 		if msg.ref != m.ref {
 			return m, nil
 		}
-		m.discardWorking = false
+		m.phase = phaseIdle
 		if msg.err != nil {
-			m.discardErr = msg.err.Error()
+			m.errText = msg.err.Error()
 			return m, nil
 		}
-		m.discarding = false
+		m.mode = modeView
 		m.review.PendingID = ""
 		return m, m.fetchReview()
 	case tea.KeyPressMsg:
@@ -330,14 +353,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.composing || m.posting {
+	switch m.mode {
+	case modeCompose:
 		return m.handleComposeKey(msg)
-	}
-	if m.submitting {
+	case modeSubmit:
 		return m.handleSubmitKey(msg)
-	}
-	if m.discarding {
+	case modeDiscard:
 		return m.handleDiscardKey(msg)
+	case modeView:
 	}
 	switch msg.String() {
 	case "esc", "q":
