@@ -24,10 +24,11 @@ func TestARunningCheckHasNoDuration(t *testing.T) {
 	}
 }
 
-func TestACheckThatNeverStartedHasNoDuration(t *testing.T) {
+func TestACheckWithNoStartTimeHasNoDuration(t *testing.T) {
 	t.Parallel()
 
-	if got := (CheckRun{}).Duration(); got != 0 {
+	c := CheckRun{CompletedAt: time.Date(2026, 9, 7, 5, 44, 0, 0, time.UTC)}
+	if got := c.Duration(); got != 0 {
 		t.Errorf("Duration() = %v, want 0", got)
 	}
 }
