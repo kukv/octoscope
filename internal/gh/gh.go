@@ -145,9 +145,35 @@ const (
 )
 
 // CheckRun is one check behind the roll-up, named as GitHub names it.
+//
+// Everything past Name and State is filled only by the per-pull-request
+// query the checks view runs: the Work board's search selects the roll-up to
+// count it, not to act on it.
 type CheckRun struct {
 	Name  string
 	State CheckState
+	Kind  CheckKind
+	// Workflow and RunNumber name the Actions workflow this check belongs to.
+	// A StatusContext belongs to none.
+	Workflow  string
+	RunNumber int
+	// JobID addresses the job's log, RunID the run to rerun. Both are zero
+	// for a StatusContext, which has neither.
+	JobID int64
+	RunID int64
+	// URL is where the check reports itself: detailsUrl for a check run,
+	// targetUrl for a StatusContext.
+	URL         string
+	StartedAt   time.Time
+	CompletedAt time.Time
+}
+
+// Duration is how long the check took, and zero while it is still running.
+func (c CheckRun) Duration() time.Duration {
+	if c.StartedAt.IsZero() || c.CompletedAt.IsZero() {
+		return 0
+	}
+	return c.CompletedAt.Sub(c.StartedAt)
 }
 
 // Checks counts the check runs behind CheckState so a progress bar can be

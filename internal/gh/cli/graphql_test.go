@@ -237,8 +237,8 @@ func TestEachCheckKeepsItsOwnName(t *testing.T) {
 	}
 	item := w[gh.SectionReviewRequested][0]
 	want := []gh.CheckRun{
-		{Name: "build", State: gh.CheckSuccess},
-		{Name: "ci/legacy", State: gh.CheckFailure},
+		{Name: "build", State: gh.CheckSuccess, Kind: gh.CheckKindRun},
+		{Name: "ci/legacy", State: gh.CheckFailure, Kind: gh.CheckKindStatus},
 	}
 	if !reflect.DeepEqual(item.Checks.Runs, want) {
 		t.Errorf("runs = %+v, want %+v", item.Checks.Runs, want)
