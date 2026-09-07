@@ -354,3 +354,51 @@ summary:
     other: "{{.Count}} CI failures"
   updated:
     other: "updated {{.Ago}}"
+
+merge:
+  title:
+    other: "Merge #{{.Number}}"
+  loading:
+    other: "Asking GitHub"
+  method_squash:
+    other: "Squash and merge"
+  method_commit:
+    other: "Create a merge commit"
+  method_rebase:
+    other: "Rebase and merge"
+  auto:
+    other: "auto-merge (after the checks pass)"
+  auto_on:
+    other: "auto-merge is on; enter cancels it"
+  auto_unavailable_repo:
+    other: "auto-merge is off for this repository"
+  auto_unavailable_clean:
+    other: "auto-merge has nothing left to wait for"
+  delete_branch_on:
+    other: "the branch is deleted after the merge"
+  delete_branch_off:
+    other: "the branch is kept"
+  block_draft:
+    other: "this pull request is a draft"
+  block_conflicting:
+    other: "it conflicts with the base branch"
+  block_computing:
+    other: "GitHub is still working out whether it can be merged"
+  block_protected:
+    other: "a branch rule is holding it"
+  block_behind:
+    other: "it is behind the base branch"
+  block_dirty:
+    other: "GitHub cannot merge it as it stands"
+  review_required:
+    other: "it has not been approved"
+  review_changes:
+    other: "changes have been requested"
+  key_merge:
+    other: "enter:merge"
+  key_auto:
+    other: "space:auto"
+  key_refresh:
+    other: "r:refresh"
+  key_cancel:
+    other: "esc:cancel"
