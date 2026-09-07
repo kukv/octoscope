@@ -53,8 +53,9 @@ func open(t *testing.T, width int) Model {
 	return m
 }
 
-// key builds the KeyPressMsg for a key name, matching the shape the app uses.
-func key(s string) tea.KeyMsg {
+// keyPress builds the KeyPressMsg for a key name, matching the shape the app
+// uses.
+func keyPress(s string) tea.KeyMsg {
 	switch s {
 	case "esc":
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
@@ -65,10 +66,8 @@ func key(s string) tea.KeyMsg {
 	}
 }
 
-func keyPress(s string) tea.KeyMsg { return key(s) }
-
 func press(m Model, k string) Model {
-	m, _ = m.Update(key(k))
+	m, _ = m.Update(keyPress(k))
 	return m
 }
 
