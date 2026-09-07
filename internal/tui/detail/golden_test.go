@@ -91,7 +91,7 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("detail_loading_declined_%s_%d", lang.name, w), declined.View())
 
 				// No other recording covers the error line.
-				failed, _ := m.Update(stateErrorMsg{err: errors.New("boom")})
+				failed, _ := m.Update(stateErrorMsg{ref: prRef(), err: errors.New("boom")})
 				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())
 			})
 		}

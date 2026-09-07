@@ -848,6 +848,50 @@ func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 	}
 }
 
+// TestAStaleCommentOrStateAnswerIsDropped pins the ref guard on the four
+// answers c and x produce. Both ways out end in a refetch, so an answer for
+// the item the user has left would pull that item's body onto the screen and
+// leave the reader looking at something they did not open.
+func TestAStaleCommentOrStateAnswerIsDropped(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+
+	t.Run("commentPostedMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(key("c"))
+		m, cmd := m.Update(commentPostedMsg{ref: other})
+		if m.mode != modeCompose || cmd != nil {
+			t.Errorf("mode = %v, cmd = %v; want the composer untouched", m.mode, cmd)
+		}
+	})
+
+	t.Run("commentErrorMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(commentErrorMsg{ref: other, err: errors.New("boom")})
+		if m.errText != "" {
+			t.Errorf("errText = %q after a stale failure, want empty", m.errText)
+		}
+	})
+
+	t.Run("stateChangedMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, cmd := m.Update(stateChangedMsg{ref: other})
+		if m.phase != phaseIdle || cmd != nil {
+			t.Errorf("phase = %v, cmd = %v; want no refetch for another item", m.phase, cmd)
+		}
+	})
+
+	t.Run("stateErrorMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(key("x")) // the confirmation is up
+		m, _ = m.Update(stateErrorMsg{ref: other, err: errors.New("boom")})
+		if m.mode != modeConfirm || m.errText != "" {
+			t.Errorf("mode = %v, errText = %q; want the confirmation untouched",
+				m.mode, m.errText)
+		}
+	})
+}
+
 // TestKeysDeclinedWhileLoadingSayWhy covers the report that c does nothing:
 // the item can still be on its way seconds later, and until it lands the screen is a
 // spinner with no footer, so a key that is ignored looks like a key that is

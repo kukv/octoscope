@@ -68,10 +68,19 @@ type (
 		ref gh.ItemRef
 		err error
 	}
-	commentPostedMsg struct{}
-	commentErrorMsg  struct{ err error }
-	stateChangedMsg  struct{}
-	stateErrorMsg    struct{ err error }
+	// The comment and state answers carry the ref for the same reason
+	// itemMsg does. Both end in a refetch of the item they were sent for,
+	// which on another item would replace what the user is reading.
+	commentPostedMsg struct{ ref gh.ItemRef }
+	commentErrorMsg  struct {
+		ref gh.ItemRef
+		err error
+	}
+	stateChangedMsg struct{ ref gh.ItemRef }
+	stateErrorMsg   struct {
+		ref gh.ItemRef
+		err error
+	}
 	// The three picker answers carry the ref for the same reason itemMsg
 	// does. Labels and assignees belong to the repository, so an answer
 	// started on another item opens a picker nobody asked for, offering
@@ -249,9 +258,9 @@ func openWeb(src Source, ref gh.ItemRef, url string) tea.Cmd {
 func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.AddComment(ref, body); err != nil {
-			return commentErrorMsg{err}
+			return commentErrorMsg{ref: ref, err: err}
 		}
-		return commentPostedMsg{}
+		return commentPostedMsg{ref: ref}
 	}
 }
 
@@ -274,9 +283,9 @@ func (m Model) stateAction() (closing bool, ok bool) {
 func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SetState(ref, closing); err != nil {
-			return stateErrorMsg{err}
+			return stateErrorMsg{ref: ref, err: err}
 		}
-		return stateChangedMsg{}
+		return stateChangedMsg{ref: ref}
 	}
 }
 
@@ -324,13 +333,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case itemMsg:
 		return m.itemArrived(msg), nil
 	case commentPostedMsg:
-		return m.commentPosted()
+		return m.commentPosted(msg)
 	case commentErrorMsg:
-		return m.commentFailed(msg.err), nil
+		return m.commentFailed(msg), nil
 	case stateChangedMsg:
-		return m.stateChanged()
+		return m.stateChanged(msg)
 	case stateErrorMsg:
-		return m.stateFailed(msg.err), nil
+		return m.stateFailed(msg), nil
 	case pickerCandidatesMsg:
 		return m.candidatesArrived(msg), nil
 	case pickerAppliedMsg:
@@ -397,28 +406,40 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	return m
 }
 
-func (m Model) commentPosted() (Model, tea.Cmd) {
+func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	m.errText = ""
 	m.textarea.Reset()
 	m.mode, m.phase = modeView, phaseLoading
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) commentFailed(err error) Model {
+func (m Model) commentFailed(msg commentErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
 	m.phase = phaseIdle
-	m.errText = err.Error()
+	m.errText = msg.err.Error()
 	return m
 }
 
-func (m Model) stateChanged() (Model, tea.Cmd) {
+func (m Model) stateChanged(msg stateChangedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	m.errText = ""
 	m.mode, m.phase = modeView, phaseLoading
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) stateFailed(err error) Model {
+func (m Model) stateFailed(msg stateErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
 	m.mode, m.phase = modeView, phaseIdle
-	m.errText = err.Error()
+	m.errText = msg.err.Error()
 	return m
 }
 
