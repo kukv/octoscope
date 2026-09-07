@@ -24,21 +24,54 @@ gh pr list --repo kukv/octoscope --state all --json \
 ```
 
 `work.json` は `@me` を含む検索なので、**録った人が見えるリポジトリを全部なめる**。
-録るときに `jq` で `kukv/octoscope` の分だけに絞る（上のコマンド参照）。
-**これは秘密情報の除去であって、「テストを通すための編集」ではない。**
-前者は必須、後者は禁止。
+録った時点の `kukv/octoscope` にはこの 4 つの検索に該当する項目が無かったので、
+`kukv/octoscope` だけに絞ると 4 エイリアスとも `nodes: []` になり、`ListWork` の
+アイテム変換（`__typename` ごとの分岐、ラベル、チェックの集約）を一つも通さない
+テストになる。守るべきは「秘密情報が入らないこと」であって「対象が
+`kukv/octoscope` であること」自体ではないので、絞り方を**公開リポジトリすべて**に
+広げた。ノードの `repository.nameWithOwner` を集め、`gh repo view <owner/name>
+--json nameWithOwner,isPrivate` で 1 つずつ private かどうかを確認し、
+`isPrivate: false` のものだけを残す。
+
+```bash
+gh api graphql -F query=@internal/gh/cli/work.graphql > /tmp/work-raw.json
+jq -r '[.data[].nodes[]?.repository.nameWithOwner] | unique[]' /tmp/work-raw.json
+# 出てきたリポジトリを 1 つずつ確認する
+gh repo view <owner>/<repo> --json nameWithOwner,isPrivate
+# isPrivate:false だったものだけを allowlist に入れ、それだけを残す
+jq --argjson pub '["kukv/os-setup", ...]' \
+  '.data |= with_entries(.value.nodes |= map(select(.repository.nameWithOwner as $r | $pub | index($r))))' \
+  /tmp/work-raw.json > /tmp/work-public.json
+```
+
+**ノード自身が公開リポジトリでも、そのタイトルや本文が別の（私有の）リポジトリの
+中身を書き写していることがある。** 実際、公開リポジトリの PR 本文の中に、私有の
+Terraform リポジトリ名・内部サブネット・1Password のアイテム名が出てきた実例が
+あった。`gh repo view` の判定は「ノードがどのリポジトリのものか」しか見ないので、
+**残す前に全ノードの `title` と `bodyText` を人間が読む。** インフラ・ホスト名・
+IP レンジ・認証情報・私有リポジトリ名が出てくるノードは、公開リポジトリのもの
+であっても除外し、次の候補に差し替える。
 
 件数はテストの主張に使わない（録り直すたびに変わる）。使うのは
 「4 つのエイリアスが揃っていること」と「`__typename` ごとの変換結果」だけ。
+それでも testdata は人が読んで確認できる大きさに保つため、**各エイリアス最大 5
+件**まで残し、`kukv/*`（このプロジェクト自身のアカウント）を `bright-room/*`
+より優先する。
+
+```bash
+jq '.data.reviewRequested.nodes |= map(select(.number as $n | [<採用した番号...>] | index($n)))
+  | .data.yourPRs.nodes |= map(select(.number as $n | [...] | index($n)))
+  | .data.assigned.nodes |= map(select(.number as $n | [...] | index($n)))' \
+  /tmp/work-public.json > internal/gh/cli/testdata/work.json
+```
+
+**これは秘密情報の除去であって、「テストを通すための編集」ではない。**
+前者は必須、後者は禁止。allowlist と件数の絞り込みは、その都度 `gh repo view` の
+結果と本文の実読で判断する。「動くから入れる」「テストが通るから残す」は禁止の側。
 
 `pr_list.json` は `--state all` で録っている（`ListPRs` 自身は open だけを取る）。
 open / closed / merged の 3 状態が 1 ファイルに入るほうが、`ParseItemState` の
 変換をまとめて確かめられるため。
-
-録った時点の `kukv/octoscope` には、4 つの検索（review-requested / author /
-assignee / mentions、いずれも `is:open`）に該当する項目が無かった。`work.json` は
-4 つのエイリアスがすべて `nodes: []` の空配列で、`ListWork` が空レスポンスを
-正しくパースできることの確認に留まる。
 
 ## `schema.json`
 

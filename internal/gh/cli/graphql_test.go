@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -357,12 +359,28 @@ func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
 	}
 }
 
-// ListWork reads four aliased searches out of one response. A recording is
-// the only way to know the aliases the query declares and the keys the answer
-// carries are still the same four.
+// A recording is the only way to know the four aliases the query declares
+// still match the keys the answer carries.
 func TestListWorkParsesARecordedResponse(t *testing.T) {
-	c, _ := newTestClient(readTestdata(t, "work.json"), nil)
+	raw := readTestdata(t, "work.json")
 
+	var doc struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatalf("unmarshal recording: %v", err)
+	}
+	wantAliases := []string{"assigned", "mentioned", "reviewRequested", "yourPRs"}
+	gotAliases := make([]string, 0, len(doc.Data))
+	for k := range doc.Data {
+		gotAliases = append(gotAliases, k)
+	}
+	slices.Sort(gotAliases)
+	if !slices.Equal(gotAliases, wantAliases) {
+		t.Errorf("recorded aliases = %v, want %v", gotAliases, wantAliases)
+	}
+
+	c, _ := newTestClient(raw, nil)
 	w, err := c.ListWork(t.Context())
 	if err != nil {
 		t.Fatalf("ListWork: %v", err)

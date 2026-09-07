@@ -40,9 +40,7 @@ func newTestClient(out string, err error) (*Client, *fakeRun) {
 	return &Client{dir: "/repo", run: f.run}, f
 }
 
-// readTestdata returns a recorded gh response. The recordings are what the
-// parse tests answer with: hand-written JSON only proves the parser handles
-// the shape the test author imagined (see testdata/README.md).
+// readTestdata returns a recorded gh response (see testdata/README.md).
 func readTestdata(t *testing.T, name string) string {
 	t.Helper()
 
