@@ -157,7 +157,14 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 	f := &scenarioSource{pr: scenarioPR()}
 	m := scenarioModel(t, f)
 
-	m = run(t, m, "2", "enter") // the Repos row -> the detail view
+	m = run(t, m, "2")
+	// The Work board's own enter opens the same detail view, so without
+	// this the scenario would still pass with no Repos tab at all.
+	if m.tab != tabRepos {
+		t.Fatalf("precondition: tab = %d, want the Repos tab", m.tab)
+	}
+
+	m = run(t, m, "enter") // the Repos row -> the detail view
 	if !strings.Contains(content(m), "#12") {
 		t.Fatalf("the detail view did not open:\n%s", content(m))
 	}
@@ -176,7 +183,17 @@ func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 	f := &scenarioSource{pr: scenarioPR(), labels: []gh.Label{{Name: "bug", Color: "d73a4a"}}}
 	m := scenarioModel(t, f)
 
-	m = run(t, m, "2", "enter", "l", "space", "enter")
+	m = run(t, m, "2")
+	if m.tab != tabRepos {
+		t.Fatalf("precondition: tab = %d, want the Repos tab", m.tab)
+	}
+
+	m = run(t, m, "enter")
+	if !strings.Contains(content(m), "state: open") {
+		t.Fatalf("precondition: the detail view did not open:\n%s", content(m))
+	}
+
+	m = run(t, m, "l", "space", "enter")
 
 	if len(f.pr.Labels) != 1 || f.pr.Labels[0].Name != "bug" {
 		t.Fatalf("labels = %+v, want bug applied", f.pr.Labels)
