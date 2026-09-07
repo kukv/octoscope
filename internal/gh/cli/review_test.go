@@ -443,3 +443,95 @@ func TestPRReviewContextWalksEveryPageOfThreads(t *testing.T) {
 		t.Errorf("first call = %v, want no cursor", f.calls[0])
 	}
 }
+
+// GitHub caps a thread's comments at what the first page asked for; without
+// a second request the rest of a long conversation vanishes with no error.
+func TestPRReviewContextWalksEveryPageOfAThreadsComments(t *testing.T) {
+	t.Parallel()
+
+	threads := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
+		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T1"},` +
+		`"nodes":[{"id":"THREAD_1","path":"a.go","originalLine":1,"diffSide":"RIGHT",` +
+		`"comments":{"pageInfo":{"hasNextPage":true,"endCursor":"C50"},` +
+		`"nodes":[{"body":"first","author":{"login":"kukv"}}]}}]}}}}}`
+	rest := `{"data":{"node":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C99"},` +
+		`"nodes":[{"body":"fifty-first","author":{"login":"kukv"}}]}}}}`
+
+	f := &fakeSeq{outs: []string{threads, rest}}
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+
+	rc, err := c.PRReviewContext(t.Context(), "", 55)
+	if err != nil {
+		t.Fatalf("PRReviewContext: %v", err)
+	}
+	if len(f.calls) != 2 {
+		t.Fatalf("calls = %d, want 2 (the thread says it has more comments)", len(f.calls))
+	}
+	if !slices.Contains(f.calls[1], "threadId=THREAD_1") {
+		t.Errorf("second call = %v, want it to name the thread", f.calls[1])
+	}
+	// Without the cursor the second request asks for the first fifty again
+	// and the loop never ends.
+	if !slices.Contains(f.calls[1], "after=C50") {
+		t.Errorf("second call = %v, want it to carry after=C50", f.calls[1])
+	}
+	if len(rc.Threads) != 1 {
+		t.Fatalf("Threads = %d, want 1", len(rc.Threads))
+	}
+	got := rc.Threads[0].Comments
+	if len(got) != 2 {
+		t.Fatalf("Comments = %d, want 2 (one from each page)", len(got))
+	}
+	if got[0].Body != "first" || got[1].Body != "fifty-first" {
+		t.Errorf("Comments = %q / %q, want the second page appended after the first",
+			got[0].Body, got[1].Body)
+	}
+}
+
+func TestAThreadThatFitsInOnePageCostsNoExtraRequest(t *testing.T) {
+	t.Parallel()
+
+	threads := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
+		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T1"},` +
+		`"nodes":[{"id":"THREAD_1","path":"a.go","originalLine":1,"diffSide":"RIGHT",` +
+		`"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C1"},` +
+		`"nodes":[{"body":"only","author":{"login":"kukv"}}]}}]}}}}}`
+
+	f := &fakeSeq{outs: []string{threads}}
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+
+	if _, err := c.PRReviewContext(t.Context(), "", 55); err != nil {
+		t.Fatalf("PRReviewContext: %v", err)
+	}
+	if len(f.calls) != 1 {
+		t.Errorf("calls = %d, want 1: a thread with nothing more must not cost a request", len(f.calls))
+	}
+}
+
+func TestAThreadWithThreePagesOfCommentsIsFollowedToTheEnd(t *testing.T) {
+	t.Parallel()
+
+	threads := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
+		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T1"},` +
+		`"nodes":[{"id":"THREAD_1","path":"a.go","originalLine":1,"diffSide":"RIGHT",` +
+		`"comments":{"pageInfo":{"hasNextPage":true,"endCursor":"C50"},` +
+		`"nodes":[{"body":"one","author":{"login":"kukv"}}]}}]}}}}}`
+	page2 := `{"data":{"node":{"comments":{"pageInfo":{"hasNextPage":true,"endCursor":"C150"},` +
+		`"nodes":[{"body":"two","author":{"login":"kukv"}}]}}}}`
+	page3 := `{"data":{"node":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C250"},` +
+		`"nodes":[{"body":"three","author":{"login":"kukv"}}]}}}}`
+
+	f := &fakeSeq{outs: []string{threads, page2, page3}}
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+
+	rc, err := c.PRReviewContext(t.Context(), "", 55)
+	if err != nil {
+		t.Fatalf("PRReviewContext: %v", err)
+	}
+	if len(f.calls) != 3 {
+		t.Fatalf("calls = %d, want 3: no cap is placed on the number of pages", len(f.calls))
+	}
+	if len(rc.Threads[0].Comments) != 3 {
+		t.Errorf("Comments = %d, want 3", len(rc.Threads[0].Comments))
+	}
+}

@@ -30,6 +30,9 @@ var reviewAtOnceMutation string
 //go:embed discard_review.graphql
 var discardReviewMutation string
 
+//go:embed thread_comments.graphql
+var threadCommentsQuery string
+
 // repoArgs names the repository for a GraphQL call.
 //
 // GraphQL's repository() takes owner and name separately, unlike `gh pr`
@@ -110,7 +113,9 @@ type threadCommentNode struct {
 
 // PRReviewContext fetches everything the diff view needs to draw and change
 // a review. It walks review threads one page at a time itself, since
-// `gh api --paginate` cannot follow a GraphQL cursor below the top level.
+// `gh api --paginate` cannot follow a GraphQL cursor below the top level,
+// and follows a thread's own comments only when that thread says it has
+// more.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
 	repoFields, err := repoArgs(c.effectiveRepo(repo))
 	if err != nil {
@@ -118,6 +123,7 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 	}
 
 	var rc gh.ReviewContext
+	var nodes []threadNode
 	cursor := ""
 	for {
 		args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
@@ -146,14 +152,65 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		if len(pr.Reviews.Nodes) > 0 {
 			rc.PendingID = pr.Reviews.Nodes[0].ID
 		}
-		for _, n := range pr.ReviewThreads.Nodes {
-			rc.Threads = append(rc.Threads, n.toDomain())
-		}
+		nodes = append(nodes, pr.ReviewThreads.Nodes...)
 
 		if !pr.ReviewThreads.PageInfo.HasNextPage || pr.ReviewThreads.PageInfo.EndCursor == "" {
-			return rc, nil
+			break
 		}
 		cursor = pr.ReviewThreads.PageInfo.EndCursor
+	}
+
+	for _, n := range nodes {
+		t := n.toDomain()
+		if n.Comments.PageInfo.HasNextPage {
+			rest, err := c.threadComments(ctx, n.ID, n.Comments.PageInfo.EndCursor)
+			if err != nil {
+				return gh.ReviewContext{}, err
+			}
+			t.Comments = append(t.Comments, rest...)
+		}
+		rc.Threads = append(rc.Threads, t)
+	}
+	return rc, nil
+}
+
+type threadCommentsResponse struct {
+	Data struct {
+		Node struct {
+			Comments struct {
+				PageInfo pageInfo            `json:"pageInfo"`
+				Nodes    []threadCommentNode `json:"nodes"`
+			} `json:"comments"`
+		} `json:"node"`
+	} `json:"data"`
+}
+
+// threadComments reads what did not fit in the page PRReviewContext already
+// has, starting after the cursor that page ended on.
+func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]gh.ThreadComment, error) {
+	var rest []gh.ThreadComment
+	cursor := after
+	for {
+		args := []string{
+			"api", "graphql", "-f", "query=" + threadCommentsQuery,
+			"-f", "threadId=" + threadID, "-f", "after=" + cursor,
+		}
+		out, err := c.run(ctx, c.dir, args...)
+		if err != nil {
+			return nil, err
+		}
+		var resp threadCommentsResponse
+		if err := json.Unmarshal(out, &resp); err != nil {
+			return nil, fmt.Errorf("parse thread comments: %w", err)
+		}
+		page := resp.Data.Node.Comments
+		for _, n := range page.Nodes {
+			rest = append(rest, n.toDomain())
+		}
+		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
+			return rest, nil
+		}
+		cursor = page.PageInfo.EndCursor
 	}
 }
 
