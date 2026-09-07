@@ -3,7 +3,7 @@ package diff
 import tea "charm.land/bubbletea/v2"
 
 // The mouse handling below reads the same geometry render.go draws with --
-// showSidebar, sidebarWidth, m.gutter, headerHeight, paneHeight and m.top --
+// showSidebar, sidebarWidth, headerHeight, paneHeight and m.top --
 // because a hit-test that computes the layout a second time is a hit-test
 // that drifts.
 

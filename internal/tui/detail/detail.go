@@ -96,9 +96,15 @@ type (
 	}
 )
 
-// mode is which overlay is on screen. Parallel bools made 2^n nominal states
-// out of the eight this view actually has, and Update, handleKey and View
-// each assumed a different subset of them (.claude/rules/tui.md).
+// mode is which overlay is on screen. Ten parallel bools named 2^10 nominal
+// states for the eleven this view reaches, and Update, handleKey and View
+// each assumed a different subset of them (.claude/rules/tui.md). mode and
+// phase name 5x3, and the eleven are: modeView idle or loading; modeCompose
+// and modeConfirm idle or working; modePick loading, idle or working;
+// modeSubmit loading or idle -- never working, because review.Model owns the
+// send. The other four are unreachable: phaseWorking is only ever set by the
+// compose, confirm and picker key handlers, and phaseLoading only alongside
+// the mode it is fetching for.
 type mode uint8
 
 const (
