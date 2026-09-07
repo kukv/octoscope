@@ -23,14 +23,24 @@ func (m Model) View() string {
 	}
 	var b strings.Builder
 	b.WriteString(theme.Title().Render(i18n.Tf("merge.title", map[string]any{"Number": m.ref.Number})) + "\n\n")
-	if m.loading {
+	switch {
+	case m.loading:
 		b.WriteString(i18n.T("merge.loading") + "\n\n")
-	} else {
+	case m.answered():
 		b.WriteString(m.body())
 	}
 	b.WriteString(m.keyBar())
-	return theme.Popup().Width(m.boxWidth()).Render(b.String())
+	// While the merge is in flight there are no keys to offer, and the blank
+	// line the key bar would have filled is not a row worth drawing.
+	return theme.Popup().Width(m.boxWidth()).Render(strings.TrimRight(b.String(), "\n"))
 }
+
+// answered reports whether a fetch has come back. Without one there is
+// nothing true to draw: an empty context reads as a repository with no merge
+// method, no auto-merge and an answer GitHub is still working out, none of
+// which was measured. The failure itself is shown by the holder at footer
+// level.
+func (m Model) answered() bool { return m.ctx.PullRequestID != "" }
 
 func (m Model) body() string {
 	var b strings.Builder
@@ -69,6 +79,8 @@ func (m Model) autoLine() string {
 		return m.checkbox() + " " + i18n.T("merge.auto")
 	case !m.ctx.AutoMergeAllowed:
 		return theme.Dim().Render(i18n.T("merge.auto_unavailable_repo"))
+	case !m.ctx.ViewerCanEnableAutoMerge:
+		return theme.Dim().Render(i18n.T("merge.auto_unavailable_permission"))
 	default:
 		return theme.Dim().Render(i18n.T("merge.auto_unavailable_clean"))
 	}
@@ -127,13 +139,35 @@ func blockText(b gh.MergeBlock) string {
 }
 
 func (m Model) keyBar() string {
-	hints := []string{
-		i18n.T("merge.key_merge"),
-		i18n.T("merge.key_auto"),
-		i18n.T("merge.key_refresh"),
-		i18n.T("merge.key_cancel"),
+	hints := m.hints()
+	if len(hints) == 0 {
+		return ""
 	}
 	return theme.Dim().Render(layout.FitKeyBar(hints, m.boxWidth()-4))
+}
+
+// hints names only the keys that act in the state the popup is in. A bar
+// that offers enter while merging is blocked, or space where the box is not
+// on offer, teaches the wrong keys and makes the popup look broken when they
+// do nothing.
+func (m Model) hints() []string {
+	switch {
+	case m.sending:
+		return nil // every key is ignored until GitHub answers
+	case m.loading:
+		return []string{i18n.T("merge.key_refresh"), i18n.T("merge.key_cancel")}
+	}
+	var hints []string
+	switch {
+	case m.ctx.AutoMergeEnabled:
+		hints = append(hints, i18n.T("merge.key_auto_off"))
+	case m.answered() && m.ctx.Block() == gh.BlockNone:
+		hints = append(hints, i18n.T("merge.key_merge"))
+	}
+	if m.ctx.CanAutoMerge() && !m.ctx.AutoMergeEnabled {
+		hints = append(hints, i18n.T("merge.key_auto"))
+	}
+	return append(hints, i18n.T("merge.key_refresh"), i18n.T("merge.key_cancel"))
 }
 
 // boxWidth is the popup's outer width, border included: never wider than

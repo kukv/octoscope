@@ -290,6 +290,13 @@ func (m Model) stateAction() (closing bool, ok bool) {
 	}
 }
 
+// canMerge reports whether the merge key applies: only an open pull request
+// can be merged, and until the item has arrived the state is not known.
+func (m Model) canMerge() bool {
+	closing, ok := m.stateAction()
+	return m.ref.Kind == gh.ItemPR && ok && closing
+}
+
 func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SetState(ref, closing); err != nil {
@@ -684,6 +691,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		if m.phase == phaseLoading {
 			return m.stillLoading(), nil
+		}
+		// Nor has a pull request that is already merged or closed. GitHub
+		// answers UNKNOWN for a merged one, so the popup would say it is
+		// still working the answer out, for ever.
+		if !m.canMerge() {
+			return m, nil
 		}
 		m.mode, m.phase = modeMerge, phaseIdle
 		m.errText = ""

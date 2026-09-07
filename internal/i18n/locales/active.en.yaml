@@ -374,6 +374,8 @@ merge:
     other: "auto-merge is on; enter cancels it"
   auto_unavailable_repo:
     other: "auto-merge is off for this repository"
+  auto_unavailable_permission:
+    other: "you may not turn auto-merge on here"
   auto_unavailable_clean:
     other: "auto-merge has nothing left to wait for"
   delete_branch_on:
@@ -400,6 +402,8 @@ merge:
     other: "enter:merge"
   key_auto:
     other: "space:auto"
+  key_auto_off:
+    other: "enter:auto-merge off"
   key_refresh:
     other: "r:refresh"
   key_cancel:

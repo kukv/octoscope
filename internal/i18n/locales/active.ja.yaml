@@ -359,6 +359,8 @@ merge:
     other: "auto-merge は有効です。enter で解除します"
   auto_unavailable_repo:
     other: "このリポジトリでは auto-merge が無効です"
+  auto_unavailable_permission:
+    other: "auto-merge を有効にする権限がありません"
   auto_unavailable_clean:
     other: "auto-merge が待つものはありません"
   delete_branch_on:
@@ -385,6 +387,8 @@ merge:
     other: "enter:マージ"
   key_auto:
     other: "space:auto"
+  key_auto_off:
+    other: "enter:auto-merge を解除"
   key_refresh:
     other: "r:更新"
   key_cancel:

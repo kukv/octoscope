@@ -1173,6 +1173,29 @@ func TestAClosedPopupsFailureDoesNotReachTheFooter(t *testing.T) {
 	}
 }
 
+// TestMDoesNothingOnAMergedPullRequest: GitHub answers UNKNOWN for a merged
+// pull request, so the popup would say it is still working the answer out and
+// r would never change it.
+func TestMDoesNothingOnAMergedPullRequest(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateMerged}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	before := m.View()
+	m, cmd := m.Update(key("m"))
+	if cmd != nil {
+		t.Errorf("m sent %T on a merged pull request, which has nothing to merge", cmd())
+	}
+	if m.mode != modeView {
+		t.Errorf("mode = %v, want the body: a merged pull request has no merge popup", m.mode)
+	}
+	if m.View() != before {
+		t.Error("m changed the screen on a merged pull request")
+	}
+	if strings.Contains(before, "m:merge") {
+		t.Errorf("a merged pull request's footer offers a merge:\n%s", before)
+	}
+}
+
 // TestTheMergeKeyIsInTheFooterOnAPullRequestOnly: an issue has no merge, so
 // its key bar must not offer one.
 func TestTheMergeKeyIsInTheFooterOnAPullRequestOnly(t *testing.T) {

@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -93,6 +94,26 @@ func mergeSendingModel(t *testing.T, width int) Model {
 	return m
 }
 
+// mergeAutoForbiddenModel is a repository that allows auto-merge on a pull
+// request this viewer may not queue.
+func mergeAutoForbiddenModel(t *testing.T, width int) Model {
+	c := mergeable()
+	c.AutoMergeAllowed = true
+	c.ViewerCanEnableAutoMerge = false
+	return sized(t, &fakeSource{ctx: c}, width)
+}
+
+// mergeFailedModel is the popup whose fetch failed: it has no answer to draw,
+// and the failure itself is shown by the holder under the box.
+func mergeFailedModel(t *testing.T, width int) Model {
+	t.Helper()
+
+	m := New(&fakeSource{err: errors.New("gh: HTTP 500")}, ref())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	m, _ = m.Update(m.Init()())
+	return m
+}
+
 // mergeLoadingModel is the popup before its fetch has landed.
 func mergeLoadingModel(t *testing.T, width int) Model {
 	m := New(&fakeSource{ctx: mergeable()}, ref())
@@ -110,6 +131,8 @@ var goldenStates = []struct {
 	{"merge_auto_on", mergeAutoOnModel},
 	{"merge_blocked", mergeBlockedModel},
 	{"merge_computing", mergeComputingModel},
+	{"merge_auto_forbidden", mergeAutoForbiddenModel},
+	{"merge_failed", mergeFailedModel},
 	{"merge_sending", mergeSendingModel},
 	{"merge_loading", mergeLoadingModel},
 }
