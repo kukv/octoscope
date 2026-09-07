@@ -73,9 +73,9 @@ type (
 	stateChangedMsg  struct{}
 	stateErrorMsg    struct{ err error }
 	// The three picker answers carry the ref for the same reason itemMsg
-	// does. The candidates are the item the fetch was started on: opened
-	// against another item they would precheck the wrong labels, and enter
-	// would then remove them.
+	// does. Labels and assignees belong to the repository, so an answer
+	// started on another item opens a picker nobody asked for, offering
+	// that repository's candidates.
 	pickerCandidatesMsg struct {
 		ref    gh.ItemRef
 		kind   pickerKind

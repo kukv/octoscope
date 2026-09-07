@@ -540,8 +540,8 @@ func TestTheSidebarScrollsToKeepTheSelectionVisible(t *testing.T) {
 	}
 }
 
-// TestEveryStateNamesItself catches an overlay added without a name: every
-// assertion in this package reports mode and phase with %v, and a nameless
+// TestEveryStateNamesItself catches a state dropped from String: every
+// assertion in this package reports mode and phase with %v, and an unnamed
 // one is printed as a number nobody can read.
 func TestEveryStateNamesItself(t *testing.T) {
 	for m := modeView; m <= modeDiscard; m++ {

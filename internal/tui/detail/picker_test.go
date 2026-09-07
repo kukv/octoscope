@@ -369,9 +369,8 @@ func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
 
 // TestAStalePickerAnswerIsDropped pins the ref guard on the three picker
 // answers. l and a reach the repository, not the item, so an answer for the
-// item the user has left carries candidates that look plausible here: the
-// picker would open prechecked against the other item's labels, and enter
-// would then take them off this one.
+// item the user has left would open a picker nobody asked for here, offering
+// the other repository's labels or assignees.
 func TestAStalePickerAnswerIsDropped(t *testing.T) {
 	f := &fakeSource{
 		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
