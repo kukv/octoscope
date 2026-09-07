@@ -243,9 +243,10 @@ GitHub の検索構文を覚えていなくても絞り込めることがこの�
 PR / Issue の詳細からは、diff 閲覧、レビュー提出、checks 一覧、merge 操作へ遷移する。
 diff とレビューは Phase 2、checks 一覧と merge は Phase 3 で作る。
 
-モックアップに diff とレビューの画面は無く、キーバーに `d` / `v` / `m` が
-予約されているだけである。以下の 4.4.1 と 4.4.2 がその 2 つの設計であり、
-**この 2 節についてはモックアップではなくこの文章が正**である。
+モックアップに diff・レビュー・checks・merge の画面は無く、キーバーに
+`d` / `v` / `m` が予約されているだけである。以下の 4.4.1〜4.4.4 がその設計であり、
+**この 4 節についてはモックアップではなくこの文章が正**である。
+checks の入口は `s` とする（`k` は行移動で埋まっている）。
 
 #### 4.4.1 diff ビュー
 
@@ -308,7 +309,9 @@ Repos タブと骨格を揃える。unified 表示のみとする。左右 2 分
 `reviewThreads`（100 件）、各スレッドの `comments`（50 件）、pending review の
 `comments`（100 件）はいずれもページングしていない。これを超える PR では
 スレッドが黙って欠け、`pending · N` の件数も実際より少なく出る。
-ページングは Phase 3 で対応する。
+**`statusCheckRollup.contexts`（100 件）も同じ穴で**、4.4.3 がそこを読む。
+ページングは Phase 3 で対応する。上限に当たったときは黙って切らず、
+「N 件以降は表示していません」と出す。
 
 #### 4.4.2 レビューの提出
 
@@ -340,6 +343,122 @@ diff を開いた時点で `pullRequest.reviews(states: [PENDING])` を引き、
 
 **提出のポップアップは詳細ビューからも開く。** diff を読まずに approve したい
 場面はあり、そのために diff を経由させる理由が無い。
+
+#### 4.4.3 checks ビュー
+
+**左に check の一覧、右に選択中の check のログ**を置く 2 ペイン構成とし、
+diff ビューと骨格を揃える。入口は詳細ビュー・Work のカード・Repos タブの行から `s`。
+
+```
+┌─ kukv/octoscope #61 ─────────────────────────────────────┐
+│ CI #88 · 2 failing · 1 running                           │
+├─ Checks ───────────┬─────────────────────────────────────┤
+│ CI                 │ Run osv-scanner-action              │
+│  ✗ test      2m14s │ ##[group]Run google/osv-scanner...  │
+│  ✓ lint      1m02s │   scan-args: --recursive            │
+│ security           │ ##[error]Process completed with ... │
+│  ✗ sca       0m48s │                                     │
+│ ● ci/circleci      │                                     │
+└────────────────────┴─────────────────────────────────────┘
+ j/k 行  enter ログ  L 全ログ  R 再実行  o ブラウザ  r 取り直す
+```
+
+- 一覧はワークフロー名（`checkSuite.workflowRun.workflow.name`）でグループし、
+  **失敗したワークフローを先頭に置く**。所属するワークフローの無い
+  StatusContext はグループを作らず末尾に並べる
+- 各行は状態のグリフ、名前、`completedAt - startedAt` の所要時間。
+  グリフは 4.5 のアイコンセットから引く（Nerd Font 依存の文字を直接書かない）
+- ログは既定で**失敗したステップのみ**（`gh run view --job <id> --log-failed`）。
+  `L` で全ログ（`--log`）に切り替える。知りたいのはほぼ常に失敗箇所であり、
+  全ログは取得も描画も重い（実測で失敗ジョブ 1 件が 28 行に対し全体 251 行）
+- **成功したジョブに `--log-failed` を投げると出力が空で終了コードは 0 になる。**
+  これはエラーではないので、そのときは「失敗したステップはありません」と出す
+- `gh run view --log` の各行は `ジョブ名 \t ステップ名 \t タイムスタンプ 本文` の
+  タブ区切りである。**ジョブ名とステップ名は剥がし**、ステップ名は区切りの見出しに使う。
+  タイムスタンプは残す（ログから時刻を落とすと読む意味が減る）。
+  タイムスタンプを持たない継続行がある
+- **長い行は折り返さず切り、`h` / `l` で横スクロールする。** ログは 1 行が長く、
+  折り返すと画面が段落で埋まって流れが追えなくなる
+- 更新は `r` の手動のみ。進行中の run を自動で追いかけない
+  （4.0 と同じ理由で `Update` に時計を持ち込まない。必要になったら改めて設計する）
+
+| キー | 動作 |
+|---|---|
+| `j` / `k` | 行 |
+| `h` / `l` | ペイン、ログの横スクロール |
+| `enter` | 選択中の check のログを出す |
+| `L` | 全ログと失敗ステップのみを切り替える |
+| `R` | 再実行（失敗ジョブのみ / ワークフロー全体をポップアップで選ぶ） |
+| `o` | ブラウザで開く |
+| `r` | 取り直す |
+| `esc` / `q` | 戻る |
+
+**ログと再実行は GitHub Actions の check にしか無い。** 外部 CI の StatusContext は
+`targetUrl` を持つだけなので、`o` でそれを開く。`L` や `R` を押したときは
+無言で無視せず、4.4.1 と同じ `declined` の 1 行で理由を出す。
+
+必要な id は GraphQL から取れる（実測で確認した）。
+
+| 欲しいもの | フィールド | 渡す先 |
+|---|---|---|
+| ジョブ id | `CheckRun.databaseId` | `gh run view --job <id>` |
+| run id | `CheckRun.checkSuite.workflowRun.databaseId` | `gh run rerun [--failed] <id>` |
+| ワークフロー名 / 実行番号 | `...workflowRun.workflow.name` / `runNumber` | 見出し |
+| 外部 CI のリンク | `StatusContext.targetUrl` | `o` |
+
+`gh run rerun --job` は Web の URL に出る番号ではなく `databaseId` を要る、と
+`gh` 自身が注意している。ここで使う `CheckRun.databaseId` はその `databaseId` と
+同じ値である（`detailsUrl` の `.../job/<databaseId>` と一致することを確認した）。
+
+#### 4.4.4 merge
+
+`m` でポップアップを開く。方式の選択、オプション、実行の 3 段を 1 つの画面に置く。
+
+```
+┌─ Merge #61 ─────────────────────────────┐
+│ ○ Squash and merge                      │
+│ ○ Create a merge commit                 │
+│ ○ Rebase and merge                      │
+│                                         │
+│ [x] ブランチを削除する                  │
+│ [ ] auto-merge（checks の通過後に）     │
+│                                         │
+│ ⚠ レビューが承認されていません          │
+│   enter マージ  esc 中止                │
+└─────────────────────────────────────────┘
+```
+
+- 方式は**リポジトリが許したものだけ**出す（`squashMergeAllowed` /
+  `mergeCommitAllowed` / `rebaseMergeAllowed`）。選べない項目を並べて
+  押させてから断らない
+- **ブランチ削除の既定はリポジトリの `deleteBranchOnMerge`。** GitHub 側の設定に
+  合わせるのが最も驚きが少ない。その場でトグルもできる
+- auto-merge は `autoMergeAllowed && viewerCanEnableAutoMerge` のときだけ選べる。
+  選べないときは理由を 1 行出す（リポジトリで有効化されていない、など）。
+  `autoMergeRequest` が既にあるときは、`m` は**解除**を提案する
+- **`mergeable: UNKNOWN` はエラーではない。** GitHub がマージ可能性を計算中の
+  ふつうの状態であり、実測でも普通に返る。「計算中」と出して `r` で取り直す。
+  `CONFLICTING` や `mergeStateStatus` の `BLOCKED` / `BEHIND` / `DIRTY` は
+  `enter` を塞ぎ、理由を出す
+- **確認はこのポップアップ 1 段だけ。** 方式を選んで `enter`、`esc` で中止。
+  `X`（レビューの破棄）と同じ流儀に揃える
+- 成功したら詳細ビューを閉じて Work に戻り、再取得する。マージ済みの
+  カードは一覧から消える
+- 失敗（他人が先にマージした、保護ルールに当たった）は GitHub のメッセージを
+  そのまま出す
+
+mutation は 3 つ。
+
+| したいこと | mutation |
+|---|---|
+| マージする | `mergePullRequest` |
+| auto-merge を有効にする | `enablePullRequestAutoMerge` |
+| auto-merge を解除する | `disablePullRequestAutoMerge` |
+
+**`gh pr merge` は使わない。** ローカルの作業ツリーに触れうるうえ、対象 PR を
+cwd から推測する経路が混ざる。mutation ならレビュー（4.4.2）と同じく
+GitHub 側だけで完結する。再実行にはこれに当たる mutation が存在しないため、
+そちらは `gh run rerun` を使う。
 
 ### 4.5 装飾
 
@@ -569,12 +688,24 @@ Phase 0 時点のフラグは `--repo` / `--lang` / `--version` の 3 つで、
 **この検証は TTY と実在の PR が要るため、TTY の無い環境では代行できない。**
 自動で確かめられるのは golden までであり、最後は人手で確認する。
 
-### Phase 3: checks / merge
+### Phase 3: checks / merge / ページング
 
-- checks 一覧、失敗ジョブのログ閲覧、ワークフローの再実行
-- merge（squash / merge / rebase）、auto-merge の有効化
+実装計画を 3 本に割り、checks → merge → ページングの順に 1 本ずつ PR にする。
+互いにデータの依存は無い。Phase 2 を 1 本の計画で進めて膨らませ、
+立て直しに 2 本を要した反省による。
 
-**検証**: 実際の PR を TUI からマージできる。
+- **checks**（4.4.3）: 一覧、失敗ジョブのログ閲覧、ワークフローの再実行。
+  ログと再実行は `gh run view` / `gh run rerun`（これに当たる mutation が無い）。
+  `statusCheckRollup.contexts` のページングはこの計画に含める
+- **merge**（4.4.4）: `mergePullRequest` / `enablePullRequestAutoMerge` /
+  `disablePullRequestAutoMerge`。`gh pr merge` は使わない
+- **ページング**: `reviewThreads` / 各スレッドの `comments` / pending review の
+  `comments`。Phase 2 の積み残しで、既存機能が黙って欠ける穴を塞ぐ
+
+**検証**: 実際の PR を TUI からマージでき、失敗した check のログを TUI で読める。
+**この検証は TTY と実在の PR が要るため、TTY の無い環境では代行できない**
+（Phase 2 と同じ。`docs/superpowers/2026-09-06-phase2-handoff.md` の形で
+受け渡しの手順を書く）。
 
 ### Phase 4: Repos タブ / Search タブ / API フォールバック
 
