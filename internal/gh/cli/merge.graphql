@@ -1,0 +1,22 @@
+query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    squashMergeAllowed
+    mergeCommitAllowed
+    rebaseMergeAllowed
+    deleteBranchOnMerge
+    autoMergeAllowed
+    pullRequest(number: $number) {
+      id
+      isDraft
+      mergeable
+      mergeStateStatus
+      reviewDecision
+      viewerCanEnableAutoMerge
+      # Only its presence is read: it is the difference between offering to
+      # turn auto-merge on and offering to turn it off.
+      autoMergeRequest {
+        enabledAt
+      }
+    }
+  }
+}

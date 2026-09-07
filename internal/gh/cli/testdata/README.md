@@ -116,7 +116,7 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","PageInfo"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/cli/testdata/schema.json
 ```
 
@@ -155,6 +155,28 @@ gh api graphql -f query='mutation($rid:ID!){deletePullRequestReview(input:{pullR
 D=internal/gh/cli/testdata
 gh api graphql -F query=@internal/gh/cli/checks.graphql \
   -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr_checks.json
+```
+
+## `merge_context.json`
+
+`merge.graphql` に対する実レスポンス。録った日: 2026-09-08、対象:
+`kukv/octoscope#61`。録った時点で `kukv/octoscope` に開いている PR が無かった
+ため、**マージ済みの #61** に対して録っている。読みたいのはリポジトリの
+`squashMergeAllowed` / `mergeCommitAllowed` / `rebaseMergeAllowed` /
+`deleteBranchOnMerge` / `autoMergeAllowed` と、PR の node id（マージ済みでも
+値は変わらない）で、これはマージ済みの PR でも問題なく返る。`mergeable` /
+`mergeStateStatus` / `reviewDecision` / `autoMergeRequest` はマージ済みの PR
+だと意味のある値を返さない（`UNKNOWN` / `UNKNOWN` / `REVIEW_REQUIRED` /
+`null`）ので、この録りものでは主張しない。enum の変換は
+`TestPRMergeContextTranslatesTheEnums` のインライン JSON で確かめる。
+
+`kukv/octoscope` は squash / merge commit / rebase をすべて許可し、
+`deleteBranchOnMerge` を有効にしており、`autoMergeAllowed` は無効。
+
+```bash
+D=internal/gh/cli/testdata
+gh api graphql -F query=@internal/gh/cli/merge.graphql \
+  -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/merge_context.json
 ```
 
 ## `job_log.txt` / `job_log_failed.txt`
