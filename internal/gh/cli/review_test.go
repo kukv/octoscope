@@ -531,6 +531,11 @@ func TestAThreadWithThreePagesOfCommentsIsFollowedToTheEnd(t *testing.T) {
 	if len(f.calls) != 3 {
 		t.Fatalf("calls = %d, want 3: no cap is placed on the number of pages", len(f.calls))
 	}
+	// Without carrying the cursor forward the third call would repeat
+	// after=C50 and the walk would loop on the same page forever.
+	if !slices.Contains(f.calls[2], "after=C150") {
+		t.Errorf("third call = %v, want it to carry after=C150", f.calls[2])
+	}
 	if len(rc.Threads[0].Comments) != 3 {
 		t.Errorf("Comments = %d, want 3", len(rc.Threads[0].Comments))
 	}

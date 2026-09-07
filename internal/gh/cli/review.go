@@ -162,10 +162,10 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 
 	for _, n := range nodes {
 		t := n.toDomain()
-		if n.Comments.PageInfo.HasNextPage {
+		if n.Comments.PageInfo.HasNextPage && n.Comments.PageInfo.EndCursor != "" {
 			rest, err := c.threadComments(ctx, n.ID, n.Comments.PageInfo.EndCursor)
 			if err != nil {
-				return gh.ReviewContext{}, err
+				return gh.ReviewContext{}, fmt.Errorf("fetch thread comments: %w", err)
 			}
 			t.Comments = append(t.Comments, rest...)
 		}
