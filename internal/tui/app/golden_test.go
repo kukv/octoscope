@@ -39,8 +39,13 @@ func TestGolden(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
+				// --repo starts on the Repos tab, so the board's own first
+				// frame is reached with 1.
 				withRepo := goldenModel(w, Options{HasRepo: true})
 				golden.Assert(t, fmt.Sprintf("app_tabs_%s_%d", lang.name, w), withRepo.View().Content)
+
+				onWork := press(withRepo, "1")
+				golden.Assert(t, fmt.Sprintf("app_tabs_work_%s_%d", lang.name, w), onWork.View().Content)
 
 				failed := goldenModel(w, Options{})
 				next, _ := failed.fail(errors.New("gh: HTTP 403: rate limit exceeded"))

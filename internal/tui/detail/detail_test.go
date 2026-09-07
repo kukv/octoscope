@@ -3,6 +3,7 @@ package detail
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
@@ -843,5 +845,99 @@ func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 	if m.body.YOffset() != before {
 		t.Errorf("the body scrolled to %d while the fetch was in flight, want %d",
 			m.body.YOffset(), before)
+	}
+}
+
+// TestAStaleCommentOrStateAnswerIsDropped pins the ref guard on the four
+// answers c and x produce. Both ways out end in a refetch, so an answer for
+// the item the user has left would pull that item's body onto the screen and
+// leave the reader looking at something they did not open.
+func TestAStaleCommentOrStateAnswerIsDropped(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+
+	t.Run("commentPostedMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(key("c"))
+		m, cmd := m.Update(commentPostedMsg{ref: other})
+		if m.mode != modeCompose || cmd != nil {
+			t.Errorf("mode = %v, cmd = %v; want the composer untouched", m.mode, cmd)
+		}
+	})
+
+	t.Run("commentErrorMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(commentErrorMsg{ref: other, err: errors.New("boom")})
+		if m.errText != "" {
+			t.Errorf("errText = %q after a stale failure, want empty", m.errText)
+		}
+	})
+
+	t.Run("stateChangedMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, cmd := m.Update(stateChangedMsg{ref: other})
+		if m.phase != phaseIdle || cmd != nil {
+			t.Errorf("phase = %v, cmd = %v; want no refetch for another item", m.phase, cmd)
+		}
+	})
+
+	t.Run("stateErrorMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(key("x")) // the confirmation is up
+		m, _ = m.Update(stateErrorMsg{ref: other, err: errors.New("boom")})
+		if m.mode != modeConfirm || m.errText != "" {
+			t.Errorf("mode = %v, errText = %q; want the confirmation untouched",
+				m.mode, m.errText)
+		}
+	})
+}
+
+// TestKeysDeclinedWhileLoadingSayWhy covers the report that c does nothing:
+// the item can still be on its way seconds later, and until it lands the screen is a
+// spinner with no footer, so a key that is ignored looks like a key that is
+// broken. Every key that needs the item has to say so.
+func TestKeysDeclinedWhileLoadingSayWhy(t *testing.T) {
+	want := i18n.T("detail.decline_loading")
+	for _, k := range []string{"c", "x", "v", "l", "a"} {
+		t.Run(k, func(t *testing.T) {
+			f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+			m := New(f, prRef()) // the fetch is deliberately not run
+			m, _ = m.Update(key(k))
+			if got := ansi.Strip(m.View()); !strings.Contains(got, want) {
+				t.Errorf("%s while loading said nothing:\n%s", k, got)
+			}
+		})
+	}
+}
+
+// TestTheDeclineGoesAwayWithTheWait is the other half: the note explains a
+// key that came too early, so it must not outlive the wait it was about.
+func TestTheDeclineGoesAwayWithTheWait(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	m := New(f, prRef())
+	m, _ = m.Update(key("c"))
+	if m.declined == "" {
+		t.Fatal("precondition: c while loading left no note")
+	}
+
+	m, _ = m.Update(fetch(f, prRef())())
+	if m.declined != "" {
+		t.Errorf("declined = %q after the item arrived, want empty", m.declined)
+	}
+}
+
+// TestEveryStateNamesItself catches a state dropped from String: every
+// assertion in this package reports mode and phase with %v, and an unnamed
+// one is printed as a number nobody can read.
+func TestEveryStateNamesItself(t *testing.T) {
+	for m := modeView; m <= modeSubmit; m++ {
+		if got := fmt.Sprintf("%v", m); strings.Contains(got, "?") {
+			t.Errorf("mode %d prints as %q", uint8(m), got)
+		}
+	}
+	for p := phaseIdle; p <= phaseWorking; p++ {
+		if got := fmt.Sprintf("%v", p); strings.Contains(got, "?") {
+			t.Errorf("phase %d prints as %q", uint8(p), got)
+		}
 	}
 }

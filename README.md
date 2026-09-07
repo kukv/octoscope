@@ -66,7 +66,7 @@ Or point it at any repository:
 
 | Flag | Description |
 |---|---|
-| `--repo owner/name` | Target repository. Defaults to the repository of the current directory. |
+| `--repo owner/name` | Target repository, and the tab octoscope opens on. Defaults to the repository of the current directory, and to the Work tab. |
 | `--lang en\|ja` | Display language. Defaults to the operating system locale. |
 | `--icons unicode\|nerd\|ascii` | Glyph set. Defaults to `unicode`; `OCTOSCOPE_ICONS` sets it permanently. |
 | `--version` | Print the version and exit. |

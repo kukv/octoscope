@@ -16,7 +16,11 @@ import (
 
 func (m Model) View() string {
 	if m.phase == phaseLoading {
-		return layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
+		out := layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
+		if m.declined != "" {
+			out += layout.ClipLines(theme.Dim().Render(m.declined), m.width) + "\n"
+		}
+		return out
 	}
 	switch m.mode {
 	case modeCompose:

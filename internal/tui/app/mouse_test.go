@@ -104,14 +104,15 @@ func TestClickingATabSwitchesToIt(t *testing.T) {
 		i18n.SetLanguage(lang)
 		m := newTestModel(Options{HasRepo: true})
 
-		x, _ := tokenAt(t, m, i18n.T("tab.repos"))
-		next, _ := m.Update(click(x, 0))
-		if next.(Model).tab != tabRepos {
-			t.Errorf("lang %s: clicking the Repos tab did not switch to it", lang)
+		// --repo starts on Repos, so Work is the one to click away to first.
+		next, _ := m.Update(click(0, 0))
+		if next.(Model).tab != tabWork {
+			t.Errorf("lang %s: clicking the Work tab did not switch to it", lang)
 		}
-		back, _ := next.(Model).Update(click(0, 0))
-		if back.(Model).tab != tabWork {
-			t.Errorf("lang %s: clicking the Work tab did not switch back", lang)
+		x, _ := tokenAt(t, m, i18n.T("tab.repos"))
+		back, _ := next.(Model).Update(click(x, 0))
+		if back.(Model).tab != tabRepos {
+			t.Errorf("lang %s: clicking the Repos tab did not switch back", lang)
 		}
 	}
 }
@@ -123,7 +124,7 @@ func TestClickingTheGapBetweenTabsDoesNothing(t *testing.T) {
 	gap := ansi.StringWidth("1 " + i18n.T("tab.work"))
 
 	next, _ := m.Update(click(gap, 0))
-	if next.(Model).tab != tabWork {
+	if next.(Model).tab != m.tab {
 		t.Error("clicking between the tabs switched tabs")
 	}
 }
@@ -159,7 +160,7 @@ func TestAClickIsNotBroadcast(t *testing.T) {
 		}},
 		prs: []gh.PR{{Number: 10, Title: "first pr"}, {Number: 11, Title: "second pr"}},
 	}
-	m := loadedApp(t, src, Options{HasRepo: true})
+	m := press(loadedApp(t, src, Options{HasRepo: true}), "1") // --repo lands on Repos
 
 	before, _ := m.repo.SelectedRef()
 	x, y := tokenAt(t, m, "another card")
@@ -228,7 +229,7 @@ func TestTheErrorScreenIgnoresTheMouse(t *testing.T) {
 	if cmd != nil {
 		t.Error("a click on the error screen produced a command")
 	}
-	if next.(Model).tab != tabWork {
+	if next.(Model).tab != m.tab {
 		t.Error("a click on the error screen switched tabs")
 	}
 }

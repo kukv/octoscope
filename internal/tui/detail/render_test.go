@@ -116,7 +116,7 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	reviewErrShown, _ := reviewErrDetail.Update(reviewErrCmd())
 
 	picker := sized(openPicker(t, f, prRef(), "l"))
-	failed, _ := picker.Update(pickErrorMsg{err: errors.New(overlongTitle)})
+	failed, _ := picker.Update(pickErrorMsg{ref: prRef(), err: errors.New(overlongTitle)})
 
 	// Toggle a label and press enter without resolving the resulting cmd, so
 	// the picker is caught mid "applying" render rather than already settled.

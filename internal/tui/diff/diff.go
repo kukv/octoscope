@@ -95,6 +95,23 @@ const (
 	modeDiscard
 )
 
+// String names the mode wherever it is printed. Every assertion on the state
+// of this view reports it with %v, and "mode = 3" leaves the reader counting
+// the constants to find out which overlay that was.
+func (m mode) String() string {
+	switch m {
+	case modeView:
+		return "view"
+	case modeCompose:
+		return "compose"
+	case modeSubmit:
+		return "submit"
+	case modeDiscard:
+		return "discard"
+	}
+	return "mode(?)"
+}
+
 // phase is where the current mode is in its round trip. There is no loading
 // phase: what an overlay needs is on the model before its key is accepted.
 type phase uint8
@@ -103,6 +120,16 @@ const (
 	phaseIdle    phase = iota
 	phaseWorking       // sending
 )
+
+func (p phase) String() string {
+	switch p {
+	case phaseIdle:
+		return "idle"
+	case phaseWorking:
+		return "working"
+	}
+	return "phase(?)"
+}
 
 type Model struct {
 	src Source
@@ -345,9 +372,8 @@ func (m Model) submitCancelled() Model {
 	if m.mode != modeSubmit {
 		return m
 	}
-	// A failed submission's text is left on errText: nothing outside the
-	// popup draws it, and c, v and X each clear it before they open.
 	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
 	return m
 }
 

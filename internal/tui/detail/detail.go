@@ -68,17 +68,34 @@ type (
 		ref gh.ItemRef
 		err error
 	}
-	commentPostedMsg    struct{}
-	commentErrorMsg     struct{ err error }
-	stateChangedMsg     struct{}
-	stateErrorMsg       struct{ err error }
+	// The comment and state answers carry the ref for the same reason
+	// itemMsg does. Both end in a refetch of the item they were sent for,
+	// which on another item would replace what the user is reading.
+	commentPostedMsg struct{ ref gh.ItemRef }
+	commentErrorMsg  struct {
+		ref gh.ItemRef
+		err error
+	}
+	stateChangedMsg struct{ ref gh.ItemRef }
+	stateErrorMsg   struct {
+		ref gh.ItemRef
+		err error
+	}
+	// The three picker answers carry the ref for the same reason itemMsg
+	// does. Labels and assignees belong to the repository, so an answer
+	// started on another item opens a picker nobody asked for, offering
+	// that repository's candidates.
 	pickerCandidatesMsg struct {
+		ref    gh.ItemRef
 		kind   pickerKind
 		labels []gh.Label
 		users  []string
 	}
-	pickerAppliedMsg struct{}
-	pickErrorMsg     struct{ err error }
+	pickerAppliedMsg struct{ ref gh.ItemRef }
+	pickErrorMsg     struct {
+		ref gh.ItemRef
+		err error
+	}
 
 	// reviewContextMsg and reviewContextErrMsg carry the ref for the same
 	// reason itemMsg does.
@@ -103,6 +120,25 @@ const (
 	modeSubmit
 )
 
+// String names the mode wherever it is printed. Every assertion on the state
+// of this view reports it with %v, and "mode = 3" leaves the reader counting
+// the constants to find out which overlay that was.
+func (m mode) String() string {
+	switch m {
+	case modeView:
+		return "view"
+	case modeCompose:
+		return "compose"
+	case modeConfirm:
+		return "confirm"
+	case modePick:
+		return "pick"
+	case modeSubmit:
+		return "submit"
+	}
+	return "mode(?)"
+}
+
 // phase is where the current mode is in its round trip. modeSubmit never
 // reaches phaseWorking: review.Model owns the send.
 type phase uint8
@@ -112,6 +148,18 @@ const (
 	phaseLoading
 	phaseWorking
 )
+
+func (p phase) String() string {
+	switch p {
+	case phaseIdle:
+		return "idle"
+	case phaseLoading:
+		return "loading"
+	case phaseWorking:
+		return "working"
+	}
+	return "phase(?)"
+}
 
 type Model struct {
 	src Source
@@ -126,6 +174,11 @@ type Model struct {
 	// Opening an overlay clears it rather than draw the body's failure
 	// inside it.
 	errText string
+
+	// declined says why the last key did nothing, in the one case where the
+	// screen cannot show it: while the item is loading there is a spinner
+	// and nothing else, so c, x, v, l and a look broken rather than early.
+	declined string
 
 	spin  spinner.Model
 	body  viewport.Model
@@ -205,9 +258,9 @@ func openWeb(src Source, ref gh.ItemRef, url string) tea.Cmd {
 func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.AddComment(ref, body); err != nil {
-			return commentErrorMsg{err}
+			return commentErrorMsg{ref: ref, err: err}
 		}
-		return commentPostedMsg{}
+		return commentPostedMsg{ref: ref}
 	}
 }
 
@@ -230,9 +283,9 @@ func (m Model) stateAction() (closing bool, ok bool) {
 func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SetState(ref, closing); err != nil {
-			return stateErrorMsg{err}
+			return stateErrorMsg{ref: ref, err: err}
 		}
-		return stateChangedMsg{}
+		return stateChangedMsg{ref: ref}
 	}
 }
 
@@ -240,9 +293,9 @@ func fetchLabelPicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		labels, err := src.ListLabels(context.Background(), ref.Repo)
 		if err != nil {
-			return pickErrorMsg{err}
+			return pickErrorMsg{ref: ref, err: err}
 		}
-		return pickerCandidatesMsg{kind: pickLabels, labels: labels}
+		return pickerCandidatesMsg{ref: ref, kind: pickLabels, labels: labels}
 	}
 }
 
@@ -250,9 +303,9 @@ func fetchAssigneePicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		users, err := src.ListAssignees(context.Background(), ref.Repo)
 		if err != nil {
-			return pickErrorMsg{err}
+			return pickErrorMsg{ref: ref, err: err}
 		}
-		return pickerCandidatesMsg{kind: pickAssignees, users: users}
+		return pickerCandidatesMsg{ref: ref, kind: pickAssignees, users: users}
 	}
 }
 
@@ -265,9 +318,9 @@ func applyPicker(src Source, ref gh.ItemRef, kind pickerKind, add, remove []stri
 			err = src.EditAssignees(ref, add, remove)
 		}
 		if err != nil {
-			return pickErrorMsg{err}
+			return pickErrorMsg{ref: ref, err: err}
 		}
-		return pickerAppliedMsg{}
+		return pickerAppliedMsg{ref: ref}
 	}
 }
 
@@ -280,19 +333,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case itemMsg:
 		return m.itemArrived(msg), nil
 	case commentPostedMsg:
-		return m.commentPosted()
+		return m.commentPosted(msg)
 	case commentErrorMsg:
-		return m.commentFailed(msg.err), nil
+		return m.commentFailed(msg), nil
 	case stateChangedMsg:
-		return m.stateChanged()
+		return m.stateChanged(msg)
 	case stateErrorMsg:
-		return m.stateFailed(msg.err), nil
+		return m.stateFailed(msg), nil
 	case pickerCandidatesMsg:
 		return m.candidatesArrived(msg), nil
 	case pickerAppliedMsg:
-		return m.pickApplied()
+		return m.pickApplied(msg)
 	case pickErrorMsg:
-		return m.pickFailed(msg.err), nil
+		return m.pickFailed(msg), nil
 	case reviewContextMsg:
 		return m.reviewContextArrived(msg), nil
 	case reviewContextErrMsg:
@@ -339,6 +392,7 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.phase = phaseIdle
 	m.state = it.State
 	m.errText = ""
+	m.declined = ""
 	m.labels = labelNames(it.Labels)
 	m.assignees = authorLogins(it.Assignees)
 	m.url = it.URL
@@ -352,32 +406,47 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	return m
 }
 
-func (m Model) commentPosted() (Model, tea.Cmd) {
+func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	m.errText = ""
 	m.textarea.Reset()
 	m.mode, m.phase = modeView, phaseLoading
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) commentFailed(err error) Model {
+func (m Model) commentFailed(msg commentErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
 	m.phase = phaseIdle
-	m.errText = err.Error()
+	m.errText = msg.err.Error()
 	return m
 }
 
-func (m Model) stateChanged() (Model, tea.Cmd) {
+func (m Model) stateChanged(msg stateChangedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	m.errText = ""
 	m.mode, m.phase = modeView, phaseLoading
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) stateFailed(err error) Model {
+func (m Model) stateFailed(msg stateErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
 	m.mode, m.phase = modeView, phaseIdle
-	m.errText = err.Error()
+	m.errText = msg.err.Error()
 	return m
 }
 
 func (m Model) candidatesArrived(msg pickerCandidatesMsg) Model {
+	if msg.ref != m.ref {
+		return m // an answer for an item the user has already left
+	}
 	if msg.kind == pickLabels {
 		names := make([]string, len(msg.labels))
 		colors := make(map[string]string, len(msg.labels))
@@ -393,18 +462,24 @@ func (m Model) candidatesArrived(msg pickerCandidatesMsg) Model {
 	return m
 }
 
-func (m Model) pickApplied() (Model, tea.Cmd) {
+func (m Model) pickApplied(msg pickerAppliedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	m.mode, m.phase = modeView, phaseLoading
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) pickFailed(err error) Model {
+func (m Model) pickFailed(msg pickErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
 	if m.phase == phaseWorking { // the apply failed; the picker stays up
 		m.phase = phaseIdle
 	} else { // the candidates never arrived; there is no picker to show
 		m.mode, m.phase = modeView, phaseIdle
 	}
-	m.errText = err.Error()
+	m.errText = msg.err.Error()
 	return m
 }
 
@@ -480,6 +555,15 @@ func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// stillLoading is what the keys that need the item answer with while it is
+// on its way. Against the real API the item was still not there four seconds
+// after it was asked for, which is long enough for a key that does nothing
+// to read as a key that is broken.
+func (m Model) stillLoading() Model {
+	m.declined = i18n.T("detail.decline_loading")
+	return m
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// An overlay's keys have nothing to act on until its fetch answers.
 	// modeView is the exception: the body is drawn, and q still leaves.
@@ -514,10 +598,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "r":
 		m.phase = phaseLoading
+		m.declined = ""
 		return m, fetch(m.src, m.ref)
 	case "c":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		m.mode, m.phase = modeCompose, phaseIdle
 		m.errText = ""
@@ -526,7 +611,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, textarea.Blink
 	case "x":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		if _, ok := m.stateAction(); !ok {
 			return m, nil // merged and the like: no action
@@ -537,7 +622,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "v":
 		// An issue has no review. Unlike the diff view's v, this always
 		// fetches first: detail holds no review context of its own.
-		if m.phase == phaseLoading || m.ref.Kind != gh.ItemPR {
+		if m.phase == phaseLoading {
+			return m.stillLoading(), nil
+		}
+		if m.ref.Kind != gh.ItemPR {
 			return m, nil
 		}
 		m.mode, m.phase = modeSubmit, phaseLoading
@@ -545,14 +633,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, fetchReviewContext(m.src, m.ref)
 	case "l":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		m.mode, m.phase = modePick, phaseLoading
 		m.errText = ""
 		return m, fetchLabelPicker(m.src, m.ref)
 	case "a":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		m.mode, m.phase = modePick, phaseLoading
 		m.errText = ""

@@ -539,3 +539,19 @@ func TestTheSidebarScrollsToKeepTheSelectionVisible(t *testing.T) {
 		t.Errorf("the selected file %q scrolled off screen:\n%s", want, out)
 	}
 }
+
+// TestEveryStateNamesItself catches a state dropped from String: every
+// assertion in this package reports mode and phase with %v, and an unnamed
+// one is printed as a number nobody can read.
+func TestEveryStateNamesItself(t *testing.T) {
+	for m := modeView; m <= modeDiscard; m++ {
+		if got := fmt.Sprintf("%v", m); strings.Contains(got, "?") {
+			t.Errorf("mode %d prints as %q", uint8(m), got)
+		}
+	}
+	for p := phaseIdle; p <= phaseWorking; p++ {
+		if got := fmt.Sprintf("%v", p); strings.Contains(got, "?") {
+			t.Errorf("phase %d prints as %q", uint8(p), got)
+		}
+	}
+}

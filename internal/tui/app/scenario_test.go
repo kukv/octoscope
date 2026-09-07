@@ -148,7 +148,9 @@ func scenarioModel(t *testing.T, f *scenarioSource) Model {
 	i18n.SetLanguage(language.English)
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
-	m := New(f, Options{HasRepo: true})
+	// No --repo: the repository is the working directory's, so the app starts
+	// on the board and the Repos tab appears when the lookup answers.
+	m := New(f, Options{})
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return resolve(t, next.(Model), cmd)
 }
@@ -157,8 +159,16 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 	f := &scenarioSource{pr: scenarioPR()}
 	m := scenarioModel(t, f)
 
-	m = run(t, m, "2", "enter") // the Repos row -> the detail view
-	if !strings.Contains(content(m), "#12") {
+	m = run(t, m, "2")
+	// The Work board's own enter opens the same detail view, so without
+	// this the scenario would still pass with no Repos tab at all.
+	if m.tab != tabRepos {
+		t.Fatalf("precondition: tab = %d, want the Repos tab", m.tab)
+	}
+
+	m = run(t, m, "enter") // the Repos row -> the detail view
+	// The Repos row carries the number too; the state line is detail's alone.
+	if !strings.Contains(content(m), "state: open") {
 		t.Fatalf("the detail view did not open:\n%s", content(m))
 	}
 
@@ -176,7 +186,17 @@ func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 	f := &scenarioSource{pr: scenarioPR(), labels: []gh.Label{{Name: "bug", Color: "d73a4a"}}}
 	m := scenarioModel(t, f)
 
-	m = run(t, m, "2", "enter", "l", "space", "enter")
+	m = run(t, m, "2")
+	if m.tab != tabRepos {
+		t.Fatalf("precondition: tab = %d, want the Repos tab", m.tab)
+	}
+
+	m = run(t, m, "enter")
+	if !strings.Contains(content(m), "state: open") {
+		t.Fatalf("precondition: the detail view did not open:\n%s", content(m))
+	}
+
+	m = run(t, m, "l", "space", "enter")
 
 	if len(f.pr.Labels) != 1 || f.pr.Labels[0].Name != "bug" {
 		t.Fatalf("labels = %+v, want bug applied", f.pr.Labels)
@@ -200,6 +220,9 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 		}},
 	}
 	m := scenarioModel(t, f)
+	if m.tab != tabWork {
+		t.Fatalf("precondition: tab = %d, want the board", m.tab)
+	}
 
 	// The board's own d opens the diff too, so enter is checked on its own.
 	m = run(t, m, "enter") // the card under the cursor -> the detail view
