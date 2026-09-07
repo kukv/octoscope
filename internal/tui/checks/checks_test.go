@@ -202,6 +202,20 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 	}
 }
 
+// TestTheHeadingRuleFitsATerminalNarrowerThanItself guards the one line the
+// view builds out of fixed parts -- the list's own heading, the divider and
+// the log pane's mode label -- rather than out of what is left of the width.
+// Below about 35 columns those parts alone are wider than the terminal.
+func TestTheHeadingRuleFitsATerminalNarrowerThanItself(t *testing.T) {
+	t.Parallel()
+
+	for _, line := range strings.Split(open(t, 30).View(), "\n") {
+		if w := ansi.StringWidth(line); w > 30 {
+			t.Errorf("line is %d columns wide, want at most 30:\n%s", w, line)
+		}
+	}
+}
+
 // moveTo presses j until the cursor sits on the check named name, and fails
 // the test if it never does: a helper that returns silently when it cannot
 // reach its target would make every test built on it pass for the wrong

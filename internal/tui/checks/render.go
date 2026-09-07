@@ -96,7 +96,7 @@ func (m Model) headingLine() string {
 	div := theme.Rule().Render("│")
 	label := theme.Heading().Render(m.logModeLabel())
 	rest := max(m.width-listWidth-ansi.StringWidth(div)-ansi.StringWidth(label), 0)
-	return left + div + label + theme.Rule().Render(strings.Repeat("─", rest))
+	return clip(left+div+label+theme.Rule().Render(strings.Repeat("─", rest)), m.width)
 }
 
 func (m Model) logModeLabel() string {
