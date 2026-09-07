@@ -76,17 +76,27 @@ func checksNoneModel(width int) Model {
 	return m
 }
 
+// goldenStates are the recorded states, by the name their recording carries.
+var goldenStates = []struct {
+	name  string
+	build func(width int) Model
+}{
+	{"checks", goldenModel},
+	{"checks_log", checksLogModel},
+	{"checks_rerun", checksRerunModel},
+	{"checks_loading", checksLoadingModel},
+	{"checks_none", checksNoneModel},
+}
+
 func TestGolden(t *testing.T) {
 	for _, lang := range goldenLanguages {
 		for _, w := range goldenWidths {
 			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
-				golden.Assert(t, fmt.Sprintf("checks_%s_%d", lang.name, w), goldenModel(w).View())
-				golden.Assert(t, fmt.Sprintf("checks_log_%s_%d", lang.name, w), checksLogModel(w).View())
-				golden.Assert(t, fmt.Sprintf("checks_rerun_%s_%d", lang.name, w), checksRerunModel(w).View())
-				golden.Assert(t, fmt.Sprintf("checks_loading_%s_%d", lang.name, w), checksLoadingModel(w).View())
-				golden.Assert(t, fmt.Sprintf("checks_none_%s_%d", lang.name, w), checksNoneModel(w).View())
+				for _, state := range goldenStates {
+					golden.Assert(t, fmt.Sprintf("%s_%s_%d", state.name, lang.name, w), state.build(w).View())
+				}
 			})
 		}
 	}
@@ -104,9 +114,11 @@ func TestNothingOverrunsTheTerminal(t *testing.T) {
 		for _, w := range goldenWidths {
 			i18n.SetLanguage(lang.tag)
 			t.Cleanup(func() { i18n.SetLanguage(language.English) })
-			for i, line := range strings.Split(goldenModel(w).View(), "\n") {
-				if got := ansi.StringWidth(line); got > w {
-					t.Errorf("%s %d: line %d is %d columns:\n%s", lang.name, w, i, got, line)
+			for _, state := range goldenStates {
+				for i, line := range strings.Split(state.build(w).View(), "\n") {
+					if got := ansi.StringWidth(line); got > w {
+						t.Errorf("%s %s %d: line %d is %d columns:\n%s", state.name, lang.name, w, i, got, line)
+					}
 				}
 			}
 		}
