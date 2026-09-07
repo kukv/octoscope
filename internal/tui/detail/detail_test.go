@@ -694,6 +694,34 @@ func TestActionErrClearedOnReload(t *testing.T) {
 	}
 }
 
+// TestOpeningTheComposerTakesTheBodysErrorWithIt pins what one error string
+// costs. A failed close leaves its text under the body; c opens the composer
+// over that body, and the failure has nothing to do with the comment being
+// written, so it is cleared rather than drawn inside the composer -- and it
+// does not come back when the composer is dismissed.
+func TestOpeningTheComposerTakesTheBodysErrorWithIt(t *testing.T) {
+	f := &fakeSource{
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		stateErr: errors.New("gh pr: HTTP 403 forbidden"),
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(key("x"))
+	m, cmd := m.Update(key("y"))
+	m, _ = m.Update(cmd()) // stateErrorMsg
+	if !strings.Contains(m.View(), "403") {
+		t.Fatalf("precondition: the failed close is not on the body:\n%s", m.View())
+	}
+
+	m, _ = m.Update(key("c"))
+	if strings.Contains(m.View(), "403") {
+		t.Errorf("the close failure is drawn inside the composer:\n%s", m.View())
+	}
+	m, _ = m.Update(key("esc"))
+	if strings.Contains(m.View(), "403") {
+		t.Errorf("the close failure came back after leaving the composer:\n%s", m.View())
+	}
+}
+
 func TestConfirmIgnoresKeysWhileWorking(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
 	m := loaded(f, prRef())

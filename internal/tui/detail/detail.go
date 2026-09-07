@@ -127,9 +127,10 @@ type Model struct {
 	mode  mode
 	phase phase
 
-	// errText is the last failure, whatever produced it. Which mode is on
-	// screen decides where it is drawn, so there is nothing to gain from
-	// keeping one string per kind.
+	// errText is the last failure, whatever produced it: which mode is on
+	// screen decides where it is drawn. What one string cannot carry is an
+	// error that outlives the mode it came from -- opening an overlay clears
+	// the body's error rather than draw someone else's failure inside it.
 	errText string
 
 	spin  spinner.Model
@@ -344,7 +345,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		} else {
 			m.picker = newPicker(pickAssignees, i18n.T("picker.assignees"), msg.users, nil, m.assignees)
 		}
-		m.phase = phaseIdle
+		m.mode, m.phase = modePick, phaseIdle
 		return m, nil
 	case pickerAppliedMsg:
 		m.mode, m.phase = modeView, phaseLoading
@@ -368,7 +369,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.submit = review.New(m.src, target)
 		m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		m.phase = phaseIdle
+		m.mode, m.phase = modeSubmit, phaseIdle
 		m.errText = ""
 		return m, nil
 	case reviewContextErrMsg:
