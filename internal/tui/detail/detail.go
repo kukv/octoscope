@@ -19,10 +19,6 @@ import (
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
-// itemSource is what the detail view does to the item it shows. A pull
-// request and an issue take different GitHub calls for every one of these;
-// choosing between them is internal/usecase's job, which is why there is one
-// method per operation rather than two.
 type itemSource interface {
 	GetItem(ctx context.Context, ref gh.ItemRef) (usecase.Item, error)
 	AddComment(ref gh.ItemRef, body string) error
@@ -39,18 +35,12 @@ type candidateSource interface {
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
-// reviewOpener is what v needs before the review popup can open: the pull
-// request's node id and the unsubmitted review, if any. detail has no diff of
-// its own, so unlike diff's Source this is the only thing it reads off the
-// review context.
 type reviewOpener interface {
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
 }
 
 // Source is what the detail view needs. repo is "owner/repo"; the empty
-// string targets the workspace repository. review.Source is embedded rather
-// than repeated: the submission popup this view holds declares exactly what
-// it needs.
+// string targets the workspace repository.
 type Source interface {
 	itemSource
 	candidateSource

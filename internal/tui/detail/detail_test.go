@@ -47,8 +47,6 @@ func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, e
 	return issueItem(f.issue), f.err
 }
 
-// prItem and issueItem build what usecase.GetItem hands back, so the tests
-// can go on describing a fixture as the gh.PR or gh.Issue GitHub returns.
 func prItem(pr gh.PR) usecase.Item {
 	return usecase.Item{
 		Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
@@ -689,7 +687,7 @@ func TestActionErrClearedOnReload(t *testing.T) {
 	if !m.loading || cmd == nil {
 		t.Fatalf("loading = %v, cmd = %v; want loading with fetch cmd", m.loading, cmd)
 	}
-	m, _ = m.Update(cmd()) // itemMsg
+	m, _ = m.Update(cmd())
 	if m.actionErr != "" {
 		t.Errorf("actionErr = %q after reload, want empty", m.actionErr)
 	}

@@ -40,7 +40,6 @@ func newTestClient(out string, err error) (*Client, *fakeRun) {
 	return &Client{dir: "/repo", run: f.run}, f
 }
 
-// readTestdata returns a recorded gh response (see testdata/README.md).
 func readTestdata(t *testing.T, name string) string {
 	t.Helper()
 
@@ -422,8 +421,6 @@ func TestTheListsAskForMoreThanTheDefaultThirty(t *testing.T) {
 	}
 }
 
-// The recorded response is what gh actually prints. A parser that only ever
-// sees hand-written JSON passes on a shape GitHub may not send.
 func TestListPRsParsesARecordedResponse(t *testing.T) {
 	c, _ := newTestClient(readTestdata(t, "pr_list.json"), nil)
 

@@ -1,7 +1,5 @@
-// Package usecase is where an operation that takes more than one call to the
-// GitHub layer, or that picks a call by the kind of item, is decided. The
-// views above it say what they want done; which requests that takes, and in
-// what order, is not their business.
+// Package usecase decides what calls an operation on the GitHub layer takes,
+// and in what order.
 package usecase
 
 import (
@@ -12,19 +10,10 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 )
 
-// The source interfaces are split by what each operation needs, so a test can
-// build a fake with only the methods that operation calls
-// (.claude/rules/architecture.md).
-
 type itemFetcher interface {
 	GetPR(ctx context.Context, repo string, number int) (gh.PR, error)
 	GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error)
 }
-
-// The write side is split four ways rather than kept as one itemWriter: ten
-// methods on one declaration is over the limit the rules set, and GitHub
-// having a separate endpoint per kind is not a reason for this package to
-// have one big interface.
 
 type commenter interface {
 	AddPRComment(repo string, number int, body string) error
@@ -57,15 +46,11 @@ type lister interface {
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
-// reviewFetcher is the read half of the review API. It is split out from
-// reviewer so a fake for one does not have to stub the other.
 type reviewFetcher interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
 }
 
-// reviewer is the write half of the review API: starting a pending review,
-// adding threads to it, and submitting or discarding it.
 type reviewer interface {
 	StartReview(pullRequestID string) (string, error)
 	AddReviewThread(reviewID string, c gh.PendingComment) error
@@ -78,10 +63,6 @@ type opener interface {
 	OpenWeb(url string) error
 }
 
-// source is the whole of what a backend has to provide. It is a composition
-// of the interfaces above rather than one long list, so that a test can build
-// a fake for just the half it exercises (see usecase_test.go, which is in
-// this package for exactly that reason).
 type source interface {
 	itemFetcher
 	commenter
@@ -94,8 +75,7 @@ type source interface {
 	opener
 }
 
-// Usecase holds one backend, split across the fields by what each operation
-// needs. The split is what keeps any single interface declaration small.
+// Usecase holds the backend every view talks to.
 type Usecase struct {
 	items      itemFetcher
 	comments   commenter
@@ -108,9 +88,7 @@ type Usecase struct {
 	web        opener
 }
 
-// New wires a Usecase to one backend. cmd/octoscope passes a *cli.Client;
-// the compiler checks there that it still has every method, which is the
-// whole point of naming the union.
+// New wires a Usecase to one backend.
 func New(src source) *Usecase {
 	return &Usecase{
 		items:      src,
@@ -125,16 +103,8 @@ func New(src source) *Usecase {
 	}
 }
 
-// Item is where a pull request and an issue meet. The detail view draws one
-// screen for both, and the two GitHub types do not unify -- so this is the
-// shape that screen reads. It is not a DTO: nothing here is a second spelling
-// of a domain field, and PR is the pull request itself, not a copy of it.
-//
-// A field belongs on Item only when GitHub gives both a pull request and an
-// issue their own. Anything only a pull request has is read through PR, not
-// copied up to here. Adding a field because one screen wants to draw it is
-// how this turns into a DTO, and a DTO is what a screen's needs leaking a
-// layer down looks like.
+// Item is where a pull request and an issue meet: the fields GitHub gives
+// both (.claude/rules/architecture.md).
 type Item struct {
 	Kind      gh.ItemKind
 	Number    int
@@ -148,14 +118,11 @@ type Item struct {
 	Comments  []gh.Comment
 	UpdatedAt time.Time
 
-	// PR is set only when Kind is ItemPR. It carries what an issue has no
-	// equivalent of: the branches, the size of the change, the checks and
-	// the review decision.
+	// PR is set only when Kind is ItemPR.
 	PR *gh.PR
 }
 
-// GetItem fetches whichever of the two the reference names. Choosing between
-// them is what ItemRef.Kind is for, and no view has to do it.
+// GetItem fetches whichever of the two the reference names.
 func (u *Usecase) GetItem(ctx context.Context, ref gh.ItemRef) (Item, error) {
 	if ref.Kind == gh.ItemPR {
 		pr, err := u.items.GetPR(ctx, ref.Repo, ref.Number)
@@ -188,8 +155,6 @@ func (u *Usecase) AddComment(ref gh.ItemRef, body string) error {
 }
 
 // SetState closes the item when closing is true and reopens it otherwise.
-// Whether either is possible is the view's question -- a merged pull request
-// is neither -- and it asks before calling.
 func (u *Usecase) SetState(ref gh.ItemRef, closing bool) error {
 	switch {
 	case ref.Kind == gh.ItemPR && closing:
@@ -216,10 +181,6 @@ func (u *Usecase) EditAssignees(ref gh.ItemRef, add, remove []string) error {
 	}
 	return u.assignees.EditIssueAssignees(ref.Repo, ref.Number, add, remove)
 }
-
-// The rest delegate one for one. They are here so that every view asks the
-// same package for everything: an operation that grows a second call later
-// grows it in one place, and no view has to change which package it talks to.
 
 func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) { return u.lists.ListWork(ctx) }
 

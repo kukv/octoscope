@@ -39,6 +39,8 @@ fragment WorkItem on SearchResultItem {
     author {
       login
     }
+    # 100 is GitHub's cap for a connection, and an item can carry any number
+    # of labels.
     labels(first: 100) {
       nodes { ...LabelFields }
     }
@@ -66,6 +68,8 @@ fragment WorkItem on SearchResultItem {
     author {
       login
     }
+    # 100 is GitHub's cap for a connection, and an item can carry any number
+    # of labels.
     labels(first: 100) {
       nodes { ...LabelFields }
     }
@@ -75,9 +79,6 @@ fragment WorkItem on SearchResultItem {
   }
 }
 
-# labels asks for 100, GitHub's cap for a connection; there is no documented
-# limit on how many labels one item may carry.
-#
 # color is the six hex digits GitHub stores for the label, with no leading
 # "#": the badge reproduces it as a background.
 fragment LabelFields on Label {

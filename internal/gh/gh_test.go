@@ -86,9 +86,7 @@ func TestParseReviewDecision(t *testing.T) {
 }
 
 // A section added without widening Work panics at run time with no compiler
-// error. The list below is written by hand, not read from WorkSections()
-// (see .claude/rules/testing.md on assertions that share their source with
-// the code under test), so a missed section makes this test fail.
+// error. The list below is written by hand (.claude/rules/testing.md).
 func TestEverySectionConstantIsASlotInWork(t *testing.T) {
 	t.Parallel()
 

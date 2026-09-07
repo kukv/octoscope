@@ -15,11 +15,8 @@ type ReviewTarget struct {
 }
 
 // PostLineComment attaches one line comment to the pull request's unsubmitted
-// review, starting that review first if there is none.
-//
-// The order is GitHub's, not the diff view's: a line comment has to hang off
-// a review, and a review the reader never submits must not be created just
-// because they opened the diff.
+// review, starting that review first if there is none: on GitHub a line
+// comment has to hang off a review.
 func (u *Usecase) PostLineComment(t ReviewTarget, c gh.PendingComment) (string, error) {
 	reviewID := t.PendingID
 	if reviewID == "" {
@@ -35,9 +32,9 @@ func (u *Usecase) PostLineComment(t ReviewTarget, c gh.PendingComment) (string, 
 	return reviewID, nil
 }
 
-// SubmitReview sends the review out. When line comments are already waiting
-// it submits the review they are on; when nothing is waiting it creates and
-// submits in one call, so a plain approval leaves nothing behind if it fails.
+// SubmitReview sends the review out. With nothing waiting it creates and
+// submits in one call: starting a review first would leave an empty pending
+// review behind if the submission then failed.
 func (u *Usecase) SubmitReview(t ReviewTarget, event gh.ReviewEvent, body string) error {
 	if t.PendingID != "" {
 		if err := u.reviews.SubmitReview(t.PendingID, event, body); err != nil {

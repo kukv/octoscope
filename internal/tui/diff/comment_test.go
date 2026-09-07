@@ -143,12 +143,9 @@ func TestCommentingOnARemovedLineQuotesTheLeftSide(t *testing.T) {
 	}
 }
 
-// TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview: post() reads
-// m.review.PendingID, but the fetch that would confirm that id from GitHub
-// is asynchronous -- commentPostedMsg sets PendingID itself, synchronously,
-// precisely so a second c sent before that fetch's answer arrives still
-// finds it set. Getting this wrong hands over an empty PendingID and leaves
-// two pending reviews open on the pull request.
+// commentPostedMsg sets PendingID synchronously; the refetch that would
+// confirm it is not. Handing over an empty PendingID leaves two pending
+// reviews open on the pull request.
 func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
@@ -157,7 +154,7 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	m = press(m, "c")
 	m = typeInto(m, "first")
 	m, cmd := m.Update(keyPress("ctrl+s"))
-	posted := cmd() // runs the network side: PostLineComment
+	posted := cmd()
 	m, _ = m.Update(posted)
 	// posted's own fetchReview command is deliberately never run: the
 	// refetch's answer must not be what makes PendingID available.
@@ -176,9 +173,9 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	}
 }
 
-// TestCWaitsForThePullRequestID: the diff and the review context are fetched
-// in parallel. If the diff lands first and c opened the composer, sending
-// would go out with an empty pull request node id.
+// The diff and the review context are fetched in parallel. If the diff lands
+// first and c opened the composer, sending would go out with an empty pull
+// request node id.
 func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = cursorOnLine(t, m, gh.LineAdded, 13)

@@ -29,9 +29,6 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewCon
 	return f.review, nil
 }
 
-// PostLineComment, DiscardReview and SubmitReview are stubs so fakeSource
-// satisfies Source; recordingSource (comment_test.go) overrides the ones a
-// comment test needs to assert against.
 func (f *fakeSource) PostLineComment(usecase.ReviewTarget, gh.PendingComment) (string, error) {
 	return "", nil
 }

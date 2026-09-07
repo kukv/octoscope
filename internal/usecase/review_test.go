@@ -8,8 +8,6 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 )
 
-// fakeReviewer records the review calls in order. What these tests are about
-// is the order and the choice, not the payloads.
 type fakeReviewer struct {
 	calls     []string
 	newID     string

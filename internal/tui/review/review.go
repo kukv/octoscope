@@ -15,9 +15,7 @@ import (
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
-// Source is what submitting needs. Which GitHub call that takes -- the
-// pending review's submit or a create-and-submit in one -- is GitHub's rule
-// about unsubmitted reviews, not a question about this popup.
+// Source is what submitting needs.
 type Source interface {
 	SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error
 }

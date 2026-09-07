@@ -17,11 +17,7 @@ import (
 )
 
 // Source is what the diff view needs. repo is "owner/repo"; the empty string
-// targets the workspace repository. Posting a line comment is one operation
-// here, whatever GitHub needs behind it (.claude/rules/architecture.md).
-//
-// review.Source is embedded rather than repeated: the submission popup this
-// view holds declares exactly what it needs.
+// targets the workspace repository.
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)

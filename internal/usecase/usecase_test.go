@@ -10,9 +10,6 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 )
 
-// fakeSource answers the calls GetItem makes and records which it made. The
-// point of GetItem is that the view stops choosing between the PR and the
-// Issue call, so what this fake proves is which one the usecase chose.
 type fakeSource struct {
 	pr     gh.PR
 	issue  gh.Issue
@@ -53,8 +50,6 @@ func TestGetItemFetchesAPullRequestForAPRRef(t *testing.T) {
 	if item.URL != "https://example.test/pull/55" {
 		t.Errorf("url = %q; o would have nothing to open", item.URL)
 	}
-	// PR is what the detail view reads for branches, checks and review state.
-	// An issue has none of it, so it is a pointer and only a PR ref fills it.
 	if item.PR == nil {
 		t.Fatal("PR is nil on a pull request; the detail view loses head/base and checks")
 	}
@@ -98,9 +93,8 @@ func TestGetItemPassesTheFetchFailureThrough(t *testing.T) {
 	}
 }
 
-// TestGetItemCopiesEveryFieldAGhIssueHas locks the copy in GetItem against
-// dropping a field silently: .claude/rules/architecture.md requires Item to
-// carry every field common to gh.PR and gh.Issue.
+// .claude/rules/architecture.md requires Item to carry every field common to
+// gh.PR and gh.Issue; a copy that silently drops one is what this catches.
 func TestGetItemCopiesEveryFieldAGhIssueHas(t *testing.T) {
 	t.Parallel()
 
@@ -176,9 +170,6 @@ func assertItemMatchesCommonFields(
 	}
 }
 
-// fakeWriter is a source for AddComment, SetState, EditLabels and
-// EditAssignees; it records which low-level method each call reached so a
-// test can prove the PR/Issue dispatch, not the fake's own bookkeeping.
 type fakeWriter struct {
 	calls []string
 	err   error
