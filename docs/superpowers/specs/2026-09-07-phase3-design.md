@@ -11,7 +11,7 @@
 |---|---|
 | checks 一覧・失敗ジョブのログ・ワークフローの再実行 | スレッドへの返信・解決（Phase 2 の範囲外のまま） |
 | merge（squash / merge / rebase）と auto-merge | Repos サイドバー・追加ダイアログ、Search タブ（Phase 4） |
-| `reviewThreads` / `comments` / `contexts` のページング | `internal/gh/api` の API フォールバック（Phase 4） |
+| `contexts` と各スレッドの `comments` のページング | `internal/gh/api` の API フォールバック（Phase 4） |
 
 ## 2. 実測して確かめたこと（2026-09-07）
 
@@ -71,21 +71,36 @@ TUI が受け取るのは既に意味の付いた型である。
 
 ## 5. ページング
 
-対象は 4 か所。いずれも `pageInfo` の cursor を追って直列に取る。
+**書き始めた時点の想定は外れていた。** Phase 2 の handoff と standalone spec §4.4.1 は
+「`reviewThreads`（100 件）、各スレッドの `comments`（50 件）、pending review の
+`comments`（100 件）がページングされていない」と書いているが、コードを読むと:
 
-| 場所 | 1 ページ | 上限 | 実効件数 |
-|---|---|---|---|
-| `statusCheckRollup.contexts` | 100 | 5 ページ | 500 |
-| `reviewThreads` | 100 | 10 ページ | 1000 |
-| 各スレッドの `comments` | 50 | 4 ページ | 200 |
-| pending review の `comments` | 100 | 10 ページ | 1000 |
+- `reviewThreads` は **既に全ページ取れている**（`cfdd925`「walk every page of review
+  threads instead of stopping at 100」）。上限も置いていない
+- pending review の `comments` は **そもそも取っていない**。`review.graphql` は
+  未提出レビューから id しか選ばない。穴ではない
 
-**上限を置く理由**は、cursor 逐次のため往復が直列になり、1 PR を開く時間が
-件数に比例して伸びるからである。上限に当たったら**黙って切らず**、
-その面のヘッダに「N 件以降は表示していません」と出す。
+実際に残っている穴は 2 か所である。
 
-**上限の値そのものに測った根拠はまだ無い。** 実際の PR で当たった時点で
-測って見直す。当たらないうちに数字を動かさない。
+| 場所 | 現在 | 何が起きるか |
+|---|---|---|
+| `statusCheckRollup.contexts` | `first: 100` | 101 件目以降の check が黙って消える。4.4.3 がそこを読む |
+| 各スレッドの `comments` | `first: 50` | 51 件目以降のコメントが黙って消える |
+
+**上限（何ページまで）は置かない。** `reviewThreads` が `cfdd925` で上限なしに
+全ページ取る形になっており、ここだけ別の流儀にする理由が無い。ページ数の上限を
+置くとしたら実際に遅くて困った測定が根拠になるはずで、その測定はまだ無い。
+
+`comments` は nested connection なので、追うにはスレッド 1 件につき 1 リクエストが
+要る（`review.graphql` のコメントがそう書いている）。**50 件を超えたスレッドだけ**
+追加で引く形にし、超えていないスレッドには 1 リクエストも足さない。
+
+`contexts` は `statusCheckRollup` の直下なので、`reviewThreads` と同じ形で
+cursor を追える。
+
+**この計画で扱わない別の切り詰め**: Work の search は 1 列 `first: 50`、
+`labels` は `first: 100`。どちらも Work 板の話で、checks とも review とも
+関係が無い。見つけたことだけ記録し、直すのは別の機会にする。
 
 ## 6. テスト
 
@@ -101,16 +116,16 @@ TUI が受け取るのは既に意味の付いた型である。
 - golden は checks ビューと merge ポップアップを en / ja × 80 / 120 / 160 で録る。
   キーバーは **ja の 80 桁に収まること**
 - 新しい文字列は `active.en.yaml` と `active.ja.yaml` の両方に足す
-- ページングは「2 ページ目がある fixture」と「上限に当たる fixture」の
-  両方を持ち、後者で打ち切りの 1 行が出ることを確かめる
+- ページングは「2 ページ目がある fixture」を持ち、2 ページ目の中身が
+  結果に入ることを確かめる。`reviewThreads` の既存のテストに倣う
 
 ## 7. 計画の割り方
 
 3 本 → 3 PR。順に **checks → merge → ページング**。互いにデータの依存は無い。
 
-1. **checks**（§4.4.3 + §5 の `contexts` 1 行）
+1. **checks**（§4.4.3 + §5 の `contexts`）
 2. **merge**（§4.4.4）
-3. **ページング**（§5 の残り 3 か所。Phase 2 の積み残し）
+3. **ページング**（§5 の各スレッドの `comments`。Phase 2 の積み残し）
 
 各 PR は `make check` が緑であること。
 
@@ -122,7 +137,7 @@ TUI が受け取るのは既に意味の付いた型である。
 4. merge ポップアップがリポジトリの許した方式だけを出し、`mergeable: UNKNOWN` を
    エラーではなく「計算中」として扱う
 5. auto-merge を有効化・解除できる。使えないリポジトリではその理由が出る
-6. 4 か所のページングが 1 ページを超えて取れ、上限に当たったことが画面に出る
+6. `contexts` と各スレッドの `comments` が 1 ページを超えて取れる
 7. `internal/tui` が `internal/gh/cli` を import していない
 8. golden が en / ja × 80 / 120 / 160 で録れており、ja の 80 桁でキーバーが収まる
 
