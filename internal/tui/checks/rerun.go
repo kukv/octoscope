@@ -66,8 +66,12 @@ type rerunErrMsg struct {
 // while the popup is open would rebuild m.order and could move what row
 // m.row now points at.
 func (m Model) startRerun() Model {
-	if m.loading || len(m.order) == 0 {
+	if m.loading {
 		m.declined = i18n.T("checks.decline_loading")
+		return m
+	}
+	if len(m.order) == 0 {
+		m.declined = i18n.T("checks.none")
 		return m
 	}
 	r := m.order[m.row]

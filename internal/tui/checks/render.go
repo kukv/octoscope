@@ -309,6 +309,19 @@ func (m Model) visibleLogRows() []string {
 	return lines
 }
 
+// maxHscroll is how far right the log pane can be scrolled before the widest
+// line on screen has gone past its left edge, leaving it blank.
+func (m Model) maxHscroll() int {
+	rows := m.logRows()
+	end := min(m.logRow+m.paneHeight(), len(rows))
+	start := min(m.logRow, len(rows))
+	widest := 0
+	for _, r := range rows[start:end] {
+		widest = max(widest, ansi.StringWidth(r))
+	}
+	return max(widest-m.logWidth(), 0)
+}
+
 // logRows builds every line the log pane would draw, ungated by scrolling:
 // a heading per step and the step's own lines under it. A continuation
 // line has no timestamp of its own (LogLine.Time is zero), so only a

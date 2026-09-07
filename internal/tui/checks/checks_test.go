@@ -299,6 +299,58 @@ func TestAStatusContextSaysWhyItHasNoLog(t *testing.T) {
 	}
 }
 
+// TestTheLogPaneStopsScrollingAtItsWidestLine guards the right-hand edge: an
+// unbounded l walks the window past every line there is and leaves the pane
+// blank, with nothing on screen saying how to get back.
+func TestTheLogPaneStopsScrollingAtItsWidestLine(t *testing.T) {
+	t.Parallel()
+
+	long := strings.Repeat("x", 400)
+	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: long}}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	for range 500 {
+		m = press(m, "l")
+	}
+	if view := m.View(); !strings.Contains(view, "xxx") {
+		t.Errorf("l scrolled the log pane off the end of its own lines:\n%s", view)
+	}
+}
+
+func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
+	t.Parallel()
+
+	m := openChecks(t, gh.Checks{}, 120, 30)
+	m, _ = m.Update(keyPress("enter"))
+	if m.declined != i18n.T("checks.none") {
+		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
+			m.declined, i18n.T("checks.none"))
+	}
+}
+
+func TestRerunOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
+	t.Parallel()
+
+	m := press(openChecks(t, gh.Checks{}, 120, 30), "R")
+	if m.declined != i18n.T("checks.none") {
+		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
+			m.declined, i18n.T("checks.none"))
+	}
+}
+
+func TestOpenOnACheckWithNoPageOfItsOwnSaysWhy(t *testing.T) {
+	t.Parallel()
+
+	m := moveTo(t, open(t, 120), "lint") // the fixture records it with no URL
+	m, _ = m.Update(keyPress("o"))
+	if view := m.View(); !strings.Contains(view, i18n.T("checks.decline_no_url")) {
+		t.Errorf("o on a check with no page did nothing and said nothing:\n%s", view)
+	}
+}
+
 // appCheck is one check run an App created: GitHub reports those with a null
 // checkSuite.workflowRun, so there is no workflow behind them to name or to
 // rerun (Codecov, Sonar and deploy checks are all this shape).

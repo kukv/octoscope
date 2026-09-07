@@ -289,6 +289,8 @@ checks:
     other: "rerun requested; press r to see it"
   decline_rerun_status_context:
     other: "only GitHub Actions checks can be rerun from here"
+  decline_no_url:
+    other: "this check reports no page of its own to open"
 
 md:
   author:

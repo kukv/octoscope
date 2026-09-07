@@ -250,7 +250,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "L":
 		return m.startLog(!m.failedOnly)
 	case "o":
-		return m, m.openSelected()
+		return m.openSelected()
 	}
 	return m, nil
 }
@@ -285,7 +285,7 @@ func (m Model) moveHscroll(delta int) Model {
 		m.pane = paneList
 		return m
 	}
-	m.hscroll = max(m.hscroll+delta, 0)
+	m.hscroll = clamp(m.hscroll+delta, m.maxHscroll())
 	return m
 }
 
@@ -316,8 +316,12 @@ func (m Model) clearLog() Model {
 // while still browsing the list, and L re-asks for the log already open
 // without leaving the list either.
 func (m Model) startLog(failedOnly bool) (Model, tea.Cmd) {
-	if m.loading || len(m.order) == 0 {
+	if m.loading {
 		m.declined = i18n.T("checks.decline_loading")
+		return m, nil
+	}
+	if len(m.order) == 0 {
+		m.declined = i18n.T("checks.none")
 		return m, nil
 	}
 	r := m.order[m.row]
@@ -347,19 +351,23 @@ func (m Model) fetchLog(jobID int64, failedOnly bool) tea.Cmd {
 }
 
 // openSelected opens the selected check's own page: detailsUrl for a check
-// run, targetUrl for a StatusContext. A failure here escalates the same way
-// a failed checks fetch does -- there is nothing sensible left on screen
-// once the browser could not be opened.
-func (m Model) openSelected() tea.Cmd {
+// run, targetUrl for a StatusContext. A check that reports neither is said
+// so at footer level rather than swallowed. A failure to open escalates the
+// same way a failed checks fetch does -- there is nothing sensible left on
+// screen once the browser could not be opened.
+func (m Model) openSelected() (Model, tea.Cmd) {
 	if len(m.order) == 0 {
-		return nil
+		m.declined = i18n.T("checks.none")
+		return m, nil
 	}
 	url := m.order[m.row].URL
 	if url == "" {
-		return nil
+		m.declined = i18n.T("checks.decline_no_url")
+		return m, nil
 	}
+	m.declined = ""
 	src, ref := m.src, m.ref
-	return func() tea.Msg {
+	return m, func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
 			return errMsg{ref: ref, err: err}
 		}

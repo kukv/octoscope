@@ -280,6 +280,8 @@ checks:
     other: "再実行を要求しました。r で取り直せます"
   decline_rerun_status_context:
     other: "ここから再実行できるのは GitHub Actions の check だけです"
+  decline_no_url:
+    other: "この check は開けるページを報告していません"
 
 md:
   author:
