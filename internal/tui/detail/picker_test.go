@@ -332,19 +332,37 @@ func TestPickerViewShowsItemsAndHelp(t *testing.T) {
 
 // TestLeavingThePickerTakesItsErrorWithIt guards the one string that now
 // carries every failure: a picker error is the picker's, and once the picker
-// is gone the body must not go on showing it.
+// is gone the body must not go on showing it. Both ways out are covered --
+// esc, and the enter that closes because nothing is left to apply.
 func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
-	f := &fakeSource{
-		pr:      gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels:  []gh.Label{{Name: "bug"}, {Name: "wip"}},
-		editErr: errors.New("gh pr: HTTP 403 forbidden"),
+	failedApply := func(t *testing.T) Model {
+		t.Helper()
+		f := &fakeSource{
+			pr:      gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
+			labels:  []gh.Label{{Name: "bug"}, {Name: "wip"}},
+			editErr: errors.New("gh pr: HTTP 403 forbidden"),
+		}
+		m := openPicker(t, f, prRef(), "l")
+		m, _ = m.Update(key("space")) // toggle bug off -> a diff to apply
+		m, cmd := m.Update(key("enter"))
+		m, _ = m.Update(cmd()) // pickErrorMsg
+		return m
 	}
-	m := openPicker(t, f, prRef(), "l")
-	m, _ = m.Update(key("space"))
-	m, cmd := m.Update(key("enter"))
-	m, _ = m.Update(cmd()) // pickErrorMsg
-	m, _ = m.Update(key("esc"))
-	if strings.Contains(m.View(), "403") {
-		t.Errorf("the picker's error is still on the body after esc:\n%s", m.View())
-	}
+
+	t.Run("esc", func(t *testing.T) {
+		m := failedApply(t)
+		m, _ = m.Update(key("esc"))
+		if strings.Contains(m.View(), "403") {
+			t.Errorf("the picker's error is still on the body after esc:\n%s", m.View())
+		}
+	})
+
+	t.Run("enter with nothing to apply", func(t *testing.T) {
+		m := failedApply(t)
+		m, _ = m.Update(key("space")) // toggle bug back on -> an empty diff
+		m, _ = m.Update(key("enter"))
+		if strings.Contains(m.View(), "403") {
+			t.Errorf("the picker's error is still on the body after an empty-diff enter:\n%s", m.View())
+		}
+	})
 }
