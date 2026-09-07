@@ -3,7 +3,8 @@
 checks ビュー（`docs/superpowers/plans/2026-09-07-phase3-checks.md`）を入れたときに
 見つかったが、そのブランチでは直さないと決めたもの。**直さないと決めた理由も書く。**
 
-実端末での確認は別で、`docs/superpowers/2026-09-07-phase3-checks-handoff.md` にある。
+実端末での確認は別で、checks は `docs/superpowers/2026-09-07-phase3-checks-handoff.md`、
+merge は `docs/superpowers/2026-09-08-phase3-merge-handoff.md` にある。
 
 **2026-09-08 に、直し方が決まっていたものを全部片付けた。**
 `arrange` のバケツ分け、`enter` / `L` が出せないログを取りに行く件、`follow()` が
