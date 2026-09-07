@@ -23,7 +23,8 @@ const (
 	// line number (4), the +/- marker (1) and the space that separates it
 	// from the text (1). It is a floor, not a fixed size: a file whose line
 	// numbers run to five digits or more needs a wider gutter, computed by
-	// Model.gutter, which both the drawing and the hit-test read.
+	// Model.gutter, which the drawing reads to know how much width the text
+	// beside it has left.
 	gutterWidth = 11
 
 	// headerHeight is the two header lines plus the rule and "Files" heading
@@ -482,8 +483,7 @@ func (m Model) diffTextLine(l gh.DiffLine, width int) string {
 
 // gutter is the columns the line numbers and marker occupy: two
 // lineNumberWidth fields, the space between them, the marker and the space
-// that separates it from the text. The drawing and the hit-test both read
-// this method, so neither can drift from the other.
+// that separates it from the text.
 func (m Model) gutter() int { return 2*m.lineNumberWidth() + 3 }
 
 // lineNumberWidth is how many columns the widest line number in the file
