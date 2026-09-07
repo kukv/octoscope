@@ -91,6 +91,17 @@ type Model struct {
 
 	pane pane
 
+	mode mode
+
+	// rerunPhase, rerunScope, rerunRunID and rerunWorkflow are the rerun
+	// popup's own state: which run it targets (captured at R-press time,
+	// see startRerun), which scope is picked, and whether a send is in
+	// flight.
+	rerunPhase    rerunPhase
+	rerunScope    gh.RerunScope
+	rerunRunID    int64
+	rerunWorkflow string
+
 	// log is the lines of the currently open job, failed steps only unless
 	// failedOnly was toggled off. logJob is the id of the check that log
 	// belongs to (or is being fetched for): an answer for any other job is
@@ -142,6 +153,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.logArrived(msg), nil
 	case logErrMsg:
 		return m.logFailed(msg), nil
+	case rerunDoneMsg:
+		return m.rerunDone(msg), nil
+	case rerunErrMsg:
+		return m.rerunFailed(msg), nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case spinner.TickMsg:
@@ -209,6 +224,9 @@ func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.mode == modeRerun {
+		return m.handleRerunKey(msg)
+	}
 	switch msg.String() {
 	case "esc", "q":
 		return m, func() tea.Msg { return ClosedMsg{} }
@@ -217,6 +235,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.declined = ""
 		m.errText = ""
 		return m, tea.Batch(m.spin.Tick, m.fetch())
+	case "R":
+		return m.startRerun(), nil
 	case "j", "down":
 		return m.moveRow(1), nil
 	case "k", "up":

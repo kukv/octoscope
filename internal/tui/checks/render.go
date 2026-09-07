@@ -42,6 +42,9 @@ func (m Model) View() string {
 	if m.declined != "" {
 		lines = append(lines, m.declinedLine())
 	}
+	if m.mode == modeRerun {
+		lines = append(lines, m.rerunLines()...)
+	}
 	return strings.Join(append(lines, m.keyBar()), "\n")
 }
 
@@ -58,6 +61,7 @@ func checksHints() []string {
 		i18n.T("footer.checks.move"),
 		i18n.T("footer.checks.log"),
 		i18n.T("footer.checks.full"),
+		i18n.T("footer.checks.rerun"),
 		i18n.T("footer.checks.pane"),
 		i18n.T("footer.checks.open"),
 		i18n.T("footer.checks.refresh"),
@@ -125,13 +129,54 @@ func (m Model) declinedHeight() int {
 	return 0
 }
 
+// rerunLines draws the rerun popup: a blank separator, the title naming the
+// workflow, the two scopes with the selected one picked out, and either a
+// failed send's error or the spinner while it is in flight.
+func (m Model) rerunLines() []string {
+	title := i18n.Tf("checks.rerun_title", map[string]any{"Workflow": m.rerunWorkflow})
+	lines := []string{
+		"",
+		clip(theme.Title().Render(title), m.width),
+		clip(m.rerunOption(gh.RerunFailed, i18n.T("checks.rerun_failed_only")), m.width),
+		clip(m.rerunOption(gh.RerunAll, i18n.T("checks.rerun_all")), m.width),
+	}
+	switch {
+	case m.errText != "":
+		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+	case m.rerunPhase == rerunWorking:
+		lines = append(lines, clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
+	}
+	return lines
+}
+
+func (m Model) rerunOption(scope gh.RerunScope, text string) string {
+	if scope == m.rerunScope {
+		return theme.Selected().Render(text)
+	}
+	return text
+}
+
+// rerunHeight is what rerunLines takes, out of the pane's height budget the
+// same way declinedHeight is, so the popup never pushes the key bar off the
+// bottom.
+func (m Model) rerunHeight() int {
+	if m.mode != modeRerun {
+		return 0
+	}
+	h := 4
+	if m.errText != "" || m.rerunPhase == rerunWorking {
+		h++
+	}
+	return h
+}
+
 // paneHeight is what is left for the two panes once the header, the key bar
 // and the footer lines have been paid for.
 func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.errHeight()-m.declinedHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.errHeight()-m.declinedHeight()-m.rerunHeight(), 1)
 }
 
 // body lays the check list and the log pane side by side, the way the diff

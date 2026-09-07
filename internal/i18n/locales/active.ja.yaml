@@ -238,6 +238,8 @@ footer:
       other: "enter:ログ"
     full:
       other: "L:全ログ"
+    rerun:
+      other: "R:再実行"
     pane:
       other: "h/l:ペイン"
     open:
@@ -266,6 +268,16 @@ checks:
     other: "全ログ"
   log_failed_only:
     other: "失敗ステップ"
+  rerun_title:
+    other: "{{.Workflow}} を再実行"
+  rerun_failed_only:
+    other: "失敗したジョブのみ"
+  rerun_all:
+    other: "ワークフロー全体"
+  rerun_started:
+    other: "再実行を要求しました。r で取り直せます"
+  decline_rerun_status_context:
+    other: "ここから再実行できるのは GitHub Actions の check だけです"
 
 md:
   author:

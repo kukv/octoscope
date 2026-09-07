@@ -247,6 +247,8 @@ footer:
       other: "enter:log"
     full:
       other: "L:full log"
+    rerun:
+      other: "R:rerun"
     pane:
       other: "h/l:pane"
     open:
@@ -275,6 +277,16 @@ checks:
     other: "full log"
   log_failed_only:
     other: "failed steps"
+  rerun_title:
+    other: "Rerun {{.Workflow}}"
+  rerun_failed_only:
+    other: "only the failed jobs"
+  rerun_all:
+    other: "the whole workflow"
+  rerun_started:
+    other: "rerun requested; press r to see it"
+  decline_rerun_status_context:
+    other: "only GitHub Actions checks can be rerun from here"
 
 md:
   author:
