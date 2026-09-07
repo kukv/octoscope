@@ -1,0 +1,83 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "pageInfo": {
+                      "hasNextPage": false,
+                      "endCursor": "Mw"
+                    },
+                    "nodes": [
+                      {
+                        "__typename": "CheckRun",
+                        "name": "lint",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "databaseId": 101635448466,
+                        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34087925535/job/101635448466",
+                        "startedAt": "2026-09-07T05:44:01Z",
+                        "completedAt": "2026-09-07T05:44:37Z",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "databaseId": 34087925535,
+                            "runNumber": 88,
+                            "workflow": {
+                              "name": "CI"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "sca",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "databaseId": 101635448396,
+                        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34087925557/job/101635448396",
+                        "startedAt": "2026-09-07T05:44:01Z",
+                        "completedAt": "2026-09-07T05:44:15Z",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "databaseId": 34087925557,
+                            "runNumber": 116,
+                            "workflow": {
+                              "name": "security"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "test",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "databaseId": 101635448213,
+                        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34087925535/job/101635448213",
+                        "startedAt": "2026-09-07T05:44:36Z",
+                        "completedAt": "2026-09-07T05:45:44Z",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "databaseId": 34087925535,
+                            "runNumber": 88,
+                            "workflow": {
+                              "name": "CI"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

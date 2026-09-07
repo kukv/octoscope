@@ -1,0 +1,51 @@
+query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              # first is capped at 100 by GitHub, so pageInfo/after page
+              # beyond it. The Work board's copy of this selection stays at
+              # one page on purpose: it counts the rollup, it does not act
+              # on it.
+              contexts(first: 100, after: $after) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  __typename
+                  ... on CheckRun {
+                    name
+                    status
+                    conclusion
+                    databaseId
+                    detailsUrl
+                    startedAt
+                    completedAt
+                    checkSuite {
+                      workflowRun {
+                        databaseId
+                        runNumber
+                        workflow {
+                          name
+                        }
+                      }
+                    }
+                  }
+                  ... on StatusContext {
+                    context
+                    state
+                    targetUrl
+                    createdAt
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

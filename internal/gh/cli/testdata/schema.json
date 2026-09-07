@@ -60,6 +60,29 @@
       "url": "URI"
     }
   },
+  "CheckSuite": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "app": "App",
+      "branch": "Ref",
+      "checkRuns": "CheckRunConnection",
+      "commit": "Commit",
+      "conclusion": "CheckConclusionState",
+      "createdAt": "DateTime",
+      "creator": "User",
+      "databaseId": "Int",
+      "id": "ID",
+      "matchingPullRequests": "PullRequestConnection",
+      "push": "Push",
+      "repository": "Repository",
+      "resourcePath": "URI",
+      "status": "CheckStatusState",
+      "updatedAt": "DateTime",
+      "url": "URI",
+      "workflowRun": "WorkflowRun"
+    }
+  },
   "Commit": {
     "kind": "OBJECT",
     "possibleTypes": [],
@@ -1093,6 +1116,42 @@
     "fields": {
       "clientMutationId": "String",
       "pullRequestReview": "PullRequestReview"
+    }
+  },
+  "Workflow": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "createdAt": "DateTime",
+      "databaseId": "Int",
+      "id": "ID",
+      "name": "String",
+      "resourcePath": "URI",
+      "runs": "WorkflowRunConnection",
+      "state": "WorkflowState",
+      "updatedAt": "DateTime",
+      "url": "URI"
+    }
+  },
+  "WorkflowRun": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "checkSuite": "CheckSuite",
+      "createdAt": "DateTime",
+      "databaseId": "Int",
+      "deploymentReviews": "DeploymentReviewConnection",
+      "displayTitle": "String",
+      "event": "String",
+      "file": "WorkflowRunFile",
+      "id": "ID",
+      "pendingDeploymentRequests": "DeploymentRequestConnection",
+      "resourcePath": "URI",
+      "runAttempt": "Int",
+      "runNumber": "Int",
+      "updatedAt": "DateTime",
+      "url": "URI",
+      "workflow": "Workflow"
     }
   }
 }

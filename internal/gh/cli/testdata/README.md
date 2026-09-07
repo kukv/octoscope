@@ -116,7 +116,7 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","PageInfo"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","PageInfo"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/cli/testdata/schema.json
 ```
 
@@ -142,6 +142,19 @@ gh api graphql -f query='mutation($prid:ID!){addPullRequestReview(input:{pullReq
 gh api graphql -f query='mutation($rid:ID!){addPullRequestReviewThread(input:{pullRequestReviewId:$rid,path:"...",line:1,side:RIGHT,body:"..."}){thread{id}}}' -f rid=<review id>
 # 録り終えたら消す
 gh api graphql -f query='mutation($rid:ID!){deletePullRequestReview(input:{pullRequestReviewId:$rid}){pullRequestReview{id}}}' -f rid=<review id>
+```
+
+## `pr_checks.json`
+
+`checks.graphql` に対する実レスポンス。録った日: 2026-09-07、対象:
+`kukv/octoscope#61`。1 ページで終わる（`hasNextPage: false`）応答で、
+フィールドの読み取りだけを確かめる。ページングの仕組みは録りものではなく
+`checks_test.go` 内のインライン JSON で確かめる。
+
+```bash
+D=internal/gh/cli/testdata
+gh api graphql -F query=@internal/gh/cli/checks.graphql \
+  -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr_checks.json
 ```
 
 ## `sample.diff`
