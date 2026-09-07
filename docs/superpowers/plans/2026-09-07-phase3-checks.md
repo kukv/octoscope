@@ -45,7 +45,9 @@ rollup を追加でページングすると**カード 1 枚ごとに往復が�
 `CheckRun` は既に「roll-up の後ろにある 1 件の check」であり、ジョブ id も
 ワークフロー名も同じものの属性である。別の型を足すと、同じ概念に 2 つの名前が付く。
 `work.graphql` はそれらのフィールドを選ばないのでゼロ値のままになるが、
-それを読むのは checks ビューだけである。
+それを読むのは checks ビューだけである。ただし **`Kind` だけは Work 板の経路
+（`graphql.go` の `rollup`）でも埋める**。ゼロ値は `CheckKindRun` であり、
+StatusContext をそう名乗らせたままにするのは「1 つの型に 1 つの意味」に反する。
 
 ### D3. ログの整形は `internal/gh/cli` に閉じる
 
@@ -67,7 +69,7 @@ spec §2 のとおり、進行中の run に `gh run view --log` を投げたと
 | `internal/gh/checks.go`（新規） | `CheckKind` / `LogLine` / `RerunScope` |
 | `internal/gh/cli/checks.graphql`（新規） | 1 PR の `statusCheckRollup.contexts` を `after` でページングして引く |
 | `internal/gh/cli/checks.go`（新規） | `PRChecks` / `JobLog` / `RerunWorkflow` と、`gh run view --log` のパーサ |
-| `internal/gh/cli/testdata/`（追加） | `pr_checks.json`（1 ページ目）/ `pr_checks_page2.json` / `job_log.txt` / `job_log_failed.txt`、`schema.json` の録り直し |
+| `internal/gh/cli/testdata/`（追加） | `pr_checks.json` / `job_log.txt` / `job_log_failed.txt`、`schema.json` の録り直し |
 | `internal/usecase/usecase.go`（修正） | `checksFetcher` interface と 3 つの委譲メソッド |
 | `internal/tui/checks/checks.go`（新規） | `Source` / `Model` / `Update` / キー処理 |
 | `internal/tui/checks/render.go`（新規） | 一覧ペイン、ログペイン、ヘッダ、キーバー |
@@ -84,6 +86,11 @@ spec §2 のとおり、進行中の run に `gh run view --log` を投げたと
 - Modify: `internal/gh/gh.go`（`CheckRun` の定義）
 - Create: `internal/gh/checks.go`
 - Test: `internal/gh/checks_test.go`
+
+**書式の決めごと:** 画面に出す所要時間は `Duration().String()` をそのまま使わない。
+GitHub の時刻は秒未満まで持つので `2m14.123456s` になり、1 分未満は `48s` と
+`0m48s` で桁が変わる。**`m:ss` に固定する**（`2:14` / `0:48`）。整形は
+Task 6 の `render.go` に置く。
 
 **Interfaces:**
 - Produces: `gh.CheckKind`（`CheckKindRun` / `CheckKindStatus`）、`gh.CheckRun`（既存 2 フィールド + `Kind CheckKind` / `Workflow string` / `RunNumber int` / `JobID int64` / `RunID int64` / `URL string` / `StartedAt time.Time` / `CompletedAt time.Time`）、`(gh.CheckRun).Duration() time.Duration`、`gh.LogLine{Step string; Time time.Time; Text string}`、`gh.RerunScope`（`RerunFailed` / `RerunAll`）
@@ -205,7 +212,20 @@ const (
 )
 ```
 
-（`internal/gh/checks.go` に `time` の import が要る。`gh.go` は既に `time` を import している。）
+（`internal/gh/checks.go` に `time` の import が要る。`gh.go` は既に `time` を
+import している。）
+
+`internal/gh/cli/graphql.go` の `rollup` にも 1 行足す（D2）:
+
+```go
+		kind := gh.CheckKindRun
+		if node.Typename == "StatusContext" {
+			kind = gh.CheckKindStatus
+		}
+		c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state, Kind: kind})
+```
+
+差し替える前の行は `c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state})`。
 
 - [ ] **Step 4: 通ることを確かめる**
 
@@ -231,7 +251,7 @@ git commit -m "feat: give a check run the ids the checks view acts on"
 
 **Files:**
 - Create: `internal/gh/cli/checks.graphql`, `internal/gh/cli/checks.go`, `internal/gh/cli/checks_test.go`
-- Create: `internal/gh/cli/testdata/pr_checks.json`, `internal/gh/cli/testdata/pr_checks_page2.json`
+- Create: `internal/gh/cli/testdata/pr_checks.json`
 - Modify: `internal/gh/cli/testdata/schema.json`（`CheckSuite` / `WorkflowRun` / `Workflow` を足して録り直す）
 - Modify: `internal/gh/cli/schema_test.go`（`checks.graphql` を docs に足す）
 - Modify: `internal/gh/cli/testdata/README.md`（録り方を書く）
@@ -324,11 +344,13 @@ gh api graphql -F query=@internal/gh/cli/checks.graphql \
   -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr_checks.json
 ```
 
-2 ページ目の fixture（`pr_checks_page2.json`）は、**録った 1 ページ目を写して
-`nodes` を 1 件だけ残し、`hasNextPage` を `false` に、`endCursor` を `null` に
-書き換えて作る**。1 ページ目のほうは `hasNextPage` を `true`、`endCursor` を
-`"CURSOR"` に書き換える。README にそう作ったことを書く（実測を写した加工物であり、
-手書きの JSON ではない）。
+**録ったものは手で書き換えない**（`testdata/README.md`）。GitHub が実際にどう返すかを
+保つためのファイルで、テストを通すために中身を直すと存在意義が消える。
+
+**ページングの仕組みのテストは、録りものではなくテスト内のインライン JSON で書く。**
+`review_test.go` の `TestPRReviewContextWalksEveryPageOfThreads` が既にその形で、
+`fakeSeq` に 2 つの応答文字列を渡している。同じ `fakeSeq` を使う。録った
+`pr_checks.json` は**フィールドの読み取り**のテストにだけ使う。
 
 - [ ] **Step 5: パースとページングのテストを書く**
 
@@ -338,62 +360,51 @@ gh api graphql -F query=@internal/gh/cli/checks.graphql \
 package cli
 
 import (
-	"context"
-	"os"
 	"slices"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
 )
 
-// twoPages answers the first request with page one and the second with page
-// two, and records the arguments of each call.
-func twoPages(t *testing.T, calls *[][]string) runFunc {
-	t.Helper()
-
-	page1, err := os.ReadFile("testdata/pr_checks.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	page2, err := os.ReadFile("testdata/pr_checks_page2.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return func(_ context.Context, _ string, args ...string) ([]byte, error) {
-		*calls = append(*calls, args)
-		if len(*calls) == 1 {
-			return page1, nil
-		}
-		return page2, nil
-	}
+// rollupPage wraps contexts nodes in the shape the query selects them in.
+func rollupPage(pageInfo, nodes string) string {
+	return `{"data":{"repository":{"pullRequest":{"commits":{"nodes":[{"commit":` +
+		`{"statusCheckRollup":{"contexts":{"pageInfo":` + pageInfo + `,"nodes":[` + nodes + `]}}}}]}}}}}`
 }
 
 func TestPRChecksWalksEveryPageOfContexts(t *testing.T) {
 	t.Parallel()
 
-	var calls [][]string
-	c := &Client{repo: "kukv/octoscope", run: twoPages(t, &calls)}
-	checks, err := c.PRChecks(context.Background(), "", 61)
+	page1 := rollupPage(`{"hasNextPage":true,"endCursor":"CUR1"}`,
+		`{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"SUCCESS"}`)
+	page2 := rollupPage(`{"hasNextPage":false,"endCursor":"CUR2"}`,
+		`{"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE"}`)
+
+	f := &fakeSeq{outs: []string{page1, page2}}
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+
+	checks, err := c.PRChecks(t.Context(), "", 61)
 	if err != nil {
 		t.Fatalf("PRChecks: %v", err)
 	}
-	if len(calls) != 2 {
-		t.Fatalf("made %d requests, want 2 (the first page says there is another)", len(calls))
+	if len(f.calls) != 2 {
+		t.Fatalf("calls = %d, want 2 (the first page says there is another)", len(f.calls))
 	}
-	if !slices.Contains(calls[1], "after=CURSOR") {
-		t.Errorf("second request did not carry the cursor: %v", calls[1])
+	// Without the cursor the second request asks for page one again and the
+	// loop never ends.
+	if !slices.Contains(f.calls[1], "after=CUR1") {
+		t.Errorf("second call = %v, want it to carry after=CUR1", f.calls[1])
 	}
-	if checks.Total != 4 {
-		t.Errorf("Total = %d, want 4 (three on page one, one on page two)", checks.Total)
+	if checks.Total != 2 {
+		t.Errorf("Total = %d, want 2 (one from each page)", checks.Total)
 	}
 }
 
 func TestPRChecksReadsTheIdsTheViewActsOn(t *testing.T) {
 	t.Parallel()
 
-	var calls [][]string
-	c := &Client{repo: "kukv/octoscope", run: twoPages(t, &calls)}
-	checks, err := c.PRChecks(context.Background(), "", 61)
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: fileRun(t, "testdata/pr_checks.json")}
+	checks, err := c.PRChecks(t.Context(), "", 61)
 	if err != nil {
 		t.Fatalf("PRChecks: %v", err)
 	}
@@ -421,7 +432,11 @@ func TestPRChecksReadsTheIdsTheViewActsOn(t *testing.T) {
 ```
 
 （`lint` の id と所要時間は Step 4 で録った `pr_checks.json` の実値に合わせる。
-録った値が上と違ったら**テストのほうを実値に直す**。fixture を書き換えない。）
+録った値が上と違ったら**テストのほうを実値に直す**。録りものを書き換えない。
+
+`fileRun`（1 つの録りものを毎回返す）は Task 3 Step 2 のヘルパーだが、先に要るので
+このタスクで足し、Task 3 では既にあるものとして使う。`pr_checks.json` は 1 ページで
+終わる応答なので、同じものを返し続けてもループは 1 周で止まる。)
 
 - [ ] **Step 6: 実装する**
 
@@ -618,7 +633,7 @@ func TestJobLogStripsTheJobNameAndTheByteOrderMark(t *testing.T) {
 		t.Fatal("no lines")
 	}
 	first := lines[0]
-	if strings.HasPrefix(first.Text, "﻿") {
+	if strings.HasPrefix(first.Text, "\ufeff") {
 		t.Errorf("Text keeps the byte order mark: %q", first.Text)
 	}
 	if strings.Contains(first.Text, "\t") {
@@ -643,9 +658,11 @@ func TestALineWithoutATimestampKeepsItsText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
 	}
+	// The recording has continuation lines: the osv-scanner step's scan-args
+	// wrap onto lines the runner did not stamp.
 	i := slices.IndexFunc(lines, func(l gh.LogLine) bool { return l.Time.IsZero() })
 	if i < 0 {
-		t.Skip("the recording has no continuation line")
+		t.Fatalf("no continuation line among %d lines; the recording has some", len(lines))
 	}
 	if lines[i].Text == "" {
 		t.Error("a continuation line lost its text")
@@ -734,21 +751,24 @@ func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnl
 
 // parseJobLog reads the format gh prints: three tab-separated fields, the
 // job's name, the step's name, and the message, whose first word is an
-// RFC3339 timestamp on every line the runner stamped. The very first byte of
-// the output is a byte order mark.
+// RFC3339 timestamp on every line the runner stamped. The message of the
+// very first line starts with a byte order mark.
 func parseJobLog(out string) []gh.LogLine {
 	var lines []gh.LogLine
 	for _, raw := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
 		if raw == "" {
 			continue
 		}
-		fields := strings.SplitN(strings.TrimPrefix(raw, "﻿"), "\t", 3)
+		fields := strings.SplitN(raw, "\t", 3)
 		if len(fields) < 3 {
 			lines = append(lines, gh.LogLine{Text: fields[len(fields)-1]})
 			continue
 		}
-		line := gh.LogLine{Step: fields[1], Text: fields[2]}
-		if stamp, rest, ok := strings.Cut(fields[2], " "); ok {
+		// The mark sits at the start of the message, not of the line: the
+		// job and the step name come before it.
+		message := strings.TrimPrefix(fields[2], "\ufeff")
+		line := gh.LogLine{Step: fields[1], Text: message}
+		if stamp, rest, ok := strings.Cut(message, " "); ok {
 			if at, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
 				line.Time, line.Text = at, rest
 			}
@@ -768,7 +788,7 @@ Expected: PASS
 
 - [ ] **Step 6: 空振りしないことを確かめる**
 
-`strings.TrimPrefix(raw, "﻿")` を `raw` に戻して BOM のテストが落ちること、
+`strings.TrimPrefix(fields[2], "\ufeff")` を `fields[2]` に戻して BOM のテストが落ちること、
 `failedOnly` の分岐を潰して引数のテストが落ちることを見る。
 
 - [ ] **Step 7: `make check` とコミット**
@@ -854,8 +874,8 @@ Run: `go test ./internal/gh/cli/ -run Rerun -v` → PASS。
 
 - [ ] **Step 5: 進行中の run のログを実測する**
 
-**これは実物への 1 回の観測であり、コードではない。** 進行中の run を 1 つ作り
-（このリポジトリに空コミットを push するのが最も安い）、走っている間に:
+**これは実物への 1 回の観測であり、コードではない。main には push しない。**
+この作業ブランチを push すれば CI が走るので、走っている間に:
 
 ```bash
 gh run view -R kukv/octoscope --job <走っているジョブの id> --log-failed; echo "exit=$?"
@@ -1030,6 +1050,7 @@ package checks
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1037,6 +1058,9 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 )
+
+// Task 7 と Task 8 のテストは i18n.T と ansi.StringWidth も使う。import は
+// テストを足すときに増やす（golangci-lint が余った import を落とす)。
 
 type fakeSource struct {
 	checks gh.Checks
@@ -1098,6 +1122,37 @@ func TestTheHeaderCountsWhatIsWrong(t *testing.T) {
 	}
 }
 
+// interleaved is two green workflows whose checks GitHub listed alternately.
+// Ranking alone cannot separate them, so this is what catches a comparator
+// that only sorts by state.
+func interleaved() gh.Checks {
+	return gh.Checks{
+		Total: 4, Passed: 4, State: gh.CheckSuccess,
+		Runs: []gh.CheckRun{
+			{Name: "a", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
+			{Name: "b", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "release", JobID: 2, RunID: 20},
+			{Name: "c", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 3, RunID: 10},
+			{Name: "d", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "release", JobID: 4, RunID: 20},
+		},
+	}
+}
+
+func TestChecksOfOneWorkflowStayTogether(t *testing.T) {
+	t.Parallel()
+
+	m := New(&fakeSource{checks: interleaved()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: interleaved()})
+	var got []string
+	for _, r := range m.order {
+		got = append(got, r.Workflow)
+	}
+	want := []string{"CI", "CI", "release", "release"}
+	if !slices.Equal(got, want) {
+		t.Errorf("workflows in order = %v, want %v", got, want)
+	}
+}
+
 func TestEscLeavesTheView(t *testing.T) {
 	t.Parallel()
 
@@ -1109,6 +1164,14 @@ func TestEscLeavesTheView(t *testing.T) {
 		t.Errorf("esc sent %T, want ClosedMsg", cmd())
 	}
 }
+```
+
+このパッケージにも `press` と `keyPress` が要る。**diff のものは別パッケージの
+`_test.go` にあり import できない**ので、写して足す:
+
+```bash
+grep -n "func press" internal/tui/diff/diff_test.go
+grep -n "func keyPress\|func key(" internal/tui/diff/comment_test.go
 ```
 
 - [ ] **Step 3: 落ちることを確かめる**
@@ -1191,31 +1254,31 @@ type Model struct {
 // checks together. A StatusContext belongs to no workflow and sorts last: it
 // is the one the view can do the least with.
 func arrange(runs []gh.CheckRun) []gh.CheckRun {
+	worst := map[string]int{}
+	first := map[string]int{}
+	for i, r := range runs {
+		worst[r.Workflow] = max(worst[r.Workflow], rank(r.State))
+		if _, seen := first[r.Workflow]; !seen {
+			first[r.Workflow] = i
+		}
+	}
 	out := append([]gh.CheckRun(nil), runs...)
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if (a.Kind == gh.CheckKindStatus) != (b.Kind == gh.CheckKindStatus) {
 			return b.Kind == gh.CheckKindStatus
 		}
-		if a.Workflow != b.Workflow {
-			return worstOf(runs, a.Workflow) > worstOf(runs, b.Workflow)
+		if a.Workflow == b.Workflow {
+			return false
 		}
-		return false
+		if worst[a.Workflow] != worst[b.Workflow] {
+			return worst[a.Workflow] > worst[b.Workflow]
+		}
+		// Two workflows in the same state still have to be told apart, or
+		// their checks stay interleaved in whatever order GitHub listed them.
+		return first[a.Workflow] < first[b.Workflow]
 	})
 	return out
-}
-
-// worstOf ranks a workflow by the worst state any of its checks is in, so a
-// workflow with one red check outranks a workflow that is merely running.
-func worstOf(runs []gh.CheckRun, workflow string) int {
-	worst := 0
-	for _, r := range runs {
-		if r.Workflow != workflow {
-			continue
-		}
-		worst = max(worst, rank(r.State))
-	}
-	return worst
 }
 
 func rank(s gh.CheckState) int {
@@ -1229,6 +1292,10 @@ func rank(s gh.CheckState) int {
 	}
 }
 ```
+
+ヘッダは `owner/name #番号` と、その下に `checks.summary`（失敗と実行中の件数）。
+**モックアップの `CI #88` は出さない**: ワークフローが複数あるときにどれの番号かが
+決まらない。実行番号は各ワークフローの見出し行に `security #116` の形で出す。
 
 `render.go` は左ペイン（ワークフロー名の見出し + 各 check の行）とヘッダだけをまず描く。
 右ペインは Task 7。グリフは `icon.Check(state)` から引き、色は `theme` から引く
@@ -1281,6 +1348,21 @@ git commit -m "feat: list a pull request's checks, the failing ones first"
 - [ ] **Step 2: 失敗するテストを書く**
 
 ```go
+func TestALogForACheckTheUserLeftIsDropped(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: "FAIL sca"}}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	_, cmd := m.Update(keyPress("enter")) // asks for the log of the selected check
+	m = press(m, "j")                     // and the user moves on before it lands
+	m, _ = m.Update(cmd())
+	if view := m.View(); strings.Contains(view, "FAIL sca") {
+		t.Errorf("the log of the check the user left is drawn under another one:\n%s", view)
+	}
+}
+
 func TestEnterFetchesTheLogOfTheSelectedCheck(t *testing.T) {
 	t.Parallel()
 
@@ -1352,12 +1434,22 @@ Expected: FAIL
 
 - [ ] **Step 4: 実装する**
 
-- `Model` に `log []gh.LogLine` / `logRow int` / `hscroll int` / `failedOnly bool`（既定 `true`）/ `logPhase`（`phaseIdle` / `phaseLoading`）を足す
+- `Model` に `log []gh.LogLine` / `logRow int` / `hscroll int` / `failedOnly bool`（既定 `true`）/ `logPhase`（`phaseIdle` / `phaseLoading`）/ `logJob int64`（今の答え待ちがどの check のものか）を足す
+- **答えには宛先を持たせる。** `logMsg{ref gh.ItemRef; jobID int64; lines []gh.LogLine}` と
+  `logErrMsg{ref; jobID; err}` を定義し、`ref != m.ref` または
+  `jobID != 選択中の JobID` の答えは**捨てる**。カーソルを動かしたあとに前の
+  check のログが届いて別の check の下に描かれるのを防ぐ。同じ穴を 2 回塞いだ
+  経緯がある（`d44b7fe` / `e1f8a99`）ので、ここは最初からこの形で書く
+- **ペインの焦点。** `pane`（`paneList` / `paneLog`）を持つ。`enter` は
+  ログを取りに行くだけで焦点は動かさない（取得中に一覧を動かせる）。
+  `l` で `paneLog` へ、`paneLog` の左端でさらに `h` を押すと `paneList` へ戻る
+  （diff の `sidebar` と同じ作法）。`j` / `k` は `paneList` では check の行を、
+  `paneLog` ではログの行を動かす
 - `enter`: 選択中が `CheckKindStatus` なら `m.declined = i18n.T("checks.decline_status_context")`、
   そうでなければ `fetchLog(jobID, m.failedOnly)` を返す。checks がまだ届いていないときは
   `checks.decline_loading`
 - `L`: `failedOnly` を反転して取り直す。`CheckKindStatus` では `enter` と同じ理由を出す
-- `h` / `l`: `hscroll` を動かす。左端で `h` を押したら一覧ペインへ戻る（diff の `sidebar` と同じ）
+- `h` / `l`: `paneLog` では `hscroll` を動かす
 - `o`: `OpenWeb(選択中の URL)`
 - ログの描画は**折り返さない**。`hscroll` から幅ぶんを切り出す。切り出しは
   `internal/tui/layout` の既存の関数を使う（`diff` の行の切り方を読んで同じにする）
@@ -1369,8 +1461,9 @@ Run: `go test ./internal/tui/checks/ -v` → PASS
 
 - [ ] **Step 6: 空振りしないことを確かめる**
 
-`decline_status_context` の代入を消して 3 本目が落ちること、ログの切り出しを
-やめて 4 本目が落ちることを見る。
+`decline_status_context` の代入を消して StatusContext のテストが落ちること、
+ログの切り出しをやめて折り返しのテストが落ちること、`jobID` のガードを消して
+`TestALogForACheckTheUserLeftIsDropped` が落ちることを、それぞれ見る。
 
 - [ ] **Step 7: `make check` とコミット**
 
@@ -1440,8 +1533,10 @@ func TestChoosingAScopeSendsIt(t *testing.T) {
 	if src.scope != gh.RerunAll {
 		t.Errorf("scope = %v, want RerunAll", src.scope)
 	}
-	if src.runID != 10 {
-		t.Errorf("runID = %d, want the run of the selected check", src.runID)
+	// arrange puts the failing workflow first, so the cursor starts on sca,
+	// whose run is 20.
+	if src.runID != 20 {
+		t.Errorf("runID = %d, want 20, the run of the selected check", src.runID)
 	}
 }
 
@@ -1564,6 +1659,15 @@ Expected: FAIL
 - `broadcast` に checks モデルを足す（他のビューと同じく、離れたあとに
   届く応答を捨てないため）
 - `checks.ErrorMsg` は `diffFailed` と同じ形で、スタックに無ければ捨てる
+- `checks.ClosedMsg` で `m.pop(overlayChecks)`
+- **`overlayDiff` が現れる場所を全部なぞる。** `View` / `handleKey` / `handleMouse` /
+  `resize` にも分岐がある:
+
+```bash
+grep -n overlayDiff internal/tui/app/*.go
+```
+
+  1 か所でも漏らすと、ビューは開くのにキーが届かない（あるいは描かれない）
 
 - [ ] **Step 4: 通ることを確かめ、空振りしないことを見る**
 
