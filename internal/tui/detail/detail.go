@@ -68,17 +68,25 @@ type (
 		ref gh.ItemRef
 		err error
 	}
-	commentPostedMsg    struct{}
-	commentErrorMsg     struct{ err error }
-	stateChangedMsg     struct{}
-	stateErrorMsg       struct{ err error }
+	commentPostedMsg struct{}
+	commentErrorMsg  struct{ err error }
+	stateChangedMsg  struct{}
+	stateErrorMsg    struct{ err error }
+	// The three picker answers carry the ref for the same reason itemMsg
+	// does. The candidates are the item the fetch was started on: opened
+	// against another item they would precheck the wrong labels, and enter
+	// would then remove them.
 	pickerCandidatesMsg struct {
+		ref    gh.ItemRef
 		kind   pickerKind
 		labels []gh.Label
 		users  []string
 	}
-	pickerAppliedMsg struct{}
-	pickErrorMsg     struct{ err error }
+	pickerAppliedMsg struct{ ref gh.ItemRef }
+	pickErrorMsg     struct {
+		ref gh.ItemRef
+		err error
+	}
 
 	// reviewContextMsg and reviewContextErrMsg carry the ref for the same
 	// reason itemMsg does.
@@ -240,9 +248,9 @@ func fetchLabelPicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		labels, err := src.ListLabels(context.Background(), ref.Repo)
 		if err != nil {
-			return pickErrorMsg{err}
+			return pickErrorMsg{ref: ref, err: err}
 		}
-		return pickerCandidatesMsg{kind: pickLabels, labels: labels}
+		return pickerCandidatesMsg{ref: ref, kind: pickLabels, labels: labels}
 	}
 }
 
@@ -250,9 +258,9 @@ func fetchAssigneePicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		users, err := src.ListAssignees(context.Background(), ref.Repo)
 		if err != nil {
-			return pickErrorMsg{err}
+			return pickErrorMsg{ref: ref, err: err}
 		}
-		return pickerCandidatesMsg{kind: pickAssignees, users: users}
+		return pickerCandidatesMsg{ref: ref, kind: pickAssignees, users: users}
 	}
 }
 
@@ -265,9 +273,9 @@ func applyPicker(src Source, ref gh.ItemRef, kind pickerKind, add, remove []stri
 			err = src.EditAssignees(ref, add, remove)
 		}
 		if err != nil {
-			return pickErrorMsg{err}
+			return pickErrorMsg{ref: ref, err: err}
 		}
-		return pickerAppliedMsg{}
+		return pickerAppliedMsg{ref: ref}
 	}
 }
 
@@ -290,9 +298,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case pickerCandidatesMsg:
 		return m.candidatesArrived(msg), nil
 	case pickerAppliedMsg:
-		return m.pickApplied()
+		return m.pickApplied(msg)
 	case pickErrorMsg:
-		return m.pickFailed(msg.err), nil
+		return m.pickFailed(msg), nil
 	case reviewContextMsg:
 		return m.reviewContextArrived(msg), nil
 	case reviewContextErrMsg:
@@ -378,6 +386,9 @@ func (m Model) stateFailed(err error) Model {
 }
 
 func (m Model) candidatesArrived(msg pickerCandidatesMsg) Model {
+	if msg.ref != m.ref {
+		return m // an answer for an item the user has already left
+	}
 	if msg.kind == pickLabels {
 		names := make([]string, len(msg.labels))
 		colors := make(map[string]string, len(msg.labels))
@@ -393,18 +404,24 @@ func (m Model) candidatesArrived(msg pickerCandidatesMsg) Model {
 	return m
 }
 
-func (m Model) pickApplied() (Model, tea.Cmd) {
+func (m Model) pickApplied(msg pickerAppliedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	m.mode, m.phase = modeView, phaseLoading
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) pickFailed(err error) Model {
+func (m Model) pickFailed(msg pickErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
 	if m.phase == phaseWorking { // the apply failed; the picker stays up
 		m.phase = phaseIdle
 	} else { // the candidates never arrived; there is no picker to show
 		m.mode, m.phase = modeView, phaseIdle
 	}
-	m.errText = err.Error()
+	m.errText = msg.err.Error()
 	return m
 }
 

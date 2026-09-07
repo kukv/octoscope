@@ -366,3 +366,43 @@ func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
 		}
 	})
 }
+
+// TestAStalePickerAnswerIsDropped pins the ref guard on the three picker
+// answers. l and a reach the repository, not the item, so an answer for the
+// item the user has left carries candidates that look plausible here: the
+// picker would open prechecked against the other item's labels, and enter
+// would then take them off this one.
+func TestAStalePickerAnswerIsDropped(t *testing.T) {
+	f := &fakeSource{
+		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
+		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+	}
+	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+
+	t.Run("pickerCandidatesMsg", func(t *testing.T) {
+		m := loaded(f, prRef())
+		m, _ = m.Update(pickerCandidatesMsg{
+			ref: other, kind: pickLabels, labels: []gh.Label{{Name: "other"}},
+		})
+		if m.mode != modeView {
+			t.Errorf("mode = %v, want the picker to stay closed on a stale answer", m.mode)
+		}
+	})
+
+	t.Run("pickerAppliedMsg", func(t *testing.T) {
+		m := openPicker(t, f, prRef(), "l")
+		m, cmd := m.Update(pickerAppliedMsg{ref: other})
+		if m.mode != modePick || cmd != nil {
+			t.Errorf("mode = %v, cmd = %v; want the open picker untouched by a stale answer",
+				m.mode, cmd)
+		}
+	})
+
+	t.Run("pickErrorMsg", func(t *testing.T) {
+		m := openPicker(t, f, prRef(), "l")
+		m, _ = m.Update(pickErrorMsg{ref: other, err: errors.New("boom")})
+		if m.errText != "" {
+			t.Errorf("errText = %q after a stale failure, want empty", m.errText)
+		}
+	})
+}
