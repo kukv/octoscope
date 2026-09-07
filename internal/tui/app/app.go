@@ -138,12 +138,20 @@ type Model struct {
 }
 
 func New(src Source, opts Options) Model {
-	return Model{
+	m := Model{
 		src:  src,
 		opts: opts,
 		work: work.New(src),
 		repo: repo.New(src),
 	}
+	// Naming a repository on the command line is a statement about what the
+	// user came to look at, so that is the tab they land on. A repository
+	// found later, from the working directory, does not move them: see
+	// repoResolved.
+	if opts.HasRepo {
+		m.tab = tabRepos
+	}
+	return m
 }
 
 // Init asks the terminal for its background colour and nothing else: the
@@ -202,6 +210,8 @@ func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
 		m.repoLookupTimedOut = msg.timedOut
 		return m, nil
 	}
+	// The Repos tab appears, but the user stays where they are: the answer
+	// arrives seconds after the board is already on screen.
 	m.opts.HasRepo = true
 	// broadcast skips the list until this point, so it never saw the
 	// WindowSizeMsg that told the others how wide they are: an unsized

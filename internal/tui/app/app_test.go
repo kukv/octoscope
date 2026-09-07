@@ -176,9 +176,26 @@ func isQuit(cmd tea.Cmd) bool {
 	return ok
 }
 
-func TestStartsOnTheWorkTab(t *testing.T) {
-	if m := newTestModel(Options{HasRepo: true}); m.tab != tabWork {
-		t.Errorf("tab: got %v, want tabWork", m.tab)
+// TestTheFirstTabFollowsTheFlag covers both halves of the rule: --repo says
+// which repository the user came for, so they land on it; without the flag
+// there is no repository yet to land on.
+func TestTheFirstTabFollowsTheFlag(t *testing.T) {
+	if m := New(&fakeSource{}, Options{HasRepo: true}); m.tab != tabRepos {
+		t.Errorf("with --repo: tab = %d, want tabRepos", m.tab)
+	}
+	if m := New(&fakeSource{}, Options{HasRepo: false}); m.tab != tabWork {
+		t.Errorf("without --repo: tab = %d, want tabWork", m.tab)
+	}
+}
+
+// TestAResolvedRepositoryDoesNotMoveTheUser is the other half: the working
+// directory's repository is answered seconds after the board is already on
+// screen, and swapping the tab under the user then is not a courtesy.
+func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
+	m := newTestModel(Options{HasRepo: false})
+	next, _ := m.Update(repoResolvedMsg{found: true})
+	if got := next.(Model); got.tab != tabWork {
+		t.Errorf("tab = %d after the repository was resolved, want tabWork", got.tab)
 	}
 }
 
@@ -733,7 +750,7 @@ func TestKeysReachTheTabUnderneath(t *testing.T) {
 	src := &fakeSource{work: gh.Work{
 		gh.SectionReviewRequested: {{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "first"}},
 	}}
-	m := New(src, Options{HasRepo: true})
+	m := New(src, Options{}) // no --repo: the board is the first tab
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, next.(Model), cmd)
 
@@ -760,7 +777,7 @@ func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 		},
 		pr: gh.PR{Number: 41, Title: "add the work board", State: gh.StateOpen},
 	}
-	m := New(src, Options{HasRepo: true})
+	m := New(src, Options{}) // no --repo: the board is the first tab
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, next.(Model), cmd)
 
