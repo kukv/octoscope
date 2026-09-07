@@ -14,6 +14,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"
 	"github.com/kukv/octoscope/internal/tui/icon"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // version is set by GoReleaser via -ldflags at release build time.
@@ -49,7 +50,8 @@ func main() {
 	// not here: answering it costs a gh subprocess, and waiting for one before
 	// the first frame left the terminal blank for as long as it took.
 	client := cli.New(dir, *repoFlag)
-	p := tea.NewProgram(app.New(client, app.Options{HasRepo: *repoFlag != ""}))
+	uc := usecase.New(client)
+	p := tea.NewProgram(app.New(uc, app.Options{HasRepo: *repoFlag != ""}))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

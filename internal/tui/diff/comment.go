@@ -5,6 +5,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 type (
@@ -12,7 +13,7 @@ type (
 	// Update can set m.review.PendingID synchronously, before the refetch
 	// it also triggers comes back. The refetch is asynchronous; without this
 	// field, a second c sent before it lands would still see PendingID
-	// empty and call StartReview again, leaving two pending reviews open on
+	// empty and start a second review, leaving two pending reviews open on
 	// the pull request.
 	commentPostedMsg struct {
 		ref      gh.ItemRef
@@ -69,9 +70,7 @@ func (m Model) startComposing() Model {
 }
 
 // post sends the composed comment, against the target startComposing
-// captured -- not whatever row the cursor now sits on. The review is started
-// here rather than when the view opens: a diff the user only reads must not
-// leave an empty pending review behind on the pull request.
+// captured -- not whatever row the cursor now sits on.
 func (m Model) post() (Model, tea.Cmd) {
 	body := m.textarea.Value()
 	if body == "" {
@@ -80,22 +79,20 @@ func (m Model) post() (Model, tea.Cmd) {
 	comment := m.target
 	comment.Body = body
 
-	src, ref, pullRequestID, reviewID := m.src, m.ref, m.review.PullRequestID, m.review.PendingID
+	src, ref := m.src, m.ref
+	target := usecase.ReviewTarget{
+		PullRequestID: m.review.PullRequestID,
+		PendingID:     m.review.PendingID,
+	}
 	m.composing = false
 	m.posting = true
 	m.postErr = ""
 	return m, func() tea.Msg {
-		if reviewID == "" {
-			id, err := src.StartReview(pullRequestID)
-			if err != nil {
-				return commentErrorMsg{ref: ref, err: err}
-			}
-			reviewID = id
-		}
-		if err := src.AddReviewThread(reviewID, comment); err != nil {
+		id, err := src.PostLineComment(target, comment)
+		if err != nil {
 			return commentErrorMsg{ref: ref, err: err}
 		}
-		return commentPostedMsg{ref: ref, reviewID: reviewID}
+		return commentPostedMsg{ref: ref, reviewID: id}
 	}
 }
 

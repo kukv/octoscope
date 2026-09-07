@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -315,6 +318,90 @@ func TestTheQueryCarriesEveryAliasWeReadBack(t *testing.T) {
 	for _, s := range workSearches {
 		if !strings.Contains(workQuery, s.alias+": search(") {
 			t.Errorf("the query has no search aliased %q", s.alias)
+		}
+	}
+}
+
+// GitHub caps a labels connection's first at 100; asking for less silently
+// drops labels past that count.
+func TestWorkQueryAsksForAsManyLabelsAsGitHubAllows(t *testing.T) {
+	t.Parallel()
+
+	if strings.Contains(workQuery, "labels(first: 10)") {
+		t.Error("work.graphql still asks for 10 labels; GitHub allows 100")
+	}
+	if n := strings.Count(workQuery, "labels(first: 100)"); n != 2 {
+		t.Errorf("labels(first: 100) appears %d times, want 2 (PullRequest and Issue)", n)
+	}
+}
+
+// 101 is refused outright with EXCESSIVE_PAGINATION, failing the whole
+// document.
+func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
+	t.Parallel()
+
+	docs := map[string]string{
+		"work.graphql":   workQuery,
+		"review.graphql": reviewContextQuery,
+	}
+	re := regexp.MustCompile(`first:\s*(\d+)`)
+	for name, doc := range docs {
+		for _, m := range re.FindAllStringSubmatch(doc, -1) {
+			n, err := strconv.Atoi(m[1])
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if n > 100 {
+				t.Errorf("%s: %s exceeds GitHub's cap of 100", name, m[0])
+			}
+		}
+	}
+}
+
+// A recording is the only way to know the four aliases the query declares
+// still match the keys the answer carries.
+func TestListWorkParsesARecordedResponse(t *testing.T) {
+	raw := readTestdata(t, "work.json")
+
+	var doc struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatalf("unmarshal recording: %v", err)
+	}
+	wantAliases := []string{"assigned", "mentioned", "reviewRequested", "yourPRs"}
+	gotAliases := make([]string, 0, len(doc.Data))
+	for k := range doc.Data {
+		gotAliases = append(gotAliases, k)
+	}
+	slices.Sort(gotAliases)
+	if !slices.Equal(gotAliases, wantAliases) {
+		t.Errorf("recorded aliases = %v, want %v", gotAliases, wantAliases)
+	}
+
+	c, _ := newTestClient(raw, nil)
+	w, err := c.ListWork(t.Context())
+	if err != nil {
+		t.Fatalf("ListWork: %v", err)
+	}
+	total := 0
+	for _, section := range gh.WorkSections() {
+		total += len(w[section])
+	}
+	if total == 0 {
+		t.Fatal("no work items parsed out of the recording")
+	}
+	for _, section := range gh.WorkSections() {
+		for _, item := range w[section] {
+			if item.Ref.Repo == "" {
+				t.Errorf("section %d: %q has no repo; the card cannot be opened", section, item.Title)
+			}
+			if item.Ref.Number == 0 {
+				t.Errorf("section %d: %q has no number", section, item.Title)
+			}
+			if item.URL == "" {
+				t.Errorf("section %d: %q has no url", section, item.Title)
+			}
 		}
 	}
 }

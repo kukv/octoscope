@@ -13,6 +13,17 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 )
 
+const (
+	// A single diff line can exceed bufio's default 64KiB limit (a minified
+	// bundle is one line), and the scanner then stops mid-file.
+	scanBufInit = 64 * 1024
+	scanBufMax  = 8 * 1024 * 1024
+
+	// Everything after the second @@ in `@@ -12,7 +12,9 @@ func Walk(...)` is
+	// git's enclosing-function heuristic, which can itself start with + or -.
+	hunkHeaderFields = 3
+)
+
 // PRDiff returns the pull request's diff, one entry per file.
 //
 // --color never is passed explicitly: gh colours its output when it thinks a
@@ -142,7 +153,7 @@ func fileStatusFromAPI(s string) gh.FileStatus {
 func parseBarePatch(patch string) []gh.Hunk {
 	p := &diffParser{file: &gh.FileDiff{}}
 	s := bufio.NewScanner(strings.NewReader(patch))
-	s.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	s.Buffer(make([]byte, 0, scanBufInit), scanBufMax)
 	for s.Scan() {
 		p.line(s.Text())
 	}
@@ -157,10 +168,7 @@ func parseBarePatch(patch string) []gh.Hunk {
 func parseDiff(b []byte) []gh.FileDiff {
 	p := &diffParser{}
 	s := bufio.NewScanner(bytes.NewReader(b))
-	// A single diff line can be far longer than bufio's default 64KiB limit
-	// (a minified bundle is one line), and a scanner that gives up mid-file
-	// would drop every file after it.
-	s.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	s.Buffer(make([]byte, 0, scanBufInit), scanBufMax)
 	for s.Scan() {
 		p.line(s.Text())
 	}
@@ -267,7 +275,7 @@ func pathFromGitHeader(line string) string {
 // too, so fields past the second `@@` must not be scanned for a range.
 func hunkStarts(header string) (oldNo, newNo int) {
 	fields := strings.Fields(header)
-	for _, f := range fields[:min(3, len(fields))] {
+	for _, f := range fields[:min(hunkHeaderFields, len(fields))] {
 		switch {
 		case strings.HasPrefix(f, "-"):
 			oldNo = firstNumber(f[1:])

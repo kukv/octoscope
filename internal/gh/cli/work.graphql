@@ -4,6 +4,9 @@
 #
 # reviewDecision and isDraft are GraphQL-only: REST does not expose them
 # (spec 3.3).
+#
+# search is not paged: GitHub's search connection returns at most 1000
+# results however it is paged, well past what a 50-card column shows anyway.
 query {
   reviewRequested: search(type: ISSUE, first: 50, query: "is:open is:pr review-requested:@me") {
     nodes { ...WorkItem }
@@ -36,7 +39,9 @@ fragment WorkItem on SearchResultItem {
     author {
       login
     }
-    labels(first: 10) {
+    # 100 is GitHub's cap for a connection, and an item can carry any number
+    # of labels.
+    labels(first: 100) {
       nodes { ...LabelFields }
     }
     repository {
@@ -63,7 +68,9 @@ fragment WorkItem on SearchResultItem {
     author {
       login
     }
-    labels(first: 10) {
+    # 100 is GitHub's cap for a connection, and an item can carry any number
+    # of labels.
+    labels(first: 100) {
       nodes { ...LabelFields }
     }
     repository {

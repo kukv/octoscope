@@ -84,3 +84,29 @@ func TestParseReviewDecision(t *testing.T) {
 		}
 	}
 }
+
+// A section added without widening Work panics at run time with no compiler
+// error. The list below is written by hand (.claude/rules/testing.md).
+func TestEverySectionConstantIsASlotInWork(t *testing.T) {
+	t.Parallel()
+
+	sections := []gh.WorkSection{
+		gh.SectionReviewRequested,
+		gh.SectionYourPRs,
+		gh.SectionAssigned,
+		gh.SectionMentioned,
+	}
+
+	var w gh.Work
+	if len(w) != len(sections) {
+		t.Fatalf("Work has %d slots, %d sections are declared", len(w), len(sections))
+	}
+	if got := len(gh.WorkSections()); got != len(sections) {
+		t.Errorf("WorkSections() returns %d, %d sections are declared", got, len(sections))
+	}
+	for _, s := range sections {
+		if int(s) < 0 || int(s) >= len(w) {
+			t.Errorf("section %d is not an index into Work (len %d)", s, len(w))
+		}
+	}
+}

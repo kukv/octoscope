@@ -1,0 +1,83 @@
+[
+  {
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8f8cA",
+        "name": "Priority: Medium",
+        "description": "優先度：中",
+        "color": "ffd700"
+      },
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8f-WA",
+        "name": "Kind: Enhancement",
+        "description": "機能強化",
+        "color": "89058a"
+      }
+    ],
+    "number": 54,
+    "state": "CLOSED",
+    "title": "Workタブのカードのタイトルを3段表記にしたい",
+    "updatedAt": "2026-09-06T12:10:10Z",
+    "url": "https://github.com/kukv/octoscope/issues/54"
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "labels": [],
+    "number": 50,
+    "state": "OPEN",
+    "title": "Moving from a Herdr plugin to a standalone CLI (octoscope)",
+    "updatedAt": "2026-09-05T18:19:11Z",
+    "url": "https://github.com/kukv/octoscope/issues/50"
+  },
+  {
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "labels": [],
+    "number": 14,
+    "state": "OPEN",
+    "title": "Dependency Dashboard",
+    "updatedAt": "2026-09-06T13:39:59Z",
+    "url": "https://github.com/kukv/octoscope/issues/14"
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "labels": [],
+    "number": 4,
+    "state": "CLOSED",
+    "title": "テストCloseIssue",
+    "updatedAt": "2026-07-11T17:58:44Z",
+    "url": "https://github.com/kukv/octoscope/issues/4"
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "labels": [],
+    "number": 3,
+    "state": "CLOSED",
+    "title": "テストOpenIssue",
+    "updatedAt": "2026-07-22T15:16:34Z",
+    "url": "https://github.com/kukv/octoscope/issues/3"
+  }
+]

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // fakeSource implements Source and records calls.
@@ -35,17 +36,39 @@ type fakeSource struct {
 	reviewCtx gh.ReviewContext
 	reviewErr error
 
-	submitCalls    []string // "event:body"
-	submitNewCalls []string
-	submitErr      error
+	submitCalls []string // "<pending id>:<body>"
+	submitErr   error
 }
 
-func (f *fakeSource) GetPR(ctx context.Context, repo string, n int) (gh.PR, error) {
-	return f.pr, f.err
+func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
+	if ref.Kind == gh.ItemPR {
+		return prItem(f.pr), f.err
+	}
+	return issueItem(f.issue), f.err
 }
 
-func (f *fakeSource) GetIssue(ctx context.Context, repo string, n int) (gh.Issue, error) {
-	return f.issue, f.err
+func prItem(pr gh.PR) usecase.Item {
+	return usecase.Item{
+		Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
+		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
+		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
+		PR: &pr,
+	}
+}
+
+func issueItem(issue gh.Issue) usecase.Item {
+	return usecase.Item{
+		Kind: gh.ItemIssue, Number: issue.Number, Title: issue.Title, Author: issue.Author,
+		State: issue.State, Body: issue.Body, URL: issue.URL, Labels: issue.Labels,
+		Assignees: issue.Assignees, Comments: issue.Comments, UpdatedAt: issue.UpdatedAt,
+	}
+}
+
+func kindName(ref gh.ItemRef) string {
+	if ref.Kind == gh.ItemPR {
+		return "pr"
+	}
+	return "issue"
 }
 
 func (f *fakeSource) OpenWeb(url string) error {
@@ -53,33 +76,17 @@ func (f *fakeSource) OpenWeb(url string) error {
 	return nil
 }
 
-func (f *fakeSource) AddPRComment(repo string, n int, body string) error {
-	f.commentCalls = append(f.commentCalls, "pr:"+repo+":"+itoa(n)+":"+body)
+func (f *fakeSource) AddComment(ref gh.ItemRef, body string) error {
+	f.commentCalls = append(f.commentCalls, kindName(ref)+":"+ref.Repo+":"+itoa(ref.Number)+":"+body)
 	return f.commentErr
 }
 
-func (f *fakeSource) AddIssueComment(repo string, n int, body string) error {
-	f.commentCalls = append(f.commentCalls, "issue:"+repo+":"+itoa(n)+":"+body)
-	return f.commentErr
-}
-
-func (f *fakeSource) ClosePR(repo string, n int) error {
-	f.stateCalls = append(f.stateCalls, "close:pr:"+repo+":"+itoa(n))
-	return f.stateErr
-}
-
-func (f *fakeSource) ReopenPR(repo string, n int) error {
-	f.stateCalls = append(f.stateCalls, "reopen:pr:"+repo+":"+itoa(n))
-	return f.stateErr
-}
-
-func (f *fakeSource) CloseIssue(repo string, n int) error {
-	f.stateCalls = append(f.stateCalls, "close:issue:"+repo+":"+itoa(n))
-	return f.stateErr
-}
-
-func (f *fakeSource) ReopenIssue(repo string, n int) error {
-	f.stateCalls = append(f.stateCalls, "reopen:issue:"+repo+":"+itoa(n))
+func (f *fakeSource) SetState(ref gh.ItemRef, closing bool) error {
+	action := "reopen"
+	if closing {
+		action = "close"
+	}
+	f.stateCalls = append(f.stateCalls, action+":"+kindName(ref)+":"+ref.Repo+":"+itoa(ref.Number))
 	return f.stateErr
 }
 
@@ -91,23 +98,13 @@ func (f *fakeSource) ListAssignees(ctx context.Context, repo string) ([]string, 
 	return f.users, f.usersErr
 }
 
-func (f *fakeSource) EditPRLabels(repo string, n int, add, remove []string) error {
-	f.editCalls = append(f.editCalls, "pr:labels:"+repo+":"+itoa(n)+editSuffix(add, remove))
+func (f *fakeSource) EditLabels(ref gh.ItemRef, add, remove []string) error {
+	f.editCalls = append(f.editCalls, kindName(ref)+":labels:"+ref.Repo+":"+itoa(ref.Number)+editSuffix(add, remove))
 	return f.editErr
 }
 
-func (f *fakeSource) EditIssueLabels(repo string, n int, add, remove []string) error {
-	f.editCalls = append(f.editCalls, "issue:labels:"+repo+":"+itoa(n)+editSuffix(add, remove))
-	return f.editErr
-}
-
-func (f *fakeSource) EditPRAssignees(repo string, n int, add, remove []string) error {
-	f.editCalls = append(f.editCalls, "pr:assignees:"+repo+":"+itoa(n)+editSuffix(add, remove))
-	return f.editErr
-}
-
-func (f *fakeSource) EditIssueAssignees(repo string, n int, add, remove []string) error {
-	f.editCalls = append(f.editCalls, "issue:assignees:"+repo+":"+itoa(n)+editSuffix(add, remove))
+func (f *fakeSource) EditAssignees(ref gh.ItemRef, add, remove []string) error {
+	f.editCalls = append(f.editCalls, kindName(ref)+":assignees:"+ref.Repo+":"+itoa(ref.Number)+editSuffix(add, remove))
 	return f.editErr
 }
 
@@ -115,13 +112,8 @@ func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (g
 	return f.reviewCtx, f.reviewErr
 }
 
-func (f *fakeSource) SubmitReview(reviewID string, event gh.ReviewEvent, body string) error {
-	f.submitCalls = append(f.submitCalls, reviewID+":"+body)
-	return f.submitErr
-}
-
-func (f *fakeSource) SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error {
-	f.submitNewCalls = append(f.submitNewCalls, pullRequestID+":"+body)
+func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error {
+	f.submitCalls = append(f.submitCalls, t.PendingID+":"+body)
 	return f.submitErr
 }
 
@@ -177,8 +169,8 @@ func initFetch(t *testing.T, m Model) tea.Cmd {
 func TestInitStartsTheFetch(t *testing.T) {
 	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
 	m := New(f, prRef())
-	if _, ok := initFetch(t, m)().(prMsg); !ok {
-		t.Errorf("the batched fetch did not produce a prMsg")
+	if _, ok := initFetch(t, m)().(itemMsg); !ok {
+		t.Errorf("the batched fetch did not produce an itemMsg")
 	}
 }
 
@@ -406,23 +398,6 @@ func TestComposeViewShowsPostError(t *testing.T) {
 	m, _ = m.Update(cmd())
 	if !strings.Contains(m.View(), "403") {
 		t.Errorf("compose view missing error text:\n%s", m.View())
-	}
-}
-
-func TestComposeSubmitOnIssueRoutesToIssueComment(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
-	m := loaded(f, issueRef())
-	m, _ = m.Update(key("c"))
-	m.textarea.SetValue("issue comment")
-	m, cmd := m.Update(key("ctrl+s"))
-	if !m.posting || cmd == nil {
-		t.Fatalf("posting = %v, cmd = %v; want posting with post cmd", m.posting, cmd)
-	}
-	if _, ok := cmd().(commentPostedMsg); !ok {
-		t.Fatalf("msg = %T, want commentPostedMsg", cmd())
-	}
-	if len(f.commentCalls) != 1 || f.commentCalls[0] != "issue::5:issue comment" {
-		t.Errorf("commentCalls = %v, want [issue::5:issue comment]", f.commentCalls)
 	}
 }
 
@@ -676,8 +651,8 @@ func TestSubmitSuccessRefetches(t *testing.T) {
 	if m.submitting || !m.loading || cmd == nil {
 		t.Errorf("submitting = %v, loading = %v, cmd = %v; want false, true, non-nil", m.submitting, m.loading, cmd)
 	}
-	if len(f.submitNewCalls) != 1 {
-		t.Errorf("submitNewCalls = %v, want one submission", f.submitNewCalls)
+	if len(f.submitCalls) != 1 {
+		t.Errorf("submitCalls = %v, want one submission", f.submitCalls)
 	}
 }
 
@@ -712,28 +687,12 @@ func TestActionErrClearedOnReload(t *testing.T) {
 	if !m.loading || cmd == nil {
 		t.Fatalf("loading = %v, cmd = %v; want loading with fetch cmd", m.loading, cmd)
 	}
-	m, _ = m.Update(cmd()) // prMsg
+	m, _ = m.Update(cmd())
 	if m.actionErr != "" {
 		t.Errorf("actionErr = %q after reload, want empty", m.actionErr)
 	}
 	if strings.Contains(m.View(), "403") {
 		t.Errorf("view still shows stale error after reload:\n%s", m.View())
-	}
-}
-
-func TestConfirmSubmitOnIssueRoutesToClose(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue", State: gh.StateOpen}}
-	m := loaded(f, issueRef())
-	m, _ = m.Update(key("x"))
-	_, cmd := m.Update(key("y"))
-	if cmd == nil {
-		t.Fatal("cmd = nil, want state cmd")
-	}
-	if _, ok := cmd().(stateChangedMsg); !ok {
-		t.Fatalf("msg = %T, want stateChangedMsg", cmd())
-	}
-	if len(f.stateCalls) != 1 || f.stateCalls[0] != "close:issue::5" {
-		t.Errorf("stateCalls = %v, want [close:issue::5]", f.stateCalls)
 	}
 }
 
@@ -830,7 +789,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	other := gh.ItemRef{Kind: gh.ItemPR, Number: 99}
 	m := New(&fakeSource{}, prRef())
 
-	next, _ := m.Update(prMsg{other, gh.PR{Number: 99, Title: "the previous one"}})
+	next, _ := m.Update(itemMsg{other, prItem(gh.PR{Number: 99, Title: "the previous one"})})
 	if !next.loading {
 		t.Error("an answer for another item ended the wait for this one")
 	}
@@ -839,7 +798,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	}
 
 	issue := New(&fakeSource{}, issueRef())
-	next, _ = issue.Update(issueMsg{other, gh.Issue{Number: 99, Title: "the previous one"}})
+	next, _ = issue.Update(itemMsg{other, issueItem(gh.Issue{Number: 99, Title: "the previous one"})})
 	if !next.loading || next.title != "" {
 		t.Errorf("an issue answer for another item was accepted: %q", next.title)
 	}

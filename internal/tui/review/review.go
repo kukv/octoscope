@@ -12,12 +12,12 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
-// Source is what submitting needs from the GitHub layer.
+// Source is what submitting needs.
 type Source interface {
-	SubmitReview(reviewID string, event gh.ReviewEvent, body string) error
-	SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error
+	SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error
 }
 
 // Target names what the popup submits against: the pull request it belongs
@@ -126,27 +126,16 @@ func nextEvent(e gh.ReviewEvent) gh.ReviewEvent {
 	}
 }
 
-// submit sends through SubmitReview when a review is already waiting, or
-// SubmitNewReview when nothing is. Which one is decided here, from the
-// target, not by whoever opened the popup: approving a diff the viewer had
-// nothing to say about is the commonest review there is, and going through
-// SubmitReview first would leave an empty pending review behind if the
-// submission then failed.
 func (m Model) submit() (Model, tea.Cmd) {
-	body := m.textarea.Value()
-	event := m.event
 	src := m.src
-	reviewID := m.target.PendingID
-	pullRequestID := m.target.PullRequestID
+	target := usecase.ReviewTarget{
+		PullRequestID: m.target.PullRequestID,
+		PendingID:     m.target.PendingID,
+	}
+	event, body := m.event, m.textarea.Value()
 	m.sending = true
 	return m, func() tea.Msg {
-		var err error
-		if reviewID != "" {
-			err = src.SubmitReview(reviewID, event, body)
-		} else {
-			err = src.SubmitNewReview(pullRequestID, event, body)
-		}
-		if err != nil {
+		if err := src.SubmitReview(target, event, body); err != nil {
 			return ErrorMsg{Err: err}
 		}
 		return SubmittedMsg{}

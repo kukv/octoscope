@@ -1,0 +1,2899 @@
+[
+  {
+    "additions": 401,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 23,
+    "headRefName": "fix/rules-to-match-spec",
+    "isDraft": false,
+    "labels": [],
+    "number": 58,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T18:13:21Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34050991578/job/101534464157",
+        "name": "lint",
+        "startedAt": "2026-09-06T18:12:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T18:13:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34050991261/job/101534463070",
+        "name": "sca",
+        "startedAt": "2026-09-06T18:12:49Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T18:14:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34050991578/job/101534464233",
+        "name": "test",
+        "startedAt": "2026-09-06T18:12:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "fix: 実装より先に rules を設計書に合わせる + PreToolUse ゲートが一度も発火していなかったのを直す",
+    "updatedAt": "2026-09-06T18:14:14Z",
+    "url": "https://github.com/kukv/octoscope/pull/58"
+  },
+  {
+    "additions": 2524,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 6,
+    "headRefName": "worktree-eventual-singing-gem",
+    "isDraft": false,
+    "labels": [],
+    "number": 57,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T17:44:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34049487352/job/101530384289",
+        "name": "lint",
+        "startedAt": "2026-09-06T17:43:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T17:43:39Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34049487306/job/101530384084",
+        "name": "sca",
+        "startedAt": "2026-09-06T17:43:25Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T17:44:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34049487352/job/101530384115",
+        "name": "test",
+        "startedAt": "2026-09-06T17:43:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "chore: rules を paths で読み込ませ、spec を飛ばすセッションを検知する + Phase 2 立て直し Part 1 の実装計画",
+    "updatedAt": "2026-09-06T17:44:54Z",
+    "url": "https://github.com/kukv/octoscope/pull/57"
+  },
+  {
+    "additions": 2570,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 163,
+    "headRefName": "fix/phase2-blocking-bugs",
+    "isDraft": false,
+    "labels": [],
+    "number": 56,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T15:57:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34043886980/job/101515369699",
+        "name": "lint",
+        "startedAt": "2026-09-06T15:56:53Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T15:57:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34043887036/job/101515370019",
+        "name": "sca",
+        "startedAt": "2026-09-06T15:56:53Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T15:58:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34043886980/job/101515369826",
+        "name": "test",
+        "startedAt": "2026-09-06T15:56:53Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "fix: Phase 2 で実機が動かなかった 3 件を直す（レビュー系 GraphQL / 30 件打ち切り / ブラウザ起動）",
+    "updatedAt": "2026-09-06T15:59:11Z",
+    "url": "https://github.com/kukv/octoscope/pull/56"
+  },
+  {
+    "additions": 12436,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 151,
+    "headRefName": "feat/phase2-review",
+    "isDraft": false,
+    "labels": [],
+    "number": 55,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T13:39:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34036727268/job/101496039769",
+        "name": "lint",
+        "startedAt": "2026-09-06T13:38:53Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T13:39:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34036727297/job/101496039866",
+        "name": "sca",
+        "startedAt": "2026-09-06T13:38:53Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T13:40:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34036727268/job/101496039896",
+        "name": "test",
+        "startedAt": "2026-09-06T13:38:53Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "feat: PR のレビューを octoscope の中で完結させる（Phase 2）",
+    "updatedAt": "2026-09-06T13:40:04Z",
+    "url": "https://github.com/kukv/octoscope/pull/55"
+  },
+  {
+    "additions": 5103,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 523,
+    "headRefName": "feat/phase1-followups",
+    "isDraft": false,
+    "labels": [],
+    "number": 53,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T05:20:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34013707358/job/101433781307",
+        "name": "lint",
+        "startedAt": "2026-09-06T05:19:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T05:20:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34013707344/job/101433781204",
+        "name": "sca",
+        "startedAt": "2026-09-06T05:19:50Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-06T05:20:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/34013707358/job/101433781351",
+        "name": "test",
+        "startedAt": "2026-09-06T05:19:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "feat: Phase 1 の積み残しを片付け、画面を Artifact に合わせる",
+    "updatedAt": "2026-09-06T05:24:20Z",
+    "url": "https://github.com/kukv/octoscope/pull/53"
+  },
+  {
+    "additions": 137,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 0,
+    "headRefName": "docs/phase1-followups",
+    "isDraft": false,
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8gFBg",
+        "name": "Kind: Documentation",
+        "description": "ドキュメント追加・修正",
+        "color": "40e0d0"
+      }
+    ],
+    "number": 52,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:39:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33993662751/job/101380207813",
+        "name": "lint",
+        "startedAt": "2026-09-05T21:39:10Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:39:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33993662752/job/101380207126",
+        "name": "sca",
+        "startedAt": "2026-09-05T21:39:09Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:40:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33993662751/job/101380207900",
+        "name": "test",
+        "startedAt": "2026-09-05T21:39:10Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "docs: Phase 1 の積み残しを記録する",
+    "updatedAt": "2026-09-05T21:40:25Z",
+    "url": "https://github.com/kukv/octoscope/pull/52"
+  },
+  {
+    "additions": 5615,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 2562,
+    "headRefName": "feat/octoscope-phase1-work-tab",
+    "isDraft": false,
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8f_uQ",
+        "name": "Kind: Feature",
+        "description": "新機能",
+        "color": "00bfff"
+      }
+    ],
+    "number": 51,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:20:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33992756037/job/101377786094",
+        "name": "lint",
+        "startedAt": "2026-09-05T21:20:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:20:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33992755991/job/101377785766",
+        "name": "sca",
+        "startedAt": "2026-09-05T21:20:25Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:21:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33992756037/job/101377785832",
+        "name": "test",
+        "startedAt": "2026-09-05T21:20:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "feat: add the Work board and the tabbed root model (Phase 1)",
+    "updatedAt": "2026-09-05T21:21:40Z",
+    "url": "https://github.com/kukv/octoscope/pull/51"
+  },
+  {
+    "additions": 240,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 208,
+    "headRefName": "refactor/octoscope-phase1-gh-layer",
+    "isDraft": false,
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8gAkA",
+        "name": "Kind: Refactoring",
+        "description": "内部的なリファクタリング(APIの破壊的変更を伴わない範囲)",
+        "color": "fa8072"
+      }
+    ],
+    "number": 49,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:08:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33992100321/job/101376037607",
+        "name": "lint",
+        "startedAt": "2026-09-05T21:07:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:07:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33992100323/job/101376037791",
+        "name": "sca",
+        "startedAt": "2026-09-05T21:07:24Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T21:08:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33992100321/job/101376037703",
+        "name": "test",
+        "startedAt": "2026-09-05T21:07:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "refactor: split the GitHub layer and narrow the UI interfaces",
+    "updatedAt": "2026-09-05T21:16:27Z",
+    "url": "https://github.com/kukv/octoscope/pull/49"
+  },
+  {
+    "additions": 70,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 4,
+    "headRefName": "docs/install-instructions",
+    "isDraft": false,
+    "labels": [],
+    "number": 48,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T18:11:34Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33983250492/job/101352130121",
+        "name": "lint",
+        "startedAt": "2026-09-05T18:11:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T18:11:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33983250416/job/101352129750",
+        "name": "sca",
+        "startedAt": "2026-09-05T18:11:02Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T18:12:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33983250492/job/101352129766",
+        "name": "test",
+        "startedAt": "2026-09-05T18:11:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "docs: expand install instructions with mise and manual download",
+    "updatedAt": "2026-09-05T18:13:02Z",
+    "url": "https://github.com/kukv/octoscope/pull/48"
+  },
+  {
+    "additions": 193,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 10,
+    "headRefName": "feat/octoscope-phase1-i18n",
+    "isDraft": false,
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8f-WA",
+        "name": "Kind: Enhancement",
+        "description": "機能強化",
+        "color": "89058a"
+      },
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8gCvw",
+        "name": "Kind: Tests",
+        "description": "テスト追加・修正",
+        "color": "008000"
+      }
+    ],
+    "number": 47,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T18:05:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33982955272/job/101351337387",
+        "name": "lint",
+        "startedAt": "2026-09-05T18:05:21Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T18:05:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33982955283/job/101351337638",
+        "name": "sca",
+        "startedAt": "2026-09-05T18:05:21Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T18:06:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33982955272/job/101351337559",
+        "name": "test",
+        "startedAt": "2026-09-05T18:05:21Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "feat: guard against mistyped message IDs and localize date formats",
+    "updatedAt": "2026-09-05T21:15:33Z",
+    "url": "https://github.com/kukv/octoscope/pull/47"
+  },
+  {
+    "additions": 3009,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 0,
+    "headRefName": "docs/octoscope-phase1-plan",
+    "isDraft": false,
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8gFBg",
+        "name": "Kind: Documentation",
+        "description": "ドキュメント追加・修正",
+        "color": "40e0d0"
+      }
+    ],
+    "number": 46,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:43:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33981811097/job/101348247298",
+        "name": "lint",
+        "startedAt": "2026-09-05T17:42:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:43:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33981811117/job/101348247340",
+        "name": "sca",
+        "startedAt": "2026-09-05T17:42:50Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:43:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33981811097/job/101348247179",
+        "name": "test",
+        "startedAt": "2026-09-05T17:42:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "docs: plan the octoscope Phase 1 implementation (Work board and GraphQL)",
+    "updatedAt": "2026-09-05T17:59:26Z",
+    "url": "https://github.com/kukv/octoscope/pull/46"
+  },
+  {
+    "additions": 3,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 5,
+    "headRefName": "renovate/go.yaml.in-yaml-v3-3.0.x",
+    "isDraft": false,
+    "labels": [
+      {
+        "id": "LA_kwDOTVXF-M8AAAACz8f7tg",
+        "name": "Kind: Dependencies",
+        "description": "依存ライブラリのアップデート",
+        "color": "ededed"
+      }
+    ],
+    "number": 45,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:17:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33980468549/job/101344667817",
+        "name": "lint",
+        "startedAt": "2026-09-05T17:16:57Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:17:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33980468544/job/101344667700",
+        "name": "sca",
+        "startedAt": "2026-09-05T17:16:57Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:17:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33980468549/job/101344667708",
+        "name": "test",
+        "startedAt": "2026-09-05T17:16:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-09-05T17:16:53Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module go.yaml.in/yaml/v3 to v3.0.5",
+    "updatedAt": "2026-09-05T17:34:24Z",
+    "url": "https://github.com/kukv/octoscope/pull/45"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "chore/goreleaser-action-node24",
+    "isDraft": false,
+    "labels": [],
+    "number": 44,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:10:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33980096434/job/101343677165",
+        "name": "lint",
+        "startedAt": "2026-09-05T17:10:06Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:10:21Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33980096456/job/101343677154",
+        "name": "sca",
+        "startedAt": "2026-09-05T17:10:05Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T17:11:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33980096434/job/101343677031",
+        "name": "test",
+        "startedAt": "2026-09-05T17:10:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "ci: update goreleaser-action to v7.2.3 for Node.js 24",
+    "updatedAt": "2026-09-05T17:11:19Z",
+    "url": "https://github.com/kukv/octoscope/pull/44"
+  },
+  {
+    "additions": 928,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 411,
+    "headRefName": "feat/octoscope-phase0",
+    "isDraft": false,
+    "labels": [],
+    "number": 43,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T16:48:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33978992461/job/101340657899",
+        "name": "lint",
+        "startedAt": "2026-09-05T16:48:22Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T16:48:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33978992463/job/101340658263",
+        "name": "sca",
+        "startedAt": "2026-09-05T16:48:23Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T16:49:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33978992461/job/101340658045",
+        "name": "test",
+        "startedAt": "2026-09-05T16:48:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "feat: rebuild as the standalone octoscope CLI (Phase 0)",
+    "updatedAt": "2026-09-05T17:01:02Z",
+    "url": "https://github.com/kukv/octoscope/pull/43"
+  },
+  {
+    "additions": 2429,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 5798,
+    "headRefName": "docs/octoscope-redesign-plan",
+    "isDraft": false,
+    "labels": [],
+    "number": 42,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T16:35:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33978322132/job/101338862124",
+        "name": "lint",
+        "startedAt": "2026-09-05T16:35:08Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T16:35:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33978322117/job/101338862043",
+        "name": "sca",
+        "startedAt": "2026-09-05T16:35:09Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-05T16:36:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33978322132/job/101338861963",
+        "name": "test",
+        "startedAt": "2026-09-05T16:35:09Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "docs: plan the octoscope standalone redesign and add project rules",
+    "updatedAt": "2026-09-05T16:55:10Z",
+    "url": "https://github.com/kukv/octoscope/pull/42"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/golangci-golangci-lint-2.13.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 41,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-04T18:41:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33907177103/job/101134748015",
+        "name": "lint",
+        "startedAt": "2026-09-04T18:40:41Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-04T18:40:55Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33907177046/job/101134747637",
+        "name": "sca",
+        "startedAt": "2026-09-04T18:40:41Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-04T18:41:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33907177103/job/101134747875",
+        "name": "test",
+        "startedAt": "2026-09-04T18:40:41Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-09-04T18:40:37Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update dependency golangci/golangci-lint to v2.13.2",
+    "updatedAt": "2026-09-04T22:04:16Z",
+    "url": "https://github.com/kukv/octoscope/pull/41"
+  },
+  {
+    "additions": 6,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 6,
+    "headRefName": "renovate/charm.land-bubbles-v2-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 40,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-04T22:05:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33923958393/job/101188236876",
+        "name": "lint",
+        "startedAt": "2026-09-04T22:04:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-04T22:05:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33923958435/job/101188237570",
+        "name": "sca",
+        "startedAt": "2026-09-04T22:04:52Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-04T22:05:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33923958393/job/101188236754",
+        "name": "test",
+        "startedAt": "2026-09-04T22:04:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-09-04T22:04:46Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module charm.land/bubbles/v2 to v2.2.1",
+    "updatedAt": "2026-09-05T01:44:32Z",
+    "url": "https://github.com/kukv/octoscope/pull/40"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/golangci-golangci-lint-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 39,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-29T10:13:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33247285292/job/99086849869",
+        "name": "lint",
+        "startedAt": "2026-08-29T10:12:44Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-29T10:12:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33247285289/job/99086849854",
+        "name": "sca",
+        "startedAt": "2026-08-29T10:12:44Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-29T10:13:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33247285292/job/99086849956",
+        "name": "test",
+        "startedAt": "2026-08-29T10:12:43Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-29T10:12:39Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update dependency golangci/golangci-lint to v2.13.1",
+    "updatedAt": "2026-08-29T13:44:14Z",
+    "url": "https://github.com/kukv/octoscope/pull/39"
+  },
+  {
+    "additions": 3,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 3,
+    "headRefName": "renovate/charm.land-bubbletea-v2-2.0.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 38,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-29T00:43:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33224359683/job/99024918486",
+        "name": "lint",
+        "startedAt": "2026-08-29T00:43:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-29T00:43:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33224359724/job/99024918657",
+        "name": "sca",
+        "startedAt": "2026-08-29T00:43:17Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-29T00:44:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33224359683/job/99024918345",
+        "name": "test",
+        "startedAt": "2026-08-29T00:43:16Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-29T00:43:12Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module charm.land/bubbletea/v2 to v2.0.9",
+    "updatedAt": "2026-08-29T10:12:25Z",
+    "url": "https://github.com/kukv/octoscope/pull/38"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/google-osv-scanner-action-2.5.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 37,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-28T20:46:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33209624414/job/98979353104",
+        "name": "lint",
+        "startedAt": "2026-08-28T20:45:59Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-28T20:46:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33209624385/job/98979352873",
+        "name": "sca",
+        "startedAt": "2026-08-28T20:45:56Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-28T20:46:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33209624414/job/98979352872",
+        "name": "test",
+        "startedAt": "2026-08-28T20:45:57Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-28T20:45:52Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update google/osv-scanner-action action to v2.5.1",
+    "updatedAt": "2026-08-29T00:42:39Z",
+    "url": "https://github.com/kukv/octoscope/pull/37"
+  },
+  {
+    "additions": 3,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 3,
+    "headRefName": "renovate/github.com-charmbracelet-x-ansi-0.11.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 36,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "CLOSED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T18:18:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/32512584353/job/96866900913",
+        "name": "lint",
+        "startedAt": "2026-08-21T18:17:33Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T18:17:55Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/32512584300/job/96866900465",
+        "name": "sca",
+        "startedAt": "2026-08-21T18:17:33Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T18:18:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/32512584353/job/96866900549",
+        "name": "test",
+        "startedAt": "2026-08-21T18:17:33Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-21T18:17:29Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module github.com/charmbracelet/x/ansi to v0.11.8 - autoclosed",
+    "updatedAt": "2026-08-21T22:33:02Z",
+    "url": "https://github.com/kukv/octoscope/pull/36"
+  },
+  {
+    "additions": 18,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 18,
+    "headRefName": "renovate/charm.land-lipgloss-v2-2.0.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 35,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T18:18:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/32512570388/job/96866858301",
+        "name": "lint",
+        "startedAt": "2026-08-21T18:17:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T18:17:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/32512570400/job/96866858371",
+        "name": "sca",
+        "startedAt": "2026-08-21T18:17:24Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T18:18:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/32512570388/job/96866858059",
+        "name": "test",
+        "startedAt": "2026-08-21T18:17:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-21T18:17:19Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module charm.land/lipgloss/v2 to v2.0.6",
+    "updatedAt": "2026-08-21T22:32:52Z",
+    "url": "https://github.com/kukv/octoscope/pull/35"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/google-osv-scanner-action-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 34,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-14T17:10:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/31822744080/job/94839630673",
+        "name": "lint",
+        "startedAt": "2026-08-14T17:10:13Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-14T17:10:34Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/31822744057/job/94839630876",
+        "name": "sca",
+        "startedAt": "2026-08-14T17:10:13Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-14T17:11:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/31822744080/job/94839630449",
+        "name": "test",
+        "startedAt": "2026-08-14T17:10:13Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-14T17:10:08Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update google/osv-scanner-action action to v2.5.0",
+    "updatedAt": "2026-08-15T00:34:21Z",
+    "url": "https://github.com/kukv/octoscope/pull/34"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/k1low-octocov-action-1.5.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 33,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-07T16:51:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/31199506133/job/92935817224",
+        "name": "lint",
+        "startedAt": "2026-08-07T16:50:43Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-07T16:50:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/31199506947/job/92935819977",
+        "name": "sca",
+        "startedAt": "2026-08-07T16:50:45Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-07T16:51:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/31199506133/job/92935817154",
+        "name": "test",
+        "startedAt": "2026-08-07T16:50:44Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-08-07T16:50:39Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update k1low/octocov-action action to v1.5.2",
+    "updatedAt": "2026-08-07T21:25:20Z",
+    "url": "https://github.com/kukv/octoscope/pull/33"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/actions-checkout-7.0.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 32,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-03T16:56:06Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33781520641/job/100736079801",
+        "name": "lint",
+        "startedAt": "2026-09-03T16:55:35Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-03T16:55:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33781520643/job/100736079883",
+        "name": "sca",
+        "startedAt": "2026-09-03T16:55:40Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-03T16:56:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/33781520641/job/100736079378",
+        "name": "test",
+        "startedAt": "2026-09-03T16:55:42Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-09-03T16:55:30Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update actions/checkout action to v7.0.1",
+    "updatedAt": "2026-09-05T13:22:39Z",
+    "url": "https://github.com/kukv/octoscope/pull/32"
+  },
+  {
+    "additions": 0,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 96,
+    "headRefName": "chore/remove-fanout-distributed",
+    "isDraft": false,
+    "labels": [],
+    "number": 31,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-02T14:52:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30753061298/job/91510408906",
+        "name": "lint",
+        "startedAt": "2026-08-02T14:52:09Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-02T14:52:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30753061324/job/91510409079",
+        "name": "sca",
+        "startedAt": "2026-08-02T14:52:09Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-02T14:53:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30753061298/job/91510408892",
+        "name": "test",
+        "startedAt": "2026-08-02T14:52:09Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "chore: remove repository-fanout distributed files (project retired)",
+    "updatedAt": "2026-08-02T15:17:49Z",
+    "url": "https://github.com/kukv/octoscope/pull/31"
+  },
+  {
+    "additions": 2,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 2,
+    "headRefName": "renovate/actions-checkout-7.0.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 30,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:39:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656015534/job/91240475179",
+        "name": "lint",
+        "startedAt": "2026-07-31T18:39:27Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:39:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656012188/job/91240463593",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-31T18:39:28Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:40:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656015534/job/91240475230",
+        "name": "test",
+        "startedAt": "2026-07-31T18:39:27Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:39:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656012188/job/91240463614",
+        "name": "secrets",
+        "startedAt": "2026-07-31T18:39:24Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:39:33Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656012188/job/91240463612",
+        "name": "sca",
+        "startedAt": "2026-07-31T18:39:22Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:39:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656012188/job/91240463627",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-31T18:39:23Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T18:39:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30656012188/job/91240463660",
+        "name": "policy",
+        "startedAt": "2026-07-31T18:39:28Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-31T18:39:18Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update actions/checkout action to v7.0.1",
+    "updatedAt": "2026-07-31T22:57:13Z",
+    "url": "https://github.com/kukv/octoscope/pull/30"
+  },
+  {
+    "additions": 2,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 2,
+    "headRefName": "renovate/actions-setup-go-7.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 29,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158434/job/89580328488",
+        "name": "lint",
+        "startedAt": "2026-07-24T20:12:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158430/job/89580328936",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-24T20:12:00Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158434/job/89580328614",
+        "name": "test",
+        "startedAt": "2026-07-24T20:12:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158430/job/89580328934",
+        "name": "secrets",
+        "startedAt": "2026-07-24T20:12:01Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158430/job/89580328984",
+        "name": "sca",
+        "startedAt": "2026-07-24T20:12:00Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158430/job/89580328947",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-24T20:12:00Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-24T20:12:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30123158430/job/89580328967",
+        "name": "policy",
+        "startedAt": "2026-07-24T20:12:00Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-24T20:11:56Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update actions/setup-go action to v7",
+    "updatedAt": "2026-07-24T23:10:06Z",
+    "url": "https://github.com/kukv/octoscope/pull/29"
+  },
+  {
+    "additions": 5,
+    "author": {
+      "is_bot": true,
+      "login": "app/chloe-chan-bot"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "chore/distribute-common-files",
+    "isDraft": false,
+    "labels": [],
+    "number": 28,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "CLOSED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495194/job/91289976298",
+        "name": "lint",
+        "startedAt": "2026-07-31T22:56:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495214/job/91289976683",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-31T22:57:01Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495194/job/91289976320",
+        "name": "test",
+        "startedAt": "2026-07-31T22:56:54Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495214/job/91289976684",
+        "name": "secrets",
+        "startedAt": "2026-07-31T22:56:54Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495214/job/91289976687",
+        "name": "sca",
+        "startedAt": "2026-07-31T22:56:54Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495214/job/91289976669",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-31T22:56:54Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-31T22:57:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/30671495214/job/91289976686",
+        "name": "policy",
+        "startedAt": "2026-07-31T22:56:54Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      }
+    ],
+    "title": "chore: distribute common files",
+    "updatedAt": "2026-09-05T16:19:19Z",
+    "url": "https://github.com/kukv/octoscope/pull/28"
+  },
+  {
+    "additions": 9,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 9,
+    "headRefName": "fix/osv-x-net-x-text",
+    "isDraft": false,
+    "labels": [],
+    "number": 27,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934366401/job/88971979792",
+        "name": "lint",
+        "startedAt": "2026-07-22T15:39:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:15Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934363630/job/88971970091",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-22T15:38:57Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934366401/job/88971979766",
+        "name": "test",
+        "startedAt": "2026-07-22T15:39:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934363630/job/88971970087",
+        "name": "secrets",
+        "startedAt": "2026-07-22T15:38:57Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:13Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934363630/job/88971970179",
+        "name": "sca",
+        "startedAt": "2026-07-22T15:38:59Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934363630/job/88971970120",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-22T15:38:57Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:39:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934363630/job/88971970106",
+        "name": "policy",
+        "startedAt": "2026-07-22T15:38:58Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      }
+    ],
+    "title": "fix(deps): update golang.org/x/net to v0.56.0 and golang.org/x/text to v0.39.0",
+    "updatedAt": "2026-07-22T15:40:50Z",
+    "url": "https://github.com/kukv/octoscope/pull/27"
+  },
+  {
+    "additions": 6,
+    "author": {
+      "is_bot": true,
+      "login": "app/chloe-chan-bot"
+    },
+    "baseRefName": "main",
+    "deletions": 2,
+    "headRefName": "chore/distribute-common-files",
+    "isDraft": false,
+    "labels": [],
+    "number": 26,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:30:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623182/job/88969406157",
+        "name": "lint",
+        "startedAt": "2026-07-22T15:29:40Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:30:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623331/job/88969406920",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-22T15:29:40Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:30:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623182/job/88969406336",
+        "name": "test",
+        "startedAt": "2026-07-22T15:29:40Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:29:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623331/job/88969406968",
+        "name": "secrets",
+        "startedAt": "2026-07-22T15:29:40Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:29:54Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623331/job/88969407082",
+        "name": "sca",
+        "startedAt": "2026-07-22T15:29:40Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:29:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623331/job/88969407150",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-22T15:29:40Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:29:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29933623331/job/88969407067",
+        "name": "policy",
+        "startedAt": "2026-07-22T15:29:39Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      }
+    ],
+    "title": "chore: distribute common files",
+    "updatedAt": "2026-07-22T15:33:22Z",
+    "url": "https://github.com/kukv/octoscope/pull/26"
+  },
+  {
+    "additions": 6,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 6,
+    "headRefName": "renovate/charm.land-bubbletea-v2-2.0.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 25,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:45:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934813446/job/88973531568",
+        "name": "lint",
+        "startedAt": "2026-07-22T15:44:44Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:44:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934811562/job/88973525759",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-22T15:44:43Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:45:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934813446/job/88973531471",
+        "name": "test",
+        "startedAt": "2026-07-22T15:44:44Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:44:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934811562/job/88973525819",
+        "name": "secrets",
+        "startedAt": "2026-07-22T15:44:43Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:45:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934811562/job/88973525801",
+        "name": "sca",
+        "startedAt": "2026-07-22T15:44:44Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:44:52Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934811562/job/88973525842",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-22T15:44:44Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:44:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934811562/job/88973525725",
+        "name": "policy",
+        "startedAt": "2026-07-22T15:44:43Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-22T15:44:38Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module charm.land/bubbletea/v2 to v2.0.8",
+    "updatedAt": "2026-07-22T15:49:32Z",
+    "url": "https://github.com/kukv/octoscope/pull/25"
+  },
+  {
+    "additions": 6,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 6,
+    "headRefName": "renovate/charm.land-bubbles-v2-2.1.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 24,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:43:15Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934664164/job/88973016593",
+        "name": "lint",
+        "startedAt": "2026-07-22T15:42:48Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:43:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934666895/job/88973025816",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-22T15:42:51Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:43:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934664164/job/88973016640",
+        "name": "test",
+        "startedAt": "2026-07-22T15:42:48Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:42:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934666895/job/88973025798",
+        "name": "secrets",
+        "startedAt": "2026-07-22T15:42:51Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:43:06Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934666895/job/88973025847",
+        "name": "sca",
+        "startedAt": "2026-07-22T15:42:52Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:42:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934666895/job/88973025999",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-22T15:42:51Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-22T15:43:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29934666895/job/88973025874",
+        "name": "policy",
+        "startedAt": "2026-07-22T15:42:50Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-22T15:42:40Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module charm.land/bubbles/v2 to v2.1.1",
+    "updatedAt": "2026-07-22T15:43:42Z",
+    "url": "https://github.com/kukv/octoscope/pull/24"
+  },
+  {
+    "additions": 8,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 4,
+    "headRefName": "fix/security-gate-findings",
+    "isDraft": false,
+    "labels": [],
+    "number": 23,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:42:06Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637621/job/87051343483",
+        "name": "lint",
+        "startedAt": "2026-07-14T09:41:29Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:41:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637652/job/87051343809",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-14T09:41:27Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:42:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637621/job/87051343466",
+        "name": "test",
+        "startedAt": "2026-07-14T09:41:28Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:41:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637652/job/87051343898",
+        "name": "secrets",
+        "startedAt": "2026-07-14T09:41:28Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:41:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637652/job/87051343861",
+        "name": "sca",
+        "startedAt": "2026-07-14T09:41:28Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:41:34Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637652/job/87051343818",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-14T09:41:28Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T09:41:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29322637652/job/87051343897",
+        "name": "policy",
+        "startedAt": "2026-07-14T09:41:28Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      }
+    ],
+    "title": "fix: security ゲート初回指摘の是正(zizmor 指摘の workflow 強化 + 脆弱依存更新)",
+    "updatedAt": "2026-07-14T09:45:03Z",
+    "url": "https://github.com/kukv/octoscope/pull/23"
+  },
+  {
+    "additions": 123,
+    "author": {
+      "is_bot": true,
+      "login": "app/chloe-chan-bot"
+    },
+    "baseRefName": "main",
+    "deletions": 93,
+    "headRefName": "chore/distribute-common-files",
+    "isDraft": false,
+    "labels": [],
+    "number": 22,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003468/job/87033226484",
+        "name": "lint",
+        "startedAt": "2026-07-14T08:09:07Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003473/job/87033226973",
+        "name": "hidden-unicode",
+        "startedAt": "2026-07-14T08:09:07Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003468/job/87033226524",
+        "name": "test",
+        "startedAt": "2026-07-14T08:09:07Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:14Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003473/job/87033226916",
+        "name": "secrets",
+        "startedAt": "2026-07-14T08:09:07Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:25Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003473/job/87033226940",
+        "name": "sca",
+        "startedAt": "2026-07-14T08:09:08Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:14Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003473/job/87033226942",
+        "name": "workflow-audit",
+        "startedAt": "2026-07-14T08:09:07Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-14T08:09:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29317003473/job/87033226936",
+        "name": "policy",
+        "startedAt": "2026-07-14T08:09:07Z",
+        "status": "COMPLETED",
+        "workflowName": "security"
+      }
+    ],
+    "title": "chore: distribute common files",
+    "updatedAt": "2026-07-14T09:29:27Z",
+    "url": "https://github.com/kukv/octoscope/pull/22"
+  },
+  {
+    "additions": 135,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 132,
+    "headRefName": "dependency-update",
+    "isDraft": false,
+    "labels": [],
+    "number": 21,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:59:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29201142243/job/86672621310",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:59:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T17:00:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29201142243/job/86672621365",
+        "name": "test",
+        "startedAt": "2026-07-12T16:59:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Dependency update",
+    "updatedAt": "2026-07-12T17:02:44Z",
+    "url": "https://github.com/kukv/octoscope/pull/21"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/github.com-charmbracelet-lipgloss-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 20,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:26Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199717344/job/86668834799",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:13:15Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:55Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199717344/job/86668834858",
+        "name": "test",
+        "startedAt": "2026-07-12T16:13:15Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/artifacts",
+        "startedAt": "2026-07-12T16:13:11Z",
+        "state": "FAILURE",
+        "targetUrl": ""
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-12T16:13:12Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module github.com/charmbracelet/lipgloss to v2",
+    "updatedAt": "2026-07-12T17:02:45Z",
+    "url": "https://github.com/kukv/octoscope/pull/20"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/github.com-charmbracelet-glamour-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 19,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:16Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199713059/job/86668823706",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:13:06Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:47Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199713059/job/86668823385",
+        "name": "test",
+        "startedAt": "2026-07-12T16:13:06Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/artifacts",
+        "startedAt": "2026-07-12T16:13:02Z",
+        "state": "FAILURE",
+        "targetUrl": ""
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-12T16:13:03Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module github.com/charmbracelet/glamour to v2",
+    "updatedAt": "2026-07-12T17:02:45Z",
+    "url": "https://github.com/kukv/octoscope/pull/19"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/github.com-charmbracelet-bubbletea-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 18,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:09Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199709568/job/86668813821",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:12:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:39Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199709568/job/86668813824",
+        "name": "test",
+        "startedAt": "2026-07-12T16:12:59Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/artifacts",
+        "startedAt": "2026-07-12T16:12:54Z",
+        "state": "FAILURE",
+        "targetUrl": ""
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-12T16:12:55Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module github.com/charmbracelet/bubbletea to v2",
+    "updatedAt": "2026-07-12T17:02:45Z",
+    "url": "https://github.com/kukv/octoscope/pull/18"
+  },
+  {
+    "additions": 1,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "renovate/github.com-charmbracelet-bubbles-2.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 17,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:01Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199705710/job/86668803411",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:12:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:25Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199705710/job/86668803431",
+        "name": "test",
+        "startedAt": "2026-07-12T16:12:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/artifacts",
+        "startedAt": "2026-07-12T16:12:46Z",
+        "state": "FAILURE",
+        "targetUrl": ""
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-12T16:12:47Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "fix(deps): update module github.com/charmbracelet/bubbles to v2",
+    "updatedAt": "2026-07-12T17:02:45Z",
+    "url": "https://github.com/kukv/octoscope/pull/17"
+  },
+  {
+    "additions": 2,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 2,
+    "headRefName": "renovate/actions-setup-go-6.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 16,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:15:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199758005/job/86668941598",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:14:35Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:15:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199758005/job/86668941573",
+        "name": "test",
+        "startedAt": "2026-07-12T16:14:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-12T16:14:31Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update actions/setup-go action to v6",
+    "updatedAt": "2026-07-12T17:02:45Z",
+    "url": "https://github.com/kukv/octoscope/pull/16"
+  },
+  {
+    "additions": 2,
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "baseRefName": "main",
+    "deletions": 2,
+    "headRefName": "renovate/actions-checkout-7.x",
+    "isDraft": false,
+    "labels": [],
+    "number": 15,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:12:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199694438/job/86668774542",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:12:28Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:13:14Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199694438/job/86668774535",
+        "name": "test",
+        "startedAt": "2026-07-12T16:12:28Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "renovate/stability-days",
+        "startedAt": "2026-07-12T16:12:25Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://docs.renovatebot.com/key-concepts/minimum-release-age/"
+      }
+    ],
+    "title": "chore(deps): update actions/checkout action to v7",
+    "updatedAt": "2026-07-12T16:13:54Z",
+    "url": "https://github.com/kukv/octoscope/pull/15"
+  },
+  {
+    "additions": 632,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 58,
+    "headRefName": "ci/setup",
+    "isDraft": false,
+    "labels": [],
+    "number": 13,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:09:28Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199580485/job/86668481532",
+        "name": "lint",
+        "startedAt": "2026-07-12T16:08:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-07-12T16:09:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/kukv/octoscope/actions/runs/29199580485/job/86668481555",
+        "name": "test",
+        "startedAt": "2026-07-12T16:08:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "ci: introduce lint/test/coverage CI (parallel jobs)",
+    "updatedAt": "2026-07-12T16:10:31Z",
+    "url": "https://github.com/kukv/octoscope/pull/13"
+  },
+  {
+    "additions": 2504,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 14,
+    "headRefName": "feat/phase4-labels-assignees",
+    "isDraft": false,
+    "labels": [],
+    "number": 12,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "feat: Phase 4 — edit labels/assignees via shared picker",
+    "updatedAt": "2026-07-12T12:46:26Z",
+    "url": "https://github.com/kukv/octoscope/pull/12"
+  },
+  {
+    "additions": 1371,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 2,
+    "headRefName": "chore/publish-polish",
+    "isDraft": false,
+    "labels": [],
+    "number": 11,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "feat: Phase 3 — close/reopen PR/Issue from detail screen",
+    "updatedAt": "2026-07-12T10:39:58Z",
+    "url": "https://github.com/kukv/octoscope/pull/11"
+  },
+  {
+    "additions": 14,
+    "author": {
+      "is_bot": true,
+      "login": "app/dependabot"
+    },
+    "baseRefName": "main",
+    "deletions": 12,
+    "headRefName": "dependabot/go_modules/golang.org/x/net-0.55.0",
+    "isDraft": false,
+    "labels": [],
+    "number": 10,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "build(deps): Bump golang.org/x/net from 0.38.0 to 0.55.0",
+    "updatedAt": "2026-07-12T13:23:19Z",
+    "url": "https://github.com/kukv/octoscope/pull/10"
+  },
+  {
+    "additions": 2,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 0,
+    "headRefName": "kukv-patch-1",
+    "isDraft": false,
+    "labels": [],
+    "number": 9,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "Update README with user attachments link",
+    "updatedAt": "2026-07-11T20:13:08Z",
+    "url": "https://github.com/kukv/octoscope/pull/9"
+  },
+  {
+    "additions": 3,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "chore/publish-polish",
+    "isDraft": false,
+    "labels": [],
+    "number": 8,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "docs: mention comment posting in manifest and README",
+    "updatedAt": "2026-07-11T20:13:26Z",
+    "url": "https://github.com/kukv/octoscope/pull/8"
+  },
+  {
+    "additions": 1133,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 11,
+    "headRefName": "worktree-reactive-hugging-thompson",
+    "isDraft": false,
+    "labels": [],
+    "number": 7,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "feat: add comment posting to PRs and issues (Phase 2)",
+    "updatedAt": "2026-07-11T19:45:35Z",
+    "url": "https://github.com/kukv/octoscope/pull/7"
+  },
+  {
+    "additions": 6,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 6,
+    "headRefName": "test/replace-parsetarget-fixture",
+    "isDraft": false,
+    "labels": [],
+    "number": 6,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "test: use kukv/test-repo as parseTarget fixture",
+    "updatedAt": "2026-07-11T19:32:07Z",
+    "url": "https://github.com/kukv/octoscope/pull/6"
+  },
+  {
+    "additions": 37,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 1,
+    "headRefName": "docs/readme-keybinding-troubleshooting",
+    "isDraft": false,
+    "labels": [],
+    "number": 5,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "docs: action keybinding setup and Ctrl+click troubleshooting",
+    "updatedAt": "2026-07-11T18:39:11Z",
+    "url": "https://github.com/kukv/octoscope/pull/5"
+  },
+  {
+    "additions": 3833,
+    "author": {
+      "id": "MDQ6VXNlcjQzODc4ODA5",
+      "is_bot": false,
+      "login": "kukv",
+      "name": "Nonaka Koki"
+    },
+    "baseRefName": "main",
+    "deletions": 0,
+    "headRefName": "feat/github-dash-phase1",
+    "isDraft": false,
+    "labels": [],
+    "number": 2,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "feat: GitHub Dash Phase 1 — PR/Issue list and detail panes",
+    "updatedAt": "2026-07-11T17:56:21Z",
+    "url": "https://github.com/kukv/octoscope/pull/2"
+  },
+  {
+    "additions": 166,
+    "author": {
+      "is_bot": true,
+      "login": "app/chloe-chan-bot"
+    },
+    "baseRefName": "main",
+    "deletions": 0,
+    "headRefName": "chore/distribute-common-files",
+    "isDraft": false,
+    "labels": [],
+    "number": 1,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "state": "MERGED",
+    "statusCheckRollup": [],
+    "title": "chore: distribute common files",
+    "updatedAt": "2026-07-11T13:31:39Z",
+    "url": "https://github.com/kukv/octoscope/pull/1"
+  }
+]

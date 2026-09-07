@@ -68,6 +68,10 @@ type reviewContextResponse struct {
 					} `json:"nodes"`
 				} `json:"reviews"`
 				ReviewThreads struct {
+					PageInfo struct {
+						HasNextPage bool   `json:"hasNextPage"`
+						EndCursor   string `json:"endCursor"`
+					} `json:"pageInfo"`
 					Nodes []threadNode `json:"nodes"`
 				} `json:"reviewThreads"`
 			} `json:"pullRequest"`
@@ -100,39 +104,53 @@ type threadCommentNode struct {
 	} `json:"pullRequestReview"`
 }
 
-// PRReviewContext fetches, in one request, everything the diff view needs to
-// draw and change a review.
+// PRReviewContext fetches everything the diff view needs to draw and change
+// a review. It walks review threads one page at a time itself, since
+// `gh api --paginate` cannot follow a GraphQL cursor below the top level.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
 	repoFields, err := repoArgs(c.effectiveRepo(repo))
 	if err != nil {
 		return gh.ReviewContext{}, err
 	}
-	args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
-	args = append(args, "-F", "number="+strconv.Itoa(number))
-	out, err := c.run(ctx, c.dir, args...)
-	if err != nil {
-		return gh.ReviewContext{}, err
+
+	var rc gh.ReviewContext
+	cursor := ""
+	for {
+		args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
+		args = append(args, "-F", "number="+strconv.Itoa(number))
+		if cursor != "" {
+			args = append(args, "-f", "after="+cursor)
+		}
+		out, err := c.run(ctx, c.dir, args...)
+		if err != nil {
+			return gh.ReviewContext{}, err
+		}
+		var resp reviewContextResponse
+		if err := json.Unmarshal(out, &resp); err != nil {
+			return gh.ReviewContext{}, fmt.Errorf("parse review context: %w", err)
+		}
+		pr := resp.Data.Repository.PullRequest
+
+		// The pull request's own fields repeat on every page; taking them
+		// from the first is enough, and taking them again is harmless.
+		rc.PullRequestID = pr.ID
+		rc.Title = pr.Title
+		rc.Head = pr.HeadRefName
+		rc.Base = pr.BaseRefName
+		rc.Additions = pr.Additions
+		rc.Deletions = pr.Deletions
+		if len(pr.Reviews.Nodes) > 0 {
+			rc.PendingID = pr.Reviews.Nodes[0].ID
+		}
+		for _, n := range pr.ReviewThreads.Nodes {
+			rc.Threads = append(rc.Threads, n.toDomain())
+		}
+
+		if !pr.ReviewThreads.PageInfo.HasNextPage || pr.ReviewThreads.PageInfo.EndCursor == "" {
+			return rc, nil
+		}
+		cursor = pr.ReviewThreads.PageInfo.EndCursor
 	}
-	var resp reviewContextResponse
-	if err := json.Unmarshal(out, &resp); err != nil {
-		return gh.ReviewContext{}, fmt.Errorf("parse review context: %w", err)
-	}
-	pr := resp.Data.Repository.PullRequest
-	rc := gh.ReviewContext{
-		PullRequestID: pr.ID,
-		Title:         pr.Title,
-		Head:          pr.HeadRefName,
-		Base:          pr.BaseRefName,
-		Additions:     pr.Additions,
-		Deletions:     pr.Deletions,
-	}
-	for _, n := range pr.ReviewThreads.Nodes {
-		rc.Threads = append(rc.Threads, n.toDomain())
-	}
-	if len(pr.Reviews.Nodes) > 0 {
-		rc.PendingID = pr.Reviews.Nodes[0].ID
-	}
-	return rc, nil
 }
 
 func (n threadNode) toDomain() gh.ReviewThread {

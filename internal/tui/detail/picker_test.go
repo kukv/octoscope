@@ -258,24 +258,7 @@ func TestPickerFetchErrorInlineOnDetail(t *testing.T) {
 	}
 }
 
-func TestPickerApplyOnIssueRoutesToIssue(t *testing.T) {
-	f := &fakeSource{
-		issue:  gh.Issue{Number: 5, Title: "an issue", State: gh.StateOpen},
-		labels: []gh.Label{{Name: "bug"}},
-	}
-	m := openPicker(t, f, issueRef(), "l")
-	m, _ = m.Update(key("space")) // add bug
-	_, cmd := m.Update(key("enter"))
-	if cmd == nil {
-		t.Fatal("cmd = nil, want edit cmd")
-	}
-	cmd()
-	if len(f.editCalls) != 1 || f.editCalls[0] != "issue:labels::5:add=bug:remove=" {
-		t.Errorf("editCalls = %v, want [issue:labels::5:add=bug:remove=]", f.editCalls)
-	}
-}
-
-func TestPickerApplyAssigneesRoutesToPR(t *testing.T) {
+func TestPickerApplyOnAssigneesEditsAssignees(t *testing.T) {
 	f := &fakeSource{
 		pr:    gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
 		users: []string{"alice"},

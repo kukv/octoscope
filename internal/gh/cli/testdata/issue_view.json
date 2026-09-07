@@ -1,0 +1,17 @@
+{
+  "assignees": [],
+  "author": {
+    "id": "MDQ6VXNlcjQzODc4ODA5",
+    "is_bot": false,
+    "login": "kukv",
+    "name": "Nonaka Koki"
+  },
+  "body": "`herdr-plugin-github-dash` is becoming **octoscope**, a standalone GitHub TUI that runs on Windows, macOS and Linux. The Herdr plugin integration is being retired.\n\n## What changes\n\n- The repository has been renamed to `kukv/octoscope` (old URLs redirect).\n- The Herdr-specific launch path is gone: `herdr-plugin.toml`, `open.sh` / `run.sh`, the `HERDR_PLUGIN_CONTEXT_JSON` context resolution and the `GITHUB_DASH_URL` link handler.\n- It ships as a single binary named `octoscope` instead of a plugin.\n\n## Why\n\nThe tool could only be started from inside a Herdr workspace, which turned out to be the wrong shape for something that is really just \"look at my GitHub work\". It also declared `platforms = [\"linux\", \"macos\"]` because its launch path was a pair of bash scripts — a limitation of this plugin, not of Herdr, which supports Windows plugins too.\n\nDropping the plugin wrapper makes it usable anywhere a terminal is, and opens the way to features the plugin shape made awkward: cross-repository views, diffs, reviews, checks, merge.\n\n## Using it from Herdr\n\nNothing is lost. Bind a key to run `octoscope` via `keys.command` in your Herdr configuration and it opens exactly like before — it just runs as a normal command in a pane rather than as a plugin.\n\n## Installing\n\nSee the [README](https://github.com/kukv/octoscope#install) — `mise`, a release archive, `go install`, or a source build.\n",
+  "comments": [],
+  "labels": [],
+  "number": 50,
+  "state": "OPEN",
+  "title": "Moving from a Herdr plugin to a standalone CLI (octoscope)",
+  "updatedAt": "2026-09-05T18:19:11Z",
+  "url": "https://github.com/kukv/octoscope/issues/50"
+}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // recordingSource remembers what was sent, which is the only thing worth
@@ -18,25 +19,17 @@ import (
 type recordingSource struct {
 	fakeSource
 	mu           sync.Mutex
-	started      int
+	targets      []usecase.ReviewTarget
 	comments     []gh.PendingComment
-	reviewID     string
 	discardCalls int
 }
 
-func (s *recordingSource) StartReview(string) (string, error) {
+func (s *recordingSource) PostLineComment(t usecase.ReviewTarget, c gh.PendingComment) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.started++
-	s.reviewID = "PRR_new"
-	return s.reviewID, nil
-}
-
-func (s *recordingSource) AddReviewThread(_ string, c gh.PendingComment) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.targets = append(s.targets, t)
 	s.comments = append(s.comments, c)
-	return nil
+	return "PRR_new", nil
 }
 
 func (s *recordingSource) DiscardReview(string) error {
@@ -109,19 +102,6 @@ func runCmd(t *testing.T, cmd tea.Cmd) {
 	cmd()
 }
 
-// runInto runs a command and feeds the single message it returns into the
-// model, without chasing any further command that answer produces (the way
-// the real program's runtime would). That is enough to observe composing,
-// posting and the reused review id settle after one send.
-func runInto(t *testing.T, m Model, cmd tea.Cmd) Model {
-	t.Helper()
-	if cmd == nil {
-		t.Fatal("no command to run")
-	}
-	m, _ = m.Update(cmd())
-	return m
-}
-
 func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
@@ -163,33 +143,9 @@ func TestCommentingOnARemovedLineQuotesTheLeftSide(t *testing.T) {
 	}
 }
 
-// TestTheSecondCommentReusesTheReview: starting a review per comment would
-// leave a pile of separate reviews on the pull request.
-func TestTheSecondCommentReusesTheReview(t *testing.T) {
-	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
-	m := loadedWith(t, src)
-	for _, body := range []string{"first", "second"} {
-		m = cursorOnLine(t, m, gh.LineAdded, 13)
-		m = press(m, "c")
-		m = typeInto(m, body)
-		var cmd tea.Cmd
-		m, cmd = m.Update(keyPress("ctrl+s"))
-		m = runInto(t, m, cmd)
-	}
-	if src.started != 1 {
-		t.Errorf("started %d reviews, want 1", src.started)
-	}
-	if len(src.comments) != 2 {
-		t.Errorf("%d comments sent, want 2", len(src.comments))
-	}
-}
-
-// TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview: post() reads
-// m.review.PendingID, but the fetch that would confirm that id from GitHub
-// is asynchronous -- commentPostedMsg sets PendingID itself, synchronously,
-// precisely so a second c sent before that fetch's answer arrives still
-// finds it set. Getting this wrong calls StartReview twice and leaves two
-// pending reviews open on the pull request.
+// commentPostedMsg sets PendingID synchronously; the refetch that would
+// confirm it is not. Handing over an empty PendingID leaves two pending
+// reviews open on the pull request.
 func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
@@ -198,7 +154,7 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	m = press(m, "c")
 	m = typeInto(m, "first")
 	m, cmd := m.Update(keyPress("ctrl+s"))
-	posted := cmd() // runs the network side: StartReview + AddReviewThread
+	posted := cmd()
 	m, _ = m.Update(posted)
 	// posted's own fetchReview command is deliberately never run: the
 	// refetch's answer must not be what makes PendingID available.
@@ -209,17 +165,17 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	_, cmd = m.Update(keyPress("ctrl+s"))
 	runCmd(t, cmd)
 
-	if src.started != 1 {
-		t.Errorf("started %d reviews, want 1", src.started)
+	if len(src.targets) != 2 {
+		t.Fatalf("%d comments sent, want 2", len(src.targets))
 	}
-	if len(src.comments) != 2 {
-		t.Errorf("%d comments sent, want 2", len(src.comments))
+	if got := src.targets[1].PendingID; got != "PRR_new" {
+		t.Errorf("the second comment went to PendingID %q, want the id the first came back with", got)
 	}
 }
 
-// TestCWaitsForThePullRequestID: the diff and the review context are fetched
-// in parallel. If the diff lands first and c opened the composer, sending
-// would call StartReview with an empty node id.
+// The diff and the review context are fetched in parallel. If the diff lands
+// first and c opened the composer, sending would go out with an empty pull
+// request node id.
 func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = cursorOnLine(t, m, gh.LineAdded, 13)

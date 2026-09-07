@@ -1,4 +1,4 @@
-query ($owner: String!, $name: String!, $number: Int!) {
+query ($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       id
@@ -12,12 +12,20 @@ query ($owner: String!, $name: String!, $number: Int!) {
       # diffSide nor side. They arrive through reviewThreads instead, which
       # does carry diffSide and does list a pending thread (measured against
       # kukv/octoscope#55 on 2026-09-07).
+      # GitHub allows one unsubmitted review per user per pull request, so
+      # first: 1 is not a truncation.
       reviews(states: [PENDING], first: 1) {
         nodes {
           id
         }
       }
-      reviewThreads(first: 100) {
+      # first is capped at 100 by GitHub (101 is refused with
+      # EXCESSIVE_PAGINATION), so pageInfo/after page beyond it.
+      reviewThreads(first: 100, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           isResolved
           isOutdated
@@ -25,6 +33,8 @@ query ($owner: String!, $name: String!, $number: Int!) {
           line
           originalLine
           diffSide
+          # Not paged: it is a nested connection, so following it would need
+          # one more request per thread.
           comments(first: 50) {
             nodes {
               body

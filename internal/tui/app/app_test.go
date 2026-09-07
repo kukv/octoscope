@@ -21,6 +21,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // fakeSource satisfies Source. The child views have their own tests; here we
@@ -49,27 +50,34 @@ func (f *fakeSource) ListPRs(context.Context) ([]gh.PR, error) {
 func (f *fakeSource) ListIssues(context.Context) ([]gh.Issue, error) { return nil, nil }
 func (f *fakeSource) RepoName(context.Context) (string, error)       { return "kukv/demo", nil }
 
-func (f *fakeSource) GetPR(context.Context, string, int) (gh.PR, error) { return f.pr, f.prErr }
-func (f *fakeSource) GetIssue(context.Context, string, int) (gh.Issue, error) {
-	return gh.Issue{}, nil
+func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
+	if ref.Kind == gh.ItemIssue {
+		return usecase.Item{Kind: gh.ItemIssue}, nil
+	}
+	pr := f.pr
+	return usecase.Item{
+		Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
+		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
+		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
+		PR: &pr,
+	}, f.prErr
 }
-func (f *fakeSource) OpenWeb(string) error                      { return nil }
-func (f *fakeSource) AddPRComment(string, int, string) error    { return nil }
-func (f *fakeSource) AddIssueComment(string, int, string) error { return nil }
-func (f *fakeSource) ClosePR(string, int) error                 { return nil }
-func (f *fakeSource) ReopenPR(string, int) error                { return nil }
-func (f *fakeSource) CloseIssue(string, int) error              { return nil }
-func (f *fakeSource) ReopenIssue(string, int) error             { return nil }
+
+func (f *fakeSource) OpenWeb(string) error                { return nil }
+func (f *fakeSource) AddComment(gh.ItemRef, string) error { return nil }
+func (f *fakeSource) SetState(gh.ItemRef, bool) error     { return nil }
+func (f *fakeSource) EditLabels(gh.ItemRef, []string, []string) error {
+	return nil
+}
+
+func (f *fakeSource) EditAssignees(gh.ItemRef, []string, []string) error {
+	return nil
+}
+
 func (f *fakeSource) ListLabels(context.Context, string) ([]gh.Label, error) {
 	return f.labels, nil
 }
 func (f *fakeSource) ListAssignees(context.Context, string) ([]string, error) { return nil, nil }
-func (f *fakeSource) EditPRLabels(string, int, []string, []string) error      { return nil }
-func (f *fakeSource) EditIssueLabels(string, int, []string, []string) error   { return nil }
-func (f *fakeSource) EditPRAssignees(string, int, []string, []string) error   { return nil }
-func (f *fakeSource) EditIssueAssignees(string, int, []string, []string) error {
-	return nil
-}
 
 func (f *fakeSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error) {
 	return f.files, f.diffErr
@@ -79,15 +87,13 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewCon
 	return gh.ReviewContext{}, nil
 }
 
-func (f *fakeSource) StartReview(string) (string, error) { return "", nil }
-
-func (f *fakeSource) AddReviewThread(string, gh.PendingComment) error { return nil }
+func (f *fakeSource) PostLineComment(usecase.ReviewTarget, gh.PendingComment) (string, error) {
+	return "", nil
+}
 
 func (f *fakeSource) DiscardReview(string) error { return nil }
 
-func (f *fakeSource) SubmitReview(string, gh.ReviewEvent, string) error { return nil }
-
-func (f *fakeSource) SubmitNewReview(string, gh.ReviewEvent, string) error { return nil }
+func (f *fakeSource) SubmitReview(usecase.ReviewTarget, gh.ReviewEvent, string) error { return nil }
 
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
