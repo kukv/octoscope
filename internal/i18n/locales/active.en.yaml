@@ -404,6 +404,8 @@ merge:
     other: "space:auto"
   key_auto_off:
     other: "enter:auto-merge off"
+  key_queue:
+    other: "enter:queue"
   key_refresh:
     other: "r:refresh"
   key_cancel:

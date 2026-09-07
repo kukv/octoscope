@@ -161,7 +161,11 @@ func (m Model) hints() []string {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		hints = append(hints, i18n.T("merge.key_auto_off"))
-	case m.answered() && m.ctx.Block() == gh.BlockNone:
+	case !m.answered() || m.ctx.Block() != gh.BlockNone:
+		// enter sends nothing: there is no answer, or something refuses it
+	case m.auto:
+		hints = append(hints, i18n.T("merge.key_queue"))
+	default:
 		hints = append(hints, i18n.T("merge.key_merge"))
 	}
 	if m.ctx.CanAutoMerge() && !m.ctx.AutoMergeEnabled {

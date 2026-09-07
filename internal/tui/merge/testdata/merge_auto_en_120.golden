@@ -8,5 +8,5 @@
 [38;2;38;45;57m│[m [x] auto-merge (after the checks pass)         [38;2;38;45;57m│[m
 [38;2;38;45;57m│[m [38;2;139;148;158mthe branch is deleted after the merge[m          [38;2;38;45;57m│[m
 [38;2;38;45;57m│[m                                                [38;2;38;45;57m│[m
-[38;2;38;45;57m│[m [38;2;139;148;158menter:merge  space:auto  r:refresh  esc:cancel[m [38;2;38;45;57m│[m
+[38;2;38;45;57m│[m [38;2;139;148;158menter:queue  space:auto  r:refresh  esc:cancel[m [38;2;38;45;57m│[m
 [38;2;38;45;57m╰────────────────────────────────────────────────╯[m

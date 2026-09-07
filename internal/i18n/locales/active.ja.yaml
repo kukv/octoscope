@@ -389,6 +389,8 @@ merge:
     other: "space:auto"
   key_auto_off:
     other: "enter:auto-merge を解除"
+  key_queue:
+    other: "enter:auto-merge"
   key_refresh:
     other: "r:更新"
   key_cancel:
