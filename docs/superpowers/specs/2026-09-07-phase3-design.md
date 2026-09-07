@@ -96,7 +96,10 @@ TUI が受け取るのは既に意味の付いた型である。
 追加で引く形にし、超えていないスレッドには 1 リクエストも足さない。
 
 `contexts` は `statusCheckRollup` の直下なので、`reviewThreads` と同じ形で
-cursor を追える。
+cursor を追える。**ただし追うのは checks ビュー自身のクエリだけで、Work 板が使う
+`work.graphql` は `first: 100` のままにする。** 板は 4 列 × 最大 50 件のカードを
+1 リクエストで引いており、カードごとに rollup をページングすると往復がカードの数だけ
+増える。板が要るのは件数の丸めであって 101 件目以降の 1 件 1 件ではない。
 
 **この計画で扱わない別の切り詰め**: Work の search は 1 列 `first: 50`、
 `labels` は `first: 100`。どちらも Work 板の話で、checks とも review とも
