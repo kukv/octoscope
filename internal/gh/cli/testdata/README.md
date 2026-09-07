@@ -157,6 +157,18 @@ gh api graphql -F query=@internal/gh/cli/checks.graphql \
   -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr_checks.json
 ```
 
+## `job_log.txt` / `job_log_failed.txt`
+
+`JobLog` に対する実出力。`job_log.txt` は成功したジョブ全体のログを先頭 40 行に
+切ったもの（パーサのテストに 251 行は要らないため）。それ以外は録ったままで、
+先頭行の BOM も含めて手を入れていない。
+
+```bash
+D=internal/gh/cli/testdata
+gh run view -R kukv/octoscope --job 88970766114 --log-failed > $D/job_log_failed.txt
+gh run view -R kukv/octoscope --job 101635448466 --log | head -40 > $D/job_log.txt
+```
+
 ## `sample.diff`
 
 `git diff` 形式のパース用。unified diff の hunk ヘッダ、追加、削除、文脈行を含む。
