@@ -5,10 +5,8 @@
 # reviewDecision and isDraft are GraphQL-only: REST does not expose them
 # (spec 3.3).
 #
-# search asks for 50 per column and is not paged. The Work board is what to
-# look at now, not a full listing: GitHub's search returns at most 1000
-# results however it is paged, and a column past 50 cards is already past
-# what the board can be read as.
+# search is not paged: GitHub's search connection returns at most 1000
+# results however it is paged, well past what a 50-card column shows anyway.
 query {
   reviewRequested: search(type: ISSUE, first: 50, query: "is:open is:pr review-requested:@me") {
     nodes { ...WorkItem }
@@ -77,9 +75,8 @@ fragment WorkItem on SearchResultItem {
   }
 }
 
-# labels asks for 100, GitHub's cap for a connection. There is no documented
-# limit on how many labels one item may carry, and a card that silently drops
-# labels past the tenth is the same failure as the Repos tab stopping at 30.
+# labels asks for 100, GitHub's cap for a connection; there is no documented
+# limit on how many labels one item may carry.
 #
 # color is the six hex digits GitHub stores for the label, with no leading
 # "#": the badge reproduces it as a background.

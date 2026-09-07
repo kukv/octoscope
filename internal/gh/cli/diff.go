@@ -14,17 +14,13 @@ import (
 )
 
 const (
-	// scanBufInit and scanBufMax size the diff scanner. A single diff line
-	// can be far longer than bufio's default 64KiB limit -- a minified
-	// bundle is one line -- and a scanner that gives up mid-file drops every
-	// file after it.
+	// A single diff line can exceed bufio's default 64KiB limit (a minified
+	// bundle is one line), and the scanner then stops mid-file.
 	scanBufInit = 64 * 1024
 	scanBufMax  = 8 * 1024 * 1024
 
-	// hunkHeaderFields is how many whitespace-separated fields of an
-	// `@@ -12,7 +12,9 @@ func Walk(...)` header carry the ranges. Anything
-	// after the second @@ is git's enclosing-function heuristic, and a
-	// one-line function body puts a + or - token there too.
+	// Everything after the second @@ in `@@ -12,7 +12,9 @@ func Walk(...)` is
+	// git's enclosing-function heuristic, which can itself start with + or -.
 	hunkHeaderFields = 3
 )
 

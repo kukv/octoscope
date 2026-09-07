@@ -105,9 +105,8 @@ type threadCommentNode struct {
 }
 
 // PRReviewContext fetches everything the diff view needs to draw and change
-// a review. It takes one request per page of review threads: GitHub caps a
-// connection at 100, and `gh api --paginate` cannot follow a GraphQL cursor
-// that sits below the top level, so the walk is here.
+// a review. It walks review threads one page at a time itself, since
+// `gh api --paginate` cannot follow a GraphQL cursor below the top level.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
 	repoFields, err := repoArgs(c.effectiveRepo(repo))
 	if err != nil {

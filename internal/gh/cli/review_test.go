@@ -390,8 +390,6 @@ func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
 	}
 }
 
-// fakeSeq answers each call with the next canned output, so a test can watch
-// a paging loop walk more than one page. It records every argument list.
 type fakeSeq struct {
 	outs  []string
 	calls [][]string
@@ -406,10 +404,8 @@ func (f *fakeSeq) run(_ context.Context, _ string, args ...string) ([]byte, erro
 	return []byte(f.outs[i]), nil
 }
 
-// GraphQL connections cap first at 100 (101 is refused with
-// EXCESSIVE_PAGINATION), so a pull request with more review threads than
-// that needs a second request. Without one the extra threads vanish with no
-// error, which is the failure mode this whole remediation is about.
+// GitHub caps a reviewThreads connection at 100; without a second request
+// the extra threads vanish with no error.
 func TestPRReviewContextWalksEveryPageOfThreads(t *testing.T) {
 	page1 := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
 		`"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"},` +

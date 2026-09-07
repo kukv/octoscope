@@ -192,10 +192,8 @@ const (
 	SectionAssigned
 	SectionMentioned
 
-	// WorkSectionCount is how many columns there are. It has to be the last
-	// constant in this block: Work is an array indexed by WorkSection, and
-	// iota is the only thing that keeps its length and this list from
-	// drifting apart.
+	// WorkSectionCount must be the last constant in this block: Work's
+	// length as an array indexed by WorkSection comes from it.
 	WorkSectionCount = iota
 )
 
