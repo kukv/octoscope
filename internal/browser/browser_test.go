@@ -52,6 +52,23 @@ func TestCommandPerEnvironment(t *testing.T) {
 			wantOK:     true,
 		},
 		{
+			// "Everywhere" is the point: on Windows and macOS there is always
+			// a platform default to fall back on, so only these cases catch a
+			// named browser being tried second.
+			name:       "a named browser wins on Windows too",
+			goos:       "windows",
+			browserEnv: "firefox",
+			want:       []string{"firefox"},
+			wantOK:     true,
+		},
+		{
+			name:       "a named browser wins on macOS too",
+			goos:       "darwin",
+			browserEnv: "firefox",
+			want:       []string{"firefox"},
+			wantOK:     true,
+		},
+		{
 			name:   "an unknown platform has nothing to try",
 			goos:   "plan9",
 			wantOK: false,
@@ -61,7 +78,11 @@ func TestCommandPerEnvironment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, ok := command(tt.goos, tt.wsl, tt.browserEnv)
+			got, ok := command(environment{
+				goos:    tt.goos,
+				wsl:     tt.wsl,
+				browser: tt.browserEnv,
+			})
 			if ok != tt.wantOK {
 				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
 			}
@@ -69,6 +90,37 @@ func TestCommandPerEnvironment(t *testing.T) {
 				t.Errorf("command = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// gh reads GH_BROWSER before BROWSER (`gh help environment`). A user who set
+// both did so to tell gh apart from the rest of the machine, and octoscope
+// must not reverse that.
+func TestGHBrowserBeatsBrowser(t *testing.T) {
+	t.Setenv("GH_BROWSER", "gh-choice")
+	t.Setenv("BROWSER", "system-choice")
+
+	if got := browserEnv(); got != "gh-choice" {
+		t.Errorf("browserEnv = %q, want the GH_BROWSER value", got)
+	}
+}
+
+func TestBrowserIsUsedWhenGHBrowserIsUnset(t *testing.T) {
+	t.Setenv("GH_BROWSER", "")
+	t.Setenv("BROWSER", "system-choice")
+
+	if got := browserEnv(); got != "system-choice" {
+		t.Errorf("browserEnv = %q, want the BROWSER value", got)
+	}
+}
+
+// WSL sets WSL_DISTRO_NAME in every distro's shell, which is the signal left
+// for a kernel that does not name itself in /proc/sys/kernel/osrelease.
+func TestWSLDistroNameIsEnoughToDetectWSL(t *testing.T) {
+	t.Setenv("WSL_DISTRO_NAME", "Ubuntu")
+
+	if !isWSL() {
+		t.Error("isWSL = false with WSL_DISTRO_NAME set")
 	}
 }
 
@@ -80,7 +132,7 @@ func TestNoCommandGoesThroughAShell(t *testing.T) {
 
 	for _, goos := range []string{"windows", "darwin", "linux"} {
 		for _, wsl := range []bool{false, true} {
-			argv, ok := command(goos, wsl, "")
+			argv, ok := command(environment{goos: goos, wsl: wsl})
 			if !ok {
 				continue
 			}
