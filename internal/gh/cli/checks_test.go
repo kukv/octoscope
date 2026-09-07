@@ -169,3 +169,36 @@ func TestAJobThatDidNotFailReturnsNoLines(t *testing.T) {
 		t.Errorf("lines = %v, want none", lines)
 	}
 }
+
+func TestRerunAsksForOnlyTheFailedJobsWhenScopedThatWay(t *testing.T) {
+	t.Parallel()
+
+	var got []string
+	c := &Client{repo: "kukv/octoscope", run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return nil, nil
+	}}
+	if err := c.RerunWorkflow(context.Background(), "", 34087925535, gh.RerunFailed); err != nil {
+		t.Fatalf("RerunWorkflow: %v", err)
+	}
+	want := []string{"run", "rerun", "34087925535", "--failed", "--repo", "kukv/octoscope"}
+	if !slices.Equal(got, want) {
+		t.Errorf("args = %v, want %v", got, want)
+	}
+}
+
+func TestRerunOfTheWholeRunPassesNoFailedFlag(t *testing.T) {
+	t.Parallel()
+
+	var got []string
+	c := &Client{repo: "kukv/octoscope", run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return nil, nil
+	}}
+	if err := c.RerunWorkflow(context.Background(), "", 34087925535, gh.RerunAll); err != nil {
+		t.Fatalf("RerunWorkflow: %v", err)
+	}
+	if slices.Contains(got, "--failed") {
+		t.Errorf("args = %v, want no --failed", got)
+	}
+}

@@ -159,6 +159,17 @@ func parseJobLog(out string) []gh.LogLine {
 	return lines
 }
 
+// RerunWorkflow starts a workflow run again. GraphQL has no mutation for
+// this, which is why it goes through the subcommand.
+func (c *Client) RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error {
+	args := []string{"run", "rerun", strconv.FormatInt(runID, 10)}
+	if scope == gh.RerunFailed {
+		args = append(args, "--failed")
+	}
+	_, err := c.run(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
+	return err
+}
+
 func (n checkDetailNode) toRun(state gh.CheckState) gh.CheckRun {
 	run := gh.CheckRun{Name: n.name(), State: state, Kind: gh.CheckKindRun}
 	if n.Typename == "StatusContext" {
