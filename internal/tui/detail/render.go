@@ -11,6 +11,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 func (m Model) View() string {
@@ -180,14 +181,14 @@ func prMarkdown(pr gh.PR) string {
 	return b.String()
 }
 
-func issueMarkdown(issue gh.Issue) string {
+func issueMarkdown(it usecase.Item) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# #%d %s\n\n", issue.Number, issue.Title)
-	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), issue.Author.Login)
-	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), stateText(issue.State))
-	writeCommonMeta(&b, issue.Labels, issue.UpdatedAt)
-	writeBody(&b, issue.Body)
-	writeComments(&b, issue.Comments)
+	fmt.Fprintf(&b, "# #%d %s\n\n", it.Number, it.Title)
+	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), it.Author.Login)
+	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), stateText(it.State))
+	writeCommonMeta(&b, it.Labels, it.UpdatedAt)
+	writeBody(&b, it.Body)
+	writeComments(&b, it.Comments)
 	return b.String()
 }
 

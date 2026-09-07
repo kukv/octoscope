@@ -1,6 +1,7 @@
 package review
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -8,38 +9,25 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 type fakeSource struct {
-	event    gh.ReviewEvent
-	body     string
-	calls    int
-	newCalls int
-	err      error
+	target usecase.ReviewTarget
+	event  gh.ReviewEvent
+	body   string
+	calls  int
+	err    error
 }
 
-func (f *fakeSource) SubmitReview(_ string, event gh.ReviewEvent, body string) error {
+func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error {
 	f.calls++
-	f.event, f.body = event, body
-	return f.err
-}
-
-func (f *fakeSource) SubmitNewReview(_ string, event gh.ReviewEvent, body string) error {
-	f.newCalls++
-	f.event, f.body = event, body
+	f.target, f.event, f.body = t, event, body
 	return f.err
 }
 
 func open(src Source) Model {
 	m := New(src, Target{PullRequestID: "PR_1", PendingID: "PRR_9", PendingComments: 2})
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	return m
-}
-
-// openWithNothingWaiting is the commonest review there is: read the diff, had
-// nothing to say, approve.
-func openWithNothingWaiting(src Source) Model {
-	m := New(src, Target{PullRequestID: "PR_1"})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }
@@ -58,7 +46,7 @@ func TestTabWalksTheThreeEvents(t *testing.T) {
 	}
 }
 
-func TestSubmitSendsTheChosenEventAndBody(t *testing.T) {
+func TestSubmitSendsTheTargetItWasOpenedOn(t *testing.T) {
 	src := &fakeSource{}
 	m := open(src)
 	m, _ = m.Update(keyPress("tab")) // approve
@@ -74,6 +62,10 @@ func TestSubmitSendsTheChosenEventAndBody(t *testing.T) {
 	}
 	if src.body != "looks good" {
 		t.Errorf("body = %q", src.body)
+	}
+	want := usecase.ReviewTarget{PullRequestID: "PR_1", PendingID: "PRR_9"}
+	if src.target != want {
+		t.Errorf("target = %+v, want %+v", src.target, want)
 	}
 }
 
@@ -91,25 +83,19 @@ func TestApprovingWithNoNoteIsAllowed(t *testing.T) {
 	}
 }
 
-// TestApprovingWithNothingWaitingGoesInOneCall: with no pending review there
-// is nothing to submit against, so the review is created with its event on
-// it. Going through StartReview first would leave an empty pending review
-// behind if the submission then failed.
-func TestApprovingWithNothingWaitingGoesInOneCall(t *testing.T) {
-	src := &fakeSource{}
-	m := openWithNothingWaiting(src)
-	m, _ = m.Update(keyPress("tab")) // approve
+func TestAFailedSubmitBecomesAnErrorMsg(t *testing.T) {
+	src := &fakeSource{err: errors.New("boom from github")}
+	m := open(src)
 	_, cmd := m.Update(keyPress("ctrl+s"))
-	runCmd(t, cmd)
-
-	if src.newCalls != 1 {
-		t.Errorf("%d one-shot submissions, want 1", src.newCalls)
+	if cmd == nil {
+		t.Fatal("ctrl+s produced no submit command")
 	}
-	if src.calls != 0 {
-		t.Errorf("%d submissions against a review that does not exist", src.calls)
+	msg, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("a failed submit produced %T, want ErrorMsg", cmd())
 	}
-	if src.event != gh.EventApprove {
-		t.Errorf("event = %v, want approve", src.event)
+	if msg.Err != src.err {
+		t.Errorf("ErrorMsg carries %v, want the failure the source returned", msg.Err)
 	}
 }
 

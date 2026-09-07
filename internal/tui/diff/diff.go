@@ -13,19 +13,19 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
-// Source is what the diff view needs from the GitHub layer. repo is
-// "owner/repo"; the empty string targets the workspace repository.
+// Source is what the diff view needs. repo is "owner/repo"; the empty string
+// targets the workspace repository. Posting a line comment is one operation
+// here, whatever GitHub needs behind it (.claude/rules/architecture.md).
 //
 // review.Source is embedded rather than repeated: the submission popup this
-// view holds needs exactly those two methods, and review already declares
-// them for exactly this purpose.
+// view holds declares exactly what it needs.
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
-	StartReview(pullRequestID string) (string, error)
-	AddReviewThread(reviewID string, c gh.PendingComment) error
+	PostLineComment(t usecase.ReviewTarget, c gh.PendingComment) (string, error)
 	DiscardReview(reviewID string) error
 	review.Source
 }

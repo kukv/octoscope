@@ -42,7 +42,7 @@ func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
 }
 
 func TestIssueMarkdownEmptyBody(t *testing.T) {
-	md := issueMarkdown(gh.Issue{Number: 3, Title: "an issue"})
+	md := issueMarkdown(issueItem(gh.Issue{Number: 3, Title: "an issue"}))
 	if !strings.Contains(md, "_no description_") {
 		t.Errorf("markdown missing empty-body placeholder:\n%s", md)
 	}

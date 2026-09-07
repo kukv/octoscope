@@ -16,60 +16,45 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
-// prSource is the pull-request half of what the detail view needs.
-// repo is "owner/repo"; the empty string targets the workspace repository.
-type prSource interface {
-	GetPR(ctx context.Context, repo string, number int) (gh.PR, error)
-	AddPRComment(repo string, number int, body string) error
-	ClosePR(repo string, number int) error
-	ReopenPR(repo string, number int) error
-	EditPRLabels(repo string, number int, add, remove []string) error
-	EditPRAssignees(repo string, number int, add, remove []string) error
-	// PRReviewContext is what v needs before it can open the review popup:
-	// the pull request's node id and the unsubmitted review, if any. detail
-	// has no diff of its own, so unlike diff's Source this is the only thing
-	// it reads off the review context.
-	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
-}
-
-// issueSource mirrors prSource for issues. The two are kept apart rather
-// than merged so that adding a PR-only call cannot silently imply an issue
-// equivalent that GitHub does not offer.
-type issueSource interface {
-	GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error)
-	AddIssueComment(repo string, number int, body string) error
-	CloseIssue(repo string, number int) error
-	ReopenIssue(repo string, number int) error
-	EditIssueLabels(repo string, number int, add, remove []string) error
-	EditIssueAssignees(repo string, number int, add, remove []string) error
+// itemSource is what the detail view does to the item it shows. A pull
+// request and an issue take different GitHub calls for every one of these;
+// choosing between them is internal/usecase's job, which is why there is one
+// method per operation rather than two.
+type itemSource interface {
+	GetItem(ctx context.Context, ref gh.ItemRef) (usecase.Item, error)
+	AddComment(ref gh.ItemRef, body string) error
+	SetState(ref gh.ItemRef, closing bool) error
+	EditLabels(ref gh.ItemRef, add, remove []string) error
+	EditAssignees(ref gh.ItemRef, add, remove []string) error
+	OpenWeb(url string) error
 }
 
 // candidateSource lists what a picker offers. Labels and assignees belong to
-// the repository, not to a PR or an issue, so this too is kind-free.
+// the repository, not to a PR or an issue.
 type candidateSource interface {
 	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
-// Source is what the detail view needs from the GitHub layer. A command that
-// acts on one kind takes that half; the ones that pick the kind at run time
-// take the whole. review.Source is embedded rather than repeated: the
-// submission popup this view holds needs exactly those two methods, and
-// review already declares them for exactly this purpose.
-// webOpener shows the item in a browser. It takes the URL GitHub gave the
-// item rather than a reference to it, so that nothing here has to know how
-// GitHub spells an address.
-type webOpener interface {
-	OpenWeb(url string) error
+// reviewOpener is what v needs before the review popup can open: the pull
+// request's node id and the unsubmitted review, if any. detail has no diff of
+// its own, so unlike diff's Source this is the only thing it reads off the
+// review context.
+type reviewOpener interface {
+	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
 }
 
+// Source is what the detail view needs. repo is "owner/repo"; the empty
+// string targets the workspace repository. review.Source is embedded rather
+// than repeated: the submission popup this view holds declares exactly what
+// it needs.
 type Source interface {
-	prSource
-	issueSource
+	itemSource
 	candidateSource
-	webOpener
+	reviewOpener
 	review.Source
 }
 
@@ -83,17 +68,14 @@ type OpenDiffMsg struct{ Ref gh.ItemRef }
 type ErrorMsg struct{ Err error }
 
 type (
-	// Every answer to a fetch carries the item it is about. The detail view
-	// is rebuilt for each item the user opens, but the request for the last
-	// one is still running: without the ref, its answer would land here and
-	// show the wrong item for as long as the current fetch takes.
-	prMsg struct {
-		ref gh.ItemRef
-		pr  gh.PR
-	}
-	issueMsg struct {
-		ref   gh.ItemRef
-		issue gh.Issue
+	// itemMsg carries a fetch's answer along with the item it is about. The
+	// detail view is rebuilt for each item the user opens, but the request
+	// for the last one is still running: without the ref, its answer would
+	// land here and show the wrong item for as long as the current fetch
+	// takes.
+	itemMsg struct {
+		ref  gh.ItemRef
+		item usecase.Item
 	}
 	errMsg struct {
 		ref gh.ItemRef
@@ -112,8 +94,8 @@ type (
 	pickErrorMsg     struct{ err error }
 
 	// reviewContextMsg and reviewContextErrMsg carry v's own fetch: unlike
-	// prMsg and issueMsg, this one is not part of the initial load, so it
-	// still needs the ref guard against an item the user has since left.
+	// itemMsg, this one is not part of the initial load, so it still needs
+	// the ref guard against an item the user has since left.
 	reviewContextMsg struct {
 		ref gh.ItemRef
 		ctx gh.ReviewContext
@@ -195,25 +177,17 @@ func (m Model) Init() tea.Cmd {
 
 func fetch(src Source, ref gh.ItemRef) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
-		if ref.Kind == gh.ItemPR {
-			pr, err := src.GetPR(ctx, ref.Repo, ref.Number)
-			if err != nil {
-				return errMsg{ref, err}
-			}
-			return prMsg{ref, pr}
-		}
-		issue, err := src.GetIssue(ctx, ref.Repo, ref.Number)
+		item, err := src.GetItem(context.Background(), ref)
 		if err != nil {
 			return errMsg{ref, err}
 		}
-		return issueMsg{ref, issue}
+		return itemMsg{ref, item}
 	}
 }
 
 // fetchReviewContext is what v runs before it can open the review popup: an
 // issue has no review, so this is only ever called on a pull request.
-func fetchReviewContext(src prSource, ref gh.ItemRef) tea.Cmd {
+func fetchReviewContext(src reviewOpener, ref gh.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
@@ -234,13 +208,7 @@ func openWeb(src Source, ref gh.ItemRef, url string) tea.Cmd {
 
 func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 	return func() tea.Msg {
-		var err error
-		if ref.Kind == gh.ItemPR {
-			err = src.AddPRComment(ref.Repo, ref.Number, body)
-		} else {
-			err = src.AddIssueComment(ref.Repo, ref.Number, body)
-		}
-		if err != nil {
+		if err := src.AddComment(ref, body); err != nil {
 			return commentErrorMsg{err}
 		}
 		return commentPostedMsg{}
@@ -267,18 +235,7 @@ func (m Model) stateAction() (closing bool, ok bool) {
 
 func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
-		var err error
-		switch {
-		case ref.Kind == gh.ItemPR && closing:
-			err = src.ClosePR(ref.Repo, ref.Number)
-		case ref.Kind == gh.ItemPR:
-			err = src.ReopenPR(ref.Repo, ref.Number)
-		case closing:
-			err = src.CloseIssue(ref.Repo, ref.Number)
-		default:
-			err = src.ReopenIssue(ref.Repo, ref.Number)
-		}
-		if err != nil {
+		if err := src.SetState(ref, closing); err != nil {
 			return stateErrorMsg{err}
 		}
 		return stateChangedMsg{}
@@ -308,15 +265,10 @@ func fetchAssigneePicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 func applyPicker(src Source, ref gh.ItemRef, kind pickerKind, add, remove []string) tea.Cmd {
 	return func() tea.Msg {
 		var err error
-		switch {
-		case kind == pickLabels && ref.Kind == gh.ItemPR:
-			err = src.EditPRLabels(ref.Repo, ref.Number, add, remove)
-		case kind == pickLabels:
-			err = src.EditIssueLabels(ref.Repo, ref.Number, add, remove)
-		case ref.Kind == gh.ItemPR:
-			err = src.EditPRAssignees(ref.Repo, ref.Number, add, remove)
-		default:
-			err = src.EditIssueAssignees(ref.Repo, ref.Number, add, remove)
+		if kind == pickLabels {
+			err = src.EditLabels(ref, add, remove)
+		} else {
+			err = src.EditAssignees(ref, add, remove)
 		}
 		if err != nil {
 			return pickErrorMsg{err}
@@ -341,33 +293,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
-	case prMsg:
+	case itemMsg:
 		if msg.ref != m.ref {
 			return m, nil // an answer for an item the user has already left
 		}
-		pr := msg.pr
+		it := msg.item
 		m.loading = false
-		m.state = pr.State
+		m.state = it.State
 		m.actionErr = ""
-		m.labels = labelNames(pr.Labels)
-		m.assignees = authorLogins(pr.Assignees)
-		m.url = pr.URL
-		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": pr.Number, "Title": pr.Title})
-		m.setContent(prMarkdown(pr))
-		return m, nil
-	case issueMsg:
-		if msg.ref != m.ref {
-			return m, nil // an answer for an item the user has already left
+		m.labels = labelNames(it.Labels)
+		m.assignees = authorLogins(it.Assignees)
+		m.url = it.URL
+		if it.Kind == gh.ItemPR {
+			m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
+			m.setContent(prMarkdown(*it.PR))
+		} else {
+			m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})
+			m.setContent(issueMarkdown(it))
 		}
-		issue := msg.issue
-		m.loading = false
-		m.state = issue.State
-		m.actionErr = ""
-		m.labels = labelNames(issue.Labels)
-		m.assignees = authorLogins(issue.Assignees)
-		m.url = issue.URL
-		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": issue.Number, "Title": issue.Title})
-		m.setContent(issueMarkdown(issue))
 		return m, nil
 	case commentPostedMsg:
 		m.composing = false
