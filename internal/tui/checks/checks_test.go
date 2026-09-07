@@ -350,6 +350,30 @@ func TestMovingDownOntoShorterLinesBringsTheLogBack(t *testing.T) {
 	}
 }
 
+// TestAWiderTerminalBringsTheLogBack is the other way the window moves under
+// a standing offset: the pane grows until it could hold the whole line, and
+// an offset the narrow pane needed would still be cutting the start off.
+func TestAWiderTerminalBringsTheLogBack(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{
+		checks: fixture(),
+		log:    []gh.LogLine{{Step: "s", Text: "START" + strings.Repeat("x", 400)}},
+	}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	for range 500 {
+		m = press(m, "l")
+	}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 480, Height: 8})
+	if view := m.View(); !strings.Contains(view, "START") {
+		t.Errorf("the log pane is wide enough for the whole line but still scrolled past its start:\n%s", view)
+	}
+}
+
 func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 

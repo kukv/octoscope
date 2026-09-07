@@ -73,24 +73,22 @@ func checksLoadingModel(width int) Model {
 // come back with no workflow run behind them), and a StatusContext.
 func mixed() gh.Checks {
 	start := time.Date(2026, 9, 7, 10, 12, 0, 0, time.UTC)
-	run := func(name string, state gh.CheckState, workflow string, runNumber int, jobID, runID int64, took time.Duration) gh.CheckRun {
-		return gh.CheckRun{
-			Name: name, State: state, Kind: gh.CheckKindRun,
-			Workflow: workflow, RunNumber: runNumber, JobID: jobID, RunID: runID,
-			URL:       "https://github.example/job",
-			StartedAt: start, CompletedAt: start.Add(took),
-		}
+	ran := func(r gh.CheckRun, took time.Duration) gh.CheckRun {
+		r.Kind = gh.CheckKindRun
+		r.URL = "https://github.example/job"
+		r.StartedAt, r.CompletedAt = start, start.Add(took)
+		return r
 	}
 	return gh.Checks{
 		Total: 9, Passed: 7, Failed: 1, Running: 1, State: gh.CheckFailure,
 		Runs: []gh.CheckRun{
-			run("build", gh.CheckSuccess, "CI", 88, 1, 10, 3*time.Minute+7*time.Second),
-			run("lint", gh.CheckSuccess, "CI", 88, 2, 10, 62*time.Second),
-			run("test", gh.CheckSuccess, "CI", 88, 3, 10, 2*time.Minute+14*time.Second),
-			run("sca", gh.CheckFailure, "security", 116, 4, 20, 48*time.Second),
-			run("audit", gh.CheckSuccess, "security", 116, 5, 20, 31*time.Second),
-			run("secrets", gh.CheckSuccess, "security", 116, 6, 20, 9*time.Second),
-			run("deps", gh.CheckSuccess, "security", 116, 7, 20, 12*time.Second),
+			ran(gh.CheckRun{Name: "build", State: gh.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 1, RunID: 10}, 3*time.Minute+7*time.Second),
+			ran(gh.CheckRun{Name: "lint", State: gh.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 2, RunID: 10}, 62*time.Second),
+			ran(gh.CheckRun{Name: "test", State: gh.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 3, RunID: 10}, 2*time.Minute+14*time.Second),
+			ran(gh.CheckRun{Name: "sca", State: gh.CheckFailure, Workflow: "security", RunNumber: 116, JobID: 4, RunID: 20}, 48*time.Second),
+			ran(gh.CheckRun{Name: "audit", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 5, RunID: 20}, 31*time.Second),
+			ran(gh.CheckRun{Name: "secrets", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 6, RunID: 20}, 9*time.Second),
+			ran(gh.CheckRun{Name: "deps", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 7, RunID: 20}, 12*time.Second),
 			// An App's own check run: no workflow, no run id, so no heading
 			// over it and nothing for R to rerun.
 			{
