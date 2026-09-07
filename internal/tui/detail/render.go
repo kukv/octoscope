@@ -51,8 +51,8 @@ func (m Model) footer() string {
 
 // footerHints lists the detail view's hints, most important first. esc is
 // first because layout.FitKeyBar never drops it: it is the only way out of
-// the view. review and diff only apply to a pull request, and state (close
-// or reopen) only when the item can do one of them (not merged).
+// the view. review, diff and checks only apply to a pull request, and state
+// (close or reopen) only when the item can do one of them (not merged).
 func (m Model) footerHints() []string {
 	hints := []string{
 		i18n.T("footer.detail.esc"),
@@ -60,7 +60,7 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.detail.comment"),
 	}
 	if m.ref.Kind == gh.ItemPR {
-		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"))
+		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"), i18n.T("footer.detail.checks"))
 	}
 	if s := m.stateFooterKey(); s != "" {
 		hints = append(hints, s)

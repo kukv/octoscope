@@ -300,6 +300,15 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+// TestKeyBarNamesTheChecksKey pins s alongside d in the list's key bar: a
+// key with no hint in the footer is a key nobody can find.
+func TestKeyBarNamesTheChecksKey(t *testing.T) {
+	m := loadedModel(&fakeSource{prs: samplePRs()})
+	if got := m.View(); !strings.Contains(got, "s:checks") {
+		t.Errorf("key bar = %q, want it to mention s:checks", got)
+	}
+}
+
 // TestOOpensTheSelectionsOwnURL pins that o opens the address GitHub gave
 // the selected item, rather than one octoscope spelled out itself.
 func TestOOpensTheSelectionsOwnURL(t *testing.T) {

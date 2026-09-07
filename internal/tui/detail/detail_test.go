@@ -280,6 +280,21 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+// TestKeyBarNamesTheChecksKey pins s alongside d in the footer: a key with
+// no hint is a key nobody can find. It only shows on a pull request, the
+// same way d does.
+func TestKeyBarNamesTheChecksKey(t *testing.T) {
+	pr := loaded(&fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}, prRef())
+	if got := pr.View(); !strings.Contains(got, "s:checks") {
+		t.Errorf("key bar = %q, want it to mention s:checks", got)
+	}
+
+	issue := loaded(&fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}, issueRef())
+	if got := issue.View(); strings.Contains(got, "s:checks") {
+		t.Errorf("key bar = %q, an issue has no checks to hint at", got)
+	}
+}
+
 // TestOOpensTheShownItemsOwnURL pins that o opens the address GitHub gave
 // the item, rather than one octoscope spelled out itself.
 func TestOOpensTheShownItemsOwnURL(t *testing.T) {

@@ -475,6 +475,14 @@ func offsetOf(board []string, token string) (int, bool) {
 	return 0, false
 }
 
+// TestKeyBarNamesTheChecksKey pins s alongside d in the board's key bar: a
+// key with no hint in the footer is a key nobody can find.
+func TestKeyBarNamesTheChecksKey(t *testing.T) {
+	if !strings.Contains(loaded().View(), "s:checks") {
+		t.Errorf("key bar = %q, want it to mention s:checks", loaded().View())
+	}
+}
+
 func TestNoUnresolvedIDsInTheWorkView(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 

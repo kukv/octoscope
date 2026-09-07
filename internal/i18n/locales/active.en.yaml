@@ -161,7 +161,7 @@ submit:
 
 footer:
   list:
-    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  q:quit"
+    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  s:checks  q:quit"
   close:
     other: "x:close"
   reopen:
@@ -176,7 +176,7 @@ footer:
     quit:
       other: "q:quit"
   work:
-    other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
+    other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  s:checks  q:quit"
   # detail's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
   # internal/tui/layout.FitKeyBar, the same mechanism as diff's below). esc
@@ -194,6 +194,8 @@ footer:
       other: "v:review"
     diff:
       other: "d:diff"
+    checks:
+      other: "s:checks"
     refresh:
       other: "r:refresh"
     web:

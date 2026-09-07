@@ -156,7 +156,7 @@ submit:
 
 footer:
   list:
-    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  q:終了"
+    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  s:checks  q:終了"
   close:
     other: "x:クローズ"
   reopen:
@@ -171,7 +171,7 @@ footer:
     quit:
       other: "q:終了"
   work:
-    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
+    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  s:checks  q:終了"
   # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、
   # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar。
   # diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
@@ -188,6 +188,8 @@ footer:
       other: "v:レビュー"
     diff:
       other: "d:diff"
+    checks:
+      other: "s:checks"
     refresh:
       other: "r:更新"
     web:
