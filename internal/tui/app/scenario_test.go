@@ -148,7 +148,9 @@ func scenarioModel(t *testing.T, f *scenarioSource) Model {
 	i18n.SetLanguage(language.English)
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
-	m := New(f, Options{HasRepo: true})
+	// No --repo: the repository is the working directory's, so the app starts
+	// on the board and the Repos tab appears when the lookup answers.
+	m := New(f, Options{})
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return resolve(t, next.(Model), cmd)
 }
@@ -165,7 +167,8 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 	}
 
 	m = run(t, m, "enter") // the Repos row -> the detail view
-	if !strings.Contains(content(m), "#12") {
+	// The Repos row carries the number too; the state line is detail's alone.
+	if !strings.Contains(content(m), "state: open") {
 		t.Fatalf("the detail view did not open:\n%s", content(m))
 	}
 
@@ -217,6 +220,9 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 		}},
 	}
 	m := scenarioModel(t, f)
+	if m.tab != tabWork {
+		t.Fatalf("precondition: tab = %d, want the board", m.tab)
+	}
 
 	// The board's own d opens the diff too, so enter is checked on its own.
 	m = run(t, m, "enter") // the card under the cursor -> the detail view

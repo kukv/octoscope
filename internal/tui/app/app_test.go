@@ -200,12 +200,13 @@ func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
 }
 
 func TestTabKeysSwitchTabs(t *testing.T) {
-	m := press(newTestModel(Options{HasRepo: true}), "2")
-	if m.tab != tabRepos {
-		t.Errorf("after 2: got %v, want tabRepos", m.tab)
+	// --repo starts on Repos, so 1 is the key that has somewhere to go first.
+	m := press(newTestModel(Options{HasRepo: true}), "1")
+	if m.tab != tabWork {
+		t.Errorf("after 1: got %d, want tabWork", m.tab)
 	}
-	if m = press(m, "1"); m.tab != tabWork {
-		t.Errorf("after 1: got %v, want tabWork", m.tab)
+	if m = press(m, "2"); m.tab != tabRepos {
+		t.Errorf("after 2: got %d, want tabRepos", m.tab)
 	}
 }
 
@@ -839,13 +840,14 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 	size := tea.WindowSizeMsg{Width: width, Height: 40}
 
 	src := overlongSource()
+	// --repo opens on the Repos tab; 1 is what reaches the board from there.
 	next, cmd := New(src, Options{HasRepo: true}).Update(size)
+	reposM := resolve(t, next.(Model), cmd)
+
+	next, cmd = reposM.Update(key("1"))
 	board := resolve(t, next.(Model), cmd)
 
-	repos, cmd := board.Update(key("2"))
-	repos = resolve(t, repos.(Model), cmd)
-
-	item, cmd := repos.Update(key("enter"))
+	item, cmd := reposM.Update(key("enter"))
 	item = resolve(t, item.(Model), cmd)
 
 	failed, _ := board.Update(work.ErrorMsg{Err: errors.New(overlongTitle)})
@@ -863,7 +865,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 
 	return map[string]string{
 		"work":          content(board),
-		"repos":         content(repos.(Model)),
+		"repos":         content(reposM),
 		"detail":        content(item.(Model)),
 		"error":         content(failed.(Model)),
 		"error_overlay": content(overlayFailed.(Model)),
