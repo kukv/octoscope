@@ -15,14 +15,14 @@ Codecov や Sonar のように **GitHub App が作った check run** がそれ�
 
 このビューは「見出し＝再実行できるワークフローの run がある」という約束にしたので、
 run の無い check には見出しを描かない。結果として、そういう check は
-**直上のワークフロー群の最後の 1 件に見える**（`checks_mixed_ja_80.golden` で
-`codecov/patch` が `security #116` の 5 件目に見える）。
+**どの群にも属さない行として、直上の群の続きに見える**。
 
 同じ形は StatusContext（外部 CI）でも起きるが、そちらは spec §4.4.3 の
 モックアップが `● ci/circleci` を `✗ sca` の下に見出し無しで描いており、
 **その見せ方は設計として承認されている**。
 
-問題はむしろ、**この 2 種類が画面上は見分けられないのに振る舞いが違う**ことである。
+**位置がずれる直接の原因は下の `arrange` のバグで、そちらは設計判断を要しない。**
+それを直しても残るのが、**この 2 種類が画面上は見分けられないのに振る舞いが違う**ことである。
 
 | | ログ | 再実行 |
 |---|---|---|
@@ -33,14 +33,34 @@ run の無い check には見出しを描かない。結果として、そうい
 グリフを分けるのか、行の右端に何か出すのか、群の外に置くのか。
 **印を決めれば、下の「`enter` が出せないログを取りに行く」も同時に解ける。**
 
-### `arrange` が空のワークフロー名を 1 つの群にまとめる
-
-`arrange` はワークフロー名でグループを作るので、名前を持たない check
-（App が作った check run と StatusContext）が同じ群に入り、
-**その群の中で最も悪い状態の順位を全員が継ぐ**。上の印を決めるとき、
-この並べ方も一緒に決める。
-
 ## 直し方が決まっているもの
+
+### `arrange` で、無関係な外部 CI の状態が App の check の位置を動かす
+
+**上の「一員に見える」の直接の原因はこれで、設計判断は要らない。**
+
+`arrange` は `worst` と `first` をワークフロー名で引く。名前を持たない check
+（App が作った check run と StatusContext）はどちらも `Workflow == ""` なので
+**同じ 1 つのバケツに入り、その中で最も悪い状態の順位を全員が継ぐ**。
+
+外部 CI の状態だけを変えて他を固定した実測（2026-09-08）:
+
+```
+外部 CI が running : sca audit secrets deps  codecov/patch  build lint test  ci/circleci
+外部 CI が success : sca audit secrets deps  build lint test  codecov/patch  ci/circleci
+外部 CI が無し     : sca audit secrets deps  build lint test  codecov/patch
+```
+
+`worst[""] = max(codecov=成功 1, ci/circleci=実行中 2) = 2` が `CI` の 1 を上回るので、
+**codecov/patch がワークフロー 1 つ分を飛び越して security の 5 件目の位置に着地する**。
+無関係な外部 CI の状態が、別の check の位置を動かしている。
+
+Task 6 から入っているバグで、以後のどの修正も `arrange` に触れていない。
+上の「印」をどう決めるかとは無関係に、`codecov/patch` が security の群の中に
+並ぶべきではない。直せば `test` の次、`ci/circleci` の隣に着き、
+見出しの無い 2 件が並んで、そう読める。
+
+**`checks_mixed_*.golden` は今この誤った順序を録っている。** 直したら録り直す。
 
 ### `internal/tui/checks/checks.go` を分割する
 
