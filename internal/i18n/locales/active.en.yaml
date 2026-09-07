@@ -196,6 +196,8 @@ footer:
       other: "d:diff"
     checks:
       other: "s:checks"
+    merge:
+      other: "m:merge"
     refresh:
       other: "r:refresh"
     web:

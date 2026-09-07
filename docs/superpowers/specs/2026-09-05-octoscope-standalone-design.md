@@ -418,7 +418,7 @@ diff ビューと骨格を揃える。入口は詳細ビュー・Work のカー�
 │ ○ Create a merge commit                 │
 │ ○ Rebase and merge                      │
 │                                         │
-│ [x] ブランチを削除する                  │
+│ ブランチはマージ後に削除される          │
 │ [ ] auto-merge（checks の通過後に）     │
 │                                         │
 │ ⚠ レビューが承認されていません          │
@@ -429,15 +429,20 @@ diff ビューと骨格を揃える。入口は詳細ビュー・Work のカー�
 - 方式は**リポジトリが許したものだけ**出す（`squashMergeAllowed` /
   `mergeCommitAllowed` / `rebaseMergeAllowed`）。選べない項目を並べて
   押させてから断らない
-- **ブランチ削除の既定はリポジトリの `deleteBranchOnMerge`。** GitHub 側の設定に
-  合わせるのが最も驚きが少ない。その場でトグルもできる
+- **ブランチ削除はトグルできない。** `mergePullRequest` に削除の入力が無い
+  （2026-09-08 に introspection で実測）。削除はリポジトリの `deleteBranchOnMerge` に
+  従って GitHub 側が行うので、その値を**読み取り専用の 1 行で見せる**
 - auto-merge は `autoMergeAllowed && viewerCanEnableAutoMerge` のときだけ選べる。
-  選べないときは理由を 1 行出す（リポジトリで有効化されていない、など）。
+  **`mergeStateStatus` が `CLEAN` のときも選べない**——待つものが残っていない PR への
+  有効化を GitHub が断るからである。選べないときは理由を 1 行出す
+  （リポジトリで有効化されていない、など）。
   `autoMergeRequest` が既にあるときは、`m` は**解除**を提案する
 - **`mergeable: UNKNOWN` はエラーではない。** GitHub がマージ可能性を計算中の
   ふつうの状態であり、実測でも普通に返る。「計算中」と出して `r` で取り直す。
-  `CONFLICTING` や `mergeStateStatus` の `BLOCKED` / `BEHIND` / `DIRTY` は
-  `enter` を塞ぎ、理由を出す
+  **計算中の `enter` は塞ぐ**——マージできるか分かっていない状態で送るのは、
+  確認 1 段だけという下の方針と噛み合わない。
+  `CONFLICTING` や `mergeStateStatus` の `BLOCKED` / `BEHIND` / `DIRTY`、
+  そして draft（`isDraft`。`mergePullRequest` が断る）も `enter` を塞ぎ、理由を出す
 - **確認はこのポップアップ 1 段だけ。** 方式を選んで `enter`、`esc` で中止。
   `X`（レビューの破棄）と同じ流儀に揃える
 - 成功したら詳細ビューを閉じて Work に戻り、再取得する。マージ済みの

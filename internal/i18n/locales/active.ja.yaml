@@ -190,6 +190,8 @@ footer:
       other: "d:diff"
     checks:
       other: "s:checks"
+    merge:
+      other: "m:マージ"
     refresh:
       other: "r:更新"
     web:

@@ -15,6 +15,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/checks"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/diff"
+	"github.com/kukv/octoscope/internal/tui/merge"
 	"github.com/kukv/octoscope/internal/tui/repo"
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
@@ -215,7 +216,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case checks.ErrorMsg:
 		return m.checksFailed(msg)
 	case review.SubmittedMsg:
-		return m.reviewSubmitted(msg)
+		return m.refreshLists(msg)
+	case merge.MergedMsg:
+		return m.refreshLists(msg)
 	}
 	return m.broadcast(msg)
 }
@@ -267,10 +270,11 @@ func (m Model) checksFailed(msg checks.ErrorMsg) (tea.Model, tea.Cmd) {
 	return m.failOverlay(msg.Err, overlayChecks)
 }
 
-// detail and diff each refetch their own PR when a review goes out
-// (broadcast below reaches them); the board and the Repos list have
-// no popup of their own to notice from, so the root refreshes them.
-func (m Model) reviewSubmitted(msg review.SubmittedMsg) (tea.Model, tea.Cmd) {
+// refreshLists carries a review submission or a merge to the views that are
+// open (detail and diff refetch their own PR from it, and the detail view a
+// merge came from closes) and refetches the board and the Repos list, which
+// have no popup of their own to notice from.
+func (m Model) refreshLists(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.broadcast(msg)
 	m = next.(Model)
 	var workCmd tea.Cmd
