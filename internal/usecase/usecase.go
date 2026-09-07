@@ -63,6 +63,12 @@ type opener interface {
 	OpenWeb(url string) error
 }
 
+type checksFetcher interface {
+	PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error)
+	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error
+}
+
 type source interface {
 	itemFetcher
 	commenter
@@ -73,6 +79,7 @@ type source interface {
 	reviewFetcher
 	reviewer
 	opener
+	checksFetcher
 }
 
 // Usecase holds the backend every view talks to.
@@ -86,6 +93,7 @@ type Usecase struct {
 	reviewInfo reviewFetcher
 	reviews    reviewer
 	web        opener
+	checks     checksFetcher
 }
 
 // New wires a Usecase to one backend.
@@ -100,6 +108,7 @@ func New(src source) *Usecase {
 		reviewInfo: src,
 		reviews:    src,
 		web:        src,
+		checks:     src,
 	}
 }
 
@@ -213,3 +222,15 @@ func (u *Usecase) DiscardReview(reviewID string) error {
 }
 
 func (u *Usecase) OpenWeb(url string) error { return u.web.OpenWeb(url) }
+
+func (u *Usecase) PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error) {
+	return u.checks.PRChecks(ctx, repo, number)
+}
+
+func (u *Usecase) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error) {
+	return u.checks.JobLog(ctx, repo, jobID, failedOnly)
+}
+
+func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error {
+	return u.checks.RerunWorkflow(ctx, repo, runID, scope)
+}
