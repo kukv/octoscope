@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -12,9 +13,6 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
-
-// Task 7 と Task 8 のテストは i18n.T と ansi.StringWidth も使う。import は
-// テストを足すときに増やす（golangci-lint が余った import を落とす)。
 
 type fakeSource struct {
 	checks gh.Checks
@@ -149,6 +147,46 @@ func TestJMovesTheCursorDownTheList(t *testing.T) {
 	m = press(m, "j")
 	if m.row == before {
 		t.Errorf("j did not move the cursor off row %d", before)
+	}
+}
+
+// manyChecks is four workflows of eight checks each: enough that the
+// headings drawn between the groups push the cursor off a short screen.
+func manyChecks() gh.Checks {
+	var runs []gh.CheckRun
+	id := int64(1)
+	for _, wf := range []string{"alpha", "beta", "gamma", "delta"} {
+		for i := range 8 {
+			runs = append(runs, gh.CheckRun{
+				Name:     fmt.Sprintf("%s-job%d", wf, i),
+				State:    gh.CheckSuccess,
+				Kind:     gh.CheckKindRun,
+				Workflow: wf,
+				JobID:    id,
+				RunID:    id,
+			})
+			id++
+		}
+	}
+	return gh.Checks{Total: len(runs), Passed: len(runs), State: gh.CheckSuccess, Runs: runs}
+}
+
+// TestTheCursorStaysOnScreenPastTheWorkflowHeadings guards the one thing the
+// list has to keep true while it scrolls: the row the cursor is on is drawn.
+// The headings take lines the cursor's own count knows nothing about, so a
+// window scrolled by that count alone leaves the cursor behind.
+func TestTheCursorStaysOnScreenPastTheWorkflowHeadings(t *testing.T) {
+	t.Parallel()
+
+	m := New(&fakeSource{checks: manyChecks()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: manyChecks()})
+	for range 20 {
+		m = press(m, "j")
+	}
+	want := m.order[m.row].Name
+	if view := m.View(); !strings.Contains(view, want) {
+		t.Errorf("the selected check %q is not drawn anywhere:\n%s", want, view)
 	}
 }
 

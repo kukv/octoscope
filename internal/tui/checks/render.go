@@ -217,19 +217,41 @@ func (m Model) allRows() []string {
 		return []string{clip(theme.Dim().Render(i18n.T("checks.none")), listWidth)}
 	}
 	var lines []string
-	last := ""
-	first := true
-	cursor := 0
-	for _, r := range m.order {
-		if r.Kind == gh.CheckKindRun && (first || r.Workflow != last) {
+	for i, r := range m.order {
+		if m.hasHeading(i) {
 			lines = append(lines, clip(theme.Heading().Render(m.workflowTitle(r)), listWidth))
-			last = r.Workflow
 		}
-		first = false
-		lines = append(lines, m.checkLine(r, cursor == m.row))
-		cursor++
+		lines = append(lines, m.checkLine(r, i == m.row))
 	}
 	return lines
+}
+
+// hasHeading reports whether the list draws a workflow heading above
+// order[i]. A StatusContext belongs to no workflow, and arrange keeps the
+// checks of one workflow together, so the row before is enough to tell a new
+// group from a continuing one.
+func (m Model) hasHeading(i int) bool {
+	r := m.order[i]
+	if r.Kind != gh.CheckKindRun {
+		return false
+	}
+	if i == 0 {
+		return true
+	}
+	prev := m.order[i-1]
+	return prev.Kind != gh.CheckKindRun || prev.Workflow != r.Workflow
+}
+
+// cursorLine is which line of allRows the cursor sits on: its row plus every
+// heading drawn at or above it.
+func (m Model) cursorLine() int {
+	line := m.row
+	for i := 0; i <= m.row && i < len(m.order); i++ {
+		if m.hasHeading(i) {
+			line++
+		}
+	}
+	return line
 }
 
 func (m Model) workflowTitle(r gh.CheckRun) string {

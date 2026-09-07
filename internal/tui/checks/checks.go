@@ -361,14 +361,17 @@ func (m Model) openSelected() tea.Cmd {
 	}
 }
 
-// follow scrolls the window so the cursor stays on it.
+// follow scrolls the window so the cursor stays on it. top indexes the drawn
+// lines, which count the workflow headings as well as the checks, so it is
+// the cursor's line and not its row that has to stay inside the window.
 func (m Model) follow() Model {
 	h := m.paneHeight()
-	if m.row < m.top {
-		m.top = m.row
+	line := m.cursorLine()
+	if line < m.top {
+		m.top = line
 	}
-	if m.row >= m.top+h {
-		m.top = m.row - h + 1
+	if line >= m.top+h {
+		m.top = line - h + 1
 	}
 	m.top = max(m.top, 0)
 	return m
