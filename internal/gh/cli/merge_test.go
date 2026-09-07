@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -106,5 +108,61 @@ func TestPRMergeContextSeesAutoMergeAlreadyOn(t *testing.T) {
 	}
 	if !got.AutoMergeEnabled {
 		t.Error("AutoMergeEnabled = false, want true: the popup offers to turn it off instead")
+	}
+}
+
+func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		method gh.MergeMethod
+		want   string
+	}{
+		{gh.MergeSquash, "mergeMethod=SQUASH"},
+		{gh.MergeCommit, "mergeMethod=MERGE"},
+		{gh.MergeRebase, "mergeMethod=REBASE"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
+
+			f := &fakeSeq{outs: []string{`{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}`}}
+			c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+			if err := c.MergePR("PR_1", tt.method); err != nil {
+				t.Fatalf("MergePR: %v", err)
+			}
+			if !slices.Contains(f.calls[0], tt.want) {
+				t.Errorf("call = %v, want it to carry %s", f.calls[0], tt.want)
+			}
+			if !slices.Contains(f.calls[0], "pullRequestId=PR_1") {
+				t.Errorf("call = %v, want it to carry pullRequestId=PR_1", f.calls[0])
+			}
+		})
+	}
+}
+
+func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
+	t.Parallel()
+
+	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
+	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: on.run}
+	if err := c.EnableAutoMerge("PR_1", gh.MergeRebase); err != nil {
+		t.Fatalf("EnableAutoMerge: %v", err)
+	}
+	if !slices.Contains(on.calls[0], "mergeMethod=REBASE") {
+		t.Errorf("call = %v, want it to carry mergeMethod=REBASE", on.calls[0])
+	}
+
+	off := &fakeSeq{outs: []string{`{"data":{"disablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
+	c = &Client{dir: "/repo", repo: "kukv/octoscope", run: off.run}
+	if err := c.DisableAutoMerge("PR_1"); err != nil {
+		t.Fatalf("DisableAutoMerge: %v", err)
+	}
+	// Turning it off takes the pull request and nothing else: the method
+	// belongs to the request being cancelled, not to the cancellation.
+	for _, arg := range off.calls[0] {
+		if strings.HasPrefix(arg, "mergeMethod=") {
+			t.Errorf("call = %v, want no mergeMethod", off.calls[0])
+		}
 	}
 }

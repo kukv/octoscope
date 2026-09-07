@@ -114,3 +114,59 @@ func parseMergeState(s string) gh.MergeState {
 	}
 	return gh.MergeStateUnknown
 }
+
+//go:embed merge_pr.graphql
+var mergePRMutation string
+
+//go:embed enable_auto_merge.graphql
+var enableAutoMergeMutation string
+
+//go:embed disable_auto_merge.graphql
+var disableAutoMergeMutation string
+
+// apiMergeMethod spells a method the way the GraphQL PullRequestMergeMethod
+// enum does. It is the one place that knows those words
+// (.claude/rules/architecture.md).
+func apiMergeMethod(m gh.MergeMethod) string {
+	switch m {
+	case gh.MergeCommit:
+		return "MERGE"
+	case gh.MergeRebase:
+		return "REBASE"
+	default:
+		return "SQUASH"
+	}
+}
+
+// The three mutations take no context, for the same reason review.go's do:
+// a merge that has happened has happened.
+
+// MergePR merges the pull request now.
+func (c *Client) MergePR(pullRequestID string, method gh.MergeMethod) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+mergePRMutation,
+		"-f", "pullRequestId="+pullRequestID,
+		"-f", "mergeMethod="+apiMergeMethod(method),
+	)
+	return err
+}
+
+// EnableAutoMerge asks GitHub to merge the pull request once what it is
+// waiting on is in.
+func (c *Client) EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+enableAutoMergeMutation,
+		"-f", "pullRequestId="+pullRequestID,
+		"-f", "mergeMethod="+apiMergeMethod(method),
+	)
+	return err
+}
+
+// DisableAutoMerge cancels a queued auto-merge.
+func (c *Client) DisableAutoMerge(pullRequestID string) error {
+	_, err := c.run(context.Background(), c.dir, "api", "graphql",
+		"-f", "query="+disableAutoMergeMutation,
+		"-f", "pullRequestId="+pullRequestID,
+	)
+	return err
+}
