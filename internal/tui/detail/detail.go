@@ -535,8 +535,9 @@ func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 }
 
 // stillLoading is what the keys that need the item answer with while it is
-// on its way. GetItem has been measured at over twenty seconds on a cold
-// call, which is long enough for a key that does nothing to read as broken.
+// on its way. Against the real API the item was still not there four seconds
+// after it was asked for, which is long enough for a key that does nothing
+// to read as a key that is broken.
 func (m Model) stillLoading() Model {
 	m.declined = i18n.T("detail.decline_loading")
 	return m

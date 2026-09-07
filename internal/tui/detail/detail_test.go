@@ -849,7 +849,7 @@ func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 }
 
 // TestKeysDeclinedWhileLoadingSayWhy covers the report that c does nothing:
-// the item can take tens of seconds, and until it lands the screen is a
+// the item can still be on its way seconds later, and until it lands the screen is a
 // spinner with no footer, so a key that is ignored looks like a key that is
 // broken. Every key that needs the item has to say so.
 func TestKeysDeclinedWhileLoadingSayWhy(t *testing.T) {
