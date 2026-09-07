@@ -15,8 +15,6 @@ import (
 )
 
 func (m Model) View() string {
-	// Every mode's fetch draws the same line: there is nothing of that mode
-	// to show yet.
 	if m.phase == phaseLoading {
 		return layout.ClipLines(m.spin.View()+" "+i18n.T("common.loading")+"\n", m.width)
 	}

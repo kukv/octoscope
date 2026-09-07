@@ -96,8 +96,7 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 }
 
 // TestLeavingTheSubmitPopupTakesItsErrorWithIt is the picker's rule for the
-// review popup: a failed submission's text belongs to the popup, and esc
-// must not leave it printed under the body.
+// review popup: esc must not leave the failure printed under the body.
 func TestLeavingTheSubmitPopupTakesItsErrorWithIt(t *testing.T) {
 	f := &fakeSource{
 		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},

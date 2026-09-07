@@ -47,10 +47,8 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 }
 
 // TestOpeningAnOverlayLeavesAFailedSubmitBehind pins what one error string
-// costs. Cancelling the popup takes the failed submission off the screen but
-// not off the model -- nothing outside the popup draws it -- so each key that
-// opens an overlay has to clear it, or the next composer or discard prompt
-// would carry a submission's failure that has nothing to do with it.
+// costs: cancelling the popup takes the failed submission off the screen but
+// not off the model, so each key that opens an overlay has to clear it.
 func TestOpeningAnOverlayLeavesAFailedSubmitBehind(t *testing.T) {
 	const boom = "boom from github"
 	cases := []struct {
@@ -64,8 +62,7 @@ func TestOpeningAnOverlayLeavesAFailedSubmitBehind(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// The context carries a pending review, so X has something to
-			// ask about rather than declining before the popup is reached.
+			// X declines without a pending review to ask about.
 			ctx := threadFixture()
 			ctx.PendingID = "PRR_9"
 			m := loaded(t, 120, 40)

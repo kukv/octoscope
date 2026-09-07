@@ -66,9 +66,8 @@ func TestGolden(t *testing.T) {
 				m := goldenModel(w)
 				golden.Assert(t, fmt.Sprintf("detail_%s_%d", lang.name, w), m.View())
 
-				// Every state below is reached by pressing the key that
-				// opens it, not by setting the field behind it: a recording
-				// of a state the keys cannot reach guards nothing.
+				// Every state below is reached by the key that opens it:
+				// a recording of an unreachable state guards nothing.
 				confirming, _ := m.Update(key("x"))
 				golden.Assert(t, fmt.Sprintf("detail_confirm_%s_%d", lang.name, w), confirming.View())
 
@@ -84,13 +83,11 @@ func TestGolden(t *testing.T) {
 				submitting, _ := openingReview.Update(cmd())
 				golden.Assert(t, fmt.Sprintf("detail_submit_%s_%d", lang.name, w), submitting.View())
 
-				// The first frame: nothing has arrived yet.
 				loading := New(&fakeSource{pr: goldenPR()}, prRef())
 				loading, _ = loading.Update(tea.WindowSizeMsg{Width: w, Height: 40})
 				golden.Assert(t, fmt.Sprintf("detail_loading_%s_%d", lang.name, w), loading.View())
 
-				// A failed action is drawn under the body, and no other
-				// recording covers that line.
+				// No other recording covers the error line.
 				failed, _ := m.Update(stateErrorMsg{err: errors.New("boom")})
 				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())
 			})

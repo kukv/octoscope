@@ -13,8 +13,8 @@ func wheelDown() tea.MouseWheelMsg {
 	return tea.MouseWheelMsg{X: 0, Y: 5, Button: tea.MouseWheelDown}
 }
 
-// longPR has a body taller than the viewport, so there is something to
-// scroll: a wheel test against a body that already fits proves nothing.
+// longPR has a body taller than the viewport: a wheel test against a body
+// that already fits proves nothing.
 func longPR() gh.PR {
 	return gh.PR{
 		Number: 1, Title: "a long one", State: gh.StateOpen,
@@ -34,9 +34,7 @@ func TestTheWheelScrollsTheBody(t *testing.T) {
 }
 
 // TestTheWheelIsIgnoredUnderAnOverlay keeps the wheel from scrolling text
-// nobody can see: the composer, the confirmation, the picker and the submit
-// popup are drawn over the body. Each overlay is reached by the key that
-// opens it, so a state the keys cannot reach cannot creep into the table.
+// nobody can see. Each overlay is reached by the key that opens it.
 func TestTheWheelIsIgnoredUnderAnOverlay(t *testing.T) {
 	open := func(t *testing.T, k string, settle bool) Model {
 		t.Helper()

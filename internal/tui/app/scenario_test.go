@@ -15,8 +15,8 @@ import (
 )
 
 // scenarioSource answers like the real thing does: a change lands, and the
-// next fetch sees it. app_test.go's fakeSource returns fixed values, which is
-// enough for routing but cannot show a scenario reaching its end.
+// next fetch sees it. app_test.go's fakeSource returns fixed values, which
+// cannot show a scenario reaching its end.
 type scenarioSource struct {
 	pr      gh.PR
 	files   []gh.FileDiff
@@ -105,7 +105,7 @@ func (f *scenarioSource) PRReviewContext(context.Context, string, int) (gh.Revie
 }
 
 // PostLineComment starts the pending review the first time, the way the
-// usecase does, and the thread it created shows up in the next fetch.
+// usecase does.
 func (f *scenarioSource) PostLineComment(_ usecase.ReviewTarget, c gh.PendingComment) (string, error) {
 	f.posted = append(f.posted, c)
 	f.pendingID = "PRR_1"
@@ -133,8 +133,7 @@ func scenarioPR() gh.PR {
 }
 
 // run presses each key and lets whatever it started finish, so a scenario
-// reads as the keys a user types. resolve is what makes that safe: it opens
-// the batches the fetches come wrapped in and stops at the spinner's tick.
+// reads as the keys a user types.
 func run(t *testing.T, m Model, keys ...string) Model {
 	t.Helper()
 	for _, k := range keys {
@@ -144,8 +143,6 @@ func run(t *testing.T, m Model, keys ...string) Model {
 	return m
 }
 
-// scenarioModel drives the root the way the terminal does: a size first, and
-// then everything the first size started.
 func scenarioModel(t *testing.T, f *scenarioSource) Model {
 	t.Helper()
 	i18n.SetLanguage(language.English)
@@ -156,10 +153,6 @@ func scenarioModel(t *testing.T, f *scenarioSource) Model {
 	return resolve(t, next.(Model), cmd)
 }
 
-// TestClosingFromTheReposTabShowsTheNewState walks the keys a user actually
-// presses: switch to Repos, open the row, ask to close it, confirm. Nothing
-// but the key sequence drives it, so the list, the detail view and the root
-// all have to agree for this to pass.
 func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 	f := &scenarioSource{pr: scenarioPR()}
 	m := scenarioModel(t, f)
@@ -179,9 +172,6 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 	}
 }
 
-// TestPickingALabelFromTheDetailViewAppliesIt covers the picker end to end:
-// the candidates are fetched, one is toggled, enter applies it, and the
-// refetch that follows is what puts it on screen.
 func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 	f := &scenarioSource{pr: scenarioPR(), labels: []gh.Label{{Name: "bug", Color: "d73a4a"}}}
 	m := scenarioModel(t, f)
@@ -196,11 +186,6 @@ func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 	}
 }
 
-// TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread is the scenario the
-// whole remediation started from: the line comment that never worked. It
-// starts where a user starts -- the Work board, which is the tab the root
-// opens on -- and crosses three views (board, detail, diff) on key presses
-// alone.
 func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	f := &scenarioSource{
 		pr: scenarioPR(),
@@ -216,20 +201,16 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	}
 	m := scenarioModel(t, f)
 
-	// The board's own d opens the diff too, so enter is checked on its own:
-	// without this the scenario would still reach the diff with the card's
-	// detail view never having opened.
+	// The board's own d opens the diff too, so enter is checked on its own.
 	m = run(t, m, "enter") // the card under the cursor -> the detail view
-	// The card itself carries the number, so the number is no evidence the
-	// detail view opened. The state line is drawn by nothing else here.
+	// The card carries the number too; the state line is detail's alone.
 	if !strings.Contains(content(m), "state: open") {
 		t.Fatalf("the detail view did not open:\n%s", content(m))
 	}
 
 	m = run(t, m, "d") // the detail view -> the diff
 	m = run(t, m, "j") // onto a line that can carry a comment
-	// "n" is one character of body: an empty one is not sent. key() puts a
-	// single character in Text, which is what the textarea inserts.
+	// An empty body is not sent, so type one character.
 	m = run(t, m, "c", "n", "ctrl+s")
 
 	if len(f.posted) != 1 {
@@ -238,8 +219,7 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	if f.posted[0].Path != "main.go" || f.posted[0].Line != 1 {
 		t.Errorf("posted at %s:%d, want main.go:1", f.posted[0].Path, f.posted[0].Line)
 	}
-	// The thread row carries its author, which nothing else on this screen
-	// does -- a one-character body would match anywhere.
+	// The author is drawn by the thread row alone.
 	if got := content(m); !strings.Contains(got, "kukv") {
 		t.Errorf("the view does not show the posted thread:\n%s", got)
 	}

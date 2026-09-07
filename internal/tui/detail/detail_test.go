@@ -666,8 +666,7 @@ func TestDetailFooterShowsStateAndPickerKeys(t *testing.T) {
 }
 
 // TestActionErrClearedOnReload guards against a stale error surviving a
-// successful reload: a failed close leaves the error text set, and a
-// subsequent r-triggered refresh must clear it once the new detail arrives.
+// successful reload.
 func TestActionErrClearedOnReload(t *testing.T) {
 	f := &fakeSource{
 		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
@@ -695,10 +694,8 @@ func TestActionErrClearedOnReload(t *testing.T) {
 }
 
 // TestOpeningTheComposerTakesTheBodysErrorWithIt pins what one error string
-// costs. A failed close leaves its text under the body; c opens the composer
-// over that body, and the failure has nothing to do with the comment being
-// written, so it is cleared rather than drawn inside the composer -- and it
-// does not come back when the composer is dismissed.
+// costs: a failed close leaves its text under the body, and c clears it
+// rather than draw it inside the composer.
 func TestOpeningTheComposerTakesTheBodysErrorWithIt(t *testing.T) {
 	f := &fakeSource{
 		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
@@ -831,10 +828,9 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	}
 }
 
-// TestTheWheelDoesNotScrollWhatTheSpinnerHides fixes the one behaviour this
-// fold changes on purpose: while the picker's candidates are in flight the
-// view draws a spinner, not the body, and a wheel that moved the text
-// underneath was scrolling what nobody can see.
+// TestTheWheelDoesNotScrollWhatTheSpinnerHides fixes a deliberate change:
+// while the picker's candidates are in flight the view draws a spinner, not
+// the body, so the wheel has nothing to move.
 func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 	f := &fakeSource{pr: longPR(), labels: []gh.Label{{Name: "bug"}}}
 	m := loaded(f, prRef())

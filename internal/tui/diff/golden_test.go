@@ -131,8 +131,8 @@ func TestGolden(t *testing.T) {
 	}
 }
 
-// loadingModel is the diff before either its files or its review context has
-// arrived, the first frame shown while both are still in flight.
+// loadingModel is the diff before either its files or its review context
+// has arrived.
 func loadingModel(width int) Model {
 	m := New(&fakeSource{files: goldenFixture()},
 		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
@@ -159,8 +159,8 @@ func reviewFailureModel(width int) Model {
 	return m
 }
 
-// submittingModel is goldenModel with the review popup open, a pending
-// review already on the diff so the popup has a line comment to count.
+// submittingModel is goldenModel with the review popup open. goldenReview's
+// thread comment is not pending, so the popup counts no line comments.
 func submittingModel(width int) Model {
 	m := goldenModel(width)
 	m.review.PendingID = "PRR_1"

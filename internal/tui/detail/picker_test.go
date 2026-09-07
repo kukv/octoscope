@@ -330,10 +330,10 @@ func TestPickerViewShowsItemsAndHelp(t *testing.T) {
 	}
 }
 
-// TestLeavingThePickerTakesItsErrorWithIt guards the one string that now
-// carries every failure: a picker error is the picker's, and once the picker
-// is gone the body must not go on showing it. Both ways out are covered --
-// esc, and the enter that closes because nothing is left to apply.
+// TestLeavingThePickerTakesItsErrorWithIt guards the one string that carries
+// every failure: once the picker is gone the body must not go on showing its
+// error. Both ways out are covered: esc, and the enter that closes because
+// nothing is left to apply.
 func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
 	failedApply := func(t *testing.T) Model {
 		t.Helper()

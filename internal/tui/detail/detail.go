@@ -58,11 +58,8 @@ type OpenDiffMsg struct{ Ref gh.ItemRef }
 type ErrorMsg struct{ Err error }
 
 type (
-	// itemMsg carries a fetch's answer along with the item it is about. The
-	// detail view is rebuilt for each item the user opens, but the request
-	// for the last one is still running: without the ref, its answer would
-	// land here and show the wrong item for as long as the current fetch
-	// takes.
+	// itemMsg carries the ref because the request for the item the user
+	// just left is still running, and its answer must not land here.
 	itemMsg struct {
 		ref  gh.ItemRef
 		item usecase.Item
@@ -83,9 +80,8 @@ type (
 	pickerAppliedMsg struct{}
 	pickErrorMsg     struct{ err error }
 
-	// reviewContextMsg and reviewContextErrMsg carry v's own fetch: unlike
-	// itemMsg, this one is not part of the initial load, so it still needs
-	// the ref guard against an item the user has since left.
+	// reviewContextMsg and reviewContextErrMsg carry the ref for the same
+	// reason itemMsg does.
 	reviewContextMsg struct {
 		ref gh.ItemRef
 		ctx gh.ReviewContext
@@ -96,32 +92,25 @@ type (
 	}
 )
 
-// mode is which overlay is on screen. Ten parallel bools named 2^10 nominal
-// states for the eleven this view reaches, and Update, handleKey and View
-// each assumed a different subset of them (.claude/rules/tui.md). mode and
-// phase name 5x3, and the eleven are: modeView idle or loading; modeCompose
-// and modeConfirm idle or working; modePick loading, idle or working;
-// modeSubmit loading or idle -- never working, because review.Model owns the
-// send. The other four are unreachable: phaseWorking is only ever set by the
-// compose, confirm and picker key handlers, and phaseLoading only alongside
-// the mode it is fetching for.
+// mode is which overlay is on screen (.claude/rules/tui.md).
 type mode uint8
 
 const (
-	modeView    mode = iota // the body on its own
-	modeCompose             // the comment composer
-	modeConfirm             // the close/reopen confirmation
-	modePick                // the label/assignee picker
-	modeSubmit              // the review submission popup
+	modeView mode = iota
+	modeCompose
+	modeConfirm
+	modePick
+	modeSubmit
 )
 
-// phase is where the current mode is in its own round trip.
+// phase is where the current mode is in its round trip. modeSubmit never
+// reaches phaseWorking: review.Model owns the send.
 type phase uint8
 
 const (
-	phaseIdle    phase = iota
-	phaseLoading       // fetching what the mode needs to open
-	phaseWorking       // sending
+	phaseIdle phase = iota
+	phaseLoading
+	phaseWorking
 )
 
 type Model struct {
@@ -133,10 +122,9 @@ type Model struct {
 	mode  mode
 	phase phase
 
-	// errText is the last failure, whatever produced it: which mode is on
-	// screen decides where it is drawn. What one string cannot carry is an
-	// error that outlives the mode it came from -- opening an overlay clears
-	// the body's error rather than draw someone else's failure inside it.
+	// errText is the last failure; the mode decides where it is drawn.
+	// Opening an overlay clears it rather than draw the body's failure
+	// inside it.
 	errText string
 
 	spin  spinner.Model
@@ -151,8 +139,6 @@ type Model struct {
 	labels    []string
 	assignees []string
 
-	// submit is the review submission popup (v), a small window drawn over
-	// this view rather than a view of its own.
 	submit review.Model
 }
 
@@ -226,9 +212,7 @@ func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
 }
 
 // stateAction reports whether the shown item can change state, and if so
-// whether the action is a close (true) or a reopen (false). Nothing has been
-// fetched yet is not a state of its own: loading is, and every caller checks
-// it first.
+// whether the action is a close (true) or a reopen (false).
 func (m Model) stateAction() (closing bool, ok bool) {
 	if m.phase == phaseLoading {
 		return false, false
@@ -347,9 +331,6 @@ func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// itemArrived puts a fetched item on screen. An answer for an item the user
-// has already left is dropped: the request for the last one is still running
-// while the view is rebuilt for the new one.
 func (m Model) itemArrived(msg itemMsg) Model {
 	if msg.ref != m.ref {
 		return m
@@ -490,8 +471,7 @@ func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
-	// The body is the only thing here that scrolls, and it is only on
-	// screen with nothing over it and nothing in flight.
+	// The body is drawn only with nothing over it and nothing in flight.
 	if m.mode != modeView || m.phase != phaseIdle {
 		return m, nil
 	}
@@ -501,9 +481,8 @@ func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Nothing an overlay's keys could act on is on screen until what it was
-	// opened for arrives. modeView is the exception: the body is drawn, and
-	// q still leaves.
+	// An overlay's keys have nothing to act on until its fetch answers.
+	// modeView is the exception: the body is drawn, and q still leaves.
 	if m.mode != modeView && m.phase == phaseLoading {
 		return m, nil
 	}
@@ -522,14 +501,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "q", "esc":
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "o":
-		// Before the item lands there is no address to open.
 		if m.url == "" {
 			return m, nil
 		}
 		return m, openWeb(m.src, m.ref, m.url)
 	case "d":
-		// An issue has no diff. Opening an empty diff view would be a worse
-		// answer than doing nothing.
+		// An issue has no diff.
 		if m.ref.Kind != gh.ItemPR {
 			return m, nil
 		}
@@ -558,10 +535,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.errText = ""
 		return m, nil
 	case "v":
-		// An issue has no review. detail has no diff of its own, so unlike
-		// the diff view's v this always needs a fetch first -- there is no
-		// review context already sitting on the model to open the popup
-		// against.
+		// An issue has no review. Unlike the diff view's v, this always
+		// fetches first: detail holds no review context of its own.
 		if m.phase == phaseLoading || m.ref.Kind != gh.ItemPR {
 			return m, nil
 		}
@@ -584,7 +559,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, fetchAssigneePicker(m.src, m.ref)
 	}
 	var cmd tea.Cmd
-	m.body, cmd = m.body.Update(msg) // j/k and friends scroll the viewport
+	m.body, cmd = m.body.Update(msg)
 	return m, cmd
 }
 
@@ -671,8 +646,6 @@ func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// setContent renders markdown through glamour into the viewport, falling back
-// to the raw markdown when glamour cannot render it.
 func (m *Model) setContent(md string) {
 	width := m.width
 	if width <= 0 {

@@ -77,8 +77,7 @@ func (m Model) startDiscard() Model {
 }
 
 // handleDiscardKey swallows every key while the discard is in flight, which
-// is what keeps a second y from firing DiscardReview twice: the phase, not
-// the mode, is what changed when the first one went out.
+// is what keeps a second y from firing DiscardReview twice.
 func (m Model) handleDiscardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.phase == phaseWorking {
 		return m, nil
