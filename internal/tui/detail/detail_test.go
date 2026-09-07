@@ -254,6 +254,47 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+func TestSAsksForTheChecks(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	m := loaded(f, prRef())
+	_, cmd := m.Update(key("s"))
+	if cmd == nil {
+		t.Fatal("s produced no command")
+	}
+	msg, ok := cmd().(OpenChecksMsg)
+	if !ok {
+		t.Fatalf("got %T, want OpenChecksMsg", cmd())
+	}
+	if msg.Ref != prRef() {
+		t.Errorf("Ref = %+v, want %+v", msg.Ref, prRef())
+	}
+}
+
+// TestSDoesNothingOnAnIssue is what stops the checks view opening on
+// something that has no checks.
+func TestSDoesNothingOnAnIssue(t *testing.T) {
+	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	m := loaded(f, issueRef())
+	if _, cmd := m.Update(key("s")); cmd != nil {
+		t.Errorf("s on an issue produced %T", cmd())
+	}
+}
+
+// TestKeyBarNamesTheChecksKey pins s alongside d in the footer: a key with
+// no hint is a key nobody can find. It only shows on a pull request, the
+// same way d does.
+func TestKeyBarNamesTheChecksKey(t *testing.T) {
+	pr := loaded(&fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}, prRef())
+	if got := pr.View(); !strings.Contains(got, "s:checks") {
+		t.Errorf("key bar = %q, want it to mention s:checks", got)
+	}
+
+	issue := loaded(&fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}, issueRef())
+	if got := issue.View(); strings.Contains(got, "s:checks") {
+		t.Errorf("key bar = %q, an issue has no checks to hint at", got)
+	}
+}
+
 // TestOOpensTheShownItemsOwnURL pins that o opens the address GitHub gave
 // the item, rather than one octoscope spelled out itself.
 func TestOOpensTheShownItemsOwnURL(t *testing.T) {

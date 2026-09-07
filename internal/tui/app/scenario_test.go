@@ -22,6 +22,7 @@ type scenarioSource struct {
 	files   []gh.FileDiff
 	labels  []gh.Label
 	threads []gh.ReviewThread
+	checks  gh.Checks
 
 	pendingID string
 	posted    []gh.PendingComment
@@ -119,6 +120,18 @@ func (f *scenarioSource) PostLineComment(_ usecase.ReviewTarget, c gh.PendingCom
 func (f *scenarioSource) DiscardReview(string) error { return nil }
 
 func (f *scenarioSource) SubmitReview(usecase.ReviewTarget, gh.ReviewEvent, string) error {
+	return nil
+}
+
+func (f *scenarioSource) PRChecks(context.Context, string, int) (gh.Checks, error) {
+	return f.checks, nil
+}
+
+func (f *scenarioSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine, error) {
+	return nil, nil
+}
+
+func (f *scenarioSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error {
 	return nil
 }
 

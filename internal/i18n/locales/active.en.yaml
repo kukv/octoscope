@@ -161,7 +161,7 @@ submit:
 
 footer:
   list:
-    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  q:quit"
+    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  s:checks  q:quit"
   close:
     other: "x:close"
   reopen:
@@ -176,7 +176,7 @@ footer:
     quit:
       other: "q:quit"
   work:
-    other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  q:quit"
+    other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  s:checks  q:quit"
   # detail's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
   # internal/tui/layout.FitKeyBar, the same mechanism as diff's below). esc
@@ -194,6 +194,8 @@ footer:
       other: "v:review"
     diff:
       other: "d:diff"
+    checks:
+      other: "s:checks"
     refresh:
       other: "r:refresh"
     web:
@@ -233,6 +235,64 @@ footer:
       other: "r:refresh"
   diff_comment:
     other: "ctrl+s:send  esc:cancel"
+  # checks' key bar is built from these, most important first, and dropped
+  # from the end when the terminal is too narrow for all of them (see
+  # internal/tui/layout.FitKeyBar, the same mechanism as diff's above). esc
+  # is first because it must never be the one dropped: it is the only way
+  # out of the view.
+  checks:
+    esc:
+      other: "esc:back"
+    move:
+      other: "j/k:move"
+    log:
+      other: "enter:log"
+    full:
+      other: "L:full log"
+    rerun:
+      other: "R:rerun"
+    pane:
+      other: "h/l:pane"
+    open:
+      other: "o:web"
+    refresh:
+      other: "r:refresh"
+
+checks:
+  title:
+    other: "Checks"
+  none:
+    other: "no checks on this pull request"
+  loading:
+    other: "loading checks..."
+  summary:
+    other: "{{.Failing}} failing · {{.Running}} running"
+  decline_status_context:
+    other: "this check reports from outside GitHub Actions; press o to open it"
+  decline_loading:
+    other: "still loading the checks; try again in a moment"
+  log_loading:
+    other: "loading the log..."
+  log_empty_failed:
+    other: "no step of this job failed"
+  log_empty_full:
+    other: "this job wrote no log"
+  log_full:
+    other: "full log"
+  log_failed_only:
+    other: "failed steps"
+  rerun_title:
+    other: "Rerun {{.Workflow}}"
+  rerun_failed_only:
+    other: "only the failed jobs"
+  rerun_all:
+    other: "the whole workflow"
+  rerun_started:
+    other: "rerun requested; press r to see it"
+  decline_rerun_status_context:
+    other: "only GitHub Actions checks can be rerun from here"
+  decline_no_url:
+    other: "this check reports no page of its own to open"
 
 md:
   author:

@@ -47,6 +47,7 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 		"submit_review.graphql":  submitReviewMutation,
 		"review_at_once.graphql": reviewAtOnceMutation,
 		"discard_review.graphql": discardReviewMutation,
+		"checks.graphql":         checksQuery,
 	}
 	schema := loadSchema(t)
 	for name, doc := range docs {

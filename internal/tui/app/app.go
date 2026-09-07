@@ -12,6 +12,7 @@ import (
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/checks"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/diff"
 	"github.com/kukv/octoscope/internal/tui/repo"
@@ -27,6 +28,7 @@ type Source interface {
 	repo.Source
 	detail.Source
 	diff.Source
+	checks.Source
 }
 
 // Options carries what main determined before the UI started.
@@ -92,6 +94,7 @@ type overlay int
 const (
 	overlayDetail overlay = iota
 	overlayDiff
+	overlayChecks
 )
 
 type Model struct {
@@ -110,6 +113,7 @@ type Model struct {
 	repo   repo.Model
 	detail detail.Model
 	diff   diff.Model
+	checks checks.Model
 
 	// started guards the first fetch, which waits for the first size rather
 	// than happening in Init: work.Refresh hands back a model carrying the
@@ -185,11 +189,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.openDiff(msg.Ref)
 	case detail.OpenDiffMsg:
 		return m.openDiffOverDetail(msg.Ref)
+	case work.OpenChecksMsg:
+		return m.openChecks(msg.Ref)
+	case repo.OpenChecksMsg:
+		return m.openChecks(msg.Ref)
+	case detail.OpenChecksMsg:
+		return m.openChecksOverDetail(msg.Ref)
 	case detail.ClosedMsg:
 		m.stack = m.pop(overlayDetail)
 		return m, nil
 	case diff.ClosedMsg:
 		m.stack = m.pop(overlayDiff)
+		return m, nil
+	case checks.ClosedMsg:
+		m.stack = m.pop(overlayChecks)
 		return m, nil
 	case work.ErrorMsg:
 		return m.fail(msg.Err)
@@ -199,6 +212,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.detailFailed(msg)
 	case diff.ErrorMsg:
 		return m.diffFailed(msg)
+	case checks.ErrorMsg:
+		return m.checksFailed(msg)
 	case review.SubmittedMsg:
 		return m.reviewSubmitted(msg)
 	}
@@ -240,6 +255,16 @@ func (m Model) diffFailed(msg diff.ErrorMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m.failOverlay(msg.Err, overlayDiff)
+}
+
+// Same rule as detail.ErrorMsg and diff.ErrorMsg: a request outlives the
+// view that started it, and its failure must not reach the error screen
+// once checks is no longer on the stack.
+func (m Model) checksFailed(msg checks.ErrorMsg) (tea.Model, tea.Cmd) {
+	if !m.has(overlayChecks) {
+		return m, nil
+	}
+	return m.failOverlay(msg.Err, overlayChecks)
 }
 
 // detail and diff each refetch their own PR when a review goes out
@@ -314,6 +339,11 @@ func (m Model) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
+	if m.has(overlayChecks) {
+		m.checks, cmd = m.checks.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -339,6 +369,11 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		var diffCmd tea.Cmd
 		m.diff, diffCmd = m.diff.Update(msg)
 		cmds = append(cmds, diffCmd)
+	}
+	if m.has(overlayChecks) {
+		var checksCmd tea.Cmd
+		m.checks, checksCmd = m.checks.Update(msg)
+		cmds = append(cmds, checksCmd)
 	}
 
 	if !m.started {
@@ -384,6 +419,28 @@ func (m Model) startDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 	// WindowSizeMsg that told the others how wide they are.
 	m.diff, _ = m.diff.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	return m, m.diff.Init()
+}
+
+// openChecks shows the checks on their own, with the tabs underneath: the
+// Work board and a Repos row have no detail view open when they ask for it.
+func (m Model) openChecks(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+	m.stack = []overlay{overlayChecks}
+	return m.startChecks(ref)
+}
+
+// openChecksOverDetail puts checks on top of the detail view, so esc goes
+// back to it rather than to the tabs.
+func (m Model) openChecksOverDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+	m.stack = append(m.stack, overlayChecks)
+	return m.startChecks(ref)
+}
+
+func (m Model) startChecks(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+	m.checks = checks.New(m.src, ref)
+	// The view is built after the terminal size is known, so it never sees the
+	// WindowSizeMsg that told the others how wide they are.
+	m.checks, _ = m.checks.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	return m, m.checks.Init()
 }
 
 // fail moves to the error screen for a failure that is not tied to any one
@@ -465,6 +522,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch top {
 		case overlayDiff:
 			m.diff, cmd = m.diff.Update(msg)
+		case overlayChecks:
+			m.checks, cmd = m.checks.Update(msg)
 		default:
 			m.detail, cmd = m.detail.Update(msg)
 		}

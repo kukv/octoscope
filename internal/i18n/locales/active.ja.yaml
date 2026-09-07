@@ -156,7 +156,7 @@ submit:
 
 footer:
   list:
-    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  q:終了"
+    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  s:checks  q:終了"
   close:
     other: "x:クローズ"
   reopen:
@@ -171,7 +171,7 @@ footer:
     quit:
       other: "q:終了"
   work:
-    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  q:終了"
+    other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  s:checks  q:終了"
   # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、
   # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar。
   # diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
@@ -188,6 +188,8 @@ footer:
       other: "v:レビュー"
     diff:
       other: "d:diff"
+    checks:
+      other: "s:checks"
     refresh:
       other: "r:更新"
     web:
@@ -226,6 +228,62 @@ footer:
       other: "r:再取得"
   diff_comment:
     other: "ctrl+s:送信  esc:取消"
+  # diff の下と同じ仕組み（internal/tui/layout.FitKeyBar）で、checks の
+  # キーバーはこの並びから組み立てる。esc は先頭に置く — 落としてはいけない
+  # 唯一の出口だから。
+  checks:
+    esc:
+      other: "esc:戻る"
+    move:
+      other: "j/k:移動"
+    log:
+      other: "enter:ログ"
+    full:
+      other: "L:全ログ"
+    rerun:
+      other: "R:再実行"
+    pane:
+      other: "h/l:ペイン"
+    open:
+      other: "o:Web"
+    refresh:
+      other: "r:再取得"
+
+checks:
+  title:
+    other: "Checks"
+  none:
+    other: "この PR には check がありません"
+  loading:
+    other: "checks を読み込み中..."
+  summary:
+    other: "失敗 {{.Failing}} · 実行中 {{.Running}}"
+  decline_status_context:
+    other: "この check は GitHub Actions の外から報告されています。o で開けます"
+  decline_loading:
+    other: "checks を読み込み中です。少し待ってからもう一度"
+  log_loading:
+    other: "ログを読み込み中..."
+  log_empty_failed:
+    other: "このジョブに失敗したステップはありません"
+  log_empty_full:
+    other: "このジョブはログを出力していません"
+  log_full:
+    other: "全ログ"
+  log_failed_only:
+    other: "失敗ステップ"
+  rerun_title:
+    other: "{{.Workflow}} を再実行"
+  rerun_failed_only:
+    other: "失敗したジョブのみ"
+  rerun_all:
+    other: "ワークフロー全体"
+  rerun_started:
+    other: "再実行を要求しました。r で取り直せます"
+  decline_rerun_status_context:
+    other: "ここから再実行できるのは GitHub Actions の check だけです"
+  decline_no_url:
+    other: "この check は開けるページを報告していません"
 
 md:
   author:

@@ -54,6 +54,9 @@ type ClosedMsg struct{}
 // OpenDiffMsg asks the parent to show the diff of the shown pull request.
 type OpenDiffMsg struct{ Ref gh.ItemRef }
 
+// OpenChecksMsg asks the parent to show the checks of the shown pull request.
+type OpenChecksMsg struct{ Ref gh.ItemRef }
+
 // ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
@@ -596,6 +599,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		ref := m.ref
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
+	case "s":
+		// An issue has no checks.
+		if m.ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		ref := m.ref
+		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
 	case "r":
 		m.phase = phaseLoading
 		m.declined = ""

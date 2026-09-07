@@ -158,7 +158,11 @@ func rollup(nodes []checkNode) gh.Checks {
 	for _, node := range nodes {
 		c.Total++
 		state := checkOutcome(node)
-		c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state})
+		kind := gh.CheckKindRun
+		if node.Typename == "StatusContext" {
+			kind = gh.CheckKindStatus
+		}
+		c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state, Kind: kind})
 		switch state {
 		case gh.CheckSuccess:
 			c.Passed++

@@ -203,6 +203,36 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+func TestSAsksForTheChecks(t *testing.T) {
+	m := loaded()
+	_, cmd := m.Update(key("s"))
+	if cmd == nil {
+		t.Fatal("s produced no command")
+	}
+	msg, ok := cmd().(OpenChecksMsg)
+	if !ok {
+		t.Fatalf("got %T, want OpenChecksMsg", cmd())
+	}
+	want, _ := m.SelectedRef()
+	if msg.Ref != want {
+		t.Errorf("s asked for %+v, want the selected card %+v", msg.Ref, want)
+	}
+}
+
+// TestSDoesNothingOnAnIssue is what stops the checks view opening on
+// something that has no checks.
+func TestSDoesNothingOnAnIssue(t *testing.T) {
+	m := loaded()
+	m = press(m, "l") // column 1 (your PRs) is empty
+	m = press(m, "l") // column 2 (assigned) holds the issue
+	if ref, ok := m.SelectedRef(); !ok || ref.Kind != gh.ItemIssue {
+		t.Fatalf("selection = %+v, ok=%v, want the issue", ref, ok)
+	}
+	if _, cmd := m.Update(key("s")); cmd != nil {
+		t.Errorf("s on an issue produced %T", cmd())
+	}
+}
+
 func TestFetchFailureBecomesAnErrorMsg(t *testing.T) {
 	m := New(&fakeSource{err: errors.New("boom")})
 	_, cmd := m.Update(errMsg{errors.New("boom")})
