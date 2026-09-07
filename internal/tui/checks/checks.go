@@ -392,8 +392,15 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 func (m Model) follow() Model {
 	h := m.paneHeight()
 	line := m.cursorLine()
-	if line < m.top {
-		m.top = line
+	// The first check of a group is only readable as one of that group with
+	// the heading over it on screen, so it is the heading's line the window
+	// stops at.
+	top := line
+	if m.row < len(m.order) && m.hasHeading(m.row) {
+		top--
+	}
+	if top < m.top {
+		m.top = top
 	}
 	if line >= m.top+h {
 		m.top = line - h + 1

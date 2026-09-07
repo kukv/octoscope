@@ -470,6 +470,45 @@ func TestAnExternalCIsStateDoesNotMoveAnAppsCheck(t *testing.T) {
 	}
 }
 
+// listPane is the left column of the drawn view as plain text, so a workflow
+// heading ("delta") can be told apart from the checks under it
+// ("delta-job0"), which carry the workflow's name too.
+func listPane(m Model) []string {
+	var out []string
+	for _, line := range strings.Split(ansi.Strip(m.View()), "\n") {
+		left, _, ok := strings.Cut(line, "│")
+		if !ok {
+			continue
+		}
+		out = append(out, strings.TrimSpace(left))
+	}
+	return out
+}
+
+// TestScrollingBackToAGroupsFirstCheckBringsItsHeading guards what the window
+// has to hold besides the cursor's own line. Scrolling up onto the first
+// check of a group leaves that group's heading one line above the window, and
+// the check reads as belonging to no workflow at all.
+func TestScrollingBackToAGroupsFirstCheckBringsItsHeading(t *testing.T) {
+	t.Parallel()
+
+	m := New(&fakeSource{checks: manyChecks()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 12})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: manyChecks()})
+	for range 31 {
+		m = press(m, "j")
+	}
+	for range 7 {
+		m = press(m, "k")
+	}
+	if got := m.order[m.row].Name; got != "delta-job0" {
+		t.Fatalf("the cursor sits on %q, want the first check of the last group", got)
+	}
+	if !slices.Contains(listPane(m), "delta") {
+		t.Errorf("the group's heading is off the top of the window:\n%s", m.View())
+	}
+}
+
 // TestALogIsNotAskedForACheckWithNoJobBehindIt guards what enter is allowed
 // to ask for. A check run an App created carries a check run id where a
 // workflow's check carries an Actions job id, so asking gh for its log fails
