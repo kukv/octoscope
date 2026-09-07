@@ -3,6 +3,7 @@ package detail
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -843,5 +844,21 @@ func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 	if m.body.YOffset() != before {
 		t.Errorf("the body scrolled to %d while the fetch was in flight, want %d",
 			m.body.YOffset(), before)
+	}
+}
+
+// TestEveryStateNamesItself catches an overlay added without a name: every
+// assertion in this package reports mode and phase with %v, and a nameless
+// one is printed as a number nobody can read.
+func TestEveryStateNamesItself(t *testing.T) {
+	for m := modeView; m <= modeSubmit; m++ {
+		if got := fmt.Sprintf("%v", m); strings.Contains(got, "?") {
+			t.Errorf("mode %d prints as %q", uint8(m), got)
+		}
+	}
+	for p := phaseIdle; p <= phaseWorking; p++ {
+		if got := fmt.Sprintf("%v", p); strings.Contains(got, "?") {
+			t.Errorf("phase %d prints as %q", uint8(p), got)
+		}
 	}
 }
