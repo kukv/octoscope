@@ -383,8 +383,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.fetchFailed(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
-	case tea.MouseWheelMsg:
-		return m.wheel(msg)
 	}
 	// The merge popup fetches for itself, and its answer is a type this view
 	// cannot name. Everything left over while it is open is its: sizes, keys
@@ -393,6 +391,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.merge, cmd = m.merge.Update(msg)
 		return m, cmd
+	}
+	if msg, ok := msg.(tea.MouseWheelMsg); ok {
+		return m.wheel(msg)
 	}
 	return m, nil
 }
