@@ -29,6 +29,8 @@ func (m Model) View() string {
 		return m.confirmView()
 	case modeSubmit:
 		return m.submitView()
+	case modeMerge:
+		return m.mergeView()
 	case modePick:
 		return m.pickerView()
 	case modeView:
@@ -51,8 +53,8 @@ func (m Model) footer() string {
 
 // footerHints lists the detail view's hints, most important first. esc is
 // first because layout.FitKeyBar never drops it: it is the only way out of
-// the view. review, diff and checks only apply to a pull request, and state
-// (close or reopen) only when the item can do one of them (not merged).
+// the view. review, diff and checks only apply to a pull request; merge and
+// state (close or reopen) only while the item is still open.
 func (m Model) footerHints() []string {
 	hints := []string{
 		i18n.T("footer.detail.esc"),
@@ -60,7 +62,11 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.detail.comment"),
 	}
 	if m.ref.Kind == gh.ItemPR {
-		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"), i18n.T("footer.detail.checks"))
+		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"),
+			i18n.T("footer.detail.checks"))
+	}
+	if m.canMerge() {
+		hints = append(hints, i18n.T("footer.detail.merge"))
 	}
 	if s := m.stateFooterKey(); s != "" {
 		hints = append(hints, s)
@@ -84,6 +90,17 @@ func (m Model) submitView() string {
 		body += wrapErr(m.errText, m.width) + "\n"
 	}
 	return body + layout.ClipLines(theme.Dim().Render(i18n.T("footer.submit")), m.width)
+}
+
+// mergeView draws the merge popup with a failed merge's error underneath it.
+// Unlike submitView it adds no key bar: the popup draws its own.
+func (m Model) mergeView() string {
+	body := layout.ClipLines(theme.Title().Render(m.title), m.width) + "\n\n"
+	body += m.merge.View() + "\n"
+	if m.errText != "" {
+		body += wrapErr(m.errText, m.width) + "\n"
+	}
+	return body
 }
 
 // wrapErr lays out a failure that came from gh or GitHub. Unlike the hints and

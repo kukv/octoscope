@@ -12,6 +12,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/merge"
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
@@ -40,6 +41,9 @@ type fakeSource struct {
 
 	submitCalls []string // "<pending id>:<body>"
 	submitErr   error
+
+	mergeCtx gh.MergeContext
+	mergeErr error
 }
 
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
@@ -118,6 +122,14 @@ func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, 
 	f.submitCalls = append(f.submitCalls, t.PendingID+":"+body)
 	return f.submitErr
 }
+
+func (f *fakeSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
+	return f.mergeCtx, f.mergeErr
+}
+
+func (f *fakeSource) MergePR(string, gh.MergeMethod) error         { return nil }
+func (f *fakeSource) EnableAutoMerge(string, gh.MergeMethod) error { return nil }
+func (f *fakeSource) DisableAutoMerge(string) error                { return nil }
 
 func editSuffix(add, remove []string) string {
 	return ":add=" + strings.Join(add, ",") + ":remove=" + strings.Join(remove, ",")
@@ -971,7 +983,7 @@ func TestTheDeclineGoesAwayWithTheWait(t *testing.T) {
 // assertion in this package reports mode and phase with %v, and an unnamed
 // one is printed as a number nobody can read.
 func TestEveryStateNamesItself(t *testing.T) {
-	for m := modeView; m <= modeSubmit; m++ {
+	for m := modeView; m <= modeMerge; m++ {
 		if got := fmt.Sprintf("%v", m); strings.Contains(got, "?") {
 			t.Errorf("mode %d prints as %q", uint8(m), got)
 		}
@@ -980,5 +992,223 @@ func TestEveryStateNamesItself(t *testing.T) {
 		if got := fmt.Sprintf("%v", p); strings.Contains(got, "?") {
 			t.Errorf("phase %d prints as %q", uint8(p), got)
 		}
+	}
+}
+
+// TestMOpensTheMergePopup covers the key that opens it. The size comes first
+// because the popup draws nothing until it has a width.
+func TestMOpensTheMergePopup(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	if cmd == nil {
+		t.Fatal("m returned no command: the popup never fetches")
+	}
+	if m.mode != modeMerge || m.phase != phaseIdle {
+		t.Fatalf("mode/phase = %v/%v, want the popup open", m.mode, m.phase)
+	}
+	if !strings.Contains(ansi.Strip(m.View()), i18n.T("merge.loading")) {
+		t.Errorf("the merge popup is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// TestTheMergePopupGetsItsOwnAnswer: the popup fetches for itself, and its
+// answer is a message type this view cannot name. Without forwarding, the
+// popup would sit on "asking GitHub" forever.
+func TestTheMergePopupGetsItsOwnAnswer(t *testing.T) {
+	f := &fakeSource{
+		pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeCtx: gh.MergeContext{
+			PullRequestID: "PR_1",
+			Mergeable:     gh.MergeableYes,
+			State:         gh.MergeStateUnstable,
+			Methods:       []gh.MergeMethod{gh.MergeSquash},
+		},
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, i18n.T("merge.loading")) {
+		t.Errorf("the popup is still asking GitHub after its answer arrived:\n%s", view)
+	}
+	if !strings.Contains(view, i18n.T("merge.method_squash")) {
+		t.Errorf("the popup does not show what the repository allows:\n%s", view)
+	}
+}
+
+// TestMDoesNothingOnAnIssue mirrors v's and d's own guard: an issue has
+// nothing to merge.
+func TestMDoesNothingOnAnIssue(t *testing.T) {
+	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	m := loaded(f, issueRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	before := m.View()
+	m, cmd := m.Update(key("m"))
+	if cmd != nil {
+		t.Errorf("m sent %T on an issue, which has no merge", cmd())
+	}
+	if m.View() != before {
+		t.Error("m changed the screen on an issue")
+	}
+}
+
+// TestAMergeClosesTheDetailView: a merged pull request leaves the view, and
+// the refetch of the board is the root's. The view must not send the merge
+// message on again, or the root would refresh twice.
+func TestAMergeClosesTheDetailView(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = m.Update(key("m"))
+	m, cmd := m.Update(merge.MergedMsg{Merged: true})
+	if cmd == nil {
+		t.Fatal("MergedMsg produced no command: the view stays open on a merged pull request")
+	}
+	if msg := cmd(); msg != tea.Msg(ClosedMsg{}) {
+		t.Errorf("cmd() = %#v, want ClosedMsg{}: the root is what refetches", msg)
+	}
+	if m.merge.Active() {
+		t.Error("the popup is still active after the merge")
+	}
+}
+
+// TestAnAutoMergeChangeKeepsTheDetailViewOpen: closing the view is what a
+// merge does. Joining or leaving the queue leaves the pull request open, and
+// the user was reading it.
+func TestAnAutoMergeChangeKeepsTheDetailViewOpen(t *testing.T) {
+	f := &fakeSource{
+		pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeCtx: gh.MergeContext{
+			PullRequestID:            "PR_1",
+			Mergeable:                gh.MergeableYes,
+			State:                    gh.MergeStateUnstable,
+			Methods:                  []gh.MergeMethod{gh.MergeSquash},
+			AutoMergeAllowed:         true,
+			ViewerCanEnableAutoMerge: true,
+		},
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
+
+	m, cmd = m.Update(merge.MergedMsg{})
+	if m.mode != modeMerge || !m.merge.Active() {
+		t.Fatalf("mode = %v, want the popup still up on a pull request that was only queued", m.mode)
+	}
+	if cmd == nil {
+		t.Fatal("nothing refetched: the popup would show the queue the pull request had before")
+	}
+	if msg := cmd(); msg == tea.Msg(ClosedMsg{}) {
+		t.Error("the view closed on a pull request that was only queued")
+	}
+}
+
+// TestEscFromTheMergePopupLeavesTheBody is the way back out, the same shape
+// TestSubmitEscCancelsThePopup pins for the review popup.
+func TestEscFromTheMergePopupLeavesTheBody(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
+	m, cmd = m.Update(key("esc"))
+	if cmd == nil {
+		t.Fatal("esc in the merge popup produced no command")
+	}
+	m, _ = m.Update(cmd())
+	if m.mode != modeView {
+		t.Errorf("mode = %v after esc, want the body back", m.mode)
+	}
+	if m.merge.Active() {
+		t.Error("the popup is still active after esc")
+	}
+}
+
+// TestAFailedMergeStaysUnderThePopup is the same rule as a failed review
+// submission: GitHub's message is drawn at footer level and the popup stays
+// up with what the user chose.
+func TestAFailedMergeStaysUnderThePopup(t *testing.T) {
+	f := &fakeSource{
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeErr: errors.New("gh: HTTP 405 not mergeable"),
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
+	if m.mode != modeMerge {
+		t.Errorf("mode = %v after a failed merge, want the popup still up", m.mode)
+	}
+	if !strings.Contains(m.errText, "405") {
+		t.Errorf("errText = %q, want GitHub's message", m.errText)
+	}
+}
+
+// TestAClosedPopupsFailureDoesNotReachTheFooter: the fetch a popup started
+// outlives the popup. Its failure must not clear a second popup's loading
+// flag, nor put a message about a request nobody made under it.
+func TestAClosedPopupsFailureDoesNotReachTheFooter(t *testing.T) {
+	f := &fakeSource{
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeErr: errors.New("gh: HTTP 500"),
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	stale := cmd()
+	m, cmd = m.Update(key("esc"))
+	m, _ = m.Update(cmd())
+	m, _ = m.Update(key("m"))
+
+	m, _ = m.Update(stale)
+	if m.errText != "" {
+		t.Errorf("errText = %q, want empty: the failure belongs to the popup that was closed", m.errText)
+	}
+	if !strings.Contains(ansi.Strip(m.View()), i18n.T("merge.loading")) {
+		t.Errorf("the second popup stopped waiting for its own answer:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// TestMDoesNothingOnAMergedPullRequest: GitHub answers UNKNOWN for a merged
+// pull request, so the popup would say it is still working the answer out and
+// r would never change it.
+func TestMDoesNothingOnAMergedPullRequest(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateMerged}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	before := m.View()
+	m, cmd := m.Update(key("m"))
+	if cmd != nil {
+		t.Errorf("m sent %T on a merged pull request, which has nothing to merge", cmd())
+	}
+	if m.mode != modeView {
+		t.Errorf("mode = %v, want the body: a merged pull request has no merge popup", m.mode)
+	}
+	if m.View() != before {
+		t.Error("m changed the screen on a merged pull request")
+	}
+	if strings.Contains(before, "m:merge") {
+		t.Errorf("a merged pull request's footer offers a merge:\n%s", before)
+	}
+}
+
+// TestTheMergeKeyIsInTheFooterOnAPullRequestOnly: an issue has no merge, so
+// its key bar must not offer one.
+func TestTheMergeKeyIsInTheFooterOnAPullRequestOnly(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	if !strings.Contains(m.View(), "m:merge") {
+		t.Errorf("detail footer missing m:merge:\n%s", m.View())
+	}
+
+	i := loaded(&fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}, issueRef())
+	i, _ = i.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	if strings.Contains(i.View(), "m:merge") {
+		t.Errorf("an issue's footer offers a merge:\n%s", i.View())
 	}
 }

@@ -41,6 +41,8 @@ type glyphs struct {
 	barDone, barRest                                 string
 	collapsed, commentBar                            string
 	threadBadge                                      string
+	radioOn, radioOff                                string
+	warning                                          string
 }
 
 var sets = map[Set]glyphs{
@@ -51,6 +53,7 @@ var sets = map[Set]glyphs{
 		barDone: "▰", barRest: "▱",
 		collapsed: "▸", commentBar: "▌",
 		threadBadge: "●",
+		radioOn:     "●", radioOff: "○", warning: "⚠",
 	},
 	Nerd: {
 		approved: "", changesRequested: "", reviewPending: "", draft: "",
@@ -59,6 +62,7 @@ var sets = map[Set]glyphs{
 		barDone: "█", barRest: "░",
 		collapsed: "▸", commentBar: "▌",
 		threadBadge: "●",
+		radioOn:     "●", radioOff: "○", warning: "⚠",
 	},
 	ASCII: {
 		approved: "+", changesRequested: "x", reviewPending: "*", draft: "o",
@@ -67,6 +71,7 @@ var sets = map[Set]glyphs{
 		barDone: "#", barRest: "-",
 		collapsed: ">", commentBar: "|",
 		threadBadge: "*",
+		radioOn:     "*", radioOff: "o", warning: "!",
 	},
 }
 
@@ -147,6 +152,20 @@ func Collapsed() string { return active().collapsed }
 // CommentBar returns the one-column bar drawn down the left of a review
 // comment.
 func CommentBar() string { return active().commentBar }
+
+// Radio returns the one-column marker for one option in a list where a
+// single one is chosen.
+func Radio(on bool) string {
+	g := active()
+	if on {
+		return g.radioOn
+	}
+	return g.radioOff
+}
+
+// Warning returns the one-column marker drawn beside a reason something
+// cannot be done.
+func Warning() string { return active().warning }
 
 // ThreadBadge returns the one-column marker drawn beside a file's review
 // thread count in the diff sidebar.

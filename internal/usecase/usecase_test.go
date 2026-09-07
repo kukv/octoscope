@@ -28,6 +28,13 @@ type fakeSource struct {
 	rerunRepo  string
 	rerunRunID int64
 	rerunScope gh.RerunScope
+
+	mergeContext        gh.MergeContext
+	mergedID            string
+	mergedMethod        gh.MergeMethod
+	autoMergeID         string
+	autoMergeMethod     gh.MergeMethod
+	disabledAutoMergeID string
 }
 
 func (f *fakeSource) GetPR(_ context.Context, _ string, _ int) (gh.PR, error) {
@@ -52,6 +59,25 @@ func (f *fakeSource) JobLog(_ context.Context, repo string, jobID int64, failedO
 
 func (f *fakeSource) RerunWorkflow(_ context.Context, repo string, runID int64, scope gh.RerunScope) error {
 	f.rerunRepo, f.rerunRunID, f.rerunScope = repo, runID, scope
+	return f.err
+}
+
+func (f *fakeSource) PRMergeContext(_ context.Context, _ string, _ int) (gh.MergeContext, error) {
+	return f.mergeContext, f.err
+}
+
+func (f *fakeSource) MergePR(pullRequestID string, method gh.MergeMethod) error {
+	f.mergedID, f.mergedMethod = pullRequestID, method
+	return f.err
+}
+
+func (f *fakeSource) EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error {
+	f.autoMergeID, f.autoMergeMethod = pullRequestID, method
+	return f.err
+}
+
+func (f *fakeSource) DisableAutoMerge(pullRequestID string) error {
+	f.disabledAutoMergeID = pullRequestID
 	return f.err
 }
 
@@ -320,6 +346,19 @@ func TestEditLabelsPicksTheCallByKind(t *testing.T) {
 		if !slices.Equal(f.calls, []string{tc.want}) {
 			t.Errorf("kind %v: calls = %v, want [%s]", tc.kind, f.calls, tc.want)
 		}
+	}
+}
+
+func TestMergePRPassesTheMethodThrough(t *testing.T) {
+	t.Parallel()
+
+	f := &fakeSource{}
+	u := &Usecase{merges: f}
+	if err := u.MergePR("PR_1", gh.MergeRebase); err != nil {
+		t.Fatalf("MergePR: %v", err)
+	}
+	if f.mergedID != "PR_1" || f.mergedMethod != gh.MergeRebase {
+		t.Errorf("merged (%q, %v), want (%q, %v)", f.mergedID, f.mergedMethod, "PR_1", gh.MergeRebase)
 	}
 }
 

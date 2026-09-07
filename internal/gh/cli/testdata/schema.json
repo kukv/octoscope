@@ -32,6 +32,19 @@
       "thread": "PullRequestReviewThread"
     }
   },
+  "AutoMergeRequest": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "authorEmail": "String",
+      "commitBody": "String",
+      "commitHeadline": "String",
+      "enabledAt": "DateTime",
+      "enabledBy": "Actor",
+      "mergeMethod": "PullRequestMergeMethod",
+      "pullRequest": "PullRequest"
+    }
+  },
   "CheckRun": {
     "kind": "OBJECT",
     "possibleTypes": [],
@@ -140,6 +153,24 @@
     "fields": {
       "clientMutationId": "String",
       "pullRequestReview": "PullRequestReview"
+    }
+  },
+  "DisablePullRequestAutoMergePayload": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "actor": "Actor",
+      "clientMutationId": "String",
+      "pullRequest": "PullRequest"
+    }
+  },
+  "EnablePullRequestAutoMergePayload": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "actor": "Actor",
+      "clientMutationId": "String",
+      "pullRequest": "PullRequest"
     }
   },
   "Issue": {
@@ -256,6 +287,15 @@
       "nodes": "Label",
       "pageInfo": "PageInfo",
       "totalCount": "Int"
+    }
+  },
+  "MergePullRequestPayload": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "actor": "Actor",
+      "clientMutationId": "String",
+      "pullRequest": "PullRequest"
     }
   },
   "Mutation": {

@@ -40,10 +40,12 @@ run の無い check には見出しを描かない。結果として、そうい
 
 ## Phase 3 の残り
 
-この計画は Phase 3 の 3 本のうち 1 本目である。
+merge（spec §4.4.4）は入った。実端末での確認は
+`docs/superpowers/2026-09-08-phase3-merge-handoff.md` にある。
 
-- **merge**（spec §4.4.4）— `mergePullRequest` / `enablePullRequestAutoMerge` /
-  `disablePullRequestAutoMerge`
-- **ページング** — 各スレッドの `comments`（`first: 50`）
+残っているのはページングだけである:
 
-どちらも `docs/superpowers/specs/2026-09-07-phase3-design.md` §7 にある。
+- **ページング** — 各スレッドの `comments`（`first: 50`）、
+  `docs/superpowers/plans/2026-09-08-phase3-comment-paging.md`
+
+`docs/superpowers/specs/2026-09-07-phase3-design.md` §7 にある。

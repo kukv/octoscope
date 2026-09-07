@@ -15,6 +15,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/merge"
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/usecase"
 )
@@ -46,6 +47,7 @@ type Source interface {
 	candidateSource
 	reviewOpener
 	review.Source
+	merge.Source
 }
 
 // ClosedMsg tells the parent the user left the detail view.
@@ -121,6 +123,7 @@ const (
 	modeConfirm
 	modePick
 	modeSubmit
+	modeMerge
 )
 
 // String names the mode wherever it is printed. Every assertion on the state
@@ -138,12 +141,15 @@ func (m mode) String() string {
 		return "pick"
 	case modeSubmit:
 		return "submit"
+	case modeMerge:
+		return "merge"
 	}
 	return "mode(?)"
 }
 
 // phase is where the current mode is in its round trip. modeSubmit never
-// reaches phaseWorking: review.Model owns the send.
+// reaches phaseWorking: review.Model owns the send. modeMerge stays at
+// phaseIdle, because merge.Model owns its fetch as well as its send.
 type phase uint8
 
 const (
@@ -196,6 +202,7 @@ type Model struct {
 	assignees []string
 
 	submit review.Model
+	merge  merge.Model
 }
 
 func New(src Source, ref gh.ItemRef) Model {
@@ -283,6 +290,13 @@ func (m Model) stateAction() (closing bool, ok bool) {
 	}
 }
 
+// canMerge reports whether the merge key applies: only an open pull request
+// can be merged, and until the item has arrived the state is not known.
+func (m Model) canMerge() bool {
+	closing, ok := m.stateAction()
+	return m.ref.Kind == gh.ItemPR && ok && closing
+}
+
 func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SetState(ref, closing); err != nil {
@@ -359,11 +373,26 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.submitDone()
 	case review.ErrorMsg:
 		return m.submitFailed(msg)
+	case merge.CancelledMsg:
+		return m.mergeCancelled(), nil
+	case merge.MergedMsg:
+		return m.mergeDone(msg)
+	case merge.ErrorMsg:
+		return m.mergeFailed(msg)
 	case errMsg:
 		return m.fetchFailed(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
-	case tea.MouseWheelMsg:
+	}
+	// The merge popup fetches for itself, and its answer is a type this view
+	// cannot name. Everything left over while it is open is its: sizes, keys
+	// and its three public messages have already returned above.
+	if m.mode == modeMerge {
+		var cmd tea.Cmd
+		m.merge, cmd = m.merge.Update(msg)
+		return m, cmd
+	}
+	if msg, ok := msg.(tea.MouseWheelMsg); ok {
 		return m.wheel(msg)
 	}
 	return m, nil
@@ -377,6 +406,9 @@ func (m Model) resize(msg tea.WindowSizeMsg) Model {
 	m.textarea.SetHeight(max(msg.Height-6, 3))
 	if m.submit.Active() {
 		m.submit, _ = m.submit.Update(msg)
+	}
+	if m.merge.Active() {
+		m.merge, _ = m.merge.Update(msg)
 	}
 	return m
 }
@@ -539,6 +571,51 @@ func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) mergeCancelled() Model {
+	if m.mode != modeMerge {
+		return m
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	// The zero popup is the inactive one: without this Active() would keep
+	// handing it window sizes after it is gone.
+	m.merge = merge.Model{}
+	return m
+}
+
+// mergeDone leaves the view when the pull request was merged: a merged pull
+// request is not something to keep reading. Joining or leaving the auto-merge
+// queue leaves it open, so the popup keeps the screen and refetches instead.
+// The board and the Repos list are refreshed by the root either way, which
+// sees the same merge message this one came from, so nothing is sent on.
+func (m Model) mergeDone(msg merge.MergedMsg) (Model, tea.Cmd) {
+	if m.mode != modeMerge {
+		return m, nil
+	}
+	if !msg.Merged {
+		var cmd tea.Cmd
+		m.merge, cmd = m.merge.Update(msg)
+		return m, cmd
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.merge = merge.Model{}
+	return m, func() tea.Msg { return ClosedMsg{} }
+}
+
+// mergeFailed shows the failure the popup on screen raised. A popup that was
+// closed and opened again leaves its own request in flight, and that one's
+// failure must not land in this view's footer.
+func (m Model) mergeFailed(msg merge.ErrorMsg) (Model, tea.Cmd) {
+	if m.mode != modeMerge || !m.merge.Owns(msg) {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.merge, cmd = m.merge.Update(msg)
+	m.errText = msg.Err.Error()
+	return m, cmd
+}
+
 func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 	if msg.ref != m.ref {
 		return m, nil
@@ -582,6 +659,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handlePickerKey(msg)
 	case modeSubmit:
 		return m.handleSubmitKey(msg)
+	case modeMerge:
+		return m.handleMergeKey(msg)
 	case modeView:
 	}
 	switch msg.String() {
@@ -606,6 +685,25 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		ref := m.ref
 		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
+	case "m":
+		// An issue has nothing to merge.
+		if m.ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		if m.phase == phaseLoading {
+			return m.stillLoading(), nil
+		}
+		// Nor has a pull request that is already merged or closed. GitHub
+		// answers UNKNOWN for a merged one, so the popup would say it is
+		// still working the answer out, for ever.
+		if !m.canMerge() {
+			return m, nil
+		}
+		m.mode, m.phase = modeMerge, phaseIdle
+		m.errText = ""
+		m.merge = merge.New(m.src, m.ref)
+		m.merge, _ = m.merge.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return m, m.merge.Init()
 	case "r":
 		m.phase = phaseLoading
 		m.declined = ""
@@ -696,6 +794,12 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.submit, cmd = m.submit.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleMergeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.merge, cmd = m.merge.Update(msg)
 	return m, cmd
 }
 

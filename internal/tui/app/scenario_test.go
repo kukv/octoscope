@@ -135,6 +135,14 @@ func (f *scenarioSource) RerunWorkflow(context.Context, string, int64, gh.RerunS
 	return nil
 }
 
+func (f *scenarioSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
+	return gh.MergeContext{}, nil
+}
+
+func (f *scenarioSource) MergePR(string, gh.MergeMethod) error         { return nil }
+func (f *scenarioSource) EnableAutoMerge(string, gh.MergeMethod) error { return nil }
+func (f *scenarioSource) DisableAutoMerge(string) error                { return nil }
+
 var scenarioAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 
 func scenarioPR() gh.PR {

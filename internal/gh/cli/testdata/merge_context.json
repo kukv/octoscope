@@ -1,0 +1,20 @@
+{
+  "data": {
+    "repository": {
+      "squashMergeAllowed": true,
+      "mergeCommitAllowed": true,
+      "rebaseMergeAllowed": true,
+      "deleteBranchOnMerge": true,
+      "autoMergeAllowed": false,
+      "pullRequest": {
+        "id": "PR_kwDOTVXF-M8AAAABCd9eQA",
+        "isDraft": false,
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "REVIEW_REQUIRED",
+        "viewerCanEnableAutoMerge": false,
+        "autoMergeRequest": null
+      }
+    }
+  }
+}

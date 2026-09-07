@@ -190,6 +190,8 @@ footer:
       other: "d:diff"
     checks:
       other: "s:checks"
+    merge:
+      other: "m:マージ"
     refresh:
       other: "r:更新"
     web:
@@ -339,3 +341,59 @@ summary:
     other: "CI 失敗 {{.Count}}"
   updated:
     other: "更新 {{.Ago}}"
+
+merge:
+  title:
+    other: "#{{.Number}} をマージ"
+  loading:
+    other: "GitHub に問い合わせ中"
+  method_squash:
+    other: "squash してマージ"
+  method_commit:
+    other: "マージコミットを作る"
+  method_rebase:
+    other: "rebase してマージ"
+  auto:
+    other: "auto-merge（checks の通過後に）"
+  auto_on:
+    other: "auto-merge は有効です。enter で解除します"
+  auto_unavailable_repo:
+    other: "このリポジトリでは auto-merge が無効です"
+  auto_unavailable_permission:
+    other: "auto-merge を有効にする権限がありません"
+  auto_unavailable_clean:
+    other: "auto-merge が待つものはありません"
+  delete_branch_on:
+    other: "ブランチはマージ後に削除されます"
+  delete_branch_off:
+    other: "ブランチは残ります"
+  block_draft:
+    other: "この PR はまだ draft です"
+  block_conflicting:
+    other: "ベースブランチと衝突しています"
+  block_computing:
+    other: "GitHub がマージ可能かを計算中です"
+  block_protected:
+    other: "保護ルールに止められています"
+  block_behind:
+    other: "ベースブランチに追いついていません"
+  block_dirty:
+    other: "このままではマージできません"
+  review_required:
+    other: "レビューが承認されていません"
+  review_changes:
+    other: "変更が要求されています"
+  key_merge:
+    other: "enter:マージ"
+  key_auto:
+    other: "space:auto"
+  key_auto_off:
+    other: "enter:auto-merge を解除"
+  key_queue:
+    other: "enter:auto-merge"
+  key_refresh:
+    other: "r:更新"
+  key_cancel:
+    other: "esc:中止"
+  sending:
+    other: "GitHub に送信中"

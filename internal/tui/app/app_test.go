@@ -18,6 +18,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/checks"
 	"github.com/kukv/octoscope/internal/tui/detail"
 	"github.com/kukv/octoscope/internal/tui/diff"
+	"github.com/kukv/octoscope/internal/tui/merge"
 	"github.com/kukv/octoscope/internal/tui/repo"
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
@@ -109,6 +110,14 @@ func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine,
 func (f *fakeSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error {
 	return nil
 }
+
+func (f *fakeSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
+	return gh.MergeContext{}, nil
+}
+
+func (f *fakeSource) MergePR(string, gh.MergeMethod) error         { return nil }
+func (f *fakeSource) EnableAutoMerge(string, gh.MergeMethod) error { return nil }
+func (f *fakeSource) DisableAutoMerge(string) error                { return nil }
 
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
@@ -452,6 +461,27 @@ func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a submitted review")
+	}
+}
+
+// TestAMergeRefreshesTheBoardAndTheReposList guards spec 4.4.4: a merged
+// pull request must leave the Work board, not only the view it was merged
+// from.
+func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
+	f := &fakeSource{}
+	m := newTestModelWith(f, Options{HasRepo: true})
+
+	_, cmd := m.Update(merge.MergedMsg{})
+	if cmd == nil {
+		t.Fatal("merge.MergedMsg produced no command")
+	}
+	resolve(t, m, cmd)
+
+	if f.workCalls == 0 {
+		t.Error("the board was not refreshed after a merge")
+	}
+	if f.prCalls == 0 {
+		t.Error("the Repos list was not refreshed after a merge")
 	}
 }
 
