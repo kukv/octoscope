@@ -77,6 +77,22 @@ func mergeBlockedModel(t *testing.T, width int) Model {
 	return sized(t, &fakeSource{ctx: c}, width)
 }
 
+// mergeComputingModel is a pull request GitHub has not worked out an answer
+// for yet, which is the longest of the reasons in both languages.
+func mergeComputingModel(t *testing.T, width int) Model {
+	c := mergeable()
+	c.Mergeable = gh.MergeableUnknown
+	c.State = gh.MergeStateUnknown
+	return sized(t, &fakeSource{ctx: c}, width)
+}
+
+// mergeSendingModel has enter pressed and the merge still in flight: the
+// command it returned is deliberately left unrun.
+func mergeSendingModel(t *testing.T, width int) Model {
+	m, _ := enter(sized(t, &fakeSource{ctx: mergeable()}, width))
+	return m
+}
+
 // mergeLoadingModel is the popup before its fetch has landed.
 func mergeLoadingModel(t *testing.T, width int) Model {
 	m := New(&fakeSource{ctx: mergeable()}, ref())
@@ -93,6 +109,8 @@ var goldenStates = []struct {
 	{"merge_auto", mergeAutoModel},
 	{"merge_auto_on", mergeAutoOnModel},
 	{"merge_blocked", mergeBlockedModel},
+	{"merge_computing", mergeComputingModel},
+	{"merge_sending", mergeSendingModel},
 	{"merge_loading", mergeLoadingModel},
 }
 

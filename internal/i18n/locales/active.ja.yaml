@@ -387,3 +387,5 @@ merge:
     other: "r:更新"
   key_cancel:
     other: "esc:中止"
+  sending:
+    other: "GitHub に送信中"

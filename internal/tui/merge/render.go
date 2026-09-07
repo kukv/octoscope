@@ -41,6 +41,9 @@ func (m Model) body() string {
 	if reason := m.reason(); reason != "" {
 		b.WriteString(reason + "\n")
 	}
+	if m.sending {
+		b.WriteString(i18n.T("merge.sending") + "\n")
+	}
 	return b.String()
 }
 

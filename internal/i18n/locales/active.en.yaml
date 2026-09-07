@@ -383,7 +383,7 @@ merge:
   block_conflicting:
     other: "it conflicts with the base branch"
   block_computing:
-    other: "GitHub is still working out whether it can be merged"
+    other: "GitHub is still working out if it can merge"
   block_protected:
     other: "a branch rule is holding it"
   block_behind:
@@ -402,3 +402,5 @@ merge:
     other: "r:refresh"
   key_cancel:
     other: "esc:cancel"
+  sending:
+    other: "sending it to GitHub"
