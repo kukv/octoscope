@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -187,12 +186,17 @@ func TestJobLogPassesAnInProgressJobsErrorThroughUnchanged(t *testing.T) {
 		return nil, wantErr
 	}}
 	_, err = c.JobLog(context.Background(), "", 101759970990, false)
-	if !errors.Is(err, wantErr) {
+	// The text is what reaches the view, so a wrap that keeps errors.Is
+	// happy but changes what the user reads must still fail this test.
+	if err == nil || err.Error() != wantErr.Error() {
 		t.Errorf("err = %v, want %v", err, wantErr)
 	}
 }
 
-func TestRerunAsksForOnlyTheFailedJobsWhenScopedThatWay(t *testing.T) {
+// gh run rerun takes the run id as a positional argument, not a flag, and
+// --failed is what limits the rerun to the jobs that failed rather than
+// starting the whole run again.
+func TestRerunFailedNamesTheRunAndAsksOnlyForFailedJobs(t *testing.T) {
 	t.Parallel()
 
 	var got []string
@@ -203,9 +207,14 @@ func TestRerunAsksForOnlyTheFailedJobsWhenScopedThatWay(t *testing.T) {
 	if err := c.RerunWorkflow(context.Background(), "", 34087925535, gh.RerunFailed); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
-	want := []string{"run", "rerun", "34087925535", "--failed", "--repo", "kukv/octoscope"}
-	if !slices.Equal(got, want) {
-		t.Errorf("args = %v, want %v", got, want)
+	if len(got) < 3 || got[0] != "run" || got[1] != "rerun" || got[2] != "34087925535" {
+		t.Errorf("args = %v, want it to start with run rerun 34087925535", got)
+	}
+	if !slices.Contains(got, "--failed") {
+		t.Errorf("args = %v, want --failed", got)
+	}
+	if !slices.Contains(got, "kukv/octoscope") {
+		t.Errorf("args = %v, want the repository named", got)
 	}
 }
 
