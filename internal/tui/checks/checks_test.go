@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // Task 7 と Task 8 のテストは i18n.T と ansi.StringWidth も使う。import は
@@ -160,6 +161,101 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 	for _, line := range strings.Split(open(t, 80).View(), "\n") {
 		if w := ansi.StringWidth(line); w > 80 {
 			t.Errorf("line is %d columns wide, want at most 80:\n%s", w, line)
+		}
+	}
+}
+
+// moveTo presses j until the cursor sits on the check named name, and fails
+// the test if it never does: a helper that returns silently when it cannot
+// reach its target would make every test built on it pass for the wrong
+// reason.
+func moveTo(t *testing.T, m Model, name string) Model {
+	t.Helper()
+
+	for range m.order {
+		if m.order[m.row].Name == name {
+			return m
+		}
+		before := m.row
+		m = press(m, "j")
+		if m.row == before {
+			t.Fatalf("moveTo(%q): j stopped moving at row %d before reaching it", name, m.row)
+		}
+	}
+	t.Fatalf("moveTo(%q): no such check in the fixture", name)
+	return m
+}
+
+func TestALogForACheckTheUserLeftIsDropped(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: "FAIL sca"}}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	_, cmd := m.Update(keyPress("enter")) // asks for the log of the selected check
+	m = press(m, "j")                     // and the user moves on before it lands
+	m, _ = m.Update(cmd())
+	if view := m.View(); strings.Contains(view, "FAIL sca") {
+		t.Errorf("the log of the check the user left is drawn under another one:\n%s", view)
+	}
+}
+
+func TestEnterFetchesTheLogOfTheSelectedCheck(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "Run tests", Text: "FAIL ./internal/gh"}}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	if cmd == nil {
+		t.Fatal("enter started no fetch")
+	}
+	m, _ = m.Update(cmd())
+	if view := m.View(); !strings.Contains(view, "FAIL ./internal/gh") {
+		t.Errorf("the log is not on screen:\n%s", view)
+	}
+}
+
+func TestASucceededJobSaysNoStepFailed(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture()} // JobLog answers with no lines
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	if view := m.View(); !strings.Contains(view, i18n.T("checks.log_empty_failed")) {
+		t.Errorf("an empty failed-step log said nothing:\n%s", view)
+	}
+}
+
+func TestAStatusContextSaysWhyItHasNoLog(t *testing.T) {
+	t.Parallel()
+
+	m := open(t, 120)
+	m = moveTo(t, m, "ci/circleci")
+	m, _ = m.Update(keyPress("enter"))
+	if view := m.View(); !strings.Contains(view, i18n.T("checks.decline_status_context")) {
+		t.Errorf("enter on a StatusContext did nothing and said nothing:\n%s", view)
+	}
+}
+
+func TestTheLogDoesNotWrap(t *testing.T) {
+	t.Parallel()
+
+	long := strings.Repeat("x", 400)
+	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: long}}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	for i, line := range strings.Split(m.View(), "\n") {
+		if w := ansi.StringWidth(line); w > 80 {
+			t.Fatalf("line %d is %d columns wide, want at most 80:\n%s", i, w, line)
 		}
 	}
 }

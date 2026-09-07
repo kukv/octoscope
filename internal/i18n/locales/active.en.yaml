@@ -243,6 +243,14 @@ footer:
       other: "esc:back"
     move:
       other: "j/k:move"
+    log:
+      other: "enter:log"
+    full:
+      other: "L:full log"
+    pane:
+      other: "h/l:pane"
+    open:
+      other: "o:web"
     refresh:
       other: "r:refresh"
 
@@ -259,6 +267,14 @@ checks:
     other: "this check reports from outside GitHub Actions; press o to open it"
   decline_loading:
     other: "still loading the checks; try again in a moment"
+  log_loading:
+    other: "loading the log..."
+  log_empty_failed:
+    other: "no step of this job failed"
+  log_full:
+    other: "full log"
+  log_failed_only:
+    other: "failed steps"
 
 md:
   author:

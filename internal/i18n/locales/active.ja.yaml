@@ -234,6 +234,14 @@ footer:
       other: "esc:戻る"
     move:
       other: "j/k:移動"
+    log:
+      other: "enter:ログ"
+    full:
+      other: "L:全ログ"
+    pane:
+      other: "h/l:ペイン"
+    open:
+      other: "o:Web"
     refresh:
       other: "r:再取得"
 
@@ -250,6 +258,14 @@ checks:
     other: "この check は GitHub Actions の外から報告されています。o で開けます"
   decline_loading:
     other: "checks を読み込み中です。少し待ってからもう一度"
+  log_loading:
+    other: "ログを読み込み中..."
+  log_empty_failed:
+    other: "このジョブに失敗したステップはありません"
+  log_full:
+    other: "全ログ"
+  log_failed_only:
+    other: "失敗ステップ"
 
 md:
   author:
