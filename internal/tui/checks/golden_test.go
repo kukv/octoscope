@@ -111,10 +111,7 @@ func checksMixedModel(width int) Model {
 	for range 8 {
 		m = press(m, "j")
 	}
-	for range 4 {
-		m = press(m, "k")
-	}
-	return m
+	return press(m, "k")
 }
 
 // checksNoneModel is a pull request whose checks came back empty.

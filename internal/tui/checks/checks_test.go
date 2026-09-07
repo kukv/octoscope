@@ -377,7 +377,7 @@ func TestAWiderTerminalBringsTheLogBack(t *testing.T) {
 func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, gh.Checks{}, 120, 30)
+	m := openChecks(t, gh.Checks{})
 	m, _ = m.Update(keyPress("enter"))
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
@@ -388,7 +388,7 @@ func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 func TestRerunOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := press(openChecks(t, gh.Checks{}, 120, 30), "R")
+	m := press(openChecks(t, gh.Checks{}), "R")
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
 			m.declined, i18n.T("checks.none"))
@@ -417,11 +417,11 @@ func appCheck() gh.Checks {
 	}
 }
 
-func openChecks(t *testing.T, c gh.Checks, width, height int) Model {
+func openChecks(t *testing.T, c gh.Checks) Model {
 	t.Helper()
 
 	m := New(&fakeSource{checks: c}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
-	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: c})
 	return m
 }
@@ -429,10 +429,44 @@ func openChecks(t *testing.T, c gh.Checks, width, height int) Model {
 func TestACheckWithNoWorkflowRunGetsNoHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, appCheck(), 120, 30)
+	m := openChecks(t, appCheck())
 	if rows := m.allRows(); len(rows) != 1 {
 		t.Errorf("the list drew %d lines, want 1: a check with no workflow run has no heading:\n%s",
 			len(rows), strings.Join(rows, "\n"))
+	}
+}
+
+func names(runs []gh.CheckRun) []string {
+	out := make([]string, len(runs))
+	for i, r := range runs {
+		out[i] = r.Name
+	}
+	return out
+}
+
+// TestAnExternalCIsStateDoesNotMoveAnAppsCheck guards how arrange buckets a
+// check with no workflow behind it. A check run an App created and a
+// StatusContext both carry an empty workflow name, so one shared bucket lets
+// the worst state among them rank all of them: an external CI turning green
+// would move the App's check out of the middle of a workflow's group.
+func TestAnExternalCIsStateDoesNotMoveAnAppsCheck(t *testing.T) {
+	t.Parallel()
+
+	succeeded := mixed()
+	succeeded.Runs[8].State = gh.CheckSuccess // the StatusContext, and nothing else
+
+	want := []string{"sca", "audit", "secrets", "deps", "build", "lint", "test", "codecov/patch", "ci/circleci"}
+	for _, tc := range []struct {
+		name   string
+		checks gh.Checks
+	}{
+		{"external CI running", mixed()},
+		{"external CI succeeded", succeeded},
+	} {
+		got := names(openChecks(t, tc.checks).order)
+		if !slices.Equal(got, want) {
+			t.Errorf("%s: order = %v, want %v", tc.name, got, want)
+		}
 	}
 }
 

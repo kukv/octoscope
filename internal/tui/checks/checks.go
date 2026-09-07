@@ -401,12 +401,16 @@ func (m Model) follow() Model {
 }
 
 // arrange puts the failing workflows at the top and keeps each workflow's
-// checks together. A StatusContext belongs to no workflow and sorts last: it
-// is the one the view can do the least with.
+// checks together. A check with no workflow behind it belongs to no group and
+// sorts after all of them, the StatusContext last of those: it is the one the
+// view can do the least with.
 func arrange(runs []gh.CheckRun) []gh.CheckRun {
 	worst := map[string]int{}
 	first := map[string]int{}
 	for i, r := range runs {
+		if !hasWorkflow(r) {
+			continue
+		}
 		worst[r.Workflow] = max(worst[r.Workflow], rank(r.State))
 		if _, seen := first[r.Workflow]; !seen {
 			first[r.Workflow] = i
@@ -418,7 +422,13 @@ func arrange(runs []gh.CheckRun) []gh.CheckRun {
 		if (a.Kind == gh.CheckKindStatus) != (b.Kind == gh.CheckKindStatus) {
 			return b.Kind == gh.CheckKindStatus
 		}
-		if a.Workflow == b.Workflow {
+		// Ranking a check with no workflow against the workflows would let
+		// one such check's state carry every other one along with it: they
+		// have no group of their own to be ranked as.
+		if hasWorkflow(a) != hasWorkflow(b) {
+			return hasWorkflow(a)
+		}
+		if !hasWorkflow(a) || a.Workflow == b.Workflow {
 			return false
 		}
 		if worst[a.Workflow] != worst[b.Workflow] {
@@ -429,6 +439,14 @@ func arrange(runs []gh.CheckRun) []gh.CheckRun {
 		return first[a.Workflow] < first[b.Workflow]
 	})
 	return out
+}
+
+// hasWorkflow reports whether a check has a workflow run behind it to be
+// grouped under. A StatusContext never does, and neither does a check run an
+// App created: GitHub reports those with a null checkSuite.workflowRun,
+// leaving RunID zero and the workflow's name empty.
+func hasWorkflow(r gh.CheckRun) bool {
+	return r.Kind == gh.CheckKindRun && r.RunID != 0
 }
 
 func rank(s gh.CheckState) int {
