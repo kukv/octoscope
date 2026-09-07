@@ -470,6 +470,22 @@ func TestAnExternalCIsStateDoesNotMoveAnAppsCheck(t *testing.T) {
 	}
 }
 
+// TestALogIsNotAskedForACheckWithNoJobBehindIt guards what enter is allowed
+// to ask for. A check run an App created carries a check run id where a
+// workflow's check carries an Actions job id, so asking gh for its log fails
+// on an id no job has.
+func TestALogIsNotAskedForACheckWithNoJobBehindIt(t *testing.T) {
+	t.Parallel()
+
+	m, cmd := openChecks(t, appCheck()).Update(keyPress("enter"))
+	if cmd != nil {
+		t.Errorf("enter started a log fetch for a check with no job behind it")
+	}
+	if m.declined == "" {
+		t.Error("enter declined without saying why")
+	}
+}
+
 func TestTheLogDoesNotWrap(t *testing.T) {
 	t.Parallel()
 

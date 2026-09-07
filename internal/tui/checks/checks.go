@@ -334,7 +334,9 @@ func (m Model) startLog(failedOnly bool) (Model, tea.Cmd) {
 		return m, nil
 	}
 	r := m.order[m.row]
-	if r.Kind == gh.CheckKindStatus {
+	// A check run an App created reports a check run id where a workflow's
+	// check reports an Actions job id, and gh has no job to serve for it.
+	if !hasWorkflow(r) {
 		m.declined = i18n.T("checks.decline_status_context")
 		return m, nil
 	}
