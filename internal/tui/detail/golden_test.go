@@ -87,6 +87,9 @@ func TestGolden(t *testing.T) {
 				loading, _ = loading.Update(tea.WindowSizeMsg{Width: w, Height: 40})
 				golden.Assert(t, fmt.Sprintf("detail_loading_%s_%d", lang.name, w), loading.View())
 
+				declined, _ := loading.Update(key("c"))
+				golden.Assert(t, fmt.Sprintf("detail_loading_declined_%s_%d", lang.name, w), declined.View())
+
 				// No other recording covers the error line.
 				failed, _ := m.Update(stateErrorMsg{err: errors.New("boom")})
 				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())

@@ -41,6 +41,8 @@ detail:
     other: "PR #{{.Number}} {{.Title}}"
   issue_title:
     other: "Issue #{{.Number}} {{.Title}}"
+  decline_loading:
+    other: "本文がまだ届いていません。少し待ってからもう一度"
 
 compose:
   title:

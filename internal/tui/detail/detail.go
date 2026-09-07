@@ -166,6 +166,11 @@ type Model struct {
 	// inside it.
 	errText string
 
+	// declined says why the last key did nothing, in the one case where the
+	// screen cannot show it: while the item is loading there is a spinner
+	// and nothing else, so c, x, v, l and a look broken rather than early.
+	declined string
+
 	spin  spinner.Model
 	body  viewport.Model
 	title string
@@ -378,6 +383,7 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.phase = phaseIdle
 	m.state = it.State
 	m.errText = ""
+	m.declined = ""
 	m.labels = labelNames(it.Labels)
 	m.assignees = authorLogins(it.Assignees)
 	m.url = it.URL
@@ -528,6 +534,14 @@ func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// stillLoading is what the keys that need the item answer with while it is
+// on its way. GetItem has been measured at over twenty seconds on a cold
+// call, which is long enough for a key that does nothing to read as broken.
+func (m Model) stillLoading() Model {
+	m.declined = i18n.T("detail.decline_loading")
+	return m
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// An overlay's keys have nothing to act on until its fetch answers.
 	// modeView is the exception: the body is drawn, and q still leaves.
@@ -562,10 +576,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "r":
 		m.phase = phaseLoading
+		m.declined = ""
 		return m, fetch(m.src, m.ref)
 	case "c":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		m.mode, m.phase = modeCompose, phaseIdle
 		m.errText = ""
@@ -574,7 +589,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, textarea.Blink
 	case "x":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		if _, ok := m.stateAction(); !ok {
 			return m, nil // merged and the like: no action
@@ -585,7 +600,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "v":
 		// An issue has no review. Unlike the diff view's v, this always
 		// fetches first: detail holds no review context of its own.
-		if m.phase == phaseLoading || m.ref.Kind != gh.ItemPR {
+		if m.phase == phaseLoading {
+			return m.stillLoading(), nil
+		}
+		if m.ref.Kind != gh.ItemPR {
 			return m, nil
 		}
 		m.mode, m.phase = modeSubmit, phaseLoading
@@ -593,14 +611,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, fetchReviewContext(m.src, m.ref)
 	case "l":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		m.mode, m.phase = modePick, phaseLoading
 		m.errText = ""
 		return m, fetchLabelPicker(m.src, m.ref)
 	case "a":
 		if m.phase == phaseLoading {
-			return m, nil
+			return m.stillLoading(), nil
 		}
 		m.mode, m.phase = modePick, phaseLoading
 		m.errText = ""

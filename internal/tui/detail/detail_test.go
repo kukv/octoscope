@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
@@ -844,6 +845,40 @@ func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 	if m.body.YOffset() != before {
 		t.Errorf("the body scrolled to %d while the fetch was in flight, want %d",
 			m.body.YOffset(), before)
+	}
+}
+
+// TestKeysDeclinedWhileLoadingSayWhy covers the report that c does nothing:
+// the item can take tens of seconds, and until it lands the screen is a
+// spinner with no footer, so a key that is ignored looks like a key that is
+// broken. Every key that needs the item has to say so.
+func TestKeysDeclinedWhileLoadingSayWhy(t *testing.T) {
+	want := i18n.T("detail.decline_loading")
+	for _, k := range []string{"c", "x", "v", "l", "a"} {
+		t.Run(k, func(t *testing.T) {
+			f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+			m := New(f, prRef()) // the fetch is deliberately not run
+			m, _ = m.Update(key(k))
+			if got := ansi.Strip(m.View()); !strings.Contains(got, want) {
+				t.Errorf("%s while loading said nothing:\n%s", k, got)
+			}
+		})
+	}
+}
+
+// TestTheDeclineGoesAwayWithTheWait is the other half: the note explains a
+// key that came too early, so it must not outlive the wait it was about.
+func TestTheDeclineGoesAwayWithTheWait(t *testing.T) {
+	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	m := New(f, prRef())
+	m, _ = m.Update(key("c"))
+	if m.declined == "" {
+		t.Fatal("precondition: c while loading left no note")
+	}
+
+	m, _ = m.Update(fetch(f, prRef())())
+	if m.declined != "" {
+		t.Errorf("declined = %q after the item arrived, want empty", m.declined)
 	}
 }
 

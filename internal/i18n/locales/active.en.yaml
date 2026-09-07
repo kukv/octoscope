@@ -41,6 +41,8 @@ detail:
     other: "PR #{{.Number}} {{.Title}}"
   issue_title:
     other: "Issue #{{.Number}} {{.Title}}"
+  decline_loading:
+    other: "the item is still on its way; try that key again in a moment"
 
 compose:
   title:
