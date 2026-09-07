@@ -345,9 +345,8 @@ func (m Model) submitCancelled() Model {
 	if m.mode != modeSubmit {
 		return m
 	}
-	// A failed submission's text is left on errText: nothing outside the
-	// popup draws it, and c, v and X each clear it before they open.
 	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
 	return m
 }
 

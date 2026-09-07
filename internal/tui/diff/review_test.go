@@ -92,3 +92,21 @@ func TestOpeningAnOverlayLeavesAFailedSubmitBehind(t *testing.T) {
 		})
 	}
 }
+
+// TestCancellingTheSubmitPopupTakesItsErrorWithIt is detail's rule here too:
+// an overlay's failure does not outlive the overlay, so the next thing to
+// read errText cannot pick up a submission the user has already left.
+// modeView draws errText nowhere, so this is on the state.
+func TestCancellingTheSubmitPopupTakesItsErrorWithIt(t *testing.T) {
+	m := withThreads(t, 120, 40)
+	m = press(m, "v")
+	m, _ = m.Update(review.ErrorMsg{Err: errors.New("boom from github")})
+	if m.errText == "" {
+		t.Fatal("precondition: the failed submit left no error text")
+	}
+
+	m, _ = m.Update(review.CancelledMsg{})
+	if m.errText != "" {
+		t.Errorf("errText = %q after the popup closed, want empty", m.errText)
+	}
+}
