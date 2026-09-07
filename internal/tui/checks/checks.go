@@ -104,8 +104,8 @@ type Model struct {
 
 	// log is the lines of the currently open job, failed steps only unless
 	// failedOnly was toggled off. logJob is the id of the check that log
-	// belongs to (or is being fetched for): an answer for any other job is
-	// dropped rather than drawn.
+	// belongs to (or is being fetched for); an answer is kept only while the
+	// cursor is still on the job it was asked for.
 	log        []gh.LogLine
 	logJob     int64
 	logRow     int
@@ -260,8 +260,14 @@ func (m Model) moveRow(delta int) Model {
 		m.logRow = clamp(m.logRow+delta, len(m.logRows())-1)
 		return m
 	}
+	before := m.row
 	m.row = clamp(m.row+delta, len(m.order)-1)
 	m.declined = ""
+	// The log pane says nothing about whose log it holds, so one left under
+	// another check would read as that check's.
+	if m.row != before {
+		m = m.clearLog()
+	}
 	return m.follow()
 }
 

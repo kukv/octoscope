@@ -239,6 +239,24 @@ func TestALogForACheckTheUserLeftIsDropped(t *testing.T) {
 	}
 }
 
+// TestMovingTheCursorClearsTheLogUnderIt guards the pairing of the two
+// panes: a log that has already landed carries nothing on screen saying
+// whose it is, so leaving it under another check misreads as that check's.
+func TestMovingTheCursorClearsTheLogUnderIt(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: "FAIL sca"}}}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	m = press(m, "j")
+	if view := m.View(); strings.Contains(view, "FAIL sca") {
+		t.Errorf("the log stayed on screen under the next check:\n%s", view)
+	}
+}
+
 func TestEnterFetchesTheLogOfTheSelectedCheck(t *testing.T) {
 	t.Parallel()
 
