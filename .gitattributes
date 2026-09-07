@@ -1,3 +1,14 @@
+# The working copy is LF on every platform. gofumpt treats a CRLF file as
+# unformatted, so a checkout with core.autocrlf=true fails `make lint` and
+# `make fmt-check` on every Go file at once; bash chokes on a CRLF script.
+# text=auto leaves binary files alone.
+* text=auto eol=lf
+
 # Golden recordings are compared byte for byte and hold ANSI escapes. Line
 # endings must survive a checkout on Windows unchanged.
 *.golden -text
+
+# Recorded responses are what GitHub actually returned, and converting their
+# line endings is a rewrite (.claude/rules/testing.md). Today's parsers do not
+# mind, but a line-based one would then read different bytes here and on CI.
+internal/gh/cli/testdata/** -text
