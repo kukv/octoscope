@@ -36,9 +36,8 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	// Clicking the selected row opens it -- if it has anything to open.
-	// There is no double click to detect (spec 4.0): Bubble Tea does not
-	// report one, and timing two clicks ourselves would put a clock in
-	// Update.
+	// There is no double click to detect: Bubble Tea does not report one,
+	// and timing two clicks ourselves would put a clock in Update.
 	if i == m.row && !m.sidebar {
 		return m.toggleCollapsed(), nil
 	}

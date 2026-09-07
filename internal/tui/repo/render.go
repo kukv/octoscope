@@ -14,7 +14,7 @@ import (
 )
 
 // The right pane is a table with fixed columns, so that the eye can run down
-// one of them (spec 4.2). The title takes whatever the others leave.
+// one of them. The title takes whatever the others leave.
 const (
 	stateColumn  = 2
 	numberColumn = 6
@@ -147,7 +147,7 @@ func (m Model) row(i int) string {
 }
 
 // summary is the block under the table: what the selected item changes, and
-// how its checks are doing (spec 4.2).
+// how its checks are doing.
 func (m Model) summary() []string {
 	lines := []string{theme.Rule().Render(strings.Repeat("─", m.width))}
 	if m.tab == tabIssues {

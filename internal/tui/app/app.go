@@ -36,7 +36,7 @@ type Options struct {
 	// the working directory is a subprocess, and doing it before the UI
 	// started left the terminal blank for as long as it took. The root asks
 	// as soon as it has a size, and the Repos tab appears when the answer
-	// arrives (spec 3.4).
+	// arrives.
 	HasRepo bool
 }
 
@@ -234,8 +234,7 @@ func (m Model) diffFailed(msg diff.ErrorMsg) (tea.Model, tea.Cmd) {
 
 // detail and diff each refetch their own PR when a review goes out
 // (broadcast below reaches them); the board and the Repos list have
-// no popup of their own to notice from, so the root refreshes them
-// (spec 4.4.2).
+// no popup of their own to notice from, so the root refreshes them.
 func (m Model) reviewSubmitted(msg review.SubmittedMsg) (tea.Model, tea.Cmd) {
 	next, cmd := m.broadcast(msg)
 	m = next.(Model)

@@ -38,7 +38,7 @@ func (t ReviewThread) Pending() bool {
 
 // Collapsed reports whether the thread is drawn as a count rather than in
 // full. Settled conversations must not push the code they were about off the
-// screen (spec 4.4.1).
+// screen.
 func (t ReviewThread) Collapsed() bool { return t.Resolved || t.Outdated }
 
 // PendingComment is a line comment on its way to GitHub.

@@ -195,7 +195,7 @@ func issueMarkdown(it usecase.Item) string {
 
 // stateText and reviewText name a state in the reader's language. GitHub's
 // own spelling stopped at the access layer (.claude/rules/architecture.md),
-// and a state word is ours to translate (spec 6.1).
+// and a state word is ours to translate.
 func stateText(s gh.ItemState) string {
 	switch s {
 	case gh.StateOpen:

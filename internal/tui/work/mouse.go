@@ -23,7 +23,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	}
 	// Clicking the selected card opens it. Bubble Tea reports no double
 	// clicks, and measuring the gap between two clicks would put a clock in
-	// Update; select-then-open needs neither (spec 4).
+	// Update; select-then-open needs neither.
 	if col == m.col && row == m.row {
 		if ref, ok := m.SelectedRef(); ok {
 			return m, func() tea.Msg { return OpenDetailMsg{ref} }

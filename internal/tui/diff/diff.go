@@ -182,9 +182,9 @@ type Model struct {
 
 // New builds the view for one pull request. It takes only what names the
 // pull request: the title, the branches and the size of the change arrive
-// with the review context (Task 7), because a Work card and a Repos row know
-// different amounts about a pull request and neither knows all of it. It also
-// keeps the argument list to two (.claude/rules/go-style.md).
+// with the review context, because a Work card and a Repos row know different
+// amounts about a pull request and neither knows all of it. It also keeps the
+// argument list to two (.claude/rules/go-style.md).
 func New(src Source, ref gh.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot

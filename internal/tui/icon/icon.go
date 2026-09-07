@@ -2,8 +2,7 @@
 //
 // Three sets are kept, because a terminal is not guaranteed to be able to draw
 // any given glyph: Nerd Font glyphs need a patched font installed, the Unicode
-// symbols need a font with reasonable coverage, and ASCII needs nothing at all
-// (spec 4.5).
+// symbols need a font with reasonable coverage, and ASCII needs nothing at all.
 package icon
 
 import (
@@ -150,11 +149,11 @@ func Collapsed() string { return active().collapsed }
 func CommentBar() string { return active().commentBar }
 
 // ThreadBadge returns the one-column marker drawn beside a file's review
-// thread count in the diff sidebar (spec 4.4.1).
+// thread count in the diff sidebar.
 func ThreadBadge() string { return active().threadBadge }
 
 // BarWidth is how many cells a checks bar occupies. A Work card has about 30
-// columns, so the bar has to stay narrow (spec 4.1, 6.4).
+// columns, so the bar has to stay narrow.
 const BarWidth = 7
 
 // ChecksBar draws the passed / total ratio as a fixed-width bar, in two

@@ -83,7 +83,7 @@ func Selected() lipgloss.Style {
 }
 
 // Popup styles the frame around a small window drawn over an existing view:
-// the review submission box, and Repos' add dialog in Phase 4.
+// the review submission box.
 func Popup() lipgloss.Style {
 	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1).
 		BorderForeground(pick("#d9dee4", "#262d39"))
