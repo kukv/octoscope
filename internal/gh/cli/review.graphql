@@ -27,15 +27,21 @@ query ($owner: String!, $name: String!, $number: Int!, $after: String) {
           endCursor
         }
         nodes {
+          id
           isResolved
           isOutdated
           path
           line
           originalLine
           diffSide
-          # Not paged: it is a nested connection, so following it would need
-          # one more request per thread.
+          # A nested connection: following it costs one more request per
+          # thread, so only a thread that says hasNextPage gets one
+          # (thread_comments.graphql).
           comments(first: 50) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             nodes {
               body
               createdAt

@@ -80,6 +80,9 @@ type reviewContextResponse struct {
 }
 
 type threadNode struct {
+	// ID is not put into the domain type: only thread_comments.graphql
+	// uses it, and it never reaches the screen.
+	ID         string `json:"id"`
 	IsResolved bool   `json:"isResolved"`
 	IsOutdated bool   `json:"isOutdated"`
 	Path       string `json:"path"`
@@ -89,7 +92,8 @@ type threadNode struct {
 	OriginalLine int    `json:"originalLine"`
 	DiffSide     string `json:"diffSide"`
 	Comments     struct {
-		Nodes []threadCommentNode `json:"nodes"`
+		PageInfo pageInfo            `json:"pageInfo"`
+		Nodes    []threadCommentNode `json:"nodes"`
 	} `json:"comments"`
 }
 
@@ -167,16 +171,20 @@ func (n threadNode) toDomain() gh.ReviewThread {
 		t.Side = gh.SideLeft
 	}
 	for _, c := range n.Comments.Nodes {
-		t.Comments = append(t.Comments, gh.ThreadComment{
-			Author:    gh.Author{Login: c.Author.Login},
-			Body:      c.Body,
-			CreatedAt: c.CreatedAt,
-			// PENDING is the only review state that means "written but not
-			// sent"; every other one means the comment is already public.
-			Pending: c.PullRequestReview.State == "PENDING",
-		})
+		t.Comments = append(t.Comments, c.toDomain())
 	}
 	return t
+}
+
+func (c threadCommentNode) toDomain() gh.ThreadComment {
+	return gh.ThreadComment{
+		Author:    gh.Author{Login: c.Author.Login},
+		Body:      c.Body,
+		CreatedAt: c.CreatedAt,
+		// PENDING is the only review state that means "written but not
+		// sent"; every other one means the comment is already public.
+		Pending: c.PullRequestReview.State == "PENDING",
+	}
 }
 
 // The five mutations take no context. They are changes, not fetches: a
