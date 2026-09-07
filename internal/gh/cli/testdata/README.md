@@ -20,7 +20,18 @@ D=internal/gh/cli/testdata
 gh pr list --repo kukv/octoscope --state all --json \
   'number,title,author,state,isDraft,updatedAt,reviewDecision,url,labels,headRefName,baseRefName,additions,deletions,statusCheckRollup' \
   --limit 100 | jq . > $D/pr_list.json
-# 以下同様（Task 4 Step 1 のコマンド一式）
+
+gh issue list --repo kukv/octoscope --state all --json \
+  'number,title,author,state,updatedAt,labels,url' --limit 100 | jq . > $D/issue_list.json
+
+gh pr view 55 --repo kukv/octoscope --json \
+  'number,title,author,state,isDraft,updatedAt,reviewDecision,url,labels,headRefName,baseRefName,additions,deletions,statusCheckRollup,body,comments,assignees' \
+  | jq . > $D/pr_view.json
+
+gh issue view 50 --repo kukv/octoscope --json \
+  'number,title,author,state,updatedAt,labels,url,body,comments,assignees' | jq . > $D/issue_view.json
+
+gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D/pr_files.json
 ```
 
 `work.json` は `@me` を含む検索なので、**録った人が見えるリポジトリを全部なめる**。

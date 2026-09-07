@@ -322,9 +322,8 @@ func TestTheQueryCarriesEveryAliasWeReadBack(t *testing.T) {
 	}
 }
 
-// A label connection asked for 10 silently drops the eleventh label, and a
-// Work card is where labels are read. GitHub caps first at 100, so there is
-// no reason to ask for less.
+// GitHub caps a labels connection's first at 100; asking for less silently
+// drops labels past that count.
 func TestWorkQueryAsksForAsManyLabelsAsGitHubAllows(t *testing.T) {
 	t.Parallel()
 
@@ -336,8 +335,8 @@ func TestWorkQueryAsksForAsManyLabelsAsGitHubAllows(t *testing.T) {
 	}
 }
 
-// Every connection GitHub caps at 100 must ask for no more: 101 is refused
-// outright with EXCESSIVE_PAGINATION, which fails the whole document.
+// 101 is refused outright with EXCESSIVE_PAGINATION, failing the whole
+// document.
 func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
 	t.Parallel()
 
@@ -384,6 +383,13 @@ func TestListWorkParsesARecordedResponse(t *testing.T) {
 	w, err := c.ListWork(t.Context())
 	if err != nil {
 		t.Fatalf("ListWork: %v", err)
+	}
+	total := 0
+	for _, section := range gh.WorkSections() {
+		total += len(w[section])
+	}
+	if total == 0 {
+		t.Fatal("no work items parsed out of the recording")
 	}
 	for _, section := range gh.WorkSections() {
 		for _, item := range w[section] {
