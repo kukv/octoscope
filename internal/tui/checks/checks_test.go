@@ -540,6 +540,27 @@ func TestScrollingBackToAGroupsFirstCheckBringsItsHeading(t *testing.T) {
 	}
 }
 
+// TestALongCheckNameDropsItsDurationRatherThanCutIt guards what the list's
+// fixed 22 columns do when a name leaves no room for the duration. A cut
+// duration ("0:…") does not read as cut off; it reads as a duration that
+// starts at zero, which is a different thing from what the check took.
+func TestALongCheckNameDropsItsDurationRatherThanCutIt(t *testing.T) {
+	t.Parallel()
+
+	var got string
+	for _, line := range listPane(openChecks(t, mixed())) {
+		if strings.Contains(line, "codecov/patch") {
+			got = line
+		}
+	}
+	if got == "" {
+		t.Fatal("the check is not drawn at all")
+	}
+	if !strings.HasSuffix(got, "codecov/patch") {
+		t.Errorf("the row is %q, want it to end at the name: the duration does not fit", got)
+	}
+}
+
 // TestALogIsNotAskedForACheckWithNoJobBehindIt guards what enter is allowed
 // to ask for. A check run an App created carries a check run id where a
 // workflow's check carries an Actions job id, so asking gh for its log fails

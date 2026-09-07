@@ -266,8 +266,12 @@ func (m Model) workflowTitle(r gh.CheckRun) string {
 // the diff view's file list does.
 func (m Model) checkLine(r gh.CheckRun, cursor bool) string {
 	text := "  " + icon.Check(r.State) + " " + r.Name
+	// A cut duration reads as a shorter one rather than as a cut one, so a
+	// name that leaves no room for it is drawn without it.
 	if d := r.Duration(); d > 0 {
-		text += "  " + minSec(d)
+		if withDuration := text + "  " + minSec(d); ansi.StringWidth(withDuration) <= listWidth {
+			text = withDuration
+		}
 	}
 	if cursor && m.pane == paneList {
 		return theme.Selected().Render(fit(text, listWidth))
