@@ -271,9 +271,11 @@ func (m Model) checksFailed(msg checks.ErrorMsg) (tea.Model, tea.Cmd) {
 }
 
 // refreshLists carries a review submission or a merge to the views that are
-// open (detail and diff refetch their own PR from it, and the detail view a
-// merge came from closes) and refetches the board and the Repos list, which
-// have no popup of their own to notice from.
+// open and refetches the board and the Repos list, which have nothing of
+// their own to notice from. A review submission is refetched by the detail
+// and diff views; of a merge only the detail view takes notice, closing when
+// the pull request was merged and letting the popup refetch when it only
+// joined or left the auto-merge queue.
 func (m Model) refreshLists(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.broadcast(msg)
 	m = next.(Model)

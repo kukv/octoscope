@@ -1063,7 +1063,7 @@ func TestAMergeClosesTheDetailView(t *testing.T) {
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m.Update(key("m"))
-	m, cmd := m.Update(merge.MergedMsg{})
+	m, cmd := m.Update(merge.MergedMsg{Merged: true})
 	if cmd == nil {
 		t.Fatal("MergedMsg produced no command: the view stays open on a merged pull request")
 	}
@@ -1072,6 +1072,38 @@ func TestAMergeClosesTheDetailView(t *testing.T) {
 	}
 	if m.merge.Active() {
 		t.Error("the popup is still active after the merge")
+	}
+}
+
+// TestAnAutoMergeChangeKeepsTheDetailViewOpen: closing the view is what a
+// merge does. Joining or leaving the queue leaves the pull request open, and
+// the user was reading it.
+func TestAnAutoMergeChangeKeepsTheDetailViewOpen(t *testing.T) {
+	f := &fakeSource{
+		pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeCtx: gh.MergeContext{
+			PullRequestID:            "PR_1",
+			Mergeable:                gh.MergeableYes,
+			State:                    gh.MergeStateUnstable,
+			Methods:                  []gh.MergeMethod{gh.MergeSquash},
+			AutoMergeAllowed:         true,
+			ViewerCanEnableAutoMerge: true,
+		},
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
+
+	m, cmd = m.Update(merge.MergedMsg{})
+	if m.mode != modeMerge || !m.merge.Active() {
+		t.Fatalf("mode = %v, want the popup still up on a pull request that was only queued", m.mode)
+	}
+	if cmd == nil {
+		t.Fatal("nothing refetched: the popup would show the queue the pull request had before")
+	}
+	if msg := cmd(); msg == tea.Msg(ClosedMsg{}) {
+		t.Error("the view closed on a pull request that was only queued")
 	}
 }
 
@@ -1100,16 +1132,44 @@ func TestEscFromTheMergePopupLeavesTheBody(t *testing.T) {
 // submission: GitHub's message is drawn at footer level and the popup stays
 // up with what the user chose.
 func TestAFailedMergeStaysUnderThePopup(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeErr: errors.New("gh: HTTP 405 not mergeable"),
+	}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = m.Update(key("m"))
-	m, _ = m.Update(merge.ErrorMsg{Err: errors.New("gh: HTTP 405 not mergeable")})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
 	if m.mode != modeMerge {
 		t.Errorf("mode = %v after a failed merge, want the popup still up", m.mode)
 	}
 	if !strings.Contains(m.errText, "405") {
 		t.Errorf("errText = %q, want GitHub's message", m.errText)
+	}
+}
+
+// TestAClosedPopupsFailureDoesNotReachTheFooter: the fetch a popup started
+// outlives the popup. Its failure must not clear a second popup's loading
+// flag, nor put a message about a request nobody made under it.
+func TestAClosedPopupsFailureDoesNotReachTheFooter(t *testing.T) {
+	f := &fakeSource{
+		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeErr: errors.New("gh: HTTP 500"),
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	stale := cmd()
+	m, cmd = m.Update(key("esc"))
+	m, _ = m.Update(cmd())
+	m, _ = m.Update(key("m"))
+
+	m, _ = m.Update(stale)
+	if m.errText != "" {
+		t.Errorf("errText = %q, want empty: the failure belongs to the popup that was closed", m.errText)
+	}
+	if !strings.Contains(ansi.Strip(m.View()), i18n.T("merge.loading")) {
+		t.Errorf("the second popup stopped waiting for its own answer:\n%s", ansi.Strip(m.View()))
 	}
 }
 

@@ -369,7 +369,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case merge.CancelledMsg:
 		return m.mergeCancelled(), nil
 	case merge.MergedMsg:
-		return m.mergeDone()
+		return m.mergeDone(msg)
 	case merge.ErrorMsg:
 		return m.mergeFailed(msg)
 	case errMsg:
@@ -575,12 +575,19 @@ func (m Model) mergeCancelled() Model {
 	return m
 }
 
-// mergeDone leaves the view: a merged pull request is not something to keep
-// reading. The board and the Repos list are refreshed by the root, which
+// mergeDone leaves the view when the pull request was merged: a merged pull
+// request is not something to keep reading. Joining or leaving the auto-merge
+// queue leaves it open, so the popup keeps the screen and refetches instead.
+// The board and the Repos list are refreshed by the root either way, which
 // sees the same merge message this one came from, so nothing is sent on.
-func (m Model) mergeDone() (Model, tea.Cmd) {
+func (m Model) mergeDone(msg merge.MergedMsg) (Model, tea.Cmd) {
 	if m.mode != modeMerge {
 		return m, nil
+	}
+	if !msg.Merged {
+		var cmd tea.Cmd
+		m.merge, cmd = m.merge.Update(msg)
+		return m, cmd
 	}
 	m.mode, m.phase = modeView, phaseIdle
 	m.errText = ""
@@ -588,8 +595,11 @@ func (m Model) mergeDone() (Model, tea.Cmd) {
 	return m, func() tea.Msg { return ClosedMsg{} }
 }
 
+// mergeFailed shows the failure the popup on screen raised. A popup that was
+// closed and opened again leaves its own request in flight, and that one's
+// failure must not land in this view's footer.
 func (m Model) mergeFailed(msg merge.ErrorMsg) (Model, tea.Cmd) {
-	if m.mode != modeMerge {
+	if m.mode != modeMerge || !m.merge.Owns(msg) {
 		return m, nil
 	}
 	var cmd tea.Cmd
