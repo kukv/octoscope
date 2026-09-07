@@ -137,8 +137,7 @@ func TestEscLeavesTheView(t *testing.T) {
 }
 
 // TestJMovesTheCursorDownTheList guards the list's own navigation: j/k are
-// what the design table gives the row, and this task builds the list they
-// move over.
+// what the design table gives the row.
 func TestJMovesTheCursorDownTheList(t *testing.T) {
 	t.Parallel()
 
@@ -317,6 +316,37 @@ func TestTheLogPaneStopsScrollingAtItsWidestLine(t *testing.T) {
 	}
 	if view := m.View(); !strings.Contains(view, "xxx") {
 		t.Errorf("l scrolled the log pane off the end of its own lines:\n%s", view)
+	}
+}
+
+// TestMovingDownOntoShorterLinesBringsTheLogBack guards the other end of the
+// horizontal bound: an offset that was inside the widest line on screen is
+// past every line once the window moves onto narrower ones, and a blank pane
+// says nothing about how to get back.
+func TestMovingDownOntoShorterLinesBringsTheLogBack(t *testing.T) {
+	t.Parallel()
+
+	log := []gh.LogLine{
+		{Step: "s", Text: strings.Repeat("x", 400)},
+		{Step: "s", Text: "alpha"},
+		{Step: "s", Text: "bravo"},
+		{Step: "s", Text: "charlie"},
+		{Step: "s", Text: "delta"},
+	}
+	src := &fakeSource{checks: fixture(), log: log}
+	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	for range 500 {
+		m = press(m, "l") // the first press moves the cursor to the log pane
+	}
+	for range 3 {
+		m = press(m, "j")
+	}
+	if view := m.View(); !strings.Contains(view, "charlie") {
+		t.Errorf("the log pane is blank after moving down onto shorter lines:\n%s", view)
 	}
 }
 

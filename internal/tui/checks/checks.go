@@ -167,7 +167,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) resize(msg tea.WindowSizeMsg) Model {
 	m.width, m.height = msg.Width, msg.Height
-	return m
+	return m.boundHscroll()
 }
 
 func (m Model) checksArrived(msg checksMsg) Model {
@@ -258,7 +258,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) moveRow(delta int) Model {
 	if m.pane == paneLog {
 		m.logRow = clamp(m.logRow+delta, len(m.logRows())-1)
-		return m
+		return m.boundHscroll()
 	}
 	before := m.row
 	m.row = clamp(m.row+delta, len(m.order)-1)
@@ -286,6 +286,15 @@ func (m Model) moveHscroll(delta int) Model {
 		return m
 	}
 	m.hscroll = clamp(m.hscroll+delta, m.maxHscroll())
+	return m
+}
+
+// boundHscroll pulls the log pane's offset back inside what is on screen.
+// The bound is the widest line in the window, so anything that moves the
+// window -- scrolling it, or resizing the terminal -- can leave an offset
+// that was legal past every line there now is, and the pane draws blank.
+func (m Model) boundHscroll() Model {
+	m.hscroll = min(m.hscroll, m.maxHscroll())
 	return m
 }
 
