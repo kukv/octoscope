@@ -172,3 +172,29 @@ func TestNothingOverrunsTheTerminal(t *testing.T) {
 		}
 	}
 }
+
+// TestTheKeyBarNeverDropsTheWayOut guards every golden state at every width:
+// layout.FitKeyBar drops hints from the tail, so esc -- the only way out of
+// the popup -- is the first to go when the wording grows. The key would go on
+// working with nothing on screen to say so, and the goldens catch that only
+// if someone reads the diff.
+// It does not run in parallel with the rest of the package, for the reason
+// TestNothingOverrunsTheTerminal gives.
+func TestTheKeyBarNeverDropsTheWayOut(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		for _, w := range goldenWidths {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			for _, state := range goldenStates {
+				m := state.build(t, w)
+				if len(m.hints()) == 0 {
+					continue // a state that offers no key at all draws no bar
+				}
+				view := ansi.Strip(m.View())
+				if want := i18n.T("merge.key_cancel"); !strings.Contains(view, want) {
+					t.Errorf("%s %s %d: the key bar dropped %q:\n%s", state.name, lang.name, w, want, view)
+				}
+			}
+		}
+	}
+}
