@@ -69,6 +69,13 @@ type checksFetcher interface {
 	RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error
 }
 
+type merger interface {
+	PRMergeContext(ctx context.Context, repo string, number int) (gh.MergeContext, error)
+	MergePR(pullRequestID string, method gh.MergeMethod) error
+	EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error
+	DisableAutoMerge(pullRequestID string) error
+}
+
 type source interface {
 	itemFetcher
 	commenter
@@ -80,6 +87,7 @@ type source interface {
 	reviewer
 	opener
 	checksFetcher
+	merger
 }
 
 // Usecase holds the backend every view talks to.
@@ -94,6 +102,7 @@ type Usecase struct {
 	reviews    reviewer
 	web        opener
 	checks     checksFetcher
+	merges     merger
 }
 
 // New wires a Usecase to one backend.
@@ -109,6 +118,7 @@ func New(src source) *Usecase {
 		reviews:    src,
 		web:        src,
 		checks:     src,
+		merges:     src,
 	}
 }
 
@@ -233,4 +243,20 @@ func (u *Usecase) JobLog(ctx context.Context, repo string, jobID int64, failedOn
 
 func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error {
 	return u.checks.RerunWorkflow(ctx, repo, runID, scope)
+}
+
+func (u *Usecase) PRMergeContext(ctx context.Context, repo string, number int) (gh.MergeContext, error) {
+	return u.merges.PRMergeContext(ctx, repo, number)
+}
+
+func (u *Usecase) MergePR(pullRequestID string, method gh.MergeMethod) error {
+	return u.merges.MergePR(pullRequestID, method)
+}
+
+func (u *Usecase) EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error {
+	return u.merges.EnableAutoMerge(pullRequestID, method)
+}
+
+func (u *Usecase) DisableAutoMerge(pullRequestID string) error {
+	return u.merges.DisableAutoMerge(pullRequestID)
 }
