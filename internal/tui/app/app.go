@@ -188,20 +188,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case repo.ErrorMsg:
 		return m.fail(msg.Err)
 	case detail.ErrorMsg:
-		// The detail view keeps requests in flight after the user leaves it.
-		// Their failures must not drag a closed view's error onto the screen.
-		if !m.has(overlayDetail) {
-			return m, nil
-		}
-		return m.failOverlay(msg.Err, overlayDetail)
+		return m.detailFailed(msg)
 	case diff.ErrorMsg:
-		// Same rule as detail.ErrorMsg: a request outlives the view that
-		// started it, and its failure must not reach the error screen once
-		// the diff is no longer on the stack.
-		if !m.has(overlayDiff) {
-			return m, nil
-		}
-		return m.failOverlay(msg.Err, overlayDiff)
+		return m.diffFailed(msg)
 	case review.SubmittedMsg:
 		return m.reviewSubmitted(msg)
 	}
@@ -222,6 +211,25 @@ func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
 		Height: max(m.height-tabRowHeight, 1),
 	})
 	return m, m.repo.Init()
+}
+
+// The detail view keeps requests in flight after the user leaves it.
+// Their failures must not drag a closed view's error onto the screen.
+func (m Model) detailFailed(msg detail.ErrorMsg) (tea.Model, tea.Cmd) {
+	if !m.has(overlayDetail) {
+		return m, nil
+	}
+	return m.failOverlay(msg.Err, overlayDetail)
+}
+
+// Same rule as detail.ErrorMsg: a request outlives the view that
+// started it, and its failure must not reach the error screen once
+// the diff is no longer on the stack.
+func (m Model) diffFailed(msg diff.ErrorMsg) (tea.Model, tea.Cmd) {
+	if !m.has(overlayDiff) {
+		return m, nil
+	}
+	return m.failOverlay(msg.Err, overlayDiff)
 }
 
 // detail and diff each refetch their own PR when a review goes out
