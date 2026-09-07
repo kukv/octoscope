@@ -231,113 +231,27 @@ func (m Model) fetchReview() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-		// Below minWidthForSidebar the file list is not drawn at all; a
-		// cursor left pointing at it would be on a pane that no longer
-		// exists.
-		if !m.showSidebar() {
-			m.sidebar = false
-		}
-		m.textarea.SetWidth(max(m.width, 0))
-		if m.submit.Active() {
-			m.submit, _ = m.submit.Update(msg)
-		}
-		return m, nil
+		return m.resize(msg), nil
 	case diffMsg:
-		// The request for the pull request the user just left is still in
-		// flight; its answer must not replace this one's.
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.loading = false
-		m.files = msg.files
-		m.file, m.top, m.fileTop = 0, 0, 0
-		m.rows = m.buildRows()
-		m.row = firstRow(m.rows)
-		m.declined = ""
-		return m.follow(), nil
+		return m.filesArrived(msg), nil
 	case reviewMsg:
-		// The review context for the pull request the user just left is
-		// still in flight; its answer must not land here.
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.review = msg.ctx
-		m.reviewErr = nil
-		m.declined = ""
-		m.rows = m.buildRows()
-		m.row = clamp(m.row, len(m.rows)-1)
-		m = m.follow()
-		return m, nil
+		return m.reviewArrived(msg), nil
 	case reviewErrMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.reviewErr = msg.err
-		m.declined = ""
-		return m, nil
+		return m.reviewFailed(msg), nil
 	case errMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.loading = false
-		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+		return m.fetchFailed(msg)
 	case commentPostedMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = ""
-		m.textarea.Reset()
-		m.target = gh.PendingComment{}
-		m.review.PendingID = msg.reviewID
-		return m, m.fetchReview()
+		return m.commentPosted(msg)
 	case commentErrorMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.phase = phaseIdle
-		m.errText = msg.err.Error()
-		return m, nil
+		return m.commentFailed(msg), nil
 	case review.CancelledMsg:
-		// Also reaches here when the diff is drawn over the detail view and
-		// the submission was detail's own (broadcast hands the message to
-		// both); only the one that actually opened the popup acts on it.
-		if m.mode != modeSubmit {
-			return m, nil
-		}
-		// A failed submission's text is left on errText: nothing outside the
-		// popup draws it, and c, v and X each clear it before they open.
-		m.mode, m.phase = modeView, phaseIdle
-		return m, nil
+		return m.submitCancelled(), nil
 	case review.SubmittedMsg:
-		if m.mode != modeSubmit {
-			return m, nil
-		}
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = ""
-		m.review.PendingID = ""
-		return m, m.fetchReview()
+		return m.submitDone()
 	case review.ErrorMsg:
-		if m.mode != modeSubmit {
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.submit, cmd = m.submit.Update(msg)
-		m.errText = msg.Err.Error()
-		return m, cmd
+		return m.submitFailed(msg)
 	case discardedMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.phase = phaseIdle
-		if msg.err != nil {
-			m.errText = msg.err.Error()
-			return m, nil
-		}
-		m.mode = modeView
-		m.review.PendingID = ""
-		return m, m.fetchReview()
+		return m.discarded(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
@@ -345,11 +259,145 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spin, cmd = m.spin.Update(msg)
-		return m, cmd
+		return m.tick(msg)
 	}
 	return m, nil
+}
+
+func (m Model) resize(msg tea.WindowSizeMsg) Model {
+	m.width, m.height = msg.Width, msg.Height
+	// Below minWidthForSidebar the file list is not drawn at all; a
+	// cursor left pointing at it would be on a pane that no longer
+	// exists.
+	if !m.showSidebar() {
+		m.sidebar = false
+	}
+	m.textarea.SetWidth(max(m.width, 0))
+	if m.submit.Active() {
+		m.submit, _ = m.submit.Update(msg)
+	}
+	return m
+}
+
+func (m Model) filesArrived(msg diffMsg) Model {
+	// The request for the pull request the user just left is still in
+	// flight; its answer must not replace this one's.
+	if msg.ref != m.ref {
+		return m
+	}
+	m.loading = false
+	m.files = msg.files
+	m.file, m.top, m.fileTop = 0, 0, 0
+	m.rows = m.buildRows()
+	m.row = firstRow(m.rows)
+	m.declined = ""
+	return m.follow()
+}
+
+func (m Model) reviewArrived(msg reviewMsg) Model {
+	// The review context for the pull request the user just left is
+	// still in flight; its answer must not land here.
+	if msg.ref != m.ref {
+		return m
+	}
+	m.review = msg.ctx
+	m.reviewErr = nil
+	m.declined = ""
+	m.rows = m.buildRows()
+	m.row = clamp(m.row, len(m.rows)-1)
+	m = m.follow()
+	return m
+}
+
+func (m Model) reviewFailed(msg reviewErrMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.reviewErr = msg.err
+	m.declined = ""
+	return m
+}
+
+func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.loading = false
+	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+}
+
+func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.textarea.Reset()
+	m.target = gh.PendingComment{}
+	m.review.PendingID = msg.reviewID
+	return m, m.fetchReview()
+}
+
+func (m Model) commentFailed(msg commentErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.phase = phaseIdle
+	m.errText = msg.err.Error()
+	return m
+}
+
+func (m Model) submitCancelled() Model {
+	// Also reaches here when the diff is drawn over the detail view and
+	// the submission was detail's own (broadcast hands the message to
+	// both); only the one that actually opened the popup acts on it.
+	if m.mode != modeSubmit {
+		return m
+	}
+	// A failed submission's text is left on errText: nothing outside the
+	// popup draws it, and c, v and X each clear it before they open.
+	m.mode, m.phase = modeView, phaseIdle
+	return m
+}
+
+func (m Model) submitDone() (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.review.PendingID = ""
+	return m, m.fetchReview()
+}
+
+func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.submit, cmd = m.submit.Update(msg)
+	m.errText = msg.Err.Error()
+	return m, cmd
+}
+
+func (m Model) discarded(msg discardedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.phase = phaseIdle
+	if msg.err != nil {
+		m.errText = msg.err.Error()
+		return m, nil
+	}
+	m.mode = modeView
+	m.review.PendingID = ""
+	return m, m.fetchReview()
+}
+
+func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spin, cmd = m.spin.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {

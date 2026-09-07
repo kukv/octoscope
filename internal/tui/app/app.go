@@ -166,19 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 	case repoResolvedMsg:
-		if !msg.found {
-			m.repoLookupTimedOut = msg.timedOut
-			return m, nil
-		}
-		m.opts.HasRepo = true
-		// broadcast skips the list until this point, so it never saw the
-		// WindowSizeMsg that told the others how wide they are: an unsized
-		// list clips nothing and runs off the terminal.
-		m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
-			Width:  m.width,
-			Height: max(m.height-tabRowHeight, 1),
-		})
-		return m, m.repo.Init()
+		return m.repoResolved(msg)
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
@@ -215,23 +203,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.failOverlay(msg.Err, overlayDiff)
 	case review.SubmittedMsg:
-		// detail and diff each refetch their own PR when a review goes out
-		// (broadcast below reaches them); the board and the Repos list have
-		// no popup of their own to notice from, so the root refreshes them
-		// (spec 4.4.2).
-		next, cmd := m.broadcast(msg)
-		m = next.(Model)
-		var workCmd tea.Cmd
-		m.work, workCmd = m.work.Refresh()
-		cmds := []tea.Cmd{cmd, workCmd}
-		if m.opts.HasRepo {
-			var repoCmd tea.Cmd
-			m.repo, repoCmd = m.repo.Refresh()
-			cmds = append(cmds, repoCmd)
-		}
-		return m, tea.Batch(cmds...)
+		return m.reviewSubmitted(msg)
 	}
 	return m.broadcast(msg)
+}
+
+func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
+	if !msg.found {
+		m.repoLookupTimedOut = msg.timedOut
+		return m, nil
+	}
+	m.opts.HasRepo = true
+	// broadcast skips the list until this point, so it never saw the
+	// WindowSizeMsg that told the others how wide they are: an unsized
+	// list clips nothing and runs off the terminal.
+	m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
+		Width:  m.width,
+		Height: max(m.height-tabRowHeight, 1),
+	})
+	return m, m.repo.Init()
+}
+
+// detail and diff each refetch their own PR when a review goes out
+// (broadcast below reaches them); the board and the Repos list have
+// no popup of their own to notice from, so the root refreshes them
+// (spec 4.4.2).
+func (m Model) reviewSubmitted(msg review.SubmittedMsg) (tea.Model, tea.Cmd) {
+	next, cmd := m.broadcast(msg)
+	m = next.(Model)
+	var workCmd tea.Cmd
+	m.work, workCmd = m.work.Refresh()
+	cmds := []tea.Cmd{cmd, workCmd}
+	if m.opts.HasRepo {
+		var repoCmd tea.Cmd
+		m.repo, repoCmd = m.repo.Refresh()
+		cmds = append(cmds, repoCmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // has reports whether o is anywhere on the stack, not only on top: the

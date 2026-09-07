@@ -284,143 +284,214 @@ func applyPicker(src Source, ref gh.ItemRef, kind pickerKind, add, remove []stri
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-		m.body.SetWidth(msg.Width)
-		m.body.SetHeight(max(msg.Height-4, 5))
-		m.textarea.SetWidth(msg.Width)
-		m.textarea.SetHeight(max(msg.Height-6, 3))
-		if m.submit.Active() {
-			m.submit, _ = m.submit.Update(msg)
-		}
-		return m, nil
+		return m.resize(msg), nil
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spin, cmd = m.spin.Update(msg)
-		return m, cmd
+		return m.tick(msg)
 	case itemMsg:
-		if msg.ref != m.ref {
-			return m, nil // an answer for an item the user has already left
-		}
-		it := msg.item
-		m.phase = phaseIdle
-		m.state = it.State
-		m.errText = ""
-		m.labels = labelNames(it.Labels)
-		m.assignees = authorLogins(it.Assignees)
-		m.url = it.URL
-		if it.Kind == gh.ItemPR {
-			m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
-			m.setContent(prMarkdown(*it.PR))
-		} else {
-			m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})
-			m.setContent(issueMarkdown(it))
-		}
-		return m, nil
+		return m.itemArrived(msg), nil
 	case commentPostedMsg:
-		m.errText = ""
-		m.textarea.Reset()
-		m.mode, m.phase = modeView, phaseLoading
-		return m, fetch(m.src, m.ref)
+		return m.commentPosted()
 	case commentErrorMsg:
-		m.phase = phaseIdle
-		m.errText = msg.err.Error()
-		return m, nil
+		return m.commentFailed(msg.err), nil
 	case stateChangedMsg:
-		m.errText = ""
-		m.mode, m.phase = modeView, phaseLoading
-		return m, fetch(m.src, m.ref)
+		return m.stateChanged()
 	case stateErrorMsg:
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = msg.err.Error()
-		return m, nil
+		return m.stateFailed(msg.err), nil
 	case pickerCandidatesMsg:
-		if msg.kind == pickLabels {
-			names := make([]string, len(msg.labels))
-			colors := make(map[string]string, len(msg.labels))
-			for i, l := range msg.labels {
-				names[i] = l.Name
-				colors[l.Name] = l.Color
-			}
-			m.picker = newPicker(pickLabels, i18n.T("picker.labels"), names, colors, m.labels)
-		} else {
-			m.picker = newPicker(pickAssignees, i18n.T("picker.assignees"), msg.users, nil, m.assignees)
-		}
-		m.mode, m.phase = modePick, phaseIdle
-		return m, nil
+		return m.candidatesArrived(msg), nil
 	case pickerAppliedMsg:
-		m.mode, m.phase = modeView, phaseLoading
-		return m, fetch(m.src, m.ref)
+		return m.pickApplied()
 	case pickErrorMsg:
-		if m.phase == phaseWorking { // the apply failed; the picker stays up
-			m.phase = phaseIdle
-		} else { // the candidates never arrived; there is no picker to show
-			m.mode, m.phase = modeView, phaseIdle
-		}
-		m.errText = msg.err.Error()
-		return m, nil
+		return m.pickFailed(msg.err), nil
 	case reviewContextMsg:
-		if msg.ref != m.ref {
-			return m, nil // an answer for an item the user has already left
-		}
-		target := review.Target{
-			PullRequestID:   msg.ctx.PullRequestID,
-			PendingID:       msg.ctx.PendingID,
-			PendingComments: msg.ctx.PendingCount(),
-		}
-		m.submit = review.New(m.src, target)
-		m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		m.mode, m.phase = modeSubmit, phaseIdle
-		m.errText = ""
-		return m, nil
+		return m.reviewContextArrived(msg), nil
 	case reviewContextErrMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = msg.err.Error()
-		return m, nil
+		return m.reviewContextFailed(msg), nil
 	case review.CancelledMsg:
-		if m.mode != modeSubmit {
-			return m, nil
-		}
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = ""
-		return m, nil
+		return m.submitCancelled(), nil
 	case review.SubmittedMsg:
-		if m.mode != modeSubmit {
-			return m, nil
-		}
-		m.errText = ""
-		m.mode, m.phase = modeView, phaseLoading
-		return m, fetch(m.src, m.ref)
+		return m.submitDone()
 	case review.ErrorMsg:
-		if m.mode != modeSubmit {
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.submit, cmd = m.submit.Update(msg)
-		m.errText = msg.Err.Error()
-		return m, cmd
+		return m.submitFailed(msg)
 	case errMsg:
-		if msg.ref != m.ref {
-			return m, nil
-		}
-		m.phase = phaseIdle
-		err := msg.err
-		return m, func() tea.Msg { return ErrorMsg{err} }
+		return m.fetchFailed(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseWheelMsg:
-		// The body is the only thing here that scrolls, and it is only on
-		// screen with nothing over it and nothing in flight.
-		if m.mode != modeView || m.phase != phaseIdle {
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.body, cmd = m.body.Update(msg)
-		return m, cmd
+		return m.wheel(msg)
 	}
 	return m, nil
+}
+
+func (m Model) resize(msg tea.WindowSizeMsg) Model {
+	m.width, m.height = msg.Width, msg.Height
+	m.body.SetWidth(msg.Width)
+	m.body.SetHeight(max(msg.Height-4, 5))
+	m.textarea.SetWidth(msg.Width)
+	m.textarea.SetHeight(max(msg.Height-6, 3))
+	if m.submit.Active() {
+		m.submit, _ = m.submit.Update(msg)
+	}
+	return m
+}
+
+func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spin, cmd = m.spin.Update(msg)
+	return m, cmd
+}
+
+// itemArrived puts a fetched item on screen. An answer for an item the user
+// has already left is dropped: the request for the last one is still running
+// while the view is rebuilt for the new one.
+func (m Model) itemArrived(msg itemMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	it := msg.item
+	m.phase = phaseIdle
+	m.state = it.State
+	m.errText = ""
+	m.labels = labelNames(it.Labels)
+	m.assignees = authorLogins(it.Assignees)
+	m.url = it.URL
+	if it.Kind == gh.ItemPR {
+		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
+		m.setContent(prMarkdown(*it.PR))
+	} else {
+		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})
+		m.setContent(issueMarkdown(it))
+	}
+	return m
+}
+
+func (m Model) commentPosted() (Model, tea.Cmd) {
+	m.errText = ""
+	m.textarea.Reset()
+	m.mode, m.phase = modeView, phaseLoading
+	return m, fetch(m.src, m.ref)
+}
+
+func (m Model) commentFailed(err error) Model {
+	m.phase = phaseIdle
+	m.errText = err.Error()
+	return m
+}
+
+func (m Model) stateChanged() (Model, tea.Cmd) {
+	m.errText = ""
+	m.mode, m.phase = modeView, phaseLoading
+	return m, fetch(m.src, m.ref)
+}
+
+func (m Model) stateFailed(err error) Model {
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = err.Error()
+	return m
+}
+
+func (m Model) candidatesArrived(msg pickerCandidatesMsg) Model {
+	if msg.kind == pickLabels {
+		names := make([]string, len(msg.labels))
+		colors := make(map[string]string, len(msg.labels))
+		for i, l := range msg.labels {
+			names[i] = l.Name
+			colors[l.Name] = l.Color
+		}
+		m.picker = newPicker(pickLabels, i18n.T("picker.labels"), names, colors, m.labels)
+	} else {
+		m.picker = newPicker(pickAssignees, i18n.T("picker.assignees"), msg.users, nil, m.assignees)
+	}
+	m.mode, m.phase = modePick, phaseIdle
+	return m
+}
+
+func (m Model) pickApplied() (Model, tea.Cmd) {
+	m.mode, m.phase = modeView, phaseLoading
+	return m, fetch(m.src, m.ref)
+}
+
+func (m Model) pickFailed(err error) Model {
+	if m.phase == phaseWorking { // the apply failed; the picker stays up
+		m.phase = phaseIdle
+	} else { // the candidates never arrived; there is no picker to show
+		m.mode, m.phase = modeView, phaseIdle
+	}
+	m.errText = err.Error()
+	return m
+}
+
+func (m Model) reviewContextArrived(msg reviewContextMsg) Model {
+	if msg.ref != m.ref {
+		return m // an answer for an item the user has already left
+	}
+	target := review.Target{
+		PullRequestID:   msg.ctx.PullRequestID,
+		PendingID:       msg.ctx.PendingID,
+		PendingComments: msg.ctx.PendingCount(),
+	}
+	m.submit = review.New(m.src, target)
+	m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	m.mode, m.phase = modeSubmit, phaseIdle
+	m.errText = ""
+	return m
+}
+
+func (m Model) reviewContextFailed(msg reviewContextErrMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = msg.err.Error()
+	return m
+}
+
+func (m Model) submitCancelled() Model {
+	if m.mode != modeSubmit {
+		return m
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	return m
+}
+
+func (m Model) submitDone() (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	m.errText = ""
+	m.mode, m.phase = modeView, phaseLoading
+	return m, fetch(m.src, m.ref)
+}
+
+func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.submit, cmd = m.submit.Update(msg)
+	m.errText = msg.Err.Error()
+	return m, cmd
+}
+
+func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.phase = phaseIdle
+	err := msg.err
+	return m, func() tea.Msg { return ErrorMsg{err} }
+}
+
+func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
+	// The body is the only thing here that scrolls, and it is only on
+	// screen with nothing over it and nothing in flight.
+	if m.mode != modeView || m.phase != phaseIdle {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.body, cmd = m.body.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
