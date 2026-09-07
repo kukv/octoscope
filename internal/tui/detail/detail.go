@@ -379,6 +379,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		return m.wheel(msg)
 	}
+	// The merge popup fetches for itself, and its answer is a type this view
+	// cannot name. Everything left over while it is open is its: sizes, keys
+	// and its three public messages have already returned above.
+	if m.mode == modeMerge {
+		var cmd tea.Cmd
+		m.merge, cmd = m.merge.Update(msg)
+		return m, cmd
+	}
 	return m, nil
 }
 

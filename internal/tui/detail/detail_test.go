@@ -1013,6 +1013,32 @@ func TestMOpensTheMergePopup(t *testing.T) {
 	}
 }
 
+// TestTheMergePopupGetsItsOwnAnswer: the popup fetches for itself, and its
+// answer is a message type this view cannot name. Without forwarding, the
+// popup would sit on "asking GitHub" forever.
+func TestTheMergePopupGetsItsOwnAnswer(t *testing.T) {
+	f := &fakeSource{
+		pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		mergeCtx: gh.MergeContext{
+			PullRequestID: "PR_1",
+			Mergeable:     gh.MergeableYes,
+			State:         gh.MergeStateUnstable,
+			Methods:       []gh.MergeMethod{gh.MergeSquash},
+		},
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, cmd := m.Update(key("m"))
+	m, _ = m.Update(cmd())
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, i18n.T("merge.loading")) {
+		t.Errorf("the popup is still asking GitHub after its answer arrived:\n%s", view)
+	}
+	if !strings.Contains(view, i18n.T("merge.method_squash")) {
+		t.Errorf("the popup does not show what the repository allows:\n%s", view)
+	}
+}
+
 // TestMDoesNothingOnAnIssue mirrors v's and d's own guard: an issue has
 // nothing to merge.
 func TestMDoesNothingOnAnIssue(t *testing.T) {
