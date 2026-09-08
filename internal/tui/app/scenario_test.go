@@ -268,3 +268,30 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 		t.Errorf("the view does not show the posted thread:\n%s", got)
 	}
 }
+
+// TestOpeningTheChecksFromTheReposTabNamesTheRepository covers a bug that
+// only showed on a real terminal: the Repos tab handed out a ref with no
+// repository, and the checks view drew a bare " #12".
+func TestOpeningTheChecksFromTheReposTabNamesTheRepository(t *testing.T) {
+	f := &scenarioSource{pr: scenarioPR()}
+	m := scenarioModel(t, f)
+
+	m = run(t, m, "2")
+	if m.tab != tabRepos {
+		t.Fatalf("precondition: tab = %d, want the Repos tab", m.tab)
+	}
+	// The ref borrows the header's name, so the name has to have arrived.
+	if !strings.Contains(content(m), "kukv/demo") {
+		t.Fatalf("precondition: the Repos header has no repository name:\n%s", content(m))
+	}
+
+	m = run(t, m, "s")
+	// The summary line is the checks view's alone.
+	if !strings.Contains(content(m), "0 failing") {
+		t.Fatalf("precondition: the checks view did not open:\n%s", content(m))
+	}
+
+	if got := content(m); !strings.Contains(got, "kukv/demo #12") {
+		t.Errorf("the checks title does not name the repository:\n%s", got)
+	}
+}

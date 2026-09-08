@@ -407,7 +407,7 @@ func TestAWiderTerminalBringsTheLogBack(t *testing.T) {
 func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, gh.Checks{})
+	m := openChecks(t, 120, 30, gh.Checks{})
 	m, _ = m.Update(keyPress("enter"))
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
@@ -418,7 +418,7 @@ func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 func TestRerunOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := press(openChecks(t, gh.Checks{}), "R")
+	m := press(openChecks(t, 120, 30, gh.Checks{}), "R")
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
 			m.declined, i18n.T("checks.none"))
@@ -447,22 +447,68 @@ func appCheck() gh.Checks {
 	}
 }
 
-func openChecks(t *testing.T, c gh.Checks) Model {
+// openChecks opens the list on the given checks. The height is the caller's:
+// a tall screen draws every check at once, and a short one makes the list
+// scroll.
+func openChecks(t *testing.T, width, height int, c gh.Checks) Model {
 	t.Helper()
 
 	m := New(&fakeSource{checks: c}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: c})
 	return m
 }
 
-func TestACheckWithNoWorkflowRunGetsNoHeading(t *testing.T) {
+func TestACheckWithNoWorkflowRunGetsTheOtherHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, appCheck())
-	if rows := m.allRows(); len(rows) != 1 {
-		t.Errorf("the list drew %d lines, want 1: a check with no workflow run has no heading:\n%s",
+	rows := openChecks(t, 120, 30, appCheck()).allRows()
+	if len(rows) != 2 {
+		t.Fatalf("the list drew %d lines, want 2: a check with no workflow run gets a heading:\n%s",
 			len(rows), strings.Join(rows, "\n"))
+	}
+	if got, want := ansi.Strip(rows[0]), i18n.T("checks.other"); got != want {
+		t.Errorf("the heading reads %q, want %q", got, want)
+	}
+}
+
+// The checks with no workflow run behind them -- a StatusContext, and a check
+// run an App created -- used to read as the continuation of whatever group
+// happened to sit above them. They share one heading, so it is drawn once.
+func TestTheChecksWithNoRunOfTheirOwnGetTheirOwnHeading(t *testing.T) {
+	t.Parallel()
+
+	m := openChecks(t, 120, 30, mixed())
+	want := i18n.T("checks.other")
+	got := 0
+	for _, line := range listPane(m) {
+		if line == want {
+			got++
+		}
+	}
+	if got != 1 {
+		t.Errorf("the heading %q is drawn %d times, want 1:\n%s", want, got, m.View())
+	}
+}
+
+// The cursor counts checks, but the window scrolls by lines, and a heading is
+// a line. On a screen too short to hold the list, a window that does not count
+// the new heading stops one line above the last check and leaves it undrawn.
+func TestTheCursorReachesTheLastCheckPastTheNewHeading(t *testing.T) {
+	t.Parallel()
+
+	m := openChecks(t, 80, 12, mixed())
+	for range len(m.order) - 1 {
+		m = press(m, "j")
+	}
+	pane := listPane(m)
+	if last := m.order[len(m.order)-1].Name; !slices.ContainsFunc(pane, func(l string) bool {
+		return strings.Contains(l, last)
+	}) {
+		t.Errorf("the cursor is on %q and it is not drawn:\n%s", last, m.View())
+	}
+	if !slices.Contains(pane, i18n.T("checks.other")) {
+		t.Errorf("the heading of the group the cursor is in is off the top:\n%s", m.View())
 	}
 }
 
@@ -493,7 +539,7 @@ func TestAnExternalCIsStateDoesNotMoveAnAppsCheck(t *testing.T) {
 		{"external CI running", mixed()},
 		{"external CI succeeded", succeeded},
 	} {
-		got := names(openChecks(t, tc.checks).order)
+		got := names(openChecks(t, 120, 30, tc.checks).order)
 		if !slices.Equal(got, want) {
 			t.Errorf("%s: order = %v, want %v", tc.name, got, want)
 		}
@@ -547,7 +593,7 @@ func TestALongCheckNameDropsItsDurationRatherThanCutIt(t *testing.T) {
 	t.Parallel()
 
 	var got string
-	for _, line := range listPane(openChecks(t, mixed())) {
+	for _, line := range listPane(openChecks(t, 120, 30, mixed())) {
 		if strings.Contains(line, "codecov/patch") {
 			got = line
 		}
@@ -567,7 +613,7 @@ func TestALongCheckNameDropsItsDurationRatherThanCutIt(t *testing.T) {
 func TestALogIsNotAskedForACheckWithNoJobBehindIt(t *testing.T) {
 	t.Parallel()
 
-	m, cmd := openChecks(t, appCheck()).Update(keyPress("enter"))
+	m, cmd := openChecks(t, 120, 30, appCheck()).Update(keyPress("enter"))
 	if cmd != nil {
 		t.Errorf("enter started a log fetch for a check with no job behind it")
 	}

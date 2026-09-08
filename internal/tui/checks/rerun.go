@@ -77,7 +77,7 @@ func (m Model) startRerun() Model {
 	r := m.order[m.row]
 	// A check run an App created has a null workflowRun behind it and so no
 	// run id: there is nothing for RerunWorkflow to name.
-	if r.Kind == gh.CheckKindStatus || r.RunID == 0 {
+	if !hasWorkflow(r) {
 		m.declined = i18n.T("checks.decline_rerun_status_context")
 		return m
 	}

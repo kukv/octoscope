@@ -300,6 +300,43 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+// The ref leaves this view for the detail, diff and checks views, and those
+// draw the repository in their titles. Leaving it empty put a bare " #1" at
+// the top of the checks view. Both tabs hand out refs, so both are checked.
+func TestTheSelectedRefCarriesTheRepositoryName(t *testing.T) {
+	tests := []struct {
+		name     string
+		toIssues bool
+		wantKind gh.ItemKind
+	}{
+		{name: "the PRs tab", wantKind: gh.ItemPR},
+		{name: "the Issues tab", toIssues: true, wantKind: gh.ItemIssue},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+			m := loadedModel(f)
+			m, _ = m.Update(repoNameMsg("kukv/demo"))
+			if tt.toIssues {
+				var cmd tea.Cmd
+				m, cmd = m.Update(key("tab"))
+				m, _ = m.Update(cmd())
+			}
+
+			ref, ok := m.SelectedRef()
+			if !ok {
+				t.Fatalf("%s: SelectedRef reported nothing selected", tt.name)
+			}
+			if ref.Kind != tt.wantKind {
+				t.Fatalf("%s: Kind = %v, want %v", tt.name, ref.Kind, tt.wantKind)
+			}
+			if ref.Repo != "kukv/demo" {
+				t.Errorf("%s: Repo = %q, want kukv/demo", tt.name, ref.Repo)
+			}
+		})
+	}
+}
+
 // TestKeyBarNamesTheChecksKey pins s alongside d in the list's key bar: a
 // key with no hint in the footer is a key nobody can find.
 func TestKeyBarNamesTheChecksKey(t *testing.T) {

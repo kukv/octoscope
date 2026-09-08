@@ -226,19 +226,21 @@ func (m Model) allRows() []string {
 	return lines
 }
 
-// hasHeading reports whether the list draws a workflow heading above
-// order[i]. arrange keeps the checks of one workflow together, so the row
-// before is enough to tell a new group from a continuing one.
+// hasHeading reports whether the list draws a heading above order[i].
+// arrange keeps the checks of one workflow together and the checks with no
+// run of their own last, so the row before is enough to tell a new group
+// from a continuing one.
 func (m Model) hasHeading(i int) bool {
 	r := m.order[i]
-	if !hasWorkflow(r) {
-		return false
-	}
 	if i == 0 {
 		return true
 	}
 	prev := m.order[i-1]
-	return prev.Kind != gh.CheckKindRun || prev.Workflow != r.Workflow
+	if !hasWorkflow(r) {
+		// The first of them opens the group; the rest continue it.
+		return hasWorkflow(prev)
+	}
+	return prev.Workflow != r.Workflow
 }
 
 // cursorLine is which line of allRows the cursor sits on: its row plus every
@@ -253,7 +255,12 @@ func (m Model) cursorLine() int {
 	return line
 }
 
+// workflowTitle names the group a check belongs to. A check with no workflow
+// run behind it has no name to take, so they share one heading.
 func (m Model) workflowTitle(r gh.CheckRun) string {
+	if !hasWorkflow(r) {
+		return i18n.T("checks.other")
+	}
 	if r.RunNumber > 0 {
 		return fmt.Sprintf("%s #%d", r.Workflow, r.RunNumber)
 	}

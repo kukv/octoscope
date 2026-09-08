@@ -263,6 +263,8 @@ footer:
 checks:
   title:
     other: "Checks"
+  other:
+    other: "Other"
   none:
     other: "no checks on this pull request"
   loading:
