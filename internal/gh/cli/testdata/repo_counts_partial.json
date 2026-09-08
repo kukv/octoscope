@@ -1,0 +1,29 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "kukv/octoscope",
+      "pullRequests": {
+        "totalCount": 0
+      },
+      "issues": {
+        "totalCount": 2
+      }
+    },
+    "r1": null
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "r1"
+      ],
+      "locations": [
+        {
+          "line": 3,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a Repository with the name 'kukv/no-such-repository-xyz'."
+    }
+  ]
+}

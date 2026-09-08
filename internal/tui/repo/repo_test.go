@@ -23,9 +23,11 @@ type fakeSource struct {
 	webCalls []string // the URLs handed to the browser
 }
 
-func (f *fakeSource) ListPRs(ctx context.Context) ([]gh.PR, error) { return f.prs, f.err }
+func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+	return f.prs, f.err
+}
 
-func (f *fakeSource) ListIssues(ctx context.Context) ([]gh.Issue, error) {
+func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
 	return f.issues, f.err
 }
 

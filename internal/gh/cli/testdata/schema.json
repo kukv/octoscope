@@ -261,6 +261,16 @@
       "viewerThreadSubscriptionStatus": "ThreadSubscriptionState"
     }
   },
+  "IssueConnection": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "edges": "IssueEdge",
+      "nodes": "Issue",
+      "pageInfo": "PageInfo",
+      "totalCount": "Int"
+    }
+  },
   "Label": {
     "kind": "OBJECT",
     "possibleTypes": [],
@@ -1016,6 +1026,16 @@
     "fields": {
       "edges": "PullRequestCommitEdge",
       "nodes": "PullRequestCommit",
+      "pageInfo": "PageInfo",
+      "totalCount": "Int"
+    }
+  },
+  "PullRequestConnection": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "edges": "PullRequestEdge",
+      "nodes": "PullRequest",
       "pageInfo": "PageInfo",
       "totalCount": "Int"
     }

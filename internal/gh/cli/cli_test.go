@@ -52,7 +52,7 @@ func readTestdata(t *testing.T, name string) string {
 
 func TestListPRs(t *testing.T) {
 	c, f := newTestClient(prListJSON, nil)
-	prs, err := c.ListPRs(t.Context())
+	prs, err := c.ListPRs(t.Context(), "")
 	if err != nil {
 		t.Fatalf("ListPRs: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestListPRs(t *testing.T) {
 
 func TestListPRsEmpty(t *testing.T) {
 	c, _ := newTestClient(`[]`, nil)
-	prs, err := c.ListPRs(t.Context())
+	prs, err := c.ListPRs(t.Context(), "")
 	if err != nil || len(prs) != 0 {
 		t.Errorf("prs = %v, err = %v; want empty, nil", prs, err)
 	}
@@ -109,7 +109,7 @@ func TestGetPRWithRepoOverride(t *testing.T) {
 
 func TestListIssues(t *testing.T) {
 	c, f := newTestClient(issueListJSON, nil)
-	issues, err := c.ListIssues(t.Context())
+	issues, err := c.ListIssues(t.Context(), "")
 	if err != nil {
 		t.Fatalf("ListIssues: %v", err)
 	}
@@ -120,6 +120,90 @@ func TestListIssues(t *testing.T) {
 	if len(issues) != 1 || issues[0].Number != 3 || issues[0].Author.Login != "alice" {
 		t.Errorf("unexpected parse result: %+v", issues)
 	}
+}
+
+// The sidebar lists a repository the client was not built for, so the list
+// calls have to be able to name one.
+func TestListAsksForTheRepositoryItWasGiven(t *testing.T) {
+	tests := map[string]func(*Client) ([]string, error){
+		"PR": func(c *Client) ([]string, error) {
+			var got []string
+			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				got = args
+				return []byte("[]"), nil
+			}
+			_, err := c.ListPRs(t.Context(), "cli/cli")
+			return got, err
+		},
+		"issue": func(c *Client) ([]string, error) {
+			var got []string
+			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				got = args
+				return []byte("[]"), nil
+			}
+			_, err := c.ListIssues(t.Context(), "cli/cli")
+			return got, err
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New("/tmp", "kukv/octoscope")
+			got, err := call(c)
+			if err != nil {
+				t.Fatalf("List%s: %v", name, err)
+			}
+			if repoArg(got) != "cli/cli" {
+				t.Errorf("--repo = %q, want %q", repoArg(got), "cli/cli")
+			}
+		})
+	}
+}
+
+// An empty name still means "the repository this client was built for":
+// every existing caller passes nothing.
+func TestListFallsBackToTheClientsRepository(t *testing.T) {
+	tests := map[string]func(*Client) ([]string, error){
+		"PR": func(c *Client) ([]string, error) {
+			var got []string
+			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				got = args
+				return []byte("[]"), nil
+			}
+			_, err := c.ListPRs(t.Context(), "")
+			return got, err
+		},
+		"issue": func(c *Client) ([]string, error) {
+			var got []string
+			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				got = args
+				return []byte("[]"), nil
+			}
+			_, err := c.ListIssues(t.Context(), "")
+			return got, err
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New("/tmp", "kukv/octoscope")
+			got, err := call(c)
+			if err != nil {
+				t.Fatalf("List%s: %v", name, err)
+			}
+			if repoArg(got) != "kukv/octoscope" {
+				t.Errorf("--repo = %q, want %q", repoArg(got), "kukv/octoscope")
+			}
+		})
+	}
+}
+
+// repoArg is the value gh was given for --repo, or "" if it was not given.
+func repoArg(args []string) string {
+	for i, a := range args {
+		if a == "--repo" && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
 }
 
 func TestGetIssueWithRepoOverride(t *testing.T) {
@@ -153,7 +237,7 @@ func TestRepoName(t *testing.T) {
 func TestRunErrorPassesThrough(t *testing.T) {
 	wantErr := errors.New("gh pr: no git remotes found")
 	c, _ := newTestClient("", wantErr)
-	if _, err := c.ListPRs(t.Context()); !errors.Is(err, wantErr) {
+	if _, err := c.ListPRs(t.Context(), ""); !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v", err, wantErr)
 	}
 }
@@ -324,7 +408,7 @@ func TestClientUsesDefaultRepo(t *testing.T) {
 		got = args
 		return []byte("[]"), nil
 	}
-	if _, err := c.ListPRs(t.Context()); err != nil {
+	if _, err := c.ListPRs(t.Context(), ""); err != nil {
 		t.Fatalf("ListPRs: %v", err)
 	}
 	if i := slices.Index(got, "--repo"); i < 0 || got[i+1] != "kukv/octoscope" {
@@ -388,11 +472,11 @@ func TestTheListsAskForMoreThanTheDefaultThirty(t *testing.T) {
 
 	tests := map[string]func(*Client) error{
 		"pr list": func(c *Client) error {
-			_, err := c.ListPRs(t.Context())
+			_, err := c.ListPRs(t.Context(), "")
 			return err
 		},
 		"issue list": func(c *Client) error {
-			_, err := c.ListIssues(t.Context())
+			_, err := c.ListIssues(t.Context(), "")
 			return err
 		},
 		"label list": func(c *Client) error {
@@ -424,7 +508,7 @@ func TestTheListsAskForMoreThanTheDefaultThirty(t *testing.T) {
 func TestListPRsParsesARecordedResponse(t *testing.T) {
 	c, _ := newTestClient(readTestdata(t, "pr_list.json"), nil)
 
-	prs, err := c.ListPRs(t.Context())
+	prs, err := c.ListPRs(t.Context(), "")
 	if err != nil {
 		t.Fatalf("ListPRs: %v", err)
 	}

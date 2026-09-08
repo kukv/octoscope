@@ -87,9 +87,11 @@ func (n checkNode) name() string {
 
 // ListWork fetches every column of the Work board in one GraphQL request.
 func (c *Client) ListWork(ctx context.Context) (gh.Work, error) {
-	// gh api graphql exits non-zero when the response body carries a top-level
-	// "errors" array, so a query GitHub rejects arrives here as an error from
-	// c.run rather than as a body we'd otherwise parse into empty columns.
+	// The four search strings here are fixed text embedded at build time, not
+	// data that varies per call (unlike RepoCounts' per-repository names). An
+	// "errors" array therefore means the document itself is broken, not that
+	// one column failed for reasons specific to it -- there is no partial
+	// body worth salvaging, so bail out.
 	out, err := c.run(ctx, c.dir, "api", "graphql", "-f", "query="+workQuery)
 	if err != nil {
 		return gh.Work{}, err

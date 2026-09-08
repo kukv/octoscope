@@ -39,9 +39,11 @@ func (f *scenarioSource) ListWork(context.Context) (gh.Work, error) {
 	return w, nil
 }
 
-func (f *scenarioSource) ListPRs(context.Context) ([]gh.PR, error)       { return []gh.PR{f.pr}, nil }
-func (f *scenarioSource) ListIssues(context.Context) ([]gh.Issue, error) { return nil, nil }
-func (f *scenarioSource) RepoName(context.Context) (string, error)       { return "kukv/demo", nil }
+func (f *scenarioSource) ListPRs(context.Context, string) ([]gh.PR, error) {
+	return []gh.PR{f.pr}, nil
+}
+func (f *scenarioSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
+func (f *scenarioSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
 
 func (f *scenarioSource) GetItem(context.Context, gh.ItemRef) (usecase.Item, error) {
 	pr := f.pr
