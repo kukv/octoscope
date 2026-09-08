@@ -15,6 +15,8 @@ error:
     other: "gh CLI が見つかりません。インストールして gh auth login を実行してください"
   no_browser:
     other: "ブラウザを起動できませんでした。次のアドレスを手で開いてください:\n{{.URL}}"
+  config_unreadable:
+    other: "設定ファイルを読み込めませんでした。既定値で動作します"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same
@@ -25,6 +27,8 @@ tab:
     other: "Repos"
   repo_lookup_timeout:
     other: "リポジトリの判定がタイムアウトしました"
+  config_unreadable:
+    other: "設定を読めません（既定値で動作）"
 
 list:
   tab_prs:

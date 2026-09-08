@@ -67,9 +67,22 @@ Or point it at any repository:
 | Flag | Description |
 |---|---|
 | `--repo owner/name` | Target repository, and the tab octoscope opens on. Defaults to the repository of the current directory, and to the Work tab. |
-| `--lang en\|ja` | Display language. Defaults to the operating system locale. |
-| `--icons unicode\|nerd\|ascii` | Glyph set. Defaults to `unicode`; `OCTOSCOPE_ICONS` sets it permanently. |
+| `--lang en\|ja` | Display language. Defaults to the settings file, then the operating system locale. |
+| `--icons unicode\|nerd\|ascii` | Glyph set. Defaults to `unicode`; `OCTOSCOPE_ICONS` or the settings file sets it permanently. |
 | `--version` | Print the version and exit. |
+
+### Settings file
+
+octoscope reads `octoscope/config.yaml` under the directory the operating
+system keeps configuration in: `%AppData%` on Windows, `~/Library/Application
+Support` on macOS, `~/.config` on Linux. It is optional; a missing or empty
+file just means every setting is at its default.
+
+| Key | Values |
+|---|---|
+| `language` | `en` or `ja` |
+| `icons` | `unicode`, `nerd`, or `ascii` |
+| `default_tab` | `repos`, to start on the Repos tab instead of Work |
 
 Pass `--icons nerd` if you have a [Nerd Font](https://www.nerdfonts.com/)
 patched font installed, or `--icons ascii` if the Unicode symbols do not draw.
@@ -114,4 +127,5 @@ request changes / comment).
 ## Localization
 
 octoscope speaks English and Japanese. The language is chosen from `--lang`
-first, then the operating system locale, and falls back to English.
+first, then the settings file, then the operating system locale, and falls
+back to English.

@@ -65,9 +65,22 @@ git リポジトリの中で実行する。
 | フラグ | 説明 |
 |---|---|
 | `--repo owner/name` | 対象リポジトリ。指定すると Repos タブから始まる。デフォルトはカレントディレクトリのリポジトリで、この場合は Work タブから始まる |
-| `--lang en\|ja` | 表示言語。デフォルトはオペレーティングシステムのロケール |
-| `--icons unicode\|nerd\|ascii` | グリフの種類。デフォルトは `unicode`。`OCTOSCOPE_ICONS` で恒久的に指定できる |
+| `--lang en\|ja` | 表示言語。デフォルトは設定ファイル、次にオペレーティングシステムのロケール |
+| `--icons unicode\|nerd\|ascii` | グリフの種類。デフォルトは `unicode`。`OCTOSCOPE_ICONS` または設定ファイルで恒久的に指定できる |
 | `--version` | バージョンを表示して終了する |
+
+### 設定ファイル
+
+octoscope は `os.UserConfigDir()` 配下の `octoscope/config.yaml` を読む。
+場所は Windows なら `%AppData%`、macOS なら `~/Library/Application Support`、
+Linux なら `~/.config`。無くても、または空でも構わない。その場合は全項目が
+デフォルトのまま動く。
+
+| キー | 値 |
+|---|---|
+| `language` | `en` または `ja` |
+| `icons` | `unicode` / `nerd` / `ascii` |
+| `default_tab` | `repos` を指定すると Work の代わりに Repos タブから始まる |
 
 [Nerd Font](https://www.nerdfonts.com/) のパッチ済みフォントを入れているなら
 `--icons nerd`、Unicode 記号が描けない環境なら `--icons ascii` を渡す。
@@ -111,5 +124,5 @@ git リポジトリの中で実行する。
 
 ## 多言語対応
 
-octoscope は英語と日本語に対応している。表示言語はまず `--lang`、次にオペレーティング
-システムのロケールから選ばれ、どちらもなければ英語にフォールバックする。
+octoscope は英語と日本語に対応している。表示言語はまず `--lang`、次に設定ファイル、
+次にオペレーティングシステムのロケールから選ばれ、どれもなければ英語にフォールバックする。

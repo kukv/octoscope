@@ -55,17 +55,20 @@ func SetLanguage(tag language.Tag) {
 }
 
 // Resolve picks the display language: the --lang flag first, then the
-// locale reported by the operating system, then English.
-func Resolve(flagLang, osLocale string) language.Tag {
+// settings file, then the locale reported by the operating system, then
+// English.
+func Resolve(flagLang, configLang, osLocale string) language.Tag {
 	matcher := language.NewMatcher(supported)
-	for _, candidate := range []string{flagLang, osLocale} {
+	for _, candidate := range []string{flagLang, configLang, osLocale} {
 		if candidate == "" {
 			continue
 		}
-		tag, err := language.Parse(candidate)
-		if err != nil {
-			continue
-		}
+		// language.Parse returns a best-effort tag even when it also
+		// returns an error: --lang is typed by hand and can be a
+		// tag with an unrecognized subtag, which still resolves to its
+		// base language. Only input it cannot parse at all comes back as
+		// language.Und, which the confidence check below rejects.
+		tag, _ := language.Parse(candidate)
 		if _, index, conf := matcher.Match(tag); conf != language.No {
 			return supported[index]
 		}

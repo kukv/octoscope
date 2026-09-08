@@ -41,6 +41,18 @@ type Options struct {
 	// as soon as it has a size, and the Repos tab appears when the answer
 	// arrives.
 	HasRepo bool
+
+	// DefaultRepos says the settings file asks for the Repos tab at start-up.
+	// It cannot be honoured until the tab exists, so it is remembered here
+	// and spent when the lookup finds a repository. It is weaker than --repo,
+	// which is a statement about this run.
+	DefaultRepos bool
+
+	// ConfigError is why the settings file could not be read, if it could
+	// not. Empty means it was read, or was not there at all -- which is not
+	// a failure. The run carries on with defaults either way, so the tab row
+	// is the only place the user learns of it.
+	ConfigError string
 }
 
 // repoLookupTimeout bounds the one call that decides whether the Repos tab
@@ -140,6 +152,11 @@ type Model struct {
 	// repoLookupTimedOut says the Repos tab is missing because the lookup ran
 	// out of time, not because there is no repository here.
 	repoLookupTimedOut bool
+
+	// wantRepos holds the settings file's opening tab until the Repos tab
+	// exists. It is cleared once spent, so a later answer to the same lookup
+	// does not pull the user back off the tab they moved to.
+	wantRepos bool
 }
 
 func New(src Source, opts Options) Model {
@@ -151,11 +168,14 @@ func New(src Source, opts Options) Model {
 	}
 	// Naming a repository on the command line is a statement about what the
 	// user came to look at, so that is the tab they land on. A repository
-	// found later, from the working directory, does not move them: see
+	// found later, from the working directory, does not move them by itself
+	// -- unless the settings file asked for the Repos tab, in which case
+	// wantRepos spends that request when the lookup answers: see
 	// repoResolved.
 	if opts.HasRepo {
 		m.tab = tabRepos
 	}
+	m.wantRepos = opts.DefaultRepos
 	return m
 }
 
@@ -229,8 +249,14 @@ func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	// The Repos tab appears, but the user stays where they are: the answer
-	// arrives seconds after the board is already on screen.
+	// arrives seconds after the board is already on screen -- unless the
+	// settings file asked for the Repos tab, in which case wantRepos moves
+	// them there once.
 	m.opts.HasRepo = true
+	if m.wantRepos {
+		m.wantRepos = false
+		m.tab = tabRepos
+	}
 	// broadcast skips the list until this point, so it never saw the
 	// WindowSizeMsg that told the others how wide they are: an unsized
 	// list clips nothing and runs off the terminal.
