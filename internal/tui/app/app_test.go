@@ -1085,3 +1085,47 @@ func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 		}
 	}
 }
+
+// Someone who set default_tab: repos wants the Repos tab even when the
+// repository is found from the working directory rather than named on the
+// command line -- but the tab does not exist until it is found.
+func TestDefaultReposWaitsForTheRepositoryToBeFound(t *testing.T) {
+	m := New(&fakeSource{}, Options{DefaultRepos: true})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = next.(Model)
+
+	if m.tab != tabWork {
+		t.Fatalf("tab before the lookup answered = %v, want tabWork", m.tab)
+	}
+
+	next, _ = m.Update(repoResolvedMsg{found: true})
+	if got := next.(Model).tab; got != tabRepos {
+		t.Errorf("tab after the repository was found = %v, want tabRepos", got)
+	}
+}
+
+// Without the setting, a repository found from the working directory does not
+// move the user off the board they started on.
+func TestAFoundRepositoryDoesNotMoveTheUserByItself(t *testing.T) {
+	m := New(&fakeSource{}, Options{})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	next, _ = next.(Model).Update(repoResolvedMsg{found: true})
+
+	if got := next.(Model).tab; got != tabWork {
+		t.Errorf("tab = %v, want tabWork", got)
+	}
+}
+
+// The setting must not pull the user back after they have moved: it chooses
+// where the run starts, not where it stays.
+func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
+	m := New(&fakeSource{}, Options{DefaultRepos: true})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	next, _ = next.(Model).Update(repoResolvedMsg{found: true})
+	onWork := press(next.(Model), "1")
+
+	after, _ := onWork.Update(repoResolvedMsg{found: true})
+	if got := after.(Model).tab; got != tabWork {
+		t.Errorf("tab = %v, want tabWork", got)
+	}
+}

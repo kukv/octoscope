@@ -51,7 +51,7 @@ func main() {
 	// the first frame left the terminal blank for as long as it took.
 	client := cli.New(dir, *repoFlag)
 	uc := usecase.New(client)
-	p := tea.NewProgram(app.New(uc, app.Options{HasRepo: *repoFlag != ""}))
+	p := tea.NewProgram(app.New(uc, app.Options{HasRepo: *repoFlag != "", DefaultRepos: false}))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
