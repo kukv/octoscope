@@ -456,13 +456,60 @@ func openChecks(t *testing.T, c gh.Checks) Model {
 	return m
 }
 
-func TestACheckWithNoWorkflowRunGetsNoHeading(t *testing.T) {
+func TestACheckWithNoWorkflowRunGetsTheOtherHeading(t *testing.T) {
 	t.Parallel()
 
 	m := openChecks(t, appCheck())
-	if rows := m.allRows(); len(rows) != 1 {
-		t.Errorf("the list drew %d lines, want 1: a check with no workflow run has no heading:\n%s",
+	if rows := m.allRows(); len(rows) != 2 {
+		t.Errorf("the list drew %d lines, want 2: a check with no workflow run gets a heading:\n%s",
 			len(rows), strings.Join(rows, "\n"))
+	}
+}
+
+// openMixed opens the list on one of each kind of check GitHub reports, on a
+// screen tall enough to draw all of them at once.
+func openMixed(t *testing.T, width int) Model {
+	t.Helper()
+
+	m := New(&fakeSource{checks: mixed()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: mixed()})
+	return m
+}
+
+// The checks with no workflow run behind them -- a StatusContext, and a check
+// run an App created -- used to read as the continuation of whatever group
+// happened to sit above them. They share one heading, so it is drawn once.
+func TestTheChecksWithNoRunOfTheirOwnGetTheirOwnHeading(t *testing.T) {
+	t.Parallel()
+
+	m := openMixed(t, 120)
+	want := i18n.T("checks.other")
+	got := 0
+	for _, line := range listPane(m) {
+		if line == want {
+			got++
+		}
+	}
+	if got != 1 {
+		t.Errorf("the heading %q is drawn %d times, want 1:\n%s", want, got, m.View())
+	}
+}
+
+// The cursor walks checks, and a heading is a line of its own. One more
+// heading above the last two checks moves them down by one.
+func TestTheCursorReachesTheLastCheckPastTheNewHeading(t *testing.T) {
+	t.Parallel()
+
+	m := openMixed(t, 120)
+	for range len(m.order) - 1 {
+		m = press(m, "j")
+	}
+	if got, want := m.row, len(m.order)-1; got != want {
+		t.Errorf("row = %d, want %d: j must still reach the last check", got, want)
+	}
+	if !slices.Contains(listPane(m), i18n.T("checks.other")) {
+		t.Errorf("the heading scrolled out from under the cursor:\n%s", m.View())
 	}
 }
 

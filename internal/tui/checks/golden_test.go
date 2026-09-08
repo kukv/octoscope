@@ -89,8 +89,8 @@ func mixed() gh.Checks {
 			ran(gh.CheckRun{Name: "audit", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 5, RunID: 20}, 31*time.Second),
 			ran(gh.CheckRun{Name: "secrets", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 6, RunID: 20}, 9*time.Second),
 			ran(gh.CheckRun{Name: "deps", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 7, RunID: 20}, 12*time.Second),
-			// An App's own check run: no workflow, no run id, so no heading
-			// over it and nothing for R to rerun.
+			// An App's own check run: no workflow, no run id, so it joins the
+			// "Other" group and has nothing for R to rerun.
 			{
 				Name: "codecov/patch", State: gh.CheckSuccess, Kind: gh.CheckKindRun,
 				JobID: 8, URL: "https://codecov.example/1",

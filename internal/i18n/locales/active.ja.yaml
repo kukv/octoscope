@@ -254,6 +254,8 @@ footer:
 checks:
   title:
     other: "Checks"
+  other:
+    other: "その他"
   none:
     other: "この PR には check がありません"
   loading:
