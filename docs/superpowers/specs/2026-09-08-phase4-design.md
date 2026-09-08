@@ -51,9 +51,9 @@ Phase 4 で spec §7 のフェーズ分割は終わる。
   の 3 つあり（`internal/tui/icon`）、真偽値の名前では `ascii` を指定できない。
   standalone spec §5 の表もこの名前に直す
 - **言語の決定順に組み込む**（spec §6.3）: `--lang` → `language` → OS ロケール → en
-- **`--icons` の恒久指定を `nerd_font` に寄せる**（spec §5.1）。環境変数
+- **`--icons` の恒久指定を `icons` に寄せる**（spec §5.1）。環境変数
   `OCTOSCOPE_ICONS` は後方互換として残し、優先順は `--icons` → `OCTOSCOPE_ICONS`
-  → `nerd_font` → 自動判定とする
+  → `icons` → 自動判定とする
 
 `internal/config` は読み書きだけを持ち、既定値の解決（フラグ・環境変数との優先順）は
 呼び出し側に置く。設定ファイルが「どこから来た値か」を知る必要はない。
