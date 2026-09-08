@@ -74,7 +74,7 @@ Phase 4 で spec §7 のフェーズ分割は終わる。
 
 ### `internal/gh` 側の変更
 
-`ListPRs` / `ListIssues` / `RepoName` は今、クライアントが握っている 1 つの
+`ListPRs` / `ListIssues` は今、クライアントが握っている 1 つの
 リポジトリを見る（`c.repo` を直接読む）。サイドバーは複数のリポジトリを引くので、
 **`GetPR` と同じく `repo string` を先頭に取る形に変える。** 空文字はこれまでどおり
 クライアントのリポジトリに落ちる（`effectiveRepo`）ので、既存の呼び出しは意味を変えない。

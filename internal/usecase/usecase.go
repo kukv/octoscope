@@ -45,9 +45,9 @@ type lister interface {
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
-// crossRepoLister is what a search that spans more than one repository takes:
-// unlike lister's operations, none of these are "the contents of one named
-// repository".
+// crossRepoLister is what an operation that cannot name a single repository
+// takes: unlike lister's operations, none of these are "the contents of one
+// named repository".
 type crossRepoLister interface {
 	ListWork(ctx context.Context) (gh.Work, error)
 	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)

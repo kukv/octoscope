@@ -28,6 +28,10 @@ const (
 // until it has as many as it was asked for.
 const listLimit = "100"
 
+// runFunc must return stdout even when err is non-nil: gh api graphql exits
+// non-zero when the body carries a top-level "errors" array, and that body
+// still holds the data GitHub could answer for. Only callers that can salvage
+// a partial body (RepoCounts) read it; everyone else looks at err first.
 type runFunc func(ctx context.Context, dir string, args ...string) ([]byte, error)
 
 // Client runs gh commands in a fixed directory, against a fixed repository.
@@ -63,9 +67,6 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		// gh api graphql exits non-zero when the body carries a top-level
-		// "errors" array, and that body still holds the data GitHub could
-		// answer for. Hand both back and let the caller decide.
 		if msg := bytes.TrimSpace(stderr.Bytes()); len(msg) > 0 {
 			return stdout.Bytes(), fmt.Errorf("gh %s: %s", args[0], msg)
 		}
