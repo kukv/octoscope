@@ -356,14 +356,20 @@ diff ビューと骨格を揃える。入口は詳細ビュー・Work のカー�
 │  ✓ lint      1m02s │   scan-args: --recursive            │
 │ security           │ ##[error]Process completed with ... │
 │  ✗ sca       0m48s │                                     │
-│ ● ci/circleci      │                                     │
+│ その他             │                                     │
+│  ● ci/circleci     │                                     │
 └────────────────────┴─────────────────────────────────────┘
  j/k 行  enter ログ  L 全ログ  R 再実行  o ブラウザ  r 取り直す
 ```
 
 - 一覧はワークフロー名（`checkSuite.workflowRun.workflow.name`）でグループし、
-  **失敗したワークフローを先頭に置く**。所属するワークフローの無い
-  StatusContext はグループを作らず末尾に並べる
+  **失敗したワークフローを先頭に置く**
+- 再実行できるワークフローの run を持たない check は、**「その他」の見出しで
+  まとめて末尾に置く**。そこに入るのは 2 種類。外部 CI の StatusContext と、
+  **GitHub App が作った check run**（`checkSuite.workflowRun` が `null` で返る。
+  Codecov や Sonar がこれ）
+- **見出しは群の名前であって、「再実行できる」の印ではない。** 再実行とログは
+  check ごとの性質で、run を持たない check では `R` と `enter` が理由を出して断る
 - 各行は状態のグリフ、名前、`completedAt - startedAt` の所要時間。
   グリフは 4.5 のアイコンセットから引く（Nerd Font 依存の文字を直接書かない）
 - ログは既定で**失敗したステップのみ**（`gh run view --job <id> --log-failed`）。
