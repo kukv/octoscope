@@ -162,12 +162,14 @@ func New(src Source, opts Options) Model {
 	}
 	// Naming a repository on the command line is a statement about what the
 	// user came to look at, so that is the tab they land on. A repository
-	// found later, from the working directory, does not move them: see
+	// found later, from the working directory, does not move them by itself
+	// -- unless the settings file asked for the Repos tab, in which case
+	// wantRepos spends that request when the lookup answers: see
 	// repoResolved.
 	if opts.HasRepo {
 		m.tab = tabRepos
 	}
-	m.wantRepos = opts.DefaultRepos && !opts.HasRepo
+	m.wantRepos = opts.DefaultRepos
 	return m
 }
 
@@ -241,7 +243,9 @@ func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	// The Repos tab appears, but the user stays where they are: the answer
-	// arrives seconds after the board is already on screen.
+	// arrives seconds after the board is already on screen -- unless the
+	// settings file asked for the Repos tab, in which case wantRepos moves
+	// them there once.
 	m.opts.HasRepo = true
 	if m.wantRepos {
 		m.wantRepos = false
