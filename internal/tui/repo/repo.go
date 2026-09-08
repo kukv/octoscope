@@ -135,7 +135,7 @@ func fetchRepoName(src repoNamer) tea.Cmd {
 	return func() tea.Msg {
 		name, err := src.RepoName(context.Background())
 		if err != nil {
-			return repoNameMsg("") // the name only decorates the header: a failure is not worth reporting
+			return repoNameMsg("") // titles just lose the name; not worth a new error path for that
 		}
 		return repoNameMsg(name)
 	}

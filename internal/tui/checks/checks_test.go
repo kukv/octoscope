@@ -407,7 +407,7 @@ func TestAWiderTerminalBringsTheLogBack(t *testing.T) {
 func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, gh.Checks{})
+	m := openChecks(t, 120, 30, gh.Checks{})
 	m, _ = m.Update(keyPress("enter"))
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
@@ -418,7 +418,7 @@ func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 func TestRerunOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := press(openChecks(t, gh.Checks{}), "R")
+	m := press(openChecks(t, 120, 30, gh.Checks{}), "R")
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
 			m.declined, i18n.T("checks.none"))
@@ -447,11 +447,14 @@ func appCheck() gh.Checks {
 	}
 }
 
-func openChecks(t *testing.T, c gh.Checks) Model {
+// openChecks opens the list on the given checks. The height is the caller's:
+// a tall screen draws every check at once, and a short one makes the list
+// scroll.
+func openChecks(t *testing.T, width, height int, c gh.Checks) Model {
 	t.Helper()
 
 	m := New(&fakeSource{checks: c}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: c})
 	return m
 }
@@ -459,7 +462,7 @@ func openChecks(t *testing.T, c gh.Checks) Model {
 func TestACheckWithNoWorkflowRunGetsTheOtherHeading(t *testing.T) {
 	t.Parallel()
 
-	rows := openChecks(t, appCheck()).allRows()
+	rows := openChecks(t, 120, 30, appCheck()).allRows()
 	if len(rows) != 2 {
 		t.Fatalf("the list drew %d lines, want 2: a check with no workflow run gets a heading:\n%s",
 			len(rows), strings.Join(rows, "\n"))
@@ -469,25 +472,13 @@ func TestACheckWithNoWorkflowRunGetsTheOtherHeading(t *testing.T) {
 	}
 }
 
-// openMixed opens the list on one of each kind of check GitHub reports. The
-// height is the caller's: a tall screen draws every check at once, and a short
-// one makes the list scroll.
-func openMixed(t *testing.T, width, height int) Model {
-	t.Helper()
-
-	m := New(&fakeSource{checks: mixed()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
-	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
-	m, _ = m.Update(checksMsg{ref: m.ref, checks: mixed()})
-	return m
-}
-
 // The checks with no workflow run behind them -- a StatusContext, and a check
 // run an App created -- used to read as the continuation of whatever group
 // happened to sit above them. They share one heading, so it is drawn once.
 func TestTheChecksWithNoRunOfTheirOwnGetTheirOwnHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openMixed(t, 120, 30)
+	m := openChecks(t, 120, 30, mixed())
 	want := i18n.T("checks.other")
 	got := 0
 	for _, line := range listPane(m) {
@@ -506,7 +497,7 @@ func TestTheChecksWithNoRunOfTheirOwnGetTheirOwnHeading(t *testing.T) {
 func TestTheCursorReachesTheLastCheckPastTheNewHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openMixed(t, 80, 12)
+	m := openChecks(t, 80, 12, mixed())
 	for range len(m.order) - 1 {
 		m = press(m, "j")
 	}
@@ -548,7 +539,7 @@ func TestAnExternalCIsStateDoesNotMoveAnAppsCheck(t *testing.T) {
 		{"external CI running", mixed()},
 		{"external CI succeeded", succeeded},
 	} {
-		got := names(openChecks(t, tc.checks).order)
+		got := names(openChecks(t, 120, 30, tc.checks).order)
 		if !slices.Equal(got, want) {
 			t.Errorf("%s: order = %v, want %v", tc.name, got, want)
 		}
@@ -602,7 +593,7 @@ func TestALongCheckNameDropsItsDurationRatherThanCutIt(t *testing.T) {
 	t.Parallel()
 
 	var got string
-	for _, line := range listPane(openChecks(t, mixed())) {
+	for _, line := range listPane(openChecks(t, 120, 30, mixed())) {
 		if strings.Contains(line, "codecov/patch") {
 			got = line
 		}
@@ -622,7 +613,7 @@ func TestALongCheckNameDropsItsDurationRatherThanCutIt(t *testing.T) {
 func TestALogIsNotAskedForACheckWithNoJobBehindIt(t *testing.T) {
 	t.Parallel()
 
-	m, cmd := openChecks(t, appCheck()).Update(keyPress("enter"))
+	m, cmd := openChecks(t, 120, 30, appCheck()).Update(keyPress("enter"))
 	if cmd != nil {
 		t.Errorf("enter started a log fetch for a check with no job behind it")
 	}
