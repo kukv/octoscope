@@ -32,6 +32,8 @@ linters:
           deny:
             - pkg: github.com/kukv/octoscope/internal/gh/cli
               desc: views go through internal/usecase; only cmd/octoscope names a backend
+            - pkg: github.com/kukv/octoscope/internal/config
+              desc: settings reach the views through app.Options; cmd/octoscope reads them
         # usecase sits below the UI: it decides which GitHub calls an
         # operation takes, and knows nothing of screens or messages.
         usecase-layer:
@@ -42,6 +44,20 @@ linters:
               desc: internal/usecase must not depend on the UI
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: internal/usecase must not translate; the UI does
+        # Reading the settings file is a leaf: it parses YAML and knows
+        # nothing of the screens or of GitHub.
+        config-layer:
+          files:
+            - "**/internal/config/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/gh
+              desc: internal/config must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/tui
+              desc: internal/config must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: internal/config must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/usecase
+              desc: internal/config must not depend on other internal packages
         # Messages are a leaf: they depend on nothing of ours.
         i18n-layer:
           files:
@@ -224,6 +240,15 @@ linters:
         linters:
           - gosec
         text: "G204"
+      # gosec G304 flags os.ReadFile whenever its path is not a literal
+      # constant. Load's path parameter is what makes it testable (tests
+      # pass a t.TempDir() path); the real caller always passes Path()'s own
+      # fixed result (os.UserConfigDir()/octoscope/config.yaml), never
+      # attacker- or network-supplied input.
+      - path: internal/config/config\.go
+        linters:
+          - gosec
+        text: "G304"
 
 issues:
   max-issues-per-linter: 0
