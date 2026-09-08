@@ -78,8 +78,8 @@ func appendRepo(args []string, repo string) []string {
 	return args
 }
 
-func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
-	args := appendRepo([]string{"pr", "list", "--json", prListFields, "--limit", listLimit}, c.repo)
+func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+	args := appendRepo([]string{"pr", "list", "--json", prListFields, "--limit", listLimit}, c.effectiveRepo(repo))
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
@@ -91,8 +91,8 @@ func (c *Client) ListPRs(ctx context.Context) ([]gh.PR, error) {
 	return toPRs(prs), nil
 }
 
-func (c *Client) ListIssues(ctx context.Context) ([]gh.Issue, error) {
-	args := appendRepo([]string{"issue", "list", "--json", issueListFields, "--limit", listLimit}, c.repo)
+func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
+	args := appendRepo([]string{"issue", "list", "--json", issueListFields, "--limit", listLimit}, c.effectiveRepo(repo))
 	out, err := c.run(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err

@@ -39,8 +39,8 @@ type assigneeEditor interface {
 
 type lister interface {
 	ListWork(ctx context.Context) (gh.Work, error)
-	ListPRs(ctx context.Context) ([]gh.PR, error)
-	ListIssues(ctx context.Context) ([]gh.Issue, error)
+	ListPRs(ctx context.Context, repo string) ([]gh.PR, error)
+	ListIssues(ctx context.Context, repo string) ([]gh.Issue, error)
 	RepoName(ctx context.Context) (string, error)
 	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
@@ -203,10 +203,12 @@ func (u *Usecase) EditAssignees(ref gh.ItemRef, add, remove []string) error {
 
 func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) { return u.lists.ListWork(ctx) }
 
-func (u *Usecase) ListPRs(ctx context.Context) ([]gh.PR, error) { return u.lists.ListPRs(ctx) }
+func (u *Usecase) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+	return u.lists.ListPRs(ctx, repo)
+}
 
-func (u *Usecase) ListIssues(ctx context.Context) ([]gh.Issue, error) {
-	return u.lists.ListIssues(ctx)
+func (u *Usecase) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
+	return u.lists.ListIssues(ctx, repo)
 }
 
 func (u *Usecase) RepoName(ctx context.Context) (string, error) { return u.lists.RepoName(ctx) }

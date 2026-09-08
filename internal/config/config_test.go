@@ -60,7 +60,7 @@ func TestLoadReportsBrokenYAMLAndStillReturnsDefaults(t *testing.T) {
 func TestLoadIgnoresKeysItDoesNotKnow(t *testing.T) {
 	t.Parallel()
 
-	path := write(t, "language: ja\nrepositories:\n  - kukv/octoscope\n")
+	path := write(t, "language: ja\nsaved_queries:\n  - is:open\n")
 
 	got, err := config.Load(path)
 	if err != nil {

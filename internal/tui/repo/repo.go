@@ -12,15 +12,13 @@ import (
 )
 
 // prSource is the pull-request half of what the list needs.
-// The list always shows the client's own repository, so nothing here names
-// one.
 type prSource interface {
-	ListPRs(ctx context.Context) ([]gh.PR, error)
+	ListPRs(ctx context.Context, repo string) ([]gh.PR, error)
 }
 
 // issueSource mirrors prSource for issues.
 type issueSource interface {
-	ListIssues(ctx context.Context) ([]gh.Issue, error)
+	ListIssues(ctx context.Context, repo string) ([]gh.Issue, error)
 }
 
 // webOpener shows an item in a browser. It takes the URL GitHub gave the
@@ -117,13 +115,13 @@ func fetchList(src Source, t tabID) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		if t == tabPRs {
-			prs, err := src.ListPRs(ctx)
+			prs, err := src.ListPRs(ctx, "")
 			if err != nil {
 				return errMsg{err}
 			}
 			return prListMsg(prs)
 		}
-		issues, err := src.ListIssues(ctx)
+		issues, err := src.ListIssues(ctx, "")
 		if err != nil {
 			return errMsg{err}
 		}

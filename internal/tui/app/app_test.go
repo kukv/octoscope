@@ -47,12 +47,12 @@ func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
 	return f.work, nil
 }
 
-func (f *fakeSource) ListPRs(context.Context) ([]gh.PR, error) {
+func (f *fakeSource) ListPRs(context.Context, string) ([]gh.PR, error) {
 	f.prCalls++
 	return f.prs, nil
 }
-func (f *fakeSource) ListIssues(context.Context) ([]gh.Issue, error) { return nil, nil }
-func (f *fakeSource) RepoName(context.Context) (string, error)       { return "kukv/demo", nil }
+func (f *fakeSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
+func (f *fakeSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
 
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
 	if ref.Kind == gh.ItemIssue {
