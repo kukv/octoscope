@@ -81,6 +81,14 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 		}
 		return nil, fmt.Errorf("parse repo counts: %w", err)
 	}
+	// A response with no "data" at all means the document itself was
+	// rejected -- bad credentials, rate limiting, a validation error -- not
+	// that some repositories answered and others did not. Reading it as "no
+	// repository resolved" would tell a user whose token expired that every
+	// repository disappeared.
+	if resp.Data == nil && runErr != nil {
+		return nil, runErr
+	}
 	for n, i := range indices {
 		alias := resp.Data[fmt.Sprintf("r%d", n)]
 		if alias == nil {

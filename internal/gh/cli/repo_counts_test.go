@@ -88,6 +88,60 @@ func TestRepoCountsKeepsTheAnswersItGotWhenOneRepositoryIsGone(t *testing.T) {
 	}
 }
 
+// A response with no "data" at all -- an expired token, a rate limit, a
+// validation error -- means the whole document was rejected, not that every
+// repository failed to resolve. Reading it the same way as a partial failure
+// would tell a user whose token expired that every repository disappeared.
+//
+// This body cannot be recorded without actually expiring a token or hitting
+// a rate limit, so it is written by hand; the shape ("errors" with no
+// "data") is what gh api graphql's own documentation describes for a
+// request-level failure.
+func TestRepoCountsFailsWhenTheWholeQueryIsRejected(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	wantErr := errors.New("gh api: Bad credentials")
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		return []byte(`{"errors":[{"message":"Bad credentials"}]}`), wantErr
+	}
+
+	got, err := c.RepoCounts(context.Background(), []string{"kukv/octoscope", "cli/cli"})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("err = %v, want %v", err, wantErr)
+	}
+	if got != nil {
+		t.Errorf("got %+v, want no counts when the request itself failed", got)
+	}
+}
+
+// The alias a repository is sent under is a separate count from its
+// position in the input: a malformed name earlier in the list is not sent
+// at all, so the first repository actually sent becomes alias r0 while
+// landing at index 1 in the result.
+func TestRepoCountsMatchesAliasesBackToTheRightIndexWhenAnEarlierNameIsSkipped(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		return os.ReadFile("testdata/repo_counts.json")
+	}
+
+	got, err := c.RepoCounts(context.Background(), []string{"not-a-repository", "kukv/octoscope"})
+	if err != nil {
+		t.Fatalf("RepoCounts: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d counts, want 2", len(got))
+	}
+	if !got[0].Unavailable {
+		t.Errorf("got[0] = %+v, want the malformed name marked unavailable", got[0])
+	}
+	if got[1].Unavailable || got[1].PRs != 0 || got[1].Issues != 2 {
+		t.Errorf("got[1] = %+v, want r0's counts (PRs 0, Issues 2) from the recording", got[1])
+	}
+}
+
 // A line the user typed by hand can be anything; it must not become a
 // request.
 func TestRepoCountsDoesNotAskAboutAMalformedName(t *testing.T) {
