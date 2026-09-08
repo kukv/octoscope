@@ -38,7 +38,7 @@ func main() {
 
 	osLocale, _ := locale.GetLocale() // an error here just means "unknown"
 	i18n.SetLanguage(i18n.Resolve(*lang, "", osLocale))
-	icon.Use(icon.Resolve(*icons))
+	icon.Use(icon.Resolve(*icons, ""))
 
 	dir, err := os.Getwd()
 	if err != nil {

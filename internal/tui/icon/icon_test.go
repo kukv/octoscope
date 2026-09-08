@@ -108,11 +108,39 @@ func TestResolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv(icon.EnvVar, tt.env)
-			if got := icon.Resolve(tt.flag); got != tt.want {
+			if got := icon.Resolve(tt.flag, ""); got != tt.want {
 				t.Errorf("Resolve(%q) with %s=%q = %v, want %v",
 					tt.flag, icon.EnvVar, tt.env, got, tt.want)
 			}
 		})
+	}
+}
+
+// The settings file is the standing choice; the flag and the environment
+// variable are ways to override it for one run.
+func TestResolveTakesTheSettingsFileWhenNothingOverridesIt(t *testing.T) {
+	t.Setenv(icon.EnvVar, "")
+
+	if got := icon.Resolve("", "ascii"); got != icon.ASCII {
+		t.Errorf("Resolve = %v, want ASCII", got)
+	}
+}
+
+func TestResolvePrefersTheEnvironmentOverTheSettingsFile(t *testing.T) {
+	t.Setenv(icon.EnvVar, "nerd")
+
+	if got := icon.Resolve("", "ascii"); got != icon.Nerd {
+		t.Errorf("Resolve = %v, want Nerd", got)
+	}
+}
+
+// A name no set answers to is worth ignoring rather than refusing to start
+// over: the glyphs a terminal draws are not worth an error screen.
+func TestResolveFallsBackWhenTheSettingsFileNamesNoSet(t *testing.T) {
+	t.Setenv(icon.EnvVar, "")
+
+	if got := icon.Resolve("", "emoji"); got != icon.Unicode {
+		t.Errorf("Resolve = %v, want Unicode", got)
 	}
 }
 

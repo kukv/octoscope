@@ -93,11 +93,12 @@ func active() glyphs {
 	return sets[current]
 }
 
-// Resolve picks the set from the --icons flag and the environment, in that
-// order. "auto", the empty string and anything unrecognised all mean Unicode:
-// a typo must not leave the board undrawable.
-func Resolve(flag string) Set {
-	for _, candidate := range []string{flag, os.Getenv(EnvVar)} {
+// Resolve picks the glyph set: the --icons flag first, then OCTOSCOPE_ICONS,
+// then the settings file, then the set that needs no font installed. "auto",
+// the empty string and anything unrecognised all mean Unicode: a typo must
+// not leave the board undrawable.
+func Resolve(flag, configured string) Set {
+	for _, candidate := range []string{flag, os.Getenv(EnvVar), configured} {
 		switch strings.ToLower(strings.TrimSpace(candidate)) {
 		case "nerd":
 			return Nerd
