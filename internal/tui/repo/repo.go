@@ -24,8 +24,8 @@ type issueSource interface {
 }
 
 // webOpener shows an item in a browser. It takes the URL GitHub gave the
-// item rather than a reference to it: the list leaves ItemRef.Repo empty, and
-// building the address by hand would put GitHub's URL layout in the UI.
+// item rather than a reference to it: building the address by hand would put
+// GitHub's URL layout in the UI.
 type webOpener interface {
 	OpenWeb(url string) error
 }
@@ -265,16 +265,17 @@ func (m Model) selectedURL() (string, bool) {
 }
 
 // SelectedRef names the item under the cursor. ok is false when the tab is
-// empty. Repo stays empty: the list only ever shows the client's repository.
+// empty. The repository is the one this view is showing: the ref travels to
+// the detail, diff and checks views, which draw it in their titles.
 func (m Model) SelectedRef() (gh.ItemRef, bool) {
 	if m.tab == tabPRs {
 		if len(m.prs) == 0 {
 			return gh.ItemRef{}, false
 		}
-		return gh.ItemRef{Kind: gh.ItemPR, Number: m.prs[m.cursors[tabPRs]].Number}, true
+		return gh.ItemRef{Kind: gh.ItemPR, Repo: m.repoName, Number: m.prs[m.cursors[tabPRs]].Number}, true
 	}
 	if len(m.issues) == 0 {
 		return gh.ItemRef{}, false
 	}
-	return gh.ItemRef{Kind: gh.ItemIssue, Number: m.issues[m.cursors[tabIssues]].Number}, true
+	return gh.ItemRef{Kind: gh.ItemIssue, Repo: m.repoName, Number: m.issues[m.cursors[tabIssues]].Number}, true
 }

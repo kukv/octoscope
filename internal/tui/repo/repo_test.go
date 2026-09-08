@@ -300,6 +300,22 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
+// The ref leaves this view for the detail, diff and checks views, and those
+// draw the repository in their titles. Leaving it empty put a bare " #1" at
+// the top of the checks view.
+func TestTheSelectedRefCarriesTheRepositoryName(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := loadedModel(f)
+	m, _ = m.Update(repoNameMsg("kukv/demo"))
+	ref, ok := m.SelectedRef()
+	if !ok {
+		t.Fatal("SelectedRef reported nothing selected")
+	}
+	if ref.Repo != "kukv/demo" {
+		t.Errorf("Repo = %q, want kukv/demo", ref.Repo)
+	}
+}
+
 // TestKeyBarNamesTheChecksKey pins s alongside d in the list's key bar: a
 // key with no hint in the footer is a key nobody can find.
 func TestKeyBarNamesTheChecksKey(t *testing.T) {
