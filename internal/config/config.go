@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -19,6 +20,13 @@ type Config struct {
 	Language   string `yaml:"language"`
 	Icons      string `yaml:"icons"`
 	DefaultTab string `yaml:"default_tab"`
+}
+
+// WantsRepos reports whether default_tab asks to start on the Repos tab.
+// It is as tolerant of case and surrounding whitespace as icon.Resolve and
+// i18n.Resolve are of their own values.
+func (c Config) WantsRepos() bool {
+	return strings.EqualFold(strings.TrimSpace(c.DefaultTab), "repos")
 }
 
 // Path is where the settings file lives: octoscope/config.yaml under the

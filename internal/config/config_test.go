@@ -69,6 +69,51 @@ func TestLoadIgnoresKeysItDoesNotKnow(t *testing.T) {
 	}
 }
 
+// default_tab is as tolerant of case and surrounding whitespace as icons and
+// language are; a user typing "Repos" must not silently land on Work.
+func TestWantsReposIgnoresCaseAndSurroundingWhitespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		defaultTab string
+		want       bool
+	}{
+		{"empty", "", false},
+		{"exact", "repos", true},
+		{"mixed case", "Repos", true},
+		{"surrounding whitespace", " repos ", true},
+		{"unrelated value", "work", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := config.Config{DefaultTab: tt.defaultTab}.WantsRepos()
+			if got != tt.want {
+				t.Errorf("Config{DefaultTab: %q}.WantsRepos() = %v, want %v", tt.defaultTab, got, tt.want)
+			}
+		})
+	}
+}
+
+// Path is the one function that decides where the settings file lives on
+// every platform; a broken join here silently makes every setting
+// unreadable.
+func TestPathPutsTheFileUnderTheConfigDirectory(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	got, err := config.Path()
+	if err != nil {
+		t.Fatalf("Path: %v", err)
+	}
+	want := filepath.Join(dir, "octoscope", "config.yaml")
+	if got != want {
+		t.Errorf("Path() = %q, want %q", got, want)
+	}
+}
+
 func write(t *testing.T, body string) string {
 	t.Helper()
 
