@@ -116,9 +116,12 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/cli/testdata/schema.json
 ```
+
+`PullRequestConnection` と `IssueConnection` は 2026-09-08 に `repo_counts.graphql`
+（`repository.pullRequests` / `repository.issues` の `totalCount`）のために追加した。
 
 ## `review_context.json`
 
@@ -177,6 +180,33 @@ gh api graphql -F query=@internal/gh/cli/checks.graphql \
 D=internal/gh/cli/testdata
 gh api graphql -F query=@internal/gh/cli/merge.graphql \
   -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/merge_context.json
+```
+
+## `repo_counts.json` / `repo_counts_partial.json`
+
+`RepoCounts` に対する実レスポンス。録った日: 2026-09-08、対象:
+`kukv/octoscope` と `cli/cli`（`repo_counts.json`）、`kukv/octoscope` と
+`kukv/no-such-repository-xyz`（`repo_counts_partial.json`、後者は存在しない
+リポジトリ名）。組み立てた文書は 2 リポジトリ分の alias（`r0`、`r1`）を持つ。
+
+`repo_counts_partial.json` は終了コード 1 で終わる（存在しないリポジトリを
+`errors` に載せる）ので、`gh` の出力をファイルに落としてから `jq` に渡す。
+パイプにすると `gh` の非 0 終了で `jq` に何も渡らず失敗する。
+
+```bash
+D=internal/gh/cli/testdata
+cat > /tmp/counts.graphql <<'EOF'
+query ($o0: String!, $n0: String!, $o1: String!, $n1: String!) {
+  r0: repository(owner: $o0, name: $n0) { nameWithOwner pullRequests(states: OPEN) { totalCount } issues(states: OPEN) { totalCount } }
+  r1: repository(owner: $o1, name: $n1) { nameWithOwner pullRequests(states: OPEN) { totalCount } issues(states: OPEN) { totalCount } }
+}
+EOF
+gh api graphql -F query=@/tmp/counts.graphql \
+  -f o0=kukv -f n0=octoscope -f o1=cli -f n1=cli | jq . > $D/repo_counts.json
+
+gh api graphql -F query=@/tmp/counts.graphql \
+  -f o0=kukv -f n0=octoscope -f o1=kukv -f n1=no-such-repository-xyz > /tmp/counts_partial_raw.json
+jq . /tmp/counts_partial_raw.json > $D/repo_counts_partial.json
 ```
 
 ## `job_log.txt` / `job_log_failed.txt`

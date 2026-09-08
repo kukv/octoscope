@@ -54,6 +54,8 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 		"merge_pr.graphql":           mergePRMutation,
 		"enable_auto_merge.graphql":  enableAutoMergeMutation,
 		"disable_auto_merge.graphql": disableAutoMergeMutation,
+
+		"repo_counts (built for two)": buildRepoCountsQuery(2),
 	}
 	schema := loadSchema(t)
 	for name, doc := range docs {

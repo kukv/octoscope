@@ -1,0 +1,22 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "kukv/octoscope",
+      "pullRequests": {
+        "totalCount": 0
+      },
+      "issues": {
+        "totalCount": 2
+      }
+    },
+    "r1": {
+      "nameWithOwner": "cli/cli",
+      "pullRequests": {
+        "totalCount": 68
+      },
+      "issues": {
+        "totalCount": 1019
+      }
+    }
+  }
+}

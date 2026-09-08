@@ -1,0 +1,9 @@
+repository(owner: $OWNER, name: $NAME) {
+  nameWithOwner
+  pullRequests(states: OPEN) {
+    totalCount
+  }
+  issues(states: OPEN) {
+    totalCount
+  }
+}

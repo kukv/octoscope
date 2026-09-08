@@ -38,12 +38,19 @@ type assigneeEditor interface {
 }
 
 type lister interface {
-	ListWork(ctx context.Context) (gh.Work, error)
 	ListPRs(ctx context.Context, repo string) ([]gh.PR, error)
 	ListIssues(ctx context.Context, repo string) ([]gh.Issue, error)
 	RepoName(ctx context.Context) (string, error)
 	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
+}
+
+// crossRepoLister is what a search that spans more than one repository takes:
+// unlike lister's operations, none of these are "the contents of one named
+// repository".
+type crossRepoLister interface {
+	ListWork(ctx context.Context) (gh.Work, error)
+	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
 }
 
 type reviewFetcher interface {
@@ -83,6 +90,7 @@ type source interface {
 	labelEditor
 	assigneeEditor
 	lister
+	crossRepoLister
 	reviewFetcher
 	reviewer
 	opener
@@ -98,6 +106,7 @@ type Usecase struct {
 	labels     labelEditor
 	assignees  assigneeEditor
 	lists      lister
+	crossRepo  crossRepoLister
 	reviewInfo reviewFetcher
 	reviews    reviewer
 	web        opener
@@ -114,6 +123,7 @@ func New(src source) *Usecase {
 		labels:     src,
 		assignees:  src,
 		lists:      src,
+		crossRepo:  src,
 		reviewInfo: src,
 		reviews:    src,
 		web:        src,
@@ -201,7 +211,11 @@ func (u *Usecase) EditAssignees(ref gh.ItemRef, add, remove []string) error {
 	return u.assignees.EditIssueAssignees(ref.Repo, ref.Number, add, remove)
 }
 
-func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) { return u.lists.ListWork(ctx) }
+func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) { return u.crossRepo.ListWork(ctx) }
+
+func (u *Usecase) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
+	return u.crossRepo.RepoCounts(ctx, repos)
+}
 
 func (u *Usecase) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
 	return u.lists.ListPRs(ctx, repo)
