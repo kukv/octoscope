@@ -57,9 +57,33 @@ func TestResolveOrder(t *testing.T) {
 		{"invalid flag falls back to os locale", "zzz", "ja-JP", language.Japanese},
 	}
 	for _, c := range cases {
-		if got := i18n.Resolve(c.flag, c.osLocal); got != c.want {
+		if got := i18n.Resolve(c.flag, "", c.osLocal); got != c.want {
 			t.Errorf("%s: Resolve(%q, %q) = %v, want %v", c.name, c.flag, c.osLocal, got, c.want)
 		}
+	}
+}
+
+// The flag is a one-off override; the settings file is the standing choice.
+// A user who set language: ja and passes --lang en wants English this once.
+func TestResolvePrefersTheFlagOverTheSettingsFile(t *testing.T) {
+	if got := i18n.Resolve("en", "ja", "ja_JP.UTF-8"); got != language.English {
+		t.Errorf("Resolve = %v, want English", got)
+	}
+}
+
+// The settings file is a deliberate choice; the operating system locale is
+// only a guess at one.
+func TestResolvePrefersTheSettingsFileOverTheOSLocale(t *testing.T) {
+	if got := i18n.Resolve("", "ja", "en_US.UTF-8"); got != language.Japanese {
+		t.Errorf("Resolve = %v, want Japanese", got)
+	}
+}
+
+// A language with no catalog is not a reason to fall all the way back to
+// English: the next candidate still gets its turn.
+func TestResolveSkipsASettingsFileLanguageWithNoCatalog(t *testing.T) {
+	if got := i18n.Resolve("", "fr", "ja_JP.UTF-8"); got != language.Japanese {
+		t.Errorf("Resolve = %v, want Japanese", got)
 	}
 }
 
