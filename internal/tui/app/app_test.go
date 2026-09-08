@@ -868,6 +868,26 @@ func TestTheTabRowMarksTheActiveTab(t *testing.T) {
 	i18n.AssertNoUnresolvedIDs(t, view)
 }
 
+// A settings file that cannot be read must not be silent: the user is running
+// with defaults and has no other way to find out.
+func TestTheTabRowSaysTheSettingsFileCouldNotBeRead(t *testing.T) {
+	m := New(&fakeSource{}, Options{ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	if !strings.Contains(next.(Model).View().Content, i18n.T("tab.config_unreadable")) {
+		t.Error("the tab row does not report the unreadable settings file")
+	}
+}
+
+func TestTheTabRowIsQuietWhenTheSettingsFileIsFine(t *testing.T) {
+	m := New(&fakeSource{}, Options{})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	if strings.Contains(next.(Model).View().Content, i18n.T("tab.config_unreadable")) {
+		t.Error("the tab row reports an unreadable settings file that was fine")
+	}
+}
+
 func TestTheDetailViewHasNoTabRow(t *testing.T) {
 	m := newTestModel(Options{HasRepo: true})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})

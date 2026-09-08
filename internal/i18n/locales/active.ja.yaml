@@ -25,6 +25,8 @@ tab:
     other: "Repos"
   repo_lookup_timeout:
     other: "リポジトリの判定がタイムアウトしました"
+  config_unreadable:
+    other: "設定ファイルを読めません。既定値で動いています"
 
 list:
   tab_prs:

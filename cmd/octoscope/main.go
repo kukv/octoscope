@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/config"
 	"github.com/kukv/octoscope/internal/gh/cli"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"
@@ -27,7 +28,7 @@ func main() {
 		"display language: en or ja; defaults to the operating system locale")
 	icons := flag.String("icons", "",
 		"glyph set: unicode (default), nerd for a Nerd Font patched font, or ascii; "+
-			"OCTOSCOPE_ICONS sets it permanently")
+			"OCTOSCOPE_ICONS or the settings file can set it permanently")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -36,9 +37,17 @@ func main() {
 		return
 	}
 
+	var cfg config.Config
+	var configErr string
+	if path, err := config.Path(); err != nil {
+		configErr = err.Error()
+	} else if cfg, err = config.Load(path); err != nil {
+		configErr = err.Error()
+	}
+
 	osLocale, _ := locale.GetLocale() // an error here just means "unknown"
-	i18n.SetLanguage(i18n.Resolve(*lang, "", osLocale))
-	icon.Use(icon.Resolve(*icons, ""))
+	i18n.SetLanguage(i18n.Resolve(*lang, cfg.Language, osLocale))
+	icon.Use(icon.Resolve(*icons, cfg.Icons))
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -51,7 +60,11 @@ func main() {
 	// the first frame left the terminal blank for as long as it took.
 	client := cli.New(dir, *repoFlag)
 	uc := usecase.New(client)
-	p := tea.NewProgram(app.New(uc, app.Options{HasRepo: *repoFlag != "", DefaultRepos: false}))
+	p := tea.NewProgram(app.New(uc, app.Options{
+		HasRepo:      *repoFlag != "",
+		DefaultRepos: cfg.DefaultTab == "repos",
+		ConfigError:  configErr,
+	}))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

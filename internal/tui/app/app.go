@@ -47,6 +47,12 @@ type Options struct {
 	// and spent when the lookup finds a repository. It is weaker than --repo,
 	// which is a statement about this run.
 	DefaultRepos bool
+
+	// ConfigError is why the settings file could not be read, if it could
+	// not. Empty means it was read, or was not there at all -- which is not
+	// a failure. The run carries on with defaults either way, so the tab row
+	// is the only place the user learns of it.
+	ConfigError string
 }
 
 // repoLookupTimeout bounds the one call that decides whether the Repos tab

@@ -54,6 +54,9 @@ func TestGolden(t *testing.T) {
 				missing := goldenModel(w, Options{})
 				next, _ = missing.fail(gh.ErrGhNotFound)
 				golden.Assert(t, fmt.Sprintf("app_gh_missing_%s_%d", lang.name, w), next.(Model).View().Content)
+
+				badConfig := goldenModel(w, Options{HasRepo: true, ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+				golden.Assert(t, fmt.Sprintf("app_config_error_%s_%d", lang.name, w), badConfig.View().Content)
 			})
 		}
 	}

@@ -25,6 +25,8 @@ tab:
     other: "Repos"
   repo_lookup_timeout:
     other: "repository lookup timed out"
+  config_unreadable:
+    other: "settings file unreadable; using defaults"
 
 list:
   tab_prs:

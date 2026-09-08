@@ -68,6 +68,9 @@ func (m Model) tabRow() string {
 	if m.repoLookupTimedOut {
 		row += tabGap + theme.Error().Render(i18n.T("tab.repo_lookup_timeout"))
 	}
+	if m.opts.ConfigError != "" {
+		row += tabGap + theme.Error().Render(i18n.T("tab.config_unreadable"))
+	}
 
 	summary := m.summary()
 	pad := m.width - ansi.StringWidth(row) - ansi.StringWidth(summary)
