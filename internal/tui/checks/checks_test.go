@@ -459,20 +459,24 @@ func openChecks(t *testing.T, c gh.Checks) Model {
 func TestACheckWithNoWorkflowRunGetsTheOtherHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, appCheck())
-	if rows := m.allRows(); len(rows) != 2 {
-		t.Errorf("the list drew %d lines, want 2: a check with no workflow run gets a heading:\n%s",
+	rows := openChecks(t, appCheck()).allRows()
+	if len(rows) != 2 {
+		t.Fatalf("the list drew %d lines, want 2: a check with no workflow run gets a heading:\n%s",
 			len(rows), strings.Join(rows, "\n"))
+	}
+	if got, want := ansi.Strip(rows[0]), i18n.T("checks.other"); got != want {
+		t.Errorf("the heading reads %q, want %q", got, want)
 	}
 }
 
-// openMixed opens the list on one of each kind of check GitHub reports, on a
-// screen tall enough to draw all of them at once.
-func openMixed(t *testing.T, width int) Model {
+// openMixed opens the list on one of each kind of check GitHub reports. The
+// height is the caller's: a tall screen draws every check at once, and a short
+// one makes the list scroll.
+func openMixed(t *testing.T, width, height int) Model {
 	t.Helper()
 
 	m := New(&fakeSource{checks: mixed()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
-	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: mixed()})
 	return m
 }
@@ -483,7 +487,7 @@ func openMixed(t *testing.T, width int) Model {
 func TestTheChecksWithNoRunOfTheirOwnGetTheirOwnHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openMixed(t, 120)
+	m := openMixed(t, 120, 30)
 	want := i18n.T("checks.other")
 	got := 0
 	for _, line := range listPane(m) {
@@ -496,20 +500,24 @@ func TestTheChecksWithNoRunOfTheirOwnGetTheirOwnHeading(t *testing.T) {
 	}
 }
 
-// The cursor walks checks, and a heading is a line of its own. One more
-// heading above the last two checks moves them down by one.
+// The cursor counts checks, but the window scrolls by lines, and a heading is
+// a line. On a screen too short to hold the list, a window that does not count
+// the new heading stops one line above the last check and leaves it undrawn.
 func TestTheCursorReachesTheLastCheckPastTheNewHeading(t *testing.T) {
 	t.Parallel()
 
-	m := openMixed(t, 120)
+	m := openMixed(t, 80, 12)
 	for range len(m.order) - 1 {
 		m = press(m, "j")
 	}
-	if got, want := m.row, len(m.order)-1; got != want {
-		t.Errorf("row = %d, want %d: j must still reach the last check", got, want)
+	pane := listPane(m)
+	if last := m.order[len(m.order)-1].Name; !slices.ContainsFunc(pane, func(l string) bool {
+		return strings.Contains(l, last)
+	}) {
+		t.Errorf("the cursor is on %q and it is not drawn:\n%s", last, m.View())
 	}
-	if !slices.Contains(listPane(m), i18n.T("checks.other")) {
-		t.Errorf("the heading scrolled out from under the cursor:\n%s", m.View())
+	if !slices.Contains(pane, i18n.T("checks.other")) {
+		t.Errorf("the heading of the group the cursor is in is off the top:\n%s", m.View())
 	}
 }
 
