@@ -58,8 +58,18 @@ func TestResolveOrder(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := i18n.Resolve(c.flag, "", c.osLocal); got != c.want {
-			t.Errorf("%s: Resolve(%q, %q) = %v, want %v", c.name, c.flag, c.osLocal, got, c.want)
+			t.Errorf("%s: Resolve(%q, %q, %q) = %v, want %v", c.name, c.flag, "", c.osLocal, got, c.want)
 		}
+	}
+}
+
+// --lang is typed by hand; a POSIX-style locale string ("en_US.UTF-8") is
+// not a well-formed BCP 47 tag, but language.Parse still recovers "en" from
+// it, so the flag is honored rather than silently falling through to the
+// settings file or the OS locale.
+func TestResolveAcceptsAPOSIXStyleFlagDespiteTheParseError(t *testing.T) {
+	if got := i18n.Resolve("en_US.UTF-8", "ja", "ja_JP.UTF-8"); got != language.English {
+		t.Errorf("Resolve = %v, want English", got)
 	}
 }
 

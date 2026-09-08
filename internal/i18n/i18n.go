@@ -63,9 +63,11 @@ func Resolve(flagLang, configLang, osLocale string) language.Tag {
 		if candidate == "" {
 			continue
 		}
-		// language.Parse returns a best-effort tag even on a malformed
-		// input like a POSIX locale ("ja_JP.UTF-8"); the confidence check
-		// below is what actually filters out garbage.
+		// language.Parse returns a best-effort tag even when it also
+		// returns an error: a POSIX-style locale ("en_US.UTF-8") or a
+		// tag with an unrecognized subtag still resolves to its base
+		// language. Only input it cannot parse at all comes back as
+		// language.Und, which the confidence check below rejects.
 		tag, _ := language.Parse(candidate)
 		if _, index, conf := matcher.Match(tag); conf != language.No {
 			return supported[index]
