@@ -15,6 +15,8 @@ error:
     other: "gh CLI not found; install it and run: gh auth login"
   no_browser:
     other: "No browser could be started. Open this address by hand:\n{{.URL}}"
+  config_unreadable:
+    other: "settings file could not be read; running with defaults"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same

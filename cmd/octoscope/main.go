@@ -62,11 +62,18 @@ func main() {
 	uc := usecase.New(client)
 	p := tea.NewProgram(app.New(uc, app.Options{
 		HasRepo:      *repoFlag != "",
-		DefaultRepos: cfg.DefaultTab == "repos",
+		DefaultRepos: cfg.WantsRepos(),
 		ConfigError:  configErr,
 	}))
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	_, runErr := p.Run()
+	// Printed only now: p.Run put the terminal in the alt screen, and
+	// anything written to stderr before that is gone once it clears.
+	if configErr != "" {
+		fmt.Fprintln(os.Stderr, i18n.T("error.config_unreadable"))
+		fmt.Fprintln(os.Stderr, configErr)
+	}
+	if runErr != nil {
+		fmt.Fprintln(os.Stderr, runErr)
 		os.Exit(1)
 	}
 }
