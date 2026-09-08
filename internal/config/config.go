@@ -20,6 +20,10 @@ type Config struct {
 	Language   string `yaml:"language"`
 	Icons      string `yaml:"icons"`
 	DefaultTab string `yaml:"default_tab"`
+
+	// Repositories is the list the Repos tab shows, in the order it shows
+	// them.
+	Repositories []string `yaml:"repositories"`
 }
 
 // WantsRepos reports whether default_tab asks to start on the Repos tab.

@@ -3,6 +3,8 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/config"
@@ -17,7 +19,7 @@ func TestLoadTreatsAMissingFileAsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load of a missing file: %v", err)
 	}
-	if got != (config.Config{}) {
+	if !reflect.DeepEqual(got, config.Config{}) {
 		t.Errorf("Load of a missing file = %+v, want the zero Config", got)
 	}
 }
@@ -32,7 +34,7 @@ func TestLoadReadsEveryField(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	want := config.Config{Language: "ja", Icons: "nerd", DefaultTab: "repos"}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load = %+v, want %+v", got, want)
 	}
 }
@@ -48,7 +50,7 @@ func TestLoadReportsBrokenYAMLAndStillReturnsDefaults(t *testing.T) {
 	if err == nil {
 		t.Fatal("Load of broken YAML returned no error")
 	}
-	if got != (config.Config{}) {
+	if !reflect.DeepEqual(got, config.Config{}) {
 		t.Errorf("Load of broken YAML = %+v, want the zero Config", got)
 	}
 }
@@ -111,6 +113,38 @@ func TestPathPutsTheFileUnderTheConfigDirectory(t *testing.T) {
 	want := filepath.Join(dir, "octoscope", "config.yaml")
 	if got != want {
 		t.Errorf("Path() = %q, want %q", got, want)
+	}
+}
+
+// The Repos tab's list is the reason the settings file exists; it must
+// survive a round trip through the parser in the order the user wrote it.
+func TestLoadReadsTheRepositoryList(t *testing.T) {
+	t.Parallel()
+
+	path := write(t, "repositories:\n  - kukv/octoscope\n  - cli/cli\n")
+
+	got, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []string{"kukv/octoscope", "cli/cli"}
+	if !slices.Equal(got.Repositories, want) {
+		t.Errorf("Repositories = %v, want %v", got.Repositories, want)
+	}
+}
+
+// A settings file with no list at all is the common case on a first run.
+func TestLoadLeavesTheRepositoryListEmptyWhenTheFileHasNone(t *testing.T) {
+	t.Parallel()
+
+	path := write(t, "language: ja\n")
+
+	got, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(got.Repositories) != 0 {
+		t.Errorf("Repositories = %v, want none", got.Repositories)
 	}
 }
 
