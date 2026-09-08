@@ -58,6 +58,8 @@ linters:
               desc: internal/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/usecase
               desc: internal/config must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/browser
+              desc: internal/config must not depend on other internal packages
         # Messages are a leaf: they depend on nothing of ours.
         i18n-layer:
           files:
