@@ -1,0 +1,26 @@
+# The rest of one thread's comments. reviewThreads cannot page a nested
+# connection, so a thread with more than the first page asks by node id.
+query ($threadId: ID!, $after: String) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      # first is capped at 100 by GitHub. This query only runs on a thread
+      # already known to be long, so it asks for the cap.
+      comments(first: 100, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          body
+          createdAt
+          author {
+            login
+          }
+          pullRequestReview {
+            state
+          }
+        }
+      }
+    }
+  }
+}

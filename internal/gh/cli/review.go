@@ -30,6 +30,9 @@ var reviewAtOnceMutation string
 //go:embed discard_review.graphql
 var discardReviewMutation string
 
+//go:embed thread_comments.graphql
+var threadCommentsQuery string
+
 // repoArgs names the repository for a GraphQL call.
 //
 // GraphQL's repository() takes owner and name separately, unlike `gh pr`
@@ -80,6 +83,9 @@ type reviewContextResponse struct {
 }
 
 type threadNode struct {
+	// ID is not put into the domain type: only thread_comments.graphql
+	// uses it, and it never reaches the screen.
+	ID         string `json:"id"`
 	IsResolved bool   `json:"isResolved"`
 	IsOutdated bool   `json:"isOutdated"`
 	Path       string `json:"path"`
@@ -89,7 +95,8 @@ type threadNode struct {
 	OriginalLine int    `json:"originalLine"`
 	DiffSide     string `json:"diffSide"`
 	Comments     struct {
-		Nodes []threadCommentNode `json:"nodes"`
+		PageInfo pageInfo            `json:"pageInfo"`
+		Nodes    []threadCommentNode `json:"nodes"`
 	} `json:"comments"`
 }
 
@@ -106,7 +113,9 @@ type threadCommentNode struct {
 
 // PRReviewContext fetches everything the diff view needs to draw and change
 // a review. It walks review threads one page at a time itself, since
-// `gh api --paginate` cannot follow a GraphQL cursor below the top level.
+// `gh api --paginate` cannot follow a GraphQL cursor below the top level,
+// and follows a thread's own comments only when that thread says it has
+// more.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
 	repoFields, err := repoArgs(c.effectiveRepo(repo))
 	if err != nil {
@@ -114,6 +123,7 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 	}
 
 	var rc gh.ReviewContext
+	var nodes []threadNode
 	cursor := ""
 	for {
 		args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
@@ -142,14 +152,65 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		if len(pr.Reviews.Nodes) > 0 {
 			rc.PendingID = pr.Reviews.Nodes[0].ID
 		}
-		for _, n := range pr.ReviewThreads.Nodes {
-			rc.Threads = append(rc.Threads, n.toDomain())
-		}
+		nodes = append(nodes, pr.ReviewThreads.Nodes...)
 
 		if !pr.ReviewThreads.PageInfo.HasNextPage || pr.ReviewThreads.PageInfo.EndCursor == "" {
-			return rc, nil
+			break
 		}
 		cursor = pr.ReviewThreads.PageInfo.EndCursor
+	}
+
+	for _, n := range nodes {
+		t := n.toDomain()
+		if n.Comments.PageInfo.HasNextPage && n.Comments.PageInfo.EndCursor != "" {
+			rest, err := c.threadComments(ctx, n.ID, n.Comments.PageInfo.EndCursor)
+			if err != nil {
+				return gh.ReviewContext{}, fmt.Errorf("fetch thread comments: %w", err)
+			}
+			t.Comments = append(t.Comments, rest...)
+		}
+		rc.Threads = append(rc.Threads, t)
+	}
+	return rc, nil
+}
+
+type threadCommentsResponse struct {
+	Data struct {
+		Node struct {
+			Comments struct {
+				PageInfo pageInfo            `json:"pageInfo"`
+				Nodes    []threadCommentNode `json:"nodes"`
+			} `json:"comments"`
+		} `json:"node"`
+	} `json:"data"`
+}
+
+// threadComments reads what did not fit in the page PRReviewContext already
+// has, starting after the cursor that page ended on.
+func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]gh.ThreadComment, error) {
+	var rest []gh.ThreadComment
+	cursor := after
+	for {
+		args := []string{
+			"api", "graphql", "-f", "query=" + threadCommentsQuery,
+			"-f", "threadId=" + threadID, "-f", "after=" + cursor,
+		}
+		out, err := c.run(ctx, c.dir, args...)
+		if err != nil {
+			return nil, err
+		}
+		var resp threadCommentsResponse
+		if err := json.Unmarshal(out, &resp); err != nil {
+			return nil, fmt.Errorf("parse thread comments: %w", err)
+		}
+		page := resp.Data.Node.Comments
+		for _, n := range page.Nodes {
+			rest = append(rest, n.toDomain())
+		}
+		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
+			return rest, nil
+		}
+		cursor = page.PageInfo.EndCursor
 	}
 }
 
@@ -167,16 +228,20 @@ func (n threadNode) toDomain() gh.ReviewThread {
 		t.Side = gh.SideLeft
 	}
 	for _, c := range n.Comments.Nodes {
-		t.Comments = append(t.Comments, gh.ThreadComment{
-			Author:    gh.Author{Login: c.Author.Login},
-			Body:      c.Body,
-			CreatedAt: c.CreatedAt,
-			// PENDING is the only review state that means "written but not
-			// sent"; every other one means the comment is already public.
-			Pending: c.PullRequestReview.State == "PENDING",
-		})
+		t.Comments = append(t.Comments, c.toDomain())
 	}
 	return t
+}
+
+func (c threadCommentNode) toDomain() gh.ThreadComment {
+	return gh.ThreadComment{
+		Author:    gh.Author{Login: c.Author.Login},
+		Body:      c.Body,
+		CreatedAt: c.CreatedAt,
+		// PENDING is the only review state that means "written but not
+		// sent"; every other one means the comment is already public.
+		Pending: c.PullRequestReview.State == "PENDING",
+	}
 }
 
 // The five mutations take no context. They are changes, not fetches: a

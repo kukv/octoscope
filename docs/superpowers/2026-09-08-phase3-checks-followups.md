@@ -3,7 +3,8 @@
 checks ビュー（`docs/superpowers/plans/2026-09-07-phase3-checks.md`）を入れたときに
 見つかったが、そのブランチでは直さないと決めたもの。**直さないと決めた理由も書く。**
 
-実端末での確認は別で、`docs/superpowers/2026-09-07-phase3-checks-handoff.md` にある。
+実端末での確認は別で、checks は `docs/superpowers/2026-09-07-phase3-checks-handoff.md`、
+merge は `docs/superpowers/2026-09-08-phase3-merge-handoff.md` にある。
 
 **2026-09-08 に、直し方が決まっていたものを全部片付けた。**
 `arrange` のバケツ分け、`enter` / `L` が出せないログを取りに行く件、`follow()` が
@@ -40,12 +41,12 @@ run の無い check には見出しを描かない。結果として、そうい
 
 ## Phase 3 の残り
 
-merge（spec §4.4.4）は入った。実端末での確認は
-`docs/superpowers/2026-09-08-phase3-merge-handoff.md` にある。
+Phase 3 は完了した。checks、merge（spec §4.4.4）、ページング（各スレッドの
+`comments` が 50 件を超えても取れること）の 3 本が全部入った。
+残っているのは、上の設計判断（App が作った check run の見分け）だけである。
 
-残っているのはページングだけである:
-
-- **ページング** — 各スレッドの `comments`（`first: 50`）、
-  `docs/superpowers/plans/2026-09-08-phase3-comment-paging.md`
-
-`docs/superpowers/specs/2026-09-07-phase3-design.md` §7 にある。
+`internal/gh/cli/thread_comments.graphql` は PR #59 のスレッド
+`PRRT_kwDOTVXF-M6fwhR-` に対して実際に叩いて確認した。
+`data.node.comments.nodes` にコメント 1 件（`body` / `createdAt` /
+`author.login` / `pullRequestReview.state` を含む）が返り、`pageInfo` も
+一緒に返ってきた。
