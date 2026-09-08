@@ -63,10 +63,13 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		// gh api graphql exits non-zero when the body carries a top-level
+		// "errors" array, and that body still holds the data GitHub could
+		// answer for. Hand both back and let the caller decide.
 		if msg := bytes.TrimSpace(stderr.Bytes()); len(msg) > 0 {
-			return nil, fmt.Errorf("gh %s: %s", args[0], msg)
+			return stdout.Bytes(), fmt.Errorf("gh %s: %s", args[0], msg)
 		}
-		return nil, fmt.Errorf("gh %s: %w", args[0], err)
+		return stdout.Bytes(), fmt.Errorf("gh %s: %w", args[0], err)
 	}
 	return stdout.Bytes(), nil
 }
