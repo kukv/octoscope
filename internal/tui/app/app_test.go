@@ -874,9 +874,11 @@ func TestTheTabRowSaysTheSettingsFileCouldNotBeRead(t *testing.T) {
 	m := New(&fakeSource{}, Options{ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	if !strings.Contains(next.(Model).View().Content, i18n.T("tab.config_unreadable")) {
+	view := next.(Model).View().Content
+	if !strings.Contains(view, i18n.T("tab.config_unreadable")) {
 		t.Error("the tab row does not report the unreadable settings file")
 	}
+	i18n.AssertNoUnresolvedIDs(t, view)
 }
 
 func TestTheTabRowIsQuietWhenTheSettingsFileIsFine(t *testing.T) {

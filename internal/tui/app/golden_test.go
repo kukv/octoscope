@@ -32,6 +32,15 @@ func goldenModel(width int, opts Options) Model {
 	return next.(Model)
 }
 
+// goldenModelReady is goldenModel, but runs the fetch the WindowSizeMsg
+// starts so the board's data is in and the tab row has a summary to draw.
+func goldenModelReady(t *testing.T, width int, opts Options) Model {
+	t.Helper()
+	m := New(&fakeSource{}, opts)
+	next, cmd := m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	return resolve(t, next.(Model), cmd)
+}
+
 func TestGolden(t *testing.T) {
 	for _, lang := range goldenLanguages {
 		for _, w := range goldenWidths {
@@ -57,6 +66,12 @@ func TestGolden(t *testing.T) {
 
 				badConfig := goldenModel(w, Options{HasRepo: true, ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
 				golden.Assert(t, fmt.Sprintf("app_config_error_%s_%d", lang.name, w), badConfig.View().Content)
+
+				// The tab row carries both the config warning and the
+				// board's summary at once once loading finishes; a narrow
+				// ja row must not lose the summary to make room for it.
+				badConfigWithSummary := goldenModelReady(t, w, Options{HasRepo: true, ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+				golden.Assert(t, fmt.Sprintf("app_config_error_summary_%s_%d", lang.name, w), badConfigWithSummary.View().Content)
 			})
 		}
 	}
