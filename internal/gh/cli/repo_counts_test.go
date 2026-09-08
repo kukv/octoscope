@@ -88,15 +88,42 @@ func TestRepoCountsKeepsTheAnswersItGotWhenOneRepositoryIsGone(t *testing.T) {
 	}
 }
 
-// A response with no "data" at all -- an expired token, a rate limit, a
-// validation error -- means the whole document was rejected, not that every
-// repository failed to resolve. Reading it the same way as a partial failure
-// would tell a user whose token expired that every repository disappeared.
+// A resolved repository's badge must use the spelling GitHub returns, not
+// the one typed into the settings file, so the sidebar does not depend on
+// the file's capitalization. An unresolved one has nothing but the settings
+// file's string, so it keeps that.
+func TestRepoCountsUsesTheResolvedNameForRowsThatResolved(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		raw, err := os.ReadFile("testdata/repo_counts_partial.json")
+		if err != nil {
+			return nil, err
+		}
+		return raw, errors.New("gh api: Could not resolve to a Repository")
+	}
+
+	got, err := c.RepoCounts(context.Background(), []string{"KUKV/OctoScope", "kukv/no-such-repository-xyz"})
+	if err != nil {
+		t.Fatalf("RepoCounts: %v", err)
+	}
+	if got[0].Repo != "kukv/octoscope" {
+		t.Errorf("got[0].Repo = %q, want the resolved nameWithOwner, not the settings-file spelling", got[0].Repo)
+	}
+	if got[1].Repo != "kukv/no-such-repository-xyz" {
+		t.Errorf("got[1].Repo = %q, want the settings-file spelling kept for the unresolved row", got[1].Repo)
+	}
+}
+
+// A response with no "data" at all -- a rate limit, a validation error --
+// means the whole document was rejected, not that every repository failed to
+// resolve. Reading it the same way as a partial failure would tell a
+// rate-limited user that every repository disappeared.
 //
-// This body cannot be recorded without actually expiring a token or hitting
-// a rate limit, so it is written by hand; the shape ("errors" with no
-// "data") is what gh api graphql's own documentation describes for a
-// request-level failure.
+// This body cannot be recorded without actually hitting a rate limit, so it
+// is written by hand; the shape ("errors" with no "data") is what gh api
+// graphql's own documentation describes for a request-level failure.
 func TestRepoCountsFailsWhenTheWholeQueryIsRejected(t *testing.T) {
 	t.Parallel()
 
@@ -142,8 +169,7 @@ func TestRepoCountsMatchesAliasesBackToTheRightIndexWhenAnEarlierNameIsSkipped(t
 	}
 }
 
-// A line the user typed by hand can be anything; it must not become a
-// request.
+// A name that does not split into owner/name must not become a request.
 func TestRepoCountsDoesNotAskAboutAMalformedName(t *testing.T) {
 	t.Parallel()
 
@@ -163,6 +189,38 @@ func TestRepoCountsDoesNotAskAboutAMalformedName(t *testing.T) {
 	}
 	if len(got) != 1 || !got[0].Unavailable {
 		t.Errorf("got %+v, want one unavailable row", got)
+	}
+}
+
+// strings.Cut alone would treat "a/", "/b" and "a/b/c" as valid owner/name
+// splits, even though none of them names a repository; a leading or
+// trailing space would pass through unnoticed the same way. None of these
+// must reach gh.
+func TestRepoCountsRejectsNamesThatOnlyLookLikeTheyCanSplit(t *testing.T) {
+	t.Parallel()
+
+	for _, repo := range []string{"a/", "/b", "a/b/c", " kukv/octoscope", "kukv/octoscope "} {
+		t.Run(repo, func(t *testing.T) {
+			t.Parallel()
+
+			c := New("/tmp", "")
+			called := false
+			c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+				called = true
+				return []byte(`{"data":{}}`), nil
+			}
+
+			got, err := c.RepoCounts(context.Background(), []string{repo})
+			if err != nil {
+				t.Fatalf("RepoCounts: %v", err)
+			}
+			if called {
+				t.Errorf("%q was sent to GitHub", repo)
+			}
+			if len(got) != 1 || !got[0].Unavailable {
+				t.Errorf("got %+v, want one unavailable row", got)
+			}
+		})
 	}
 }
 

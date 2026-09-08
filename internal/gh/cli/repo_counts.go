@@ -55,7 +55,7 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 	indices := []int{}
 	for i, repo := range repos {
 		counts[i].Repo = repo
-		owner, name, ok := strings.Cut(repo, "/")
+		owner, name, ok := splitOwnerRepo(repo)
 		if !ok {
 			counts[i].Unavailable = true
 			continue
@@ -70,9 +70,6 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 
 	query := buildRepoCountsQuery(len(indices))
 	callArgs := append([]string{"api", "graphql", "-f", "query=" + query}, args...)
-	// gh api graphql exits non-zero when any alias could not be resolved, but
-	// the body still carries the data GitHub could answer for, so a run
-	// error is not fatal here; only a body that fails to parse is.
 	out, runErr := c.run(ctx, c.dir, callArgs...)
 	var resp repoCountsResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
@@ -95,8 +92,24 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 			counts[i].Unavailable = true
 			continue
 		}
+		counts[i].Repo = alias.NameWithOwner
 		counts[i].PRs = alias.PullRequests.TotalCount
 		counts[i].Issues = alias.Issues.TotalCount
 	}
 	return counts, nil
+}
+
+// splitOwnerRepo reports whether repo has the shape "owner/name": both
+// halves non-empty, no second "/", and no leading or trailing whitespace
+// that a hand-edited settings file could carry in unnoticed (the config
+// loader does not trim entries).
+func splitOwnerRepo(repo string) (owner, name string, ok bool) {
+	if repo != strings.TrimSpace(repo) {
+		return "", "", false
+	}
+	owner, name, ok = strings.Cut(repo, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return "", "", false
+	}
+	return owner, name, true
 }
