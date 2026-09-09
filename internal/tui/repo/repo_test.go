@@ -122,9 +122,23 @@ func TestRepoNameShownInHeader(t *testing.T) {
 
 func TestEmptyPRList(t *testing.T) {
 	f := &fakeSource{}
-	m := loadedModel(f)
+	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
+	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: f.prs})
 	if !strings.Contains(m.View(), "No open pull requests") {
 		t.Errorf("view missing empty state:\n%s", m.View())
+	}
+}
+
+// An empty settings file and no current repository is a different state from
+// a repository with no open pull requests: there is nothing to list at all.
+func TestEmptyListSaysSo(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{}), 120)
+	view := m.View()
+	if !strings.Contains(view, i18n.T("repos.none")) {
+		t.Errorf("an empty Repos tab says nothing:\n%s", view)
+	}
+	if strings.Contains(view, i18n.T("common.loading")) {
+		t.Errorf("an empty Repos tab spins forever:\n%s", view)
 	}
 }
 
@@ -133,7 +147,7 @@ func TestEmptyPRList(t *testing.T) {
 const spinnerFrame = "⣾"
 
 func TestLoadingShowsSpinnerAndText(t *testing.T) {
-	m := sized(New(&fakeSource{prs: samplePRs()}, Options{}), 120)
+	m := sized(New(&fakeSource{prs: samplePRs()}, Options{Current: "kukv/octoscope"}), 120)
 	view := m.View()
 	if !strings.Contains(view, "loading...") {
 		t.Errorf("view missing the loading text before the list arrives:\n%s", view)
@@ -144,11 +158,11 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 }
 
 // TestInitStartsTheSpinnerAndTheFetches covers what Init batches: the spinner
-// tick and the first list. This model has no sidebar rows, so it says
-// nothing about the counts fetch: see TestInitFetchesTheSidebarsCounts.
+// tick and the first list. See TestInitFetchesTheSidebarsCounts for the
+// counts fetch.
 func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
-	m := New(f, Options{})
+	m := New(f, Options{Current: "kukv/octoscope"})
 	msgs := drain(t, m.Init())
 	var haveList bool
 	for _, msg := range msgs {

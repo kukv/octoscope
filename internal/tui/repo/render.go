@@ -103,7 +103,10 @@ func (m Model) body() []string {
 	}
 	if m.itemCount() == 0 {
 		empty := i18n.T("list.no_open_prs")
-		if m.tab == tabIssues {
+		switch {
+		case len(m.rows) == 0:
+			empty = i18n.T("repos.none")
+		case m.tab == tabIssues:
 			empty = i18n.T("list.no_open_issues")
 		}
 		return []string{theme.Dim().Render(clip(empty, m.bodyWidth()))}

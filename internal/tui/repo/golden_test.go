@@ -98,6 +98,9 @@ func TestGolden(t *testing.T) {
 
 				golden.Assert(t, fmt.Sprintf("repo_prs_%s_%d", lang.name, w), prs.View())
 				golden.Assert(t, fmt.Sprintf("repo_issues_%s_%d", lang.name, w), issues.View())
+
+				empty := sized(New(&fakeSource{}, Options{}), w)
+				golden.Assert(t, fmt.Sprintf("repo_empty_%s_%d", lang.name, w), empty.View())
 			})
 		}
 	}

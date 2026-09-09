@@ -129,7 +129,9 @@ func New(src Source, opts Options) Model {
 	m := Model{src: src, opts: opts}
 	m.spin = s
 	m.rows, m.selected = buildRows(opts.Repositories, opts.Current)
-	m.loading[m.tab] = true
+	if len(m.rows) > 0 {
+		m.loading[m.tab] = true
+	}
 	return m
 }
 
@@ -169,6 +171,9 @@ func (m Model) selectRow(i int) (Model, tea.Cmd) {
 }
 
 func (m Model) Init() tea.Cmd {
+	if len(m.rows) == 0 {
+		return nil
+	}
 	return tea.Batch(m.spin.Tick, fetchList(m.src, m.tab, m.selectedRepo()), fetchCounts(m.src, m.rowNames()))
 }
 
