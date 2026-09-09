@@ -10,13 +10,6 @@ type row struct {
 	// in the settings file. It leads the list but is not part of it: only
 	// adding it explicitly writes it there.
 	temporary bool
-
-	prs, issues int
-
-	// counted says the badge has an answer. A repository GitHub could not
-	// resolve stays uncounted, and the row is drawn without numbers rather
-	// than with zeroes.
-	counted bool
 }
 
 // buildRows turns the settings file's list into the sidebar's rows and picks

@@ -128,22 +128,10 @@ func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 }
 
 // selectRow is the single way the sidebar's cursor moves: from a key, from
-// the mouse, and from the lookup that names the current repository. What the
-// right pane holds belongs to the row that was selected, so moving clears it.
-// In this task it only moves the cursor; Task 5 gives it the clearing and the
-// fetch.
+// the mouse, and from the lookup that names the current repository.
 func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.selected = i
 	return m, nil
-}
-
-// rowNames lists the sidebar's rows in order.
-func (m Model) rowNames() []string {
-	names := make([]string, len(m.rows))
-	for i, r := range m.rows {
-		names[i] = r.name
-	}
-	return names
 }
 
 func (m Model) Init() tea.Cmd {
