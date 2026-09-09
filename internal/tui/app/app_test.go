@@ -29,17 +29,19 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work      gh.Work
-	prs       []gh.PR
-	pr        gh.PR
-	prErr     error
-	labels    []gh.Label
-	files     []gh.FileDiff
-	diffErr   error
-	checks    gh.Checks
-	checksErr error
-	workCalls int
-	prCalls   int
+	work       gh.Work
+	prs        []gh.PR
+	pr         gh.PR
+	prErr      error
+	labels     []gh.Label
+	files      []gh.FileDiff
+	diffErr    error
+	checks     gh.Checks
+	checksErr  error
+	workCalls  int
+	prCalls    int
+	prRepos    []string
+	issueRepos []string
 }
 
 func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
@@ -47,12 +49,18 @@ func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
 	return f.work, nil
 }
 
-func (f *fakeSource) ListPRs(context.Context, string) ([]gh.PR, error) {
+func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
 	f.prCalls++
+	f.prRepos = append(f.prRepos, repo)
 	return f.prs, nil
 }
-func (f *fakeSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
-func (f *fakeSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
+
+func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]gh.Issue, error) {
+	f.issueRepos = append(f.issueRepos, repo)
+	return nil, nil
+}
+
+func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
 
 func (f *fakeSource) RepoCounts(context.Context, []string) ([]gh.RepoCount, error) { return nil, nil }
 

@@ -26,6 +26,9 @@ type scenarioSource struct {
 
 	pendingID string
 	posted    []gh.PendingComment
+
+	prRepos    []string
+	issueRepos []string
 }
 
 func (f *scenarioSource) ListWork(context.Context) (gh.Work, error) {
@@ -39,11 +42,17 @@ func (f *scenarioSource) ListWork(context.Context) (gh.Work, error) {
 	return w, nil
 }
 
-func (f *scenarioSource) ListPRs(context.Context, string) ([]gh.PR, error) {
+func (f *scenarioSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
+	f.prRepos = append(f.prRepos, repo)
 	return []gh.PR{f.pr}, nil
 }
-func (f *scenarioSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
-func (f *scenarioSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
+
+func (f *scenarioSource) ListIssues(_ context.Context, repo string) ([]gh.Issue, error) {
+	f.issueRepos = append(f.issueRepos, repo)
+	return nil, nil
+}
+
+func (f *scenarioSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
 
 func (f *scenarioSource) RepoCounts(context.Context, []string) ([]gh.RepoCount, error) {
 	return nil, nil

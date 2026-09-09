@@ -29,12 +29,6 @@ type webOpener interface {
 	OpenWeb(url string) error
 }
 
-// repoNamer names the repository shown in the header. It stands alone
-// because it belongs to neither kind.
-type repoNamer interface {
-	RepoName(ctx context.Context) (string, error)
-}
-
 // repoCounter is how many pull requests and issues are open in each
 // repository of the sidebar. It stands alone because it is the only call
 // that looks past the repository on screen.
@@ -48,7 +42,6 @@ type repoCounter interface {
 type Source interface {
 	prSource
 	issueSource
-	repoNamer
 	repoCounter
 	webOpener
 }
@@ -75,7 +68,6 @@ type (
 		repo   string
 		issues []gh.Issue
 	}
-	repoNameMsg   string
 	repoCountsMsg []gh.RepoCount
 	errMsg        struct{ err error }
 )
@@ -111,7 +103,6 @@ type Model struct {
 	src  Source
 	opts Options
 
-	repoName      string
 	spin          spinner.Model
 	width, height int
 
@@ -158,14 +149,27 @@ func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 func (m Model) Current() string { return m.opts.Current }
 
 // selectRow is the single way the sidebar's cursor moves: from a key, from
-// the mouse, and from the lookup that names the current repository.
+// the mouse, and from the lookup that names the current repository. It
+// clears the previous row's lists and starts fetching the new row's, which
+// keeps the clear-and-refetch pair in the one place every path goes through.
+//
+// It does not skip the work when i already equals m.selected: SetCurrent can
+// rebuild m.rows with a new temporary row at index 0 while the old selection
+// was also 0, and an index alone cannot tell that row apart from the one it
+// replaced.
 func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.selected = i
-	return m, nil
+	m.prs, m.issues = nil, nil
+	m.loaded, m.cursors = [2]bool{}, [2]int{}
+	if len(m.rows) == 0 {
+		return m, nil
+	}
+	m.loading[m.tab] = true
+	return m, fetchList(m.src, m.tab, m.selectedRepo())
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spin.Tick, fetchRepoName(m.src), fetchList(m.src, m.tab), fetchCounts(m.src, m.rowNames()))
+	return tea.Batch(m.spin.Tick, fetchList(m.src, m.tab, m.selectedRepo()), fetchCounts(m.src, m.rowNames()))
 }
 
 // Refresh re-fetches the current tab. The parent calls it after an event
@@ -173,7 +177,7 @@ func (m Model) Init() tea.Cmd {
 // same way pressing r does.
 func (m Model) Refresh() (Model, tea.Cmd) {
 	m.loading[m.tab] = true
-	return m, tea.Batch(fetchList(m.src, m.tab), fetchCounts(m.src, m.rowNames()))
+	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo()), fetchCounts(m.src, m.rowNames()))
 }
 
 // rowNames is the sidebar's repositories in their current spelling, in the
@@ -186,31 +190,21 @@ func (m Model) rowNames() []string {
 	return names
 }
 
-func fetchList(src Source, t tabID) tea.Cmd {
+func fetchList(src Source, t tabID, repo string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		if t == tabPRs {
-			prs, err := src.ListPRs(ctx, "")
+			prs, err := src.ListPRs(ctx, repo)
 			if err != nil {
 				return errMsg{err}
 			}
-			return prListMsg{prs: prs}
+			return prListMsg{repo: repo, prs: prs}
 		}
-		issues, err := src.ListIssues(ctx, "")
+		issues, err := src.ListIssues(ctx, repo)
 		if err != nil {
 			return errMsg{err}
 		}
-		return issueListMsg{issues: issues}
-	}
-}
-
-func fetchRepoName(src repoNamer) tea.Cmd {
-	return func() tea.Msg {
-		name, err := src.RepoName(context.Background())
-		if err != nil {
-			return repoNameMsg("") // titles just lose the name; not worth a new error path for that
-		}
-		return repoNameMsg(name)
+		return issueListMsg{repo: repo, issues: issues}
 	}
 }
 
@@ -248,9 +242,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
-	case repoNameMsg:
-		m.repoName = string(msg)
-		return m, nil
 	case repoCountsMsg:
 		if len(msg) != len(m.rows) {
 			return m, nil
@@ -266,6 +257,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case prListMsg:
+		// A fetch started for a row the cursor has since left must not land
+		// under the row now selected.
+		if msg.repo != m.selectedRepo() {
+			return m, nil
+		}
 		m.prs = msg.prs
 		m.loaded[tabPRs] = true
 		m.fetchedAt[tabPRs] = time.Now()
@@ -275,6 +271,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading[tabPRs] = false
 		return m, nil
 	case issueListMsg:
+		if msg.repo != m.selectedRepo() {
+			return m, nil
+		}
 		m.issues = msg.issues
 		m.loaded[tabIssues] = true
 		m.fetchedAt[tabIssues] = time.Now()
@@ -395,10 +394,10 @@ func (m Model) SelectedRef() (gh.ItemRef, bool) {
 		if len(m.prs) == 0 {
 			return gh.ItemRef{}, false
 		}
-		return gh.ItemRef{Kind: gh.ItemPR, Repo: m.repoName, Number: m.prs[m.cursors[tabPRs]].Number}, true
+		return gh.ItemRef{Kind: gh.ItemPR, Repo: m.selectedRepo(), Number: m.prs[m.cursors[tabPRs]].Number}, true
 	}
 	if len(m.issues) == 0 {
 		return gh.ItemRef{}, false
 	}
-	return gh.ItemRef{Kind: gh.ItemIssue, Repo: m.repoName, Number: m.issues[m.cursors[tabIssues]].Number}, true
+	return gh.ItemRef{Kind: gh.ItemIssue, Repo: m.selectedRepo(), Number: m.issues[m.cursors[tabIssues]].Number}, true
 }

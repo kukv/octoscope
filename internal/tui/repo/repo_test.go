@@ -26,17 +26,20 @@ type fakeSource struct {
 	counts     []gh.RepoCount
 	countErr   error
 	countCalls [][]string
+
+	prRepos    []string // the repositories ListPRs was asked for, in call order
+	issueRepos []string
 }
 
 func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+	f.prRepos = append(f.prRepos, repo)
 	return f.prs, f.err
 }
 
 func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
+	f.issueRepos = append(f.issueRepos, repo)
 	return f.issues, f.err
 }
-
-func (f *fakeSource) RepoName(ctx context.Context) (string, error) { return "kukv/demo", f.err }
 
 func (f *fakeSource) OpenWeb(url string) error {
 	f.webCalls = append(f.webCalls, url)
@@ -117,14 +120,6 @@ func TestRepoNameShownInHeader(t *testing.T) {
 	}
 }
 
-func TestRepoNameFailureIsIgnored(t *testing.T) {
-	f := &fakeSource{err: errors.New("gh repo: no git remotes found")}
-	msg := fetchRepoName(f)()
-	if got, ok := msg.(repoNameMsg); !ok || got != "" {
-		t.Errorf("msg = %#v, want an empty repoNameMsg (the header name is not worth an error screen)", msg)
-	}
-}
-
 func TestEmptyPRList(t *testing.T) {
 	f := &fakeSource{}
 	m := loadedModel(f)
@@ -149,24 +144,17 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 }
 
 // TestInitStartsTheSpinnerAndTheFetches covers what Init batches: the spinner
-// tick, the repository name and the first list. This model has no sidebar
-// rows, so it says nothing about the counts fetch: see
-// TestInitFetchesTheSidebarsCounts.
+// tick and the first list. This model has no sidebar rows, so it says
+// nothing about the counts fetch: see TestInitFetchesTheSidebarsCounts.
 func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := New(f, Options{})
 	msgs := drain(t, m.Init())
-	var haveName, haveList bool
+	var haveList bool
 	for _, msg := range msgs {
-		switch msg.(type) {
-		case repoNameMsg:
-			haveName = true
-		case prListMsg:
+		if _, ok := msg.(prListMsg); ok {
 			haveList = true
 		}
-	}
-	if !haveName {
-		t.Errorf("Init's batch is missing repoNameMsg: %v", msgs)
 	}
 	if !haveList {
 		t.Errorf("Init's batch is missing prListMsg: %v", msgs)
@@ -231,7 +219,7 @@ func TestTabSwitchLoadsIssues(t *testing.T) {
 func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 	f := &fakeSource{err: errors.New("gh pr: no git remotes found")}
 	m := New(f, Options{})
-	_, cmd := m.Update(fetchList(f, tabPRs)())
+	_, cmd := m.Update(fetchList(f, tabPRs, "")())
 	if cmd == nil {
 		t.Fatal("cmd = nil after a failed fetch, want ErrorMsg cmd")
 	}
@@ -362,8 +350,8 @@ func TestTheSelectedRefCarriesTheRepositoryName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-			m := loadedModel(f)
-			m, _ = m.Update(repoNameMsg("kukv/demo"))
+			m := sized(New(f, Options{Current: "kukv/demo"}), 120)
+			m, _ = m.Update(prListMsg{repo: "kukv/demo", prs: f.prs})
 			if tt.toIssues {
 				var cmd tea.Cmd
 				m, cmd = m.Update(key("tab"))
@@ -666,6 +654,75 @@ func TestFocusMovesBetweenPanes(t *testing.T) {
 	m, _ = m.Update(key("l"))
 	if m.focus != paneList {
 		t.Error("l did not move the focus back to the list")
+	}
+}
+
+func TestMovingTheSidebarFetchesThatRepository(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	f.prRepos = nil
+	m, _ = m.Update(key("h"))
+	_, cmd := m.Update(key("j")) // onto kukv/koto
+	drain(t, cmd)
+	if len(f.prRepos) != 1 || f.prRepos[0] != "kukv/koto" {
+		t.Errorf("ListPRs got %v, want the row the cursor moved onto", f.prRepos)
+	}
+}
+
+// The rows the previous repository's answer would fill must not be shown
+// under the new one's name.
+func TestMovingTheSidebarClearsTheOldList(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(key("h"))
+	m, _ = m.Update(key("j"))
+	if strings.Contains(m.View(), "first pr") {
+		t.Errorf("the previous repository's rows are still on screen:\n%s", m.View())
+	}
+}
+
+// A fetch outlives the row that started it. Its answer must not land under
+// another repository's name.
+func TestAnAnswerForAnotherRepositoryIsDropped(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(key("h"))
+	m, _ = m.Update(key("j")) // now on kukv/koto
+	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: samplePRs()})
+	if strings.Contains(m.View(), "first pr") {
+		t.Errorf("a stale answer was shown:\n%s", m.View())
+	}
+}
+
+// The ref that travels to the detail, diff and checks views names the
+// repository the row belongs to, not the one the process started in.
+func TestSelectedRefNamesTheSelectedRepository(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(key("h"))
+	m, cmd := m.Update(key("j"))
+	drain(t, cmd)
+	m, _ = m.Update(prListMsg{repo: "kukv/koto", prs: samplePRs()})
+	ref, ok := m.SelectedRef()
+	if !ok || ref.Repo != "kukv/koto" {
+		t.Errorf("ref = %+v, want kukv/koto", ref)
+	}
+}
+
+// The lookup that names the working directory answers seconds after the
+// model was built, and can put a temporary row above the one already loaded.
+// What is on screen belongs to the row that was selected, so it must go.
+func TestSetCurrentClearsAndRefetches(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120) // showing kukv/octoscope's pull requests
+	f.prRepos = nil
+	m, cmd := m.SetCurrent("kukv/elsewhere")
+	drain(t, cmd)
+	if strings.Contains(m.View(), "first pr") {
+		t.Errorf("the previous row's rows survived:\n%s", m.View())
+	}
+	if len(f.prRepos) != 1 || f.prRepos[0] != "kukv/elsewhere" {
+		t.Errorf("ListPRs got %v, want the new row", f.prRepos)
 	}
 }
 

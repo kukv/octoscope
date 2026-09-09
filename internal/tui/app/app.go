@@ -22,6 +22,12 @@ import (
 	"github.com/kukv/octoscope/internal/tui/work"
 )
 
+// repoNamer names the repository of the working directory. It is the root's
+// alone: the tabs are told which repository they show.
+type repoNamer interface {
+	RepoName(ctx context.Context) (string, error)
+}
+
 // Source is the union of what the child views need. Each view takes only its
 // own slice of it.
 type Source interface {
@@ -30,6 +36,7 @@ type Source interface {
 	detail.Source
 	diff.Source
 	checks.Source
+	repoNamer
 }
 
 // Options carries what main determined before the UI started.

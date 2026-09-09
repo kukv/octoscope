@@ -71,6 +71,9 @@ func (m Model) footerHints() []string {
 // beside its name so the other one can be judged without switching to it.
 func (m Model) header() []string {
 	name := m.selectedRepo()
+	if name == "" {
+		name = i18n.T("app.name")
+	}
 
 	labels := subTabLabels()
 	counts := []int{len(m.prs), len(m.issues)}

@@ -45,11 +45,15 @@ func (m Model) bodyWidth() int {
 	return max(m.width-m.sidebarCols(), 1)
 }
 
-// selectedRepo is the name the header shows: the repository under the
-// sidebar's cursor, or the app's own name when there is nothing to show yet.
+// selectedRepo is the repository under the sidebar's cursor: what fetchList
+// asks for and what the ref in SelectedRef names. It is empty before the
+// settings file's list and the working directory's own repository are both
+// known, which fetchList passes straight to ListPRs/ListIssues: an empty
+// repository there falls back to the client's own. header substitutes its
+// own placeholder for that case; this one must not.
 func (m Model) selectedRepo() string {
 	if len(m.rows) == 0 {
-		return i18n.T("app.name")
+		return ""
 	}
 	return m.rows[m.selected].name
 }
