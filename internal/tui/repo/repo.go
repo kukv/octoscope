@@ -181,6 +181,9 @@ func (m Model) Init() tea.Cmd {
 // elsewhere changes what these lists show — a submitted review, say — the
 // same way pressing r does.
 func (m Model) Refresh() (Model, tea.Cmd) {
+	if len(m.rows) == 0 {
+		return m, nil
+	}
 	m.loading[m.tab] = true
 	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo()), fetchCounts(m.src, m.rowNames()))
 }

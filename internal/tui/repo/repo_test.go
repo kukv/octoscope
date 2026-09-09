@@ -85,6 +85,15 @@ func loadedModel(f *fakeSource) Model {
 	return m
 }
 
+// currentModel is loadedModel with a current repository, for tests that
+// switch tabs or refresh: with no rows, Refresh and showTab have nothing to
+// fetch (TestRefreshWithNoRowsFetchesNothing, TestSwitchingTabWithNoRowsFetchesNothing).
+func currentModel(f *fakeSource, width int) Model {
+	m := sized(New(f, Options{Current: "kukv/octoscope"}), width)
+	m, _ = m.Update(prListMsg{repo: m.selectedRepo(), prs: f.prs})
+	return m
+}
+
 // sidebarModel returns a Model with a sidebar and its PR list already
 // loaded. The response carries the selected row's own name: once selecting a
 // row throws away a response for a different repository, a response with no
@@ -219,7 +228,7 @@ func TestCursorMovesAndClamps(t *testing.T) {
 
 func TestTabSwitchLoadsIssues(t *testing.T) {
 	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-	m := loadedModel(f)
+	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	if m.tab != tabIssues || cmd == nil {
 		t.Fatalf("tab = %v, cmd = %v; want tabIssues with fetch cmd", m.tab, cmd)
@@ -265,7 +274,7 @@ func TestEnterAsksTheParentForTheDetail(t *testing.T) {
 
 func TestEnterOnAnIssueCarriesTheIssueKind(t *testing.T) {
 	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-	m := loadedModel(f)
+	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	m, _ = m.Update(cmd())
 	_, cmd = m.Update(key("enter"))
@@ -276,7 +285,7 @@ func TestEnterOnAnIssueCarriesTheIssueKind(t *testing.T) {
 	if !ok {
 		t.Fatalf("msg = %T, want OpenDetailMsg", cmd())
 	}
-	if msg.Ref != (gh.ItemRef{Kind: gh.ItemIssue, Number: 3}) {
+	if msg.Ref != (gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/octoscope", Number: 3}) {
 		t.Errorf("Ref = %+v, want the issue under the cursor", msg.Ref)
 	}
 }
@@ -311,7 +320,7 @@ func TestDAsksForTheDiff(t *testing.T) {
 // that has no diff.
 func TestDDoesNothingOnAnIssue(t *testing.T) {
 	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-	m := loadedModel(f)
+	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	m, _ = m.Update(cmd())
 	if _, cmd := m.Update(key("d")); cmd != nil {
@@ -341,7 +350,7 @@ func TestSAsksForTheChecks(t *testing.T) {
 // something that has no checks.
 func TestSDoesNothingOnAnIssue(t *testing.T) {
 	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-	m := loadedModel(f)
+	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	m, _ = m.Update(cmd())
 	if _, cmd := m.Update(key("s")); cmd != nil {
@@ -416,7 +425,7 @@ func TestOOpensTheSelectionsOwnURL(t *testing.T) {
 
 func TestRefreshRefetchesTheCurrentTab(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
-	m := loadedModel(f)
+	m := currentModel(f, 120)
 	m, cmd := m.Update(key("r"))
 	if !m.loading[tabPRs] || cmd == nil {
 		t.Fatalf("loading = %v, cmd = %v; want loading with fetch cmd", m.loading[tabPRs], cmd)
@@ -433,14 +442,28 @@ func TestRefreshRefetchesTheCurrentTab(t *testing.T) {
 	}
 }
 
+// With no rows there is nothing to fetch, and fetchList("") would fail:
+// gh pr list with no --repo reads the working directory, which the app.fail
+// screen would then swallow the whole UI for.
+func TestRefreshWithNoRowsFetchesNothing(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{}), 120)
+	m, cmd := m.Refresh()
+	if cmd != nil {
+		t.Errorf("cmd = %v, want nil with no rows to refresh", cmd)
+	}
+	if m.loading[m.tab] {
+		t.Error("loading was set with nothing to load")
+	}
+}
+
 // TestRefreshThenTabSwitchClearsCorrectLoading reproduces the stuck-spinner
 // bug: pressing r on the PRs tab, then tab to the already-loaded Issues tab
 // before the PR fetch returns, must not leave Issues stuck on "loading..."
 // when the late prListMsg finally arrives.
 func TestRefreshThenTabSwitchClearsCorrectLoading(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-	m := loadedModel(f)
-	m, _ = m.Update(issueListMsg{repo: "", issues: f.issues}) // Issues tab already loaded once before
+	m := currentModel(f, 120)
+	m, _ = m.Update(issueListMsg{repo: m.selectedRepo(), issues: f.issues}) // Issues tab already loaded once before
 
 	m, refreshCmd := m.Update(key("r")) // refresh PRs; fetch is still "in flight"
 	if refreshCmd == nil {
@@ -515,7 +538,7 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 		i18n.SetLanguage(lang)
 		for _, width := range []int{50, 80, 100, 120} {
 			f := &fakeSource{prs: overlongPRs(), issues: overlongIssues()}
-			prs := sized(loadedModel(f), width)
+			prs := currentModel(f, width)
 			issues, cmd := prs.Update(key("tab"))
 			issues, _ = issues.Update(cmd())
 
@@ -802,7 +825,7 @@ func TestNoUnresolvedIDsInRenderedViews(t *testing.T) {
 
 func renderEveryScreen() map[string]string {
 	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
-	list := loadedModel(f)
+	list := currentModel(f, 120)
 	issues, cmd := list.Update(key("tab"))
 	issues, _ = issues.Update(cmd())
 	empty := loadedModel(&fakeSource{})

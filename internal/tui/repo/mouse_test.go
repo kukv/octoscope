@@ -75,7 +75,9 @@ func TestClickingARowSelectsItAndClickingAgainOpensIt(t *testing.T) {
 }
 
 func TestClickingASubTabSwitchesToIt(t *testing.T) {
-	m := sized(loadedModel(&fakeSource{prs: samplePRs()}), 120)
+	// Under 100 columns the sidebar folds away: with one it would sit at
+	// column 0 too, where this test clicks to switch back to Pull Requests.
+	m := currentModel(&fakeSource{prs: samplePRs()}, 90)
 	x, y := tokenAt(t, m, i18n.T("list.tab_issues"))
 
 	next, cmd := m.Update(click(x, y))
@@ -165,6 +167,23 @@ func TestSubTabHitTestIsOffsetByTheSidebar(t *testing.T) {
 	drain(t, cmd)
 	if m.tab != tabIssues {
 		t.Error("a click on the second sub-tab, offset by the sidebar, missed it")
+	}
+}
+
+// showTab must not fetch when there are no rows, the same way Refresh must
+// not: it is reached with no rows whenever tab is pressed on an empty Repos
+// tab.
+func TestSwitchingTabWithNoRowsFetchesNothing(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{}), 120)
+	m, cmd := m.showTab(tabIssues, true)
+	if cmd != nil {
+		t.Errorf("cmd = %v, want nil with no rows to fetch", cmd)
+	}
+	if m.loading[tabIssues] {
+		t.Error("loading was set with nothing to load")
+	}
+	if m.tab != tabIssues {
+		t.Error("the tab should still switch even with nothing to show")
 	}
 }
 
