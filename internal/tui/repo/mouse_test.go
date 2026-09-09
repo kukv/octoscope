@@ -25,6 +25,10 @@ func wheel(up bool) tea.MouseWheelMsg {
 	return tea.MouseWheelMsg{X: 2, Y: listTop, Button: button}
 }
 
+func wheelDown(x, y int) tea.MouseWheelMsg {
+	return tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown}
+}
+
 // tokenAt finds where a token is actually drawn. The tests ask the rendered
 // list where a row is rather than recomputing the layout, so a hit-test that
 // has drifted from the drawing fails here.
@@ -128,6 +132,53 @@ func TestTheWheelMovesTheCursor(t *testing.T) {
 	}
 	if got, _ := up.SelectedRef(); got.Number != 1 {
 		t.Errorf("scrolling past the top selected #%d, want #1", got.Number)
+	}
+}
+
+// A click in the sidebar selects that repository and moves the focus there.
+func TestClickingASidebarRowSelectsIt(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(click(2, sidebarTop+1)) // the second repository
+	drain(t, cmd)
+	if m.selected != 1 || m.focus != paneSidebar {
+		t.Errorf("selected = %d focus = %v, want the clicked row focused", m.selected, m.focus)
+	}
+}
+
+// The sub-tab row starts at the sidebar's right edge, not at column zero: a
+// hit-test that forgot the offset would switch tabs on a sidebar click.
+func TestSubTabHitTestIsOffsetByTheSidebar(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	before := m.tab
+	m, _ = m.Update(click(1, subTabRow))
+	if m.tab != before {
+		t.Error("a click inside the sidebar switched the sub-tab")
+	}
+	// The cursor starts on the PRs tab already, so a click that landed there
+	// by coincidence (offset ignored, or missed entirely) would look the
+	// same as one that hit it correctly. Clicking Issues instead tells the
+	// two apart.
+	issuesAt := ansi.StringWidth(i18n.T("list.tab_prs")) + len(subTabGap)
+	m, cmd := m.Update(click(m.sidebarCols()+issuesAt, subTabRow))
+	drain(t, cmd)
+	if m.tab != tabIssues {
+		t.Error("a click on the second sub-tab, offset by the sidebar, missed it")
+	}
+}
+
+// The wheel moves whichever pane the pointer is over.
+func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(wheelDown(2, sidebarTop))
+	drain(t, cmd)
+	if m.selected != 1 {
+		t.Errorf("selected = %d, want the wheel to move the sidebar", m.selected)
+	}
+	if m.cursors[m.tab] != 0 {
+		t.Error("the wheel moved the table too")
 	}
 }
 
