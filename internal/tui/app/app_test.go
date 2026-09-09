@@ -266,6 +266,28 @@ func TestResolvedRepositoryReachesTheList(t *testing.T) {
 	}
 }
 
+// TestSidebarMoveAsksListPRsForTheNewRow covers the argument fetchList hands
+// down through the routing that reaches this package's Source: moving the
+// Repos sidebar's cursor here, not just inside internal/tui/repo, must ask
+// ListPRs for the row the cursor landed on.
+func TestSidebarMoveAsksListPRsForTheNewRow(t *testing.T) {
+	f := &fakeSource{}
+	next, cmd := New(f, Options{
+		Repo:         "kukv/octoscope",
+		Repositories: []string{"kukv/octoscope", "kukv/koto"},
+	}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+
+	m = press(m, "h") // focus the sidebar
+	f.prRepos = nil
+	moved, moveCmd := pressCmd(m, "j") // onto kukv/koto
+	resolve(t, moved, moveCmd)
+
+	if got := f.prRepos; len(got) != 1 || got[0] != "kukv/koto" {
+		t.Errorf("ListPRs got %v, want the row the cursor moved onto", got)
+	}
+}
+
 // --repo is a statement about this run: its repository is current from the
 // start, without waiting for a lookup.
 func TestRepoFlagIsCurrentFromTheStart(t *testing.T) {
