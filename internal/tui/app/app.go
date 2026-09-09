@@ -34,18 +34,22 @@ type Source interface {
 
 // Options carries what main determined before the UI started.
 type Options struct {
-	// HasRepo reports whether --repo named a target repository. Without the
-	// flag the answer is not known yet: asking the GitHub layer to resolve
-	// the working directory is a subprocess, and doing it before the UI
-	// started left the terminal blank for as long as it took. The root asks
-	// as soon as it has a size, and the Repos tab appears when the answer
-	// arrives.
-	HasRepo bool
+	// Repo is what --repo named, if anything. Without the flag the
+	// repository of the working directory is not known yet: asking the
+	// GitHub layer is a subprocess, and doing it before the UI started left
+	// the terminal blank for as long as it took. The root asks as soon as it
+	// has a size, and the answer reaches the list then.
+	Repo string
 
-	// DefaultRepos says the settings file asks for the Repos tab at start-up.
-	// It cannot be honoured until the tab exists, so it is remembered here
-	// and spent when the lookup finds a repository. It is weaker than --repo,
-	// which is a statement about this run.
+	// Repositories is the settings file's list, which the Repos tab shows
+	// whether or not the working directory is a repository. internal/tui
+	// cannot read internal/config, so the list travels here.
+	Repositories []string
+
+	// DefaultRepos says the settings file asks for the Repos tab at
+	// start-up. It cannot be honoured until the current repository is known,
+	// so it is remembered here and spent when the lookup answers. It is
+	// weaker than --repo, which is a statement about this run.
 	DefaultRepos bool
 
 	// ConfigError is why the settings file could not be read, if it could
@@ -55,25 +59,26 @@ type Options struct {
 	ConfigError string
 }
 
-// repoLookupTimeout bounds the one call that decides whether the Repos tab
-// exists. It is generous: the tab appearing late is a smaller problem than
-// its never appearing on a slow network. `gh repo view` reaches the API, and
-// a cold one has been measured at over six seconds.
+// repoLookupTimeout bounds the one call that decides which repository the
+// list treats as the user's own. It is generous: the answer arriving late is
+// a smaller problem than its never arriving on a slow network. `gh repo view`
+// reaches the API, and a cold one has been measured at over six seconds.
 const repoLookupTimeout = 20 * time.Second
 
 // repoResolvedMsg carries the answer to that lookup. timedOut is kept apart
-// from found because the two look identical on screen — no Repos tab — and
-// only one of them is the truth about the directory.
+// from an empty name because the two look identical on screen — no current
+// repository — and only one of them is the truth about the directory.
 type repoResolvedMsg struct {
-	found    bool
+	name     string
 	timedOut bool
 }
 
 // resolveRepo asks the GitHub layer to name the working directory's
 // repository. A failure means "there is none" — a directory that is not a
-// repository and one with nowhere to fetch from give the Repos tab nothing to
-// show either — except a timeout, which is reported: silently dropping the tab
-// because the network was slow reads as a bug in whatever else was changed.
+// repository and one with nowhere to fetch from both leave the list without a
+// current repository — except a timeout, which is reported: silently
+// dropping it because the network was slow reads as a bug in whatever else
+// was changed.
 func resolveRepo(src Source) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), repoLookupTimeout)
@@ -87,10 +92,10 @@ func resolveRepo(src Source) tea.Cmd {
 // "signal: killed" rather than wrapping the deadline, so whether time ran out
 // is a question for the context, not for the error.
 func resolved(ctx context.Context, name string, err error) repoResolvedMsg {
-	return repoResolvedMsg{
-		found:    err == nil && name != "",
-		timedOut: err != nil && ctx.Err() != nil,
+	if err != nil {
+		return repoResolvedMsg{timedOut: ctx.Err() != nil}
 	}
+	return repoResolvedMsg{name: name}
 }
 
 type tabID int
@@ -149,13 +154,13 @@ type Model struct {
 	errOverlay     overlay
 	errFromOverlay bool
 
-	// repoLookupTimedOut says the Repos tab is missing because the lookup ran
-	// out of time, not because there is no repository here.
+	// repoLookupTimedOut says the current repository is unknown because the
+	// lookup ran out of time, not because the working directory has none.
 	repoLookupTimedOut bool
 
-	// wantRepos holds the settings file's opening tab until the Repos tab
-	// exists. It is cleared once spent, so a later answer to the same lookup
-	// does not pull the user back off the tab they moved to.
+	// wantRepos holds the settings file's opening tab until the current
+	// repository is known. It is cleared once spent, so a later answer to
+	// the same lookup does not pull the user back off the tab they moved to.
 	wantRepos bool
 }
 
@@ -164,7 +169,10 @@ func New(src Source, opts Options) Model {
 		src:  src,
 		opts: opts,
 		work: work.New(src),
-		repo: repo.New(src, repo.Options{}),
+		repo: repo.New(src, repo.Options{
+			Repositories: opts.Repositories,
+			Current:      opts.Repo,
+		}),
 	}
 	// Naming a repository on the command line is a statement about what the
 	// user came to look at, so that is the tab they land on. A repository
@@ -172,7 +180,7 @@ func New(src Source, opts Options) Model {
 	// -- unless the settings file asked for the Repos tab, in which case
 	// wantRepos spends that request when the lookup answers: see
 	// repoResolved.
-	if opts.HasRepo {
+	if opts.Repo != "" {
 		m.tab = tabRepos
 	}
 	m.wantRepos = opts.DefaultRepos
@@ -244,27 +252,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
-	if !msg.found {
-		m.repoLookupTimedOut = msg.timedOut
+	m.repoLookupTimedOut = msg.timedOut
+	if msg.name == "" {
 		return m, nil
 	}
-	// The Repos tab appears, but the user stays where they are: the answer
-	// arrives seconds after the board is already on screen -- unless the
-	// settings file asked for the Repos tab, in which case wantRepos moves
-	// them there once.
-	m.opts.HasRepo = true
+	// The user stays where they are: the answer arrives seconds after the
+	// board is already on screen -- unless the settings file asked for the
+	// Repos tab, in which case wantRepos moves them there once.
+	var cmd tea.Cmd
+	m.repo, cmd = m.repo.SetCurrent(msg.name)
 	if m.wantRepos {
 		m.wantRepos = false
 		m.tab = tabRepos
 	}
-	// broadcast skips the list until this point, so it never saw the
-	// WindowSizeMsg that told the others how wide they are: an unsized
-	// list clips nothing and runs off the terminal.
-	m.repo, _ = m.repo.Update(tea.WindowSizeMsg{
-		Width:  m.width,
-		Height: max(m.height-tabRowHeight, 1),
-	})
-	return m, m.repo.Init()
+	return m, cmd
 }
 
 // The detail view keeps requests in flight after the user leaves it.
@@ -307,13 +308,9 @@ func (m Model) refreshLists(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m = next.(Model)
 	var workCmd tea.Cmd
 	m.work, workCmd = m.work.Refresh()
-	cmds := []tea.Cmd{cmd, workCmd}
-	if m.opts.HasRepo {
-		var repoCmd tea.Cmd
-		m.repo, repoCmd = m.repo.Refresh()
-		cmds = append(cmds, repoCmd)
-	}
-	return m, tea.Batch(cmds...)
+	var repoCmd tea.Cmd
+	m.repo, repoCmd = m.repo.Refresh()
+	return m, tea.Batch(cmd, workCmd, repoCmd)
 }
 
 // has reports whether o is anywhere on the stack, not only on top: the
@@ -356,10 +353,8 @@ func (m Model) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.work, cmd = m.work.Update(msg)
 	cmds = append(cmds, cmd)
 
-	if m.opts.HasRepo {
-		m.repo, cmd = m.repo.Update(msg)
-		cmds = append(cmds, cmd)
-	}
+	m.repo, cmd = m.repo.Update(msg)
+	cmds = append(cmds, cmd)
 
 	if m.has(overlayDetail) {
 		m.detail, cmd = m.detail.Update(msg)
@@ -412,10 +407,8 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.started = true
 		var fetch tea.Cmd
 		m.work, fetch = m.work.Refresh()
-		cmds = append(cmds, fetch)
-		if m.opts.HasRepo {
-			cmds = append(cmds, m.repo.Init())
-		} else {
+		cmds = append(cmds, fetch, m.repo.Init())
+		if m.opts.Repo == "" {
 			cmds = append(cmds, resolveRepo(m.src))
 		}
 	}
@@ -569,9 +562,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.tab = tabWork
 		return m, nil
 	case "2":
-		if m.opts.HasRepo {
-			m.tab = tabRepos
-		}
+		m.tab = tabRepos
 		return m, nil
 	}
 

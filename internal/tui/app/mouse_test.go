@@ -102,7 +102,7 @@ func TestClickingATabSwitchesToIt(t *testing.T) {
 
 	for _, lang := range []language.Tag{language.English, language.Japanese} {
 		i18n.SetLanguage(lang)
-		m := newTestModel(Options{HasRepo: true})
+		m := newTestModel(Options{Repo: "kukv/demo"})
 
 		// --repo starts on Repos, so Work is the one to click away to first.
 		next, _ := m.Update(click(0, 0))
@@ -120,7 +120,7 @@ func TestClickingATabSwitchesToIt(t *testing.T) {
 // TestClickingTheGapBetweenTabsDoesNothing covers the two spaces the row is
 // joined with: a hit-test that divided the row evenly would land on a tab.
 func TestClickingTheGapBetweenTabsDoesNothing(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	gap := ansi.StringWidth("1 " + i18n.T("tab.work"))
 
 	next, _ := m.Update(click(gap, 0))
@@ -160,7 +160,7 @@ func TestAClickIsNotBroadcast(t *testing.T) {
 		}},
 		prs: []gh.PR{{Number: 10, Title: "first pr"}, {Number: 11, Title: "second pr"}},
 	}
-	m := press(loadedApp(t, src, Options{HasRepo: true}), "1") // --repo lands on Repos
+	m := press(loadedApp(t, src, Options{Repo: "kukv/demo"}), "1") // --repo lands on Repos
 
 	before, _ := m.repo.SelectedRef()
 	x, y := tokenAt(t, m, "another card")
@@ -213,7 +213,7 @@ func TestADragOrAReleaseIsDropped(t *testing.T) {
 // TestAClickAboveTheBoardIsDropped covers the blank line between the tab row
 // and the tab: it belongs to neither.
 func TestAClickAboveTheBoardIsDropped(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	if _, cmd := m.Update(click(0, 1)); cmd != nil {
 		t.Error("a click on the blank line under the tab row produced a command")
 	}
@@ -222,7 +222,7 @@ func TestAClickAboveTheBoardIsDropped(t *testing.T) {
 // TestTheErrorScreenIgnoresTheMouse matches what it does with keys: only q
 // and esc get through, and neither is a click.
 func TestTheErrorScreenIgnoresTheMouse(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	failed, _ := m.fail(errors.New("gh: HTTP 502"))
 
 	next, cmd := failed.(Model).Update(click(0, 0))

@@ -50,7 +50,7 @@ func TestGolden(t *testing.T) {
 
 				// --repo starts on the Repos tab, so the board's own first
 				// frame is reached with 1.
-				withRepo := goldenModel(w, Options{HasRepo: true})
+				withRepo := goldenModel(w, Options{Repo: "kukv/demo"})
 				golden.Assert(t, fmt.Sprintf("app_tabs_%s_%d", lang.name, w), withRepo.View().Content)
 
 				onWork := press(withRepo, "1")
@@ -64,13 +64,13 @@ func TestGolden(t *testing.T) {
 				next, _ = missing.fail(gh.ErrGhNotFound)
 				golden.Assert(t, fmt.Sprintf("app_gh_missing_%s_%d", lang.name, w), next.(Model).View().Content)
 
-				badConfig := goldenModel(w, Options{HasRepo: true, ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+				badConfig := goldenModel(w, Options{Repo: "kukv/demo", ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
 				golden.Assert(t, fmt.Sprintf("app_config_error_%s_%d", lang.name, w), badConfig.View().Content)
 
 				// The tab row carries both the config warning and the
 				// board's summary at once once loading finishes; a narrow
 				// ja row must not lose the summary to make room for it.
-				badConfigWithSummary := goldenModelReady(t, w, Options{HasRepo: true, ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+				badConfigWithSummary := goldenModelReady(t, w, Options{Repo: "kukv/demo", ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
 				golden.Assert(t, fmt.Sprintf("app_config_error_summary_%s_%d", lang.name, w), badConfigWithSummary.View().Content)
 			})
 		}

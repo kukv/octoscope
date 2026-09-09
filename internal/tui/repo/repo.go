@@ -127,6 +127,10 @@ func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 	return m.selectRow(selected)
 }
 
+// Current is the repository the sidebar treats as the user's own, which the
+// root asks for once the lookup that finds it answers.
+func (m Model) Current() string { return m.opts.Current }
+
 // selectRow is the single way the sidebar's cursor moves: from a key, from
 // the mouse, and from the lookup that names the current repository.
 func (m Model) selectRow(i int) (Model, tea.Cmd) {
