@@ -45,6 +45,10 @@ func (f *scenarioSource) ListPRs(context.Context, string) ([]gh.PR, error) {
 func (f *scenarioSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
 func (f *scenarioSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
 
+func (f *scenarioSource) RepoCounts(context.Context, []string) ([]gh.RepoCount, error) {
+	return nil, nil
+}
+
 func (f *scenarioSource) GetItem(context.Context, gh.ItemRef) (usecase.Item, error) {
 	pr := f.pr
 	return usecase.Item{

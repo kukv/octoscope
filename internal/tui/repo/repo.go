@@ -3,6 +3,7 @@ package repo
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -34,6 +35,13 @@ type repoNamer interface {
 	RepoName(ctx context.Context) (string, error)
 }
 
+// repoCounter is how many pull requests and issues are open in each
+// repository of the sidebar. It stands alone because it is the only call
+// that looks past the repository on screen.
+type repoCounter interface {
+	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
+}
+
 // Source is what the repository list needs from the GitHub layer. A command
 // that acts on one kind takes that half; the ones that pick the kind at run
 // time take the whole.
@@ -41,6 +49,7 @@ type Source interface {
 	prSource
 	issueSource
 	repoNamer
+	repoCounter
 	webOpener
 }
 
@@ -66,8 +75,9 @@ type (
 		repo   string
 		issues []gh.Issue
 	}
-	repoNameMsg string
-	errMsg      struct{ err error }
+	repoNameMsg   string
+	repoCountsMsg []gh.RepoCount
+	errMsg        struct{ err error }
 )
 
 type tabID int
@@ -155,7 +165,7 @@ func (m Model) selectRow(i int) (Model, tea.Cmd) {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spin.Tick, fetchRepoName(m.src), fetchList(m.src, m.tab))
+	return tea.Batch(m.spin.Tick, fetchRepoName(m.src), fetchList(m.src, m.tab), fetchCounts(m.src, m.rowNames()))
 }
 
 // Refresh re-fetches the current tab. The parent calls it after an event
@@ -163,7 +173,17 @@ func (m Model) Init() tea.Cmd {
 // same way pressing r does.
 func (m Model) Refresh() (Model, tea.Cmd) {
 	m.loading[m.tab] = true
-	return m, fetchList(m.src, m.tab)
+	return m, tea.Batch(fetchList(m.src, m.tab), fetchCounts(m.src, m.rowNames()))
+}
+
+// rowNames is the sidebar's repositories in their current spelling, in the
+// order fetchCounts must hand its answer back in.
+func (m Model) rowNames() []string {
+	names := make([]string, len(m.rows))
+	for i, r := range m.rows {
+		names[i] = r.name
+	}
+	return names
 }
 
 func fetchList(src Source, t tabID) tea.Cmd {
@@ -194,6 +214,19 @@ func fetchRepoName(src repoNamer) tea.Cmd {
 	}
 }
 
+func fetchCounts(src repoCounter, repos []string) tea.Cmd {
+	if len(repos) == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		counts, err := src.RepoCounts(context.Background(), repos)
+		if err != nil {
+			return repoCountsMsg(nil) // badges stay blank; the lists still work
+		}
+		return repoCountsMsg(counts)
+	}
+}
+
 func openWeb(src Source, url string) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
@@ -217,6 +250,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, cmd
 	case repoNameMsg:
 		m.repoName = string(msg)
+		return m, nil
+	case repoCountsMsg:
+		if len(msg) != len(m.rows) {
+			return m, nil
+		}
+		m.rows = slices.Clone(m.rows)
+		for i, c := range msg {
+			if c.Unavailable {
+				continue
+			}
+			m.rows[i].name = c.Repo
+			m.rows[i].prs, m.rows[i].issues = c.PRs, c.Issues
+			m.rows[i].counted = true
+		}
 		return m, nil
 	case prListMsg:
 		m.prs = msg.prs

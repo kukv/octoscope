@@ -22,6 +22,10 @@ type fakeSource struct {
 	issues   []gh.Issue
 	err      error
 	webCalls []string // the URLs handed to the browser
+
+	counts     []gh.RepoCount
+	countErr   error
+	countCalls [][]string
 }
 
 func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
@@ -37,6 +41,11 @@ func (f *fakeSource) RepoName(ctx context.Context) (string, error) { return "kuk
 func (f *fakeSource) OpenWeb(url string) error {
 	f.webCalls = append(f.webCalls, url)
 	return nil
+}
+
+func (f *fakeSource) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
+	f.countCalls = append(f.countCalls, repos)
+	return f.counts, f.countErr
 }
 
 func samplePRs() []gh.PR {
@@ -140,22 +149,25 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 }
 
 // TestInitStartsTheSpinnerAndTheFetches covers what Init batches: the spinner
-// tick, the repository name and the first list.
+// tick, the repository name, the first list, and the sidebar's counts.
 func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := New(f, Options{})
-	batch, ok := m.Init()().(tea.BatchMsg)
-	if !ok {
-		t.Fatalf("Init = %T, want a batch", m.Init()())
+	msgs := drain(t, m.Init())
+	var haveName, haveList bool
+	for _, msg := range msgs {
+		switch msg.(type) {
+		case repoNameMsg:
+			haveName = true
+		case prListMsg:
+			haveList = true
+		}
 	}
-	if len(batch) != 3 {
-		t.Fatalf("Init batched %d commands, want the tick, the name and the list", len(batch))
+	if !haveName {
+		t.Errorf("Init's batch is missing repoNameMsg: %v", msgs)
 	}
-	if _, ok := batch[1]().(repoNameMsg); !ok {
-		t.Errorf("batch[1] = %T, want repoNameMsg", batch[1]())
-	}
-	if _, ok := batch[2]().(prListMsg); !ok {
-		t.Errorf("batch[2] = %T, want prListMsg", batch[2]())
+	if !haveList {
+		t.Errorf("Init's batch is missing prListMsg: %v", msgs)
 	}
 }
 
@@ -390,8 +402,15 @@ func TestRefreshRefetchesTheCurrentTab(t *testing.T) {
 	if !m.loading[tabPRs] || cmd == nil {
 		t.Fatalf("loading = %v, cmd = %v; want loading with fetch cmd", m.loading[tabPRs], cmd)
 	}
-	if _, ok := cmd().(prListMsg); !ok {
-		t.Errorf("msg = %T, want prListMsg", cmd())
+	msgs := drain(t, cmd)
+	found := false
+	for _, msg := range msgs {
+		if _, ok := msg.(prListMsg); ok {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("msgs = %v, want a prListMsg among them", msgs)
 	}
 }
 
@@ -420,7 +439,9 @@ func TestRefreshThenTabSwitchClearsCorrectLoading(t *testing.T) {
 		t.Errorf("Issues view should render items immediately, got:\n%s", view)
 	}
 
-	m, _ = m.Update(refreshCmd()) // late prListMsg arrives while Issues is visible
+	for _, msg := range drain(t, refreshCmd) { // late messages arrive while Issues is visible
+		m, _ = m.Update(msg)
+	}
 	if view := m.View(); strings.Contains(view, "loading...") || !strings.Contains(view, "an issue") {
 		t.Errorf("Issues view got stuck on the loading text after a late prListMsg, got:\n%s", view)
 	}
@@ -499,6 +520,78 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 func sized(m Model, width int) Model {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	return m
+}
+
+// drain runs cmd and, if it produced a batch, runs every command in the
+// batch too, flattening the result into the messages they returned.
+func drain(t *testing.T, cmd tea.Cmd) []tea.Msg {
+	t.Helper()
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		return []tea.Msg{msg}
+	}
+	var msgs []tea.Msg
+	for _, c := range batch {
+		msgs = append(msgs, drain(t, c)...)
+	}
+	return msgs
+}
+
+func TestBadgesShowTheCounts(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), counts: []gh.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
+		{Repo: "kukv/koto", Unavailable: true},
+	}}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(repoCountsMsg(f.counts))
+	view := m.View()
+	if !strings.Contains(view, "12/3") {
+		t.Errorf("the badge is missing:\n%s", view)
+	}
+	if !strings.Contains(view, "—") {
+		t.Errorf("a repository that could not be counted lost its row or got a zero:\n%s", view)
+	}
+}
+
+// RepoCounts answers positionally and rewrites each name to the spelling
+// GitHub resolved. Matching by name would drop the answer for a row the user
+// spelled differently.
+func TestCountsMatchByPositionAndTakeTheResolvedName(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Repositories: []string{"KUKV/Octoscope"}}), 120)
+	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
+	if m.rows[0].name != "kukv/octoscope" {
+		t.Errorf("row name = %q, want the spelling GitHub resolved", m.rows[0].name)
+	}
+}
+
+// A shorter or longer answer than there are rows must not panic.
+func TestCountsOfADifferentLengthAreIgnored(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	before := m.rows
+	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{{Repo: "kukv/octoscope"}}))
+	if m.rows[0].counted != before[0].counted {
+		t.Error("a mismatched answer was taken")
+	}
+}
+
+func TestCountsAreFetchedOnRefresh(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	f.countCalls = nil
+	_, cmd := m.Update(key("r"))
+	drain(t, cmd)
+	if len(f.countCalls) != 1 {
+		t.Errorf("RepoCounts called %d times on r, want 1", len(f.countCalls))
+	}
+	if got := f.countCalls[0]; len(got) != 2 || got[0] != "kukv/octoscope" {
+		t.Errorf("RepoCounts got %v, want every row's name", got)
+	}
 }
 
 func TestSidebarListsEveryRepository(t *testing.T) {

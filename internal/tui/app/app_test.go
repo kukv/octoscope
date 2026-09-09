@@ -54,6 +54,8 @@ func (f *fakeSource) ListPRs(context.Context, string) ([]gh.PR, error) {
 func (f *fakeSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
 func (f *fakeSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
 
+func (f *fakeSource) RepoCounts(context.Context, []string) ([]gh.RepoCount, error) { return nil, nil }
+
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
 	if ref.Kind == gh.ItemIssue {
 		return usecase.Item{Kind: gh.ItemIssue}, nil
