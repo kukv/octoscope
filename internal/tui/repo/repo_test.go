@@ -751,8 +751,8 @@ func TestMovingTheSidebarClearsTheOldList(t *testing.T) {
 	m := sidebarModel(f, 120)
 	m, _ = m.Update(key("h"))
 	m, _ = m.Update(key("j"))
-	if strings.Contains(m.View(), "first pr") {
-		t.Errorf("the previous repository's rows are still on screen:\n%s", m.View())
+	if _, ok := m.SelectedRef(); ok {
+		t.Error("an item from the previous repository can still be selected")
 	}
 }
 
@@ -794,8 +794,8 @@ func TestSetCurrentClearsAndRefetches(t *testing.T) {
 	f.prRepos = nil
 	m, cmd := m.SetCurrent("kukv/elsewhere")
 	drain(t, cmd)
-	if strings.Contains(m.View(), "first pr") {
-		t.Errorf("the previous row's rows survived:\n%s", m.View())
+	if _, ok := m.SelectedRef(); ok {
+		t.Error("an item from the previous repository can still be selected")
 	}
 	if len(f.prRepos) != 1 || f.prRepos[0] != "kukv/elsewhere" {
 		t.Errorf("ListPRs got %v, want the new row", f.prRepos)
