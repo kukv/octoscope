@@ -149,7 +149,9 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 }
 
 // TestInitStartsTheSpinnerAndTheFetches covers what Init batches: the spinner
-// tick, the repository name, the first list, and the sidebar's counts.
+// tick, the repository name and the first list. This model has no sidebar
+// rows, so it says nothing about the counts fetch: see
+// TestInitFetchesTheSidebarsCounts.
 func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := New(f, Options{})
@@ -168,6 +170,21 @@ func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 	}
 	if !haveList {
 		t.Errorf("Init's batch is missing prListMsg: %v", msgs)
+	}
+}
+
+func TestInitFetchesTheSidebarsCounts(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := New(f, Options{
+		Repositories: []string{"kukv/octoscope", "kukv/koto"},
+		Current:      "kukv/octoscope",
+	})
+	drain(t, m.Init())
+	if len(f.countCalls) != 1 {
+		t.Errorf("RepoCounts called %d times on Init, want 1", len(f.countCalls))
+	}
+	if got := f.countCalls[0]; len(got) != 2 || got[0] != "kukv/octoscope" {
+		t.Errorf("RepoCounts got %v, want every row's name", got)
 	}
 }
 
