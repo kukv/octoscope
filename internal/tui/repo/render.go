@@ -10,6 +10,7 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
+	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -38,20 +39,38 @@ func (m Model) View() string {
 	if m.itemCount() > 0 && !m.loading[m.tab] {
 		lines = append(lines, m.summary()...)
 	}
+	if m.sidebarCols() > 0 {
+		lines = joinPanes(m.sidebar(), lines, sidebarWidth)
+	}
 	return strings.Join(append(lines, "", m.keyBar()), "\n")
 }
 
 func (m Model) keyBar() string {
-	return theme.Dim().Render(clip(i18n.T("footer.list"), m.width))
+	return theme.Dim().Render(layout.FitKeyBar(m.footerHints(), m.width))
+}
+
+// footerHints is the list's key bar, most important first: FitKeyBar drops
+// from the end when the terminal is too narrow for all of them. quit comes
+// before the item-specific shortcuts: it is how the user leaves octoscope,
+// and losing it at a narrow width would leave no visible way out.
+func (m Model) footerHints() []string {
+	return []string{
+		i18n.T("footer.list.move"),
+		i18n.T("footer.list.open"),
+		i18n.T("footer.list.pane"),
+		i18n.T("footer.list.kind"),
+		i18n.T("footer.list.quit"),
+		i18n.T("footer.list.refresh"),
+		i18n.T("footer.list.diff"),
+		i18n.T("footer.list.checks"),
+		i18n.T("footer.list.web"),
+	}
 }
 
 // header is the repository and the sub-tab row, with the count of each tab
 // beside its name so the other one can be judged without switching to it.
 func (m Model) header() []string {
-	name := i18n.T("app.name")
-	if m.repoName != "" {
-		name = m.repoName
-	}
+	name := m.selectedRepo()
 
 	labels := subTabLabels()
 	counts := []int{len(m.prs), len(m.issues)}
@@ -67,9 +86,9 @@ func (m Model) header() []string {
 		}
 	}
 	return []string{
-		clip(theme.Title().Render(name), m.width),
+		clip(theme.Title().Render(name), m.bodyWidth()),
 		"",
-		clip(strings.Join(labels, subTabGap), m.width),
+		clip(strings.Join(labels, subTabGap), m.bodyWidth()),
 		"",
 	}
 }
@@ -77,14 +96,14 @@ func (m Model) header() []string {
 // body is the table, or what stands in for it while there is nothing to draw.
 func (m Model) body() []string {
 	if m.loading[m.tab] {
-		return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.width)}
+		return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
 	}
 	if m.itemCount() == 0 {
 		empty := i18n.T("list.no_open_prs")
 		if m.tab == tabIssues {
 			empty = i18n.T("list.no_open_issues")
 		}
-		return []string{theme.Dim().Render(clip(empty, m.width))}
+		return []string{theme.Dim().Render(clip(empty, m.bodyWidth()))}
 	}
 
 	rows := m.visibleRows()
@@ -132,7 +151,7 @@ func (m Model) row(i int) string {
 		age = i18n.RelTime(m.fetchedAt[tabIssues], issue.UpdatedAt)
 	}
 
-	titleWidth := max(m.width-stateColumn-numberColumn-checksColumn-ageColumn, 1)
+	titleWidth := max(m.bodyWidth()-stateColumn-numberColumn-checksColumn-ageColumn, 1)
 	title += badges(labels, titleWidth-ansi.StringWidth(title)-1)
 	line := pad(state, stateColumn) +
 		pad(theme.Dim().Render(number), numberColumn) +
@@ -141,20 +160,20 @@ func (m Model) row(i int) string {
 		right(theme.Dim().Render(age), ageColumn)
 
 	if i == m.cursors[m.tab] {
-		return theme.Selected().Render(clip(line, m.width))
+		return theme.Selected().Render(clip(line, m.bodyWidth()))
 	}
-	return clip(line, m.width)
+	return clip(line, m.bodyWidth())
 }
 
 // summary is the block under the table: what the selected item changes, and
 // how its checks are doing.
 func (m Model) summary() []string {
-	lines := []string{theme.Rule().Render(strings.Repeat("─", m.width))}
+	lines := []string{theme.Rule().Render(strings.Repeat("─", m.bodyWidth()))}
 	if m.tab == tabIssues {
 		issue := m.issues[m.cursors[tabIssues]]
 		return fill(append(lines, clip(theme.Dim().Render(
 			fmt.Sprintf("@%s · %s", issue.Author.Login, i18n.DateTime(issue.UpdatedAt))),
-			m.width)), summaryHeight)
+			m.bodyWidth())), summaryHeight)
 	}
 
 	pr := m.prs[m.cursors[tabPRs]]
@@ -167,20 +186,20 @@ func (m Model) summary() []string {
 		parts = append(parts, theme.Added().Render(fmt.Sprintf("+%d", pr.Additions))+
 			" "+theme.Removed().Render(fmt.Sprintf("−%d", pr.Deletions)))
 	}
-	lines = append(lines, clip(strings.Join(parts, theme.Dim().Render(" · ")), m.width))
+	lines = append(lines, clip(strings.Join(parts, theme.Dim().Render(" · ")), m.bodyWidth()))
 
 	// The rest of the block lists the checks by name: the bar on the row says
 	// how many passed, but not which.
 	if pr.Checks.Total == 0 {
 		return fill(append(lines,
-			theme.Dim().Render(clip(i18n.T("work.no_checks"), m.width))), summaryHeight)
+			theme.Dim().Render(clip(i18n.T("work.no_checks"), m.bodyWidth()))), summaryHeight)
 	}
 	for _, run := range pr.Checks.Runs {
 		if len(lines) >= summaryHeight {
 			break
 		}
 		lines = append(lines, clip(
-			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, m.width))
+			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, m.bodyWidth()))
 	}
 	return fill(lines, summaryHeight)
 }

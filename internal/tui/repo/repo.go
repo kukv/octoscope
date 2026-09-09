@@ -58,10 +58,16 @@ type OpenChecksMsg struct{ Ref gh.ItemRef }
 type ErrorMsg struct{ Err error }
 
 type (
-	prListMsg    []gh.PR
-	issueListMsg []gh.Issue
-	repoNameMsg  string
-	errMsg       struct{ err error }
+	prListMsg struct {
+		repo string
+		prs  []gh.PR
+	}
+	issueListMsg struct {
+		repo   string
+		issues []gh.Issue
+	}
+	repoNameMsg string
+	errMsg      struct{ err error }
 )
 
 type tabID int
@@ -69,6 +75,15 @@ type tabID int
 const (
 	tabPRs tabID = iota
 	tabIssues
+)
+
+// pane says which half of the split screen the arrow keys move: the
+// repository list on the left, or the table on the right.
+type pane int
+
+const (
+	paneList pane = iota
+	paneSidebar
 )
 
 // Options is what the list needs to know before it can draw: the
@@ -92,6 +107,7 @@ type Model struct {
 
 	rows     []row
 	selected int
+	focus    pane
 
 	tab     tabID
 	cursors [2]int
@@ -158,13 +174,13 @@ func fetchList(src Source, t tabID) tea.Cmd {
 			if err != nil {
 				return errMsg{err}
 			}
-			return prListMsg(prs)
+			return prListMsg{prs: prs}
 		}
 		issues, err := src.ListIssues(ctx, "")
 		if err != nil {
 			return errMsg{err}
 		}
-		return issueListMsg(issues)
+		return issueListMsg{issues: issues}
 	}
 }
 
@@ -191,6 +207,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.sidebarCols() == 0 {
+			m.focus = paneList
+		}
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -200,7 +219,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.repoName = string(msg)
 		return m, nil
 	case prListMsg:
-		m.prs = []gh.PR(msg)
+		m.prs = msg.prs
 		m.loaded[tabPRs] = true
 		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
@@ -209,7 +228,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading[tabPRs] = false
 		return m, nil
 	case issueListMsg:
-		m.issues = []gh.Issue(msg)
+		m.issues = msg.issues
 		m.loaded[tabIssues] = true
 		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
@@ -238,12 +257,32 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m.showTab(tabIssues, true)
 		}
 		return m.showTab(tabPRs, true)
+	case "h", "left":
+		if m.sidebarCols() > 0 {
+			m.focus = paneSidebar
+		}
+		return m, nil
+	case "l", "right":
+		m.focus = paneList
+		return m, nil
 	case "j", "down":
+		if m.focus == paneSidebar {
+			if m.selected < len(m.rows)-1 {
+				return m.selectRow(m.selected + 1)
+			}
+			return m, nil
+		}
 		if n := m.itemCount(); n > 0 && m.cursors[m.tab] < n-1 {
 			m.cursors[m.tab]++
 		}
 		return m, nil
 	case "k", "up":
+		if m.focus == paneSidebar {
+			if m.selected > 0 {
+				return m.selectRow(m.selected - 1)
+			}
+			return m, nil
+		}
 		if m.cursors[m.tab] > 0 {
 			m.cursors[m.tab]--
 		}

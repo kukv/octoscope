@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -68,7 +69,21 @@ func key(s string) tea.KeyPressMsg {
 // unsized one draws nothing at all.
 func loadedModel(f *fakeSource) Model {
 	m := sized(New(f, Options{}), 120)
-	m, _ = m.Update(prListMsg(f.prs))
+	m, _ = m.Update(prListMsg{prs: f.prs})
+	return m
+}
+
+// sidebarModel returns a Model with a sidebar and its PR list already
+// loaded. The response carries the selected row's own name: once selecting a
+// row throws away a response for a different repository, a response with no
+// repo at all would be discarded and every test built on this would find an
+// empty table.
+func sidebarModel(f *fakeSource, width int) Model {
+	m := sized(New(f, Options{
+		Repositories: []string{"kukv/octoscope", "kukv/koto"},
+		Current:      "kukv/octoscope",
+	}), width)
+	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: f.prs})
 	return m
 }
 
@@ -83,10 +98,11 @@ func TestPRListRenders(t *testing.T) {
 	}
 }
 
+// The header names the repository under the sidebar's cursor, which is
+// Current once SetCurrent has placed it there.
 func TestRepoNameShownInHeader(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
-	m := sized(New(f, Options{}), 120)
-	m, _ = m.Update(repoNameMsg("kukv/demo"))
+	m := sized(New(f, Options{Current: "kukv/demo"}), 120)
 	if !strings.Contains(m.View(), "kukv/demo") {
 		t.Errorf("header missing the repository name:\n%s", m.View())
 	}
@@ -386,7 +402,7 @@ func TestRefreshRefetchesTheCurrentTab(t *testing.T) {
 func TestRefreshThenTabSwitchClearsCorrectLoading(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
 	m := loadedModel(f)
-	m, _ = m.Update(issueListMsg(f.issues)) // Issues tab already loaded once before
+	m, _ = m.Update(issueListMsg{repo: "", issues: f.issues}) // Issues tab already loaded once before
 
 	m, refreshCmd := m.Update(key("r")) // refresh PRs; fetch is still "in flight"
 	if refreshCmd == nil {
@@ -419,7 +435,7 @@ func TestCursorClampsWhenTheListShrinks(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := loadedModel(f)
 	m, _ = m.Update(key("j")) // cursor on the second PR
-	m, _ = m.Update(prListMsg(samplePRs()[:1]))
+	m, _ = m.Update(prListMsg{prs: samplePRs()[:1]})
 	if m.cursors[tabPRs] != 0 {
 		t.Errorf("cursor = %d after the list shrank, want 0", m.cursors[tabPRs])
 	}
@@ -483,6 +499,106 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 func sized(m Model, width int) Model {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	return m
+}
+
+func TestSidebarListsEveryRepository(t *testing.T) {
+	m := sidebarModel(&fakeSource{prs: samplePRs()}, 120)
+	view := m.View()
+	for _, want := range []string{"kukv/octoscope", "kukv/koto"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the sidebar is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// Design §9: under 100 columns the sidebar folds away and the header keeps
+// the name of the repository being shown.
+func TestSidebarFoldsAwayWhenNarrow(t *testing.T) {
+	m := sidebarModel(&fakeSource{prs: samplePRs()}, 80)
+	if strings.Contains(m.View(), "kukv/koto") {
+		t.Errorf("the sidebar was drawn at 80 columns:\n%s", m.View())
+	}
+	if !strings.Contains(m.View(), "kukv/octoscope") {
+		t.Errorf("the header lost the current repository:\n%s", m.View())
+	}
+}
+
+// Every line must fit the terminal: a sidebar that does not subtract itself
+// from the table's width runs off the right edge.
+func TestEveryLineFitsTheWidth(t *testing.T) {
+	for _, w := range []int{80, 100, 120, 160} {
+		m := sidebarModel(&fakeSource{prs: samplePRs()}, w)
+		for _, line := range strings.Split(m.View(), "\n") {
+			if got := ansi.StringWidth(line); got > w {
+				t.Errorf("at %d columns a line is %d wide: %q", w, got, line)
+			}
+		}
+	}
+}
+
+func TestFocusMovesBetweenPanes(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	if m.focus != paneList {
+		t.Fatal("the list did not start focused")
+	}
+	m, _ = m.Update(key("h"))
+	if m.focus != paneSidebar {
+		t.Error("h did not move the focus to the sidebar")
+	}
+	m, _ = m.Update(key("j"))
+	if m.selected != 1 {
+		t.Errorf("selected = %d, want j to move the sidebar's cursor", m.selected)
+	}
+	if m.cursors[m.tab] != 0 {
+		t.Error("j moved the table's cursor while the sidebar had the focus")
+	}
+	m, _ = m.Update(key("l"))
+	if m.focus != paneList {
+		t.Error("l did not move the focus back to the list")
+	}
+}
+
+// Design §8: the key bar must fit ja at 80 columns. FitKeyBar guarantees the
+// width on its own -- it drops hints until they fit -- so measuring the width
+// would assert nothing (see docs: the seven tests that could not fail). What
+// is worth holding is which hints survive the drop.
+func TestKeyBarKeepsTheEssentialKeysInJapaneseAt80(t *testing.T) {
+	i18n.SetLanguage(language.Japanese)
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+	bar := sidebarModel(&fakeSource{prs: samplePRs()}, 80).keyBar()
+	for _, want := range []string{
+		i18n.T("footer.list.move"),
+		i18n.T("footer.list.open"),
+		i18n.T("footer.list.pane"),
+		i18n.T("footer.list.kind"),
+		i18n.T("footer.list.quit"),
+	} {
+		if !strings.Contains(bar, want) {
+			t.Errorf("the key bar dropped %q at ja/80: %q", want, bar)
+		}
+	}
+}
+
+// 20-50 repositories is the realistic size of the list (design §2). The
+// sidebar must scroll rather than run off the bottom of the terminal.
+func TestSidebarScrollsRatherThanOverflowing(t *testing.T) {
+	var many []string
+	for i := range 50 {
+		many = append(many, fmt.Sprintf("kukv/repo-%02d", i))
+	}
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Repositories: many}), 120)
+	if got := len(strings.Split(m.View(), "\n")); got > 40 {
+		t.Errorf("the view is %d lines tall in a 40-line terminal", got)
+	}
+	m, _ = m.Update(key("h"))
+	for range 49 {
+		m, _ = m.Update(key("j"))
+	}
+	if !strings.Contains(m.View(), "kukv/repo-49") {
+		t.Errorf("the last row is off screen:\n%s", m.View())
+	}
 }
 
 // TestNoUnresolvedIDsInRenderedViews guards spec §6.5. It renders each of the
