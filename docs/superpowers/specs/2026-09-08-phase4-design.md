@@ -30,6 +30,7 @@ Phase 4 で spec §7 のフェーズ分割は終わる。
 | 追加ダイアログの候補 | `gh search repos <語> --limit N --json fullName,description,isPrivate`。5 件で 1.6 秒 |
 | 初回投入の材料 | `gh repo list --limit N --json nameWithOwner`（6.4 秒）と `gh api user/orgs`。Org のリポジトリは `gh repo list <org>` |
 | トークンだけで GraphQL を叩けるか | **叩ける。** `https://api.github.com/graphql` に `Authorization: bearer <token>` で POST し、`{"query": "..."}` を送ると同じ JSON が返る |
+| サイドバー相当の件数（20〜50 件）で 1 リクエストが持つか（2026-09-09） | **持つ。** `buildRepoCountsQuery` と同じ形（alias を並べて 1 リクエスト）で自分の公開リポジトリ 30 件（`gh repo list --limit 30`）分を組み、`gh api graphql` で 1 回計測。**8.13 秒、30 alias 全件解決・`errors` 無し。** 1 リクエストで足りる。30 件を超えた場合の分割・ページングは未計測（3→30 件の間で線形なら 50 件でも 15 秒前後の見込みだが、これは実測ではないので設計の前提にはしない） |
 
 件数を `search(type: ISSUE, query: "repo:a/b repo:c/d")` の 1 発で引く案は採らない。
 `issueCount` は**クエリ全体の合計**であり、リポジトリごとには割れないため。
