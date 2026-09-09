@@ -42,6 +42,7 @@ type fakeSource struct {
 	prCalls    int
 	prRepos    []string
 	issueRepos []string
+	countCalls [][]string
 }
 
 func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
@@ -62,7 +63,10 @@ func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]gh.Issue, err
 
 func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
 
-func (f *fakeSource) RepoCounts(context.Context, []string) ([]gh.RepoCount, error) { return nil, nil }
+func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]gh.RepoCount, error) {
+	f.countCalls = append(f.countCalls, repos)
+	return nil, nil
+}
 
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
 	if ref.Kind == gh.ItemIssue {
@@ -263,6 +267,19 @@ func TestResolvedRepositoryReachesTheList(t *testing.T) {
 	next, _ := m.Update(repoResolvedMsg{name: "kukv/demo"})
 	if got := next.(Model).repo.Current(); got != "kukv/demo" {
 		t.Errorf("the list's current repository = %q, want kukv/demo", got)
+	}
+}
+
+// The lookup's answer replaces the list's rows, which resets every badge to
+// uncounted; without a fresh count fetch, a row counted before the answer
+// arrived would be stuck showing its old numbers.
+func TestResolvedRepositoryFetchesCounts(t *testing.T) {
+	f := &fakeSource{}
+	m := newTestModelWith(f, Options{})
+	_, cmd := m.Update(repoResolvedMsg{name: "kukv/demo"})
+	resolve(t, m, cmd)
+	if len(f.countCalls) == 0 {
+		t.Error("RepoCounts was not called after the repository was resolved")
 	}
 }
 

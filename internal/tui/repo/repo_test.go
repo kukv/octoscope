@@ -763,6 +763,22 @@ func TestSetCurrentClearsAndRefetches(t *testing.T) {
 	}
 }
 
+// SetCurrent rebuilds m.rows from the settings file's strings, which resets
+// every row's badge to uncounted. Without a fresh fetchCounts here, a row
+// counted before SetCurrent ran stays showing its old numbers forever, or --
+// on the ordinary startup path, where RepoCounts usually answers before the
+// current-repository lookup does -- every badge stays "—" until r is pressed.
+func TestSetCurrentFetchesCounts(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	f.countCalls = nil
+	_, cmd := m.SetCurrent("kukv/elsewhere")
+	drain(t, cmd)
+	if len(f.countCalls) != 1 {
+		t.Errorf("RepoCounts called %d times by SetCurrent, want 1", len(f.countCalls))
+	}
+}
+
 // Design §8: the key bar must fit ja at 80 columns. FitKeyBar guarantees the
 // width on its own -- it drops hints until they fit -- so measuring the width
 // would assert nothing (see docs: the seven tests that could not fail). What

@@ -143,7 +143,8 @@ func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 	m.opts.Current = name
 	rows, selected := buildRows(m.opts.Repositories, name)
 	m.rows = rows
-	return m.selectRow(selected)
+	next, cmd := m.selectRow(selected)
+	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()))
 }
 
 // Current is the repository the sidebar treats as the user's own, which the
