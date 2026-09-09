@@ -67,7 +67,7 @@ func key(s string) tea.KeyPressMsg {
 // app sizes it. The list lays itself out to the terminal it was given, so an
 // unsized one draws nothing at all.
 func loadedModel(f *fakeSource) Model {
-	m := sized(New(f), 120)
+	m := sized(New(f, Options{}), 120)
 	m, _ = m.Update(prListMsg(f.prs))
 	return m
 }
@@ -85,7 +85,7 @@ func TestPRListRenders(t *testing.T) {
 
 func TestRepoNameShownInHeader(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
-	m := sized(New(f), 120)
+	m := sized(New(f, Options{}), 120)
 	m, _ = m.Update(repoNameMsg("kukv/demo"))
 	if !strings.Contains(m.View(), "kukv/demo") {
 		t.Errorf("header missing the repository name:\n%s", m.View())
@@ -113,7 +113,7 @@ func TestEmptyPRList(t *testing.T) {
 const spinnerFrame = "⣾"
 
 func TestLoadingShowsSpinnerAndText(t *testing.T) {
-	m := sized(New(&fakeSource{prs: samplePRs()}), 120)
+	m := sized(New(&fakeSource{prs: samplePRs()}, Options{}), 120)
 	view := m.View()
 	if !strings.Contains(view, "loading...") {
 		t.Errorf("view missing the loading text before the list arrives:\n%s", view)
@@ -127,7 +127,7 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 // tick, the repository name and the first list.
 func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
-	m := New(f)
+	m := New(f, Options{})
 	batch, ok := m.Init()().(tea.BatchMsg)
 	if !ok {
 		t.Fatalf("Init = %T, want a batch", m.Init()())
@@ -144,7 +144,7 @@ func TestInitStartsTheSpinnerAndTheFetches(t *testing.T) {
 }
 
 func TestSpinnerTickAdvancesTheFrame(t *testing.T) {
-	m := New(&fakeSource{})
+	m := New(&fakeSource{}, Options{})
 	before := m.spin.View()
 	m, cmd := m.Update(m.spin.Tick())
 	if cmd == nil {
@@ -185,7 +185,7 @@ func TestTabSwitchLoadsIssues(t *testing.T) {
 
 func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 	f := &fakeSource{err: errors.New("gh pr: no git remotes found")}
-	m := New(f)
+	m := New(f, Options{})
 	_, cmd := m.Update(fetchList(f, tabPRs)())
 	if cmd == nil {
 		t.Fatal("cmd = nil after a failed fetch, want ErrorMsg cmd")
@@ -466,7 +466,7 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 			for name, view := range map[string]string{
 				"prs":     prs.View(),
 				"issues":  issues.View(),
-				"loading": sized(New(f), width).View(),
+				"loading": sized(New(f, Options{}), width).View(),
 				"empty":   sized(loadedModel(&fakeSource{}), width).View(),
 			} {
 				for _, line := range strings.Split(view, "\n") {
@@ -514,6 +514,6 @@ func renderEveryScreen() map[string]string {
 		"list_prs":    list.View(),
 		"list_issues": issues.View(),
 		"empty":       empty.View(),
-		"loading":     New(f).View(),
+		"loading":     New(f, Options{}).View(),
 	}
 }

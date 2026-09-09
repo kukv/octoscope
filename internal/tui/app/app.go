@@ -164,7 +164,7 @@ func New(src Source, opts Options) Model {
 		src:  src,
 		opts: opts,
 		work: work.New(src),
-		repo: repo.New(src),
+		repo: repo.New(src, repo.Options{}),
 	}
 	// Naming a repository on the command line is a statement about what the
 	// user came to look at, so that is the tab they land on. A repository

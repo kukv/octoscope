@@ -71,12 +71,27 @@ const (
 	tabIssues
 )
 
+// Options is what the list needs to know before it can draw: the
+// repositories the settings file holds, and the one the user is standing in.
+type Options struct {
+	Repositories []string
+
+	// Current is the repository --repo named, or the one the working
+	// directory belongs to. It may be empty, and it may arrive after the
+	// model was built: see SetCurrent.
+	Current string
+}
+
 type Model struct {
-	src Source
+	src  Source
+	opts Options
 
 	repoName      string
 	spin          spinner.Model
 	width, height int
+
+	rows     []row
+	selected int
 
 	tab     tabID
 	cursors [2]int
@@ -91,12 +106,44 @@ type Model struct {
 	fetchedAt [2]time.Time
 }
 
-func New(src Source) Model {
+func New(src Source, opts Options) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	m := Model{src: src, spin: s}
+	m := Model{src: src, opts: opts}
+	m.spin = s
+	m.rows, m.selected = buildRows(opts.Repositories, opts.Current)
 	m.loading[m.tab] = true
 	return m
+}
+
+// SetCurrent names the repository the user is standing in once the lookup
+// that finds it answers, which is seconds after the model was built. The
+// answer can put a new row at the top of the list and select it, so it
+// returns the fetch that row needs.
+func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
+	m.opts.Current = name
+	rows, selected := buildRows(m.opts.Repositories, name)
+	m.rows = rows
+	return m.selectRow(selected)
+}
+
+// selectRow is the single way the sidebar's cursor moves: from a key, from
+// the mouse, and from the lookup that names the current repository. What the
+// right pane holds belongs to the row that was selected, so moving clears it.
+// In this task it only moves the cursor; Task 5 gives it the clearing and the
+// fetch.
+func (m Model) selectRow(i int) (Model, tea.Cmd) {
+	m.selected = i
+	return m, nil
+}
+
+// rowNames lists the sidebar's rows in order.
+func (m Model) rowNames() []string {
+	names := make([]string, len(m.rows))
+	for i, r := range m.rows {
+		names[i] = r.name
+	}
+	return names
 }
 
 func (m Model) Init() tea.Cmd {
