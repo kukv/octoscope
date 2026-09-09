@@ -75,7 +75,7 @@ func goldenModel(width int) Model {
 		Repositories: []string{"kukv/octoscope", "kukv/koto"},
 		Current:      "kukv/octoscope",
 	}), width)
-	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: f.prs})
 	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{
 		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
 		{Repo: "kukv/koto", Unavailable: true},

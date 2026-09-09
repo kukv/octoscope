@@ -90,21 +90,19 @@ func loadedModel(f *fakeSource) Model {
 // fetch (TestRefreshWithNoRowsFetchesNothing, TestSwitchingTabWithNoRowsFetchesNothing).
 func currentModel(f *fakeSource, width int) Model {
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), width)
-	m, _ = m.Update(prListMsg{repo: m.selectedRepo(), prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: f.prs})
 	return m
 }
 
 // sidebarModel returns a Model with a sidebar and its PR list already
-// loaded. The response carries the selected row's own name: once selecting a
-// row throws away a response for a different repository, a response with no
-// repo at all would be discarded and every test built on this would find an
-// empty table.
+// loaded, before selectRow has run at all, so the response's zero-value gen
+// matches the model's own.
 func sidebarModel(f *fakeSource, width int) Model {
 	m := sized(New(f, Options{
 		Repositories: []string{"kukv/octoscope", "kukv/koto"},
 		Current:      "kukv/octoscope",
 	}), width)
-	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: f.prs})
 	return m
 }
 
@@ -132,7 +130,7 @@ func TestRepoNameShownInHeader(t *testing.T) {
 func TestEmptyPRList(t *testing.T) {
 	f := &fakeSource{}
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
-	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: f.prs})
 	if !strings.Contains(m.View(), "No open pull requests") {
 		t.Errorf("view missing empty state:\n%s", m.View())
 	}
@@ -242,7 +240,7 @@ func TestTabSwitchLoadsIssues(t *testing.T) {
 func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 	f := &fakeSource{err: errors.New("gh pr: no git remotes found")}
 	m := New(f, Options{})
-	_, cmd := m.Update(fetchList(f, tabPRs, "")())
+	_, cmd := m.Update(fetchList(f, tabPRs, "", m.gen)())
 	if cmd == nil {
 		t.Fatal("cmd = nil after a failed fetch, want ErrorMsg cmd")
 	}
@@ -252,6 +250,28 @@ func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 	}
 	if !strings.Contains(msg.Err.Error(), "no git remotes found") {
 		t.Errorf("Err = %v, want the source's error", msg.Err)
+	}
+}
+
+// A repository the cursor moved past can still fail after the move: with
+// 20-50 rows in the sidebar this is routine, not rare. Its failure must not
+// reach the row now on screen -- neither the full-screen error nor the
+// loading spinner the new row's own fetch is using.
+func TestAStaleFetchFailureIsDropped(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(key("h"))
+	m, cmd := m.Update(key("j")) // now on kukv/koto, loading its own fetch
+	if cmd == nil || !m.loading[tabPRs] {
+		t.Fatal("setup: moving the sidebar should have started a new fetch")
+	}
+	stale := m.gen - 1 // the generation kukv/octoscope's own fetch started in
+	m, cmd = m.Update(errMsg{gen: stale, err: errors.New("gh pr: repository not found")})
+	if cmd != nil {
+		t.Errorf("a stale error produced a cmd = %v, want nil", cmd)
+	}
+	if !m.loading[tabPRs] {
+		t.Error("a stale error cleared the loading of the row now on screen")
 	}
 }
 
@@ -374,7 +394,7 @@ func TestTheSelectedRefCarriesTheRepositoryName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
 			m := sized(New(f, Options{Current: "kukv/demo"}), 120)
-			m, _ = m.Update(prListMsg{repo: "kukv/demo", prs: f.prs})
+			m, _ = m.Update(prListMsg{prs: f.prs})
 			if tt.toIssues {
 				var cmd tea.Cmd
 				m, cmd = m.Update(key("tab"))
@@ -463,7 +483,7 @@ func TestRefreshWithNoRowsFetchesNothing(t *testing.T) {
 func TestRefreshThenTabSwitchClearsCorrectLoading(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
-	m, _ = m.Update(issueListMsg{repo: m.selectedRepo(), issues: f.issues}) // Issues tab already loaded once before
+	m, _ = m.Update(issueListMsg{issues: f.issues}) // Issues tab already loaded once before
 
 	m, refreshCmd := m.Update(key("r")) // refresh PRs; fetch is still "in flight"
 	if refreshCmd == nil {
@@ -611,6 +631,24 @@ func TestCountsMatchByPositionAndTakeTheResolvedName(t *testing.T) {
 	}
 }
 
+// RepoCounts usually answers before the fetch it raced against does: a
+// settings file spelled "KUKV/Octoscope" gets rewritten to GitHub's own
+// spelling before that fetch's own prListMsg lands. Matching by name would
+// drop that answer and leave the spinner stuck; matching by generation does
+// not care what the row is called.
+func TestRenamedRowDoesNotStrandAPendingFetch(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := New(f, Options{Repositories: []string{"KUKV/Octoscope"}})
+	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
+	if m.rows[0].name != "kukv/octoscope" {
+		t.Fatalf("setup: row name = %q, want the resolved spelling", m.rows[0].name)
+	}
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	if m.loading[tabPRs] {
+		t.Error("the spinner is stuck: the answer was dropped because the row's name changed under it")
+	}
+}
+
 // A shorter or longer answer than there are rows must not panic.
 func TestCountsOfADifferentLengthAreIgnored(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
@@ -725,7 +763,8 @@ func TestAnAnswerForAnotherRepositoryIsDropped(t *testing.T) {
 	m := sidebarModel(f, 120)
 	m, _ = m.Update(key("h"))
 	m, _ = m.Update(key("j")) // now on kukv/koto
-	m, _ = m.Update(prListMsg{repo: "kukv/octoscope", prs: samplePRs()})
+	stale := m.gen - 1        // the generation kukv/octoscope's own fetch started in
+	m, _ = m.Update(prListMsg{gen: stale, prs: samplePRs()})
 	if strings.Contains(m.View(), "first pr") {
 		t.Errorf("a stale answer was shown:\n%s", m.View())
 	}
@@ -739,7 +778,7 @@ func TestSelectedRefNamesTheSelectedRepository(t *testing.T) {
 	m, _ = m.Update(key("h"))
 	m, cmd := m.Update(key("j"))
 	drain(t, cmd)
-	m, _ = m.Update(prListMsg{repo: "kukv/koto", prs: samplePRs()})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: samplePRs()})
 	ref, ok := m.SelectedRef()
 	if !ok || ref.Repo != "kukv/koto" {
 		t.Errorf("ref = %+v, want kukv/koto", ref)

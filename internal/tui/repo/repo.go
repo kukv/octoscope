@@ -61,15 +61,18 @@ type ErrorMsg struct{ Err error }
 
 type (
 	prListMsg struct {
-		repo string
-		prs  []gh.PR
+		gen int
+		prs []gh.PR
 	}
 	issueListMsg struct {
-		repo   string
+		gen    int
 		issues []gh.Issue
 	}
 	repoCountsMsg []gh.RepoCount
-	errMsg        struct{ err error }
+	errMsg        struct {
+		gen int
+		err error
+	}
 )
 
 type tabID int
@@ -117,6 +120,14 @@ type Model struct {
 	loaded  [2]bool
 	loading [2]bool
 
+	// gen counts how many times selectRow has run. A fetch or the errMsg it
+	// can produce carries the generation it started in; Update drops one
+	// whose generation no longer matches, which is what a row the cursor has
+	// since left means. This does not depend on a repository's spelling, so
+	// it survives the rename repoCountsMsg can give the selected row and
+	// treats every fetch's failure the same way its success is treated.
+	gen int
+
 	// fetchedAt is when the shown list arrived. The rows carry relative
 	// times, and View must render the same string from the same state, so
 	// the clock is read here in Update rather than on every draw.
@@ -162,20 +173,21 @@ func (m Model) Current() string { return m.opts.Current }
 // replaced.
 func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.selected = i
+	m.gen++
 	m.prs, m.issues = nil, nil
 	m.loaded, m.cursors = [2]bool{}, [2]int{}
 	if len(m.rows) == 0 {
 		return m, nil
 	}
 	m.loading[m.tab] = true
-	return m, fetchList(m.src, m.tab, m.selectedRepo())
+	return m, fetchList(m.src, m.tab, m.selectedRepo(), m.gen)
 }
 
 func (m Model) Init() tea.Cmd {
 	if len(m.rows) == 0 {
 		return nil
 	}
-	return tea.Batch(m.spin.Tick, fetchList(m.src, m.tab, m.selectedRepo()), fetchCounts(m.src, m.rowNames()))
+	return tea.Batch(m.spin.Tick, fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
 // Refresh re-fetches the current tab. The parent calls it after an event
@@ -186,7 +198,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading[m.tab] = true
-	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo()), fetchCounts(m.src, m.rowNames()))
+	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
 // rowNames is the sidebar's repositories in their current spelling, in the
@@ -199,21 +211,21 @@ func (m Model) rowNames() []string {
 	return names
 }
 
-func fetchList(src Source, t tabID, repo string) tea.Cmd {
+func fetchList(src Source, t tabID, repo string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		if t == tabPRs {
 			prs, err := src.ListPRs(ctx, repo)
 			if err != nil {
-				return errMsg{err}
+				return errMsg{gen: gen, err: err}
 			}
-			return prListMsg{repo: repo, prs: prs}
+			return prListMsg{gen: gen, prs: prs}
 		}
 		issues, err := src.ListIssues(ctx, repo)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{gen: gen, err: err}
 		}
-		return issueListMsg{repo: repo, issues: issues}
+		return issueListMsg{gen: gen, issues: issues}
 	}
 }
 
@@ -224,16 +236,16 @@ func fetchCounts(src repoCounter, repos []string) tea.Cmd {
 	return func() tea.Msg {
 		counts, err := src.RepoCounts(context.Background(), repos)
 		if err != nil {
-			return repoCountsMsg(nil) // badges stay blank; the lists still work
+			return repoCountsMsg(nil) // badges fall back to the dash; the lists still work
 		}
 		return repoCountsMsg(counts)
 	}
 }
 
-func openWeb(src Source, url string) tea.Cmd {
+func openWeb(src Source, url string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
-			return errMsg{err}
+			return errMsg{gen: gen, err: err}
 		}
 		return nil
 	}
@@ -268,7 +280,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case prListMsg:
 		// A fetch started for a row the cursor has since left must not land
 		// under the row now selected.
-		if msg.repo != m.selectedRepo() {
+		if msg.gen != m.gen {
 			return m, nil
 		}
 		m.prs = msg.prs
@@ -280,7 +292,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading[tabPRs] = false
 		return m, nil
 	case issueListMsg:
-		if msg.repo != m.selectedRepo() {
+		if msg.gen != m.gen {
 			return m, nil
 		}
 		m.issues = msg.issues
@@ -292,6 +304,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading[tabIssues] = false
 		return m, nil
 	case errMsg:
+		// Symmetric with prListMsg/issueListMsg above: a row the cursor has
+		// left can still fail, and its failure must not touch the row now on
+		// screen -- neither its loading spinner nor the full-screen error.
+		if msg.gen != m.gen {
+			return m, nil
+		}
 		m.loading[m.tab] = false
 		err := msg.err
 		return m, func() tea.Msg { return ErrorMsg{err} }
@@ -351,7 +369,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		if url, ok := m.selectedURL(); ok {
-			return m, openWeb(m.src, url)
+			return m, openWeb(m.src, url, m.gen)
 		}
 		return m, nil
 	case "d":
