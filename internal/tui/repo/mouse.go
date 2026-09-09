@@ -63,7 +63,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 // scrolled into view for drawing. ok is false above the list, in the gap
 // under the heading, and past the last repository.
 func (m Model) sidebarRowAt(y int) (int, bool) {
-	if y < sidebarTop {
+	if y < sidebarTop || y >= sidebarTop+m.sidebarRows() {
 		return 0, false
 	}
 	row := y - sidebarTop + m.sidebarWindow()

@@ -168,6 +168,27 @@ func TestSubTabHitTestIsOffsetByTheSidebar(t *testing.T) {
 	}
 }
 
+// A click below the last drawn repository must not select one: sidebarRowAt
+// maps it onto a row past the screen (the footer, or further), and only
+// sidebarRows() of the list are ever drawn.
+func TestClickingBelowTheDrawnSidebarRowsSelectsNothing(t *testing.T) {
+	var many []string
+	for i := range 50 {
+		many = append(many, fmt.Sprintf("kukv/repo-%02d", i))
+	}
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Repositories: many}), 120)
+	m, _ = m.Update(prListMsg{repo: m.selectedRepo(), prs: f.prs})
+
+	m, cmd := m.Update(click(2, sidebarTop+m.sidebarRows()))
+	if cmd != nil {
+		t.Errorf("clicking below the drawn rows produced a command")
+	}
+	if m.selected != 0 {
+		t.Errorf("selected = %d, want the click below the drawn rows to change nothing", m.selected)
+	}
+}
+
 // The wheel moves whichever pane the pointer is over.
 func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
