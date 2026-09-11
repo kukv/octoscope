@@ -1,23 +1,14 @@
-# The Work board in one request: four aliased searches over one shared
-# selection. The aliases are the keys ListWork reads back, so they have to
-# match the ones listed in workSearches.
+# One column of the Work board. The search string is the caller's: the four
+# columns differ only in that, and sending them together is what made GitHub
+# stop answering.
 #
 # reviewDecision and isDraft are GraphQL-only: REST does not expose them
 # (spec 3.3).
 #
 # search is not paged: GitHub's search connection returns at most 1000
 # results however it is paged, well past what a 50-card column shows anyway.
-query {
-  reviewRequested: search(type: ISSUE, first: 50, query: "is:open is:pr review-requested:@me") {
-    nodes { ...WorkItem }
-  }
-  yourPRs: search(type: ISSUE, first: 50, query: "is:open is:pr author:@me") {
-    nodes { ...WorkItem }
-  }
-  assigned: search(type: ISSUE, first: 50, query: "is:open assignee:@me") {
-    nodes { ...WorkItem }
-  }
-  mentioned: search(type: ISSUE, first: 50, query: "is:open mentions:@me") {
+query ($search: String!) {
+  results: search(type: ISSUE, first: 50, query: $search) {
     nodes { ...WorkItem }
   }
 }

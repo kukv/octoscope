@@ -13,22 +13,20 @@ import (
 //go:embed work.graphql
 var workQuery string
 
-// workSearches maps each board column to the GraphQL alias that carries it
-// in work.graphql. The query text lives in that file; nothing here builds
-// it, so there is no string to keep escaped.
-var workSearches = []struct {
-	section gh.WorkSection
-	alias   string
-}{
-	{gh.SectionReviewRequested, "reviewRequested"},
-	{gh.SectionYourPRs, "yourPRs"},
-	{gh.SectionAssigned, "assigned"},
-	{gh.SectionMentioned, "mentioned"},
+// workSearches is each column's GitHub search. The strings are fixed text,
+// not user input: they are the definition of what the column means.
+var workSearches = [gh.WorkSectionCount]string{
+	gh.SectionReviewRequested: "is:open is:pr review-requested:@me",
+	gh.SectionYourPRs:         "is:open is:pr author:@me",
+	gh.SectionAssigned:        "is:open assignee:@me",
+	gh.SectionMentioned:       "is:open mentions:@me",
 }
 
 type workResponse struct {
-	Data map[string]struct {
-		Nodes []searchNode `json:"nodes"`
+	Data struct {
+		Results struct {
+			Nodes []searchNode `json:"nodes"`
+		} `json:"results"`
 	} `json:"data"`
 }
 
@@ -85,31 +83,32 @@ func (n checkNode) name() string {
 	return n.Name
 }
 
-// ListWork fetches every column of the Work board in one GraphQL request.
-func (c *Client) ListWork(ctx context.Context) (gh.Work, error) {
-	// The four search strings here are fixed text embedded at build time, not
-	// data that varies per call (unlike RepoCounts' per-repository names). An
-	// "errors" array therefore means the document itself is broken, not that
-	// one column failed for reasons specific to it -- there is no partial
-	// body worth salvaging, so bail out.
-	out, err := c.read(ctx, c.dir, "api", "graphql", "-f", "query="+workQuery)
+// ListWorkSection fetches one column of the Work board. The document itself
+// travels as gh's own "query" parameter, so the column's search string has to
+// go under a different name.
+func (c *Client) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+	if s < 0 || int(s) >= len(workSearches) {
+		return nil, fmt.Errorf("unknown work section %d", s)
+	}
+	// The search string is fixed text embedded at build time, not data that
+	// varies per call (unlike RepoCounts' per-repository names). An "errors"
+	// array therefore means the document itself is broken -- there is no
+	// partial body worth salvaging, so bail out.
+	out, err := c.read(ctx, c.dir, "api", "graphql",
+		"-f", "query="+workQuery, "-f", "search="+workSearches[s])
 	if err != nil {
-		return gh.Work{}, err
+		return nil, err
 	}
 	var resp workResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
-		return gh.Work{}, fmt.Errorf("parse work search: %w", err)
+		return nil, fmt.Errorf("parse work search: %w", err)
 	}
-	var w gh.Work
-	for _, s := range workSearches {
-		nodes := resp.Data[s.alias].Nodes
-		items := make([]gh.WorkItem, 0, len(nodes))
-		for _, n := range nodes {
-			items = append(items, n.toWorkItem())
-		}
-		w[s.section] = items
+	nodes := resp.Data.Results.Nodes
+	items := make([]gh.WorkItem, 0, len(nodes))
+	for _, n := range nodes {
+		items = append(items, n.toWorkItem())
 	}
-	return w, nil
+	return items, nil
 }
 
 func (n searchNode) toWorkItem() gh.WorkItem {

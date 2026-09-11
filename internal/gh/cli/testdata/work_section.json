@@ -1,0 +1,129 @@
+{
+  "data": {
+    "results": {
+      "nodes": [
+        {
+          "__typename": "Issue",
+          "number": 121,
+          "title": "safe-chain ジョブが pnpm ストアキャッシュにより実効的な検査を行えていない",
+          "url": "https://github.com/bright-room/uniso/issues/121",
+          "updatedAt": "2026-06-24T16:48:35Z",
+          "bodyText": "概要\n.github/workflows/security-check.yml の safe-chain ジョブは Aikido Safe Chain で pnpm install を監視する想定だが、actions/setup-node@v6 の cache: pnpm によりストアが復元されるため、実際の registry ダウンロードが 0 件となり safe-chain の検査が走らない状態になっている。\n確認した挙動\nPR #120 マージ後の safe-chain ジョブログ抜粋:\nSetting up shell aliases. This will wrap safe-chain around npm, npx, yarn, pnpm, pnpx, ...\nCreated 17 Unix shim(s) in /home/runner/.safe-chain/shims\nAdded shims directory to GITHUB_PATH for GitHub Actions.\n\n→ shim 自体は正しく仕込まれており、以降の pnpm 呼び出しは safe-chain 経由になる。\nしかしその直後の pnpm install --frozen-lockfile の結果:\nProgress: resolved 562, reused 562, downloaded 0, added 562, done\n\n→ downloaded 0 で 562 パッケージ全てがキャッシュから再利用され、safe-chain がフックする HTTP ダウンロードが発生しなかった。結果として Safe-chain: 由来の検査ログも出力されていない。\n影響\n\nジョブとしては success になるが、サプライチェーン攻撃検知という本来の目的を果たせていない\npnpm-lock.yaml に新規パッケージが追加された場合のみ偶発的に検査が走る\n既存依存に対する悪意ある新バージョン公開などはキャッシュヒット時に検出できない\n\n提案する対応\nsafe-chain ジョブだけ pnpm ストアキャッシュを無効化し、毎回 registry から取得して safe-chain に検査させる。\n具体策としては composite action .github/actions/setup-node-pnpm/action.yml に cache 入力を追加し、actions/setup-node@v6 の cache: pnpm 指定を条件分岐させる。safe-chain ジョブからは cache: 'false' を渡す:\n- uses: ./.github/actions/setup-node-pnpm\n  with:\n    install-dependencies: 'false'\n    cache: 'false'\n他ジョブ (ci.yml / vulnerability-audit / glassworm-detection 等) は従来どおりキャッシュ利用で問題ない。\n参考\n\nPR #120 (本問題が判明した修正)\n関連ファイル: .github/workflows/security-check.yml, .github/actions/setup-node-pnpm/action.yml",
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "bright-room/uniso"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 17,
+          "title": "feat: implement-plan スキルにサブエージェント並列実装を導入",
+          "url": "https://github.com/bright-room/br-claude-plugins/pull/17",
+          "isDraft": false,
+          "updatedAt": "2026-03-30T02:50:42Z",
+          "bodyText": "概要\nimplement-plan スキルの Step 4（コード実装）を、Haiku サブエージェントによる並列実装方式に変更。メインエージェントのトークン消費を削減し、5時間の利用制限内での実行効率を向上させる。\n変更内容\n\nStep 4.1 タスク分解: メインエージェントがプランを分析し、依存関係を考慮した実行バッチとワークパッケージ（サブエージェントへの自己完結的な指示書）を生成\nStep 4.2 並列実装: Haiku サブエージェントがバッチ単位で並列にコードを実装\nStep 4.3 検証・統合: メインエージェントがサブエージェントの出力を検証・統合（衝突チェック、整合性確認）\nStep 4.4 繰り返し: 全 Phase を順に処理\n小規模プラン最適化: Step が3つ以下の場合はサブエージェント分解をスキップし直接実装（オーバーヘッド回避）\nStep 5 追記: ビルドエラーの機械的修正もサブエージェントにディスパッチ可能に\n\n設計方針\n\nサブエージェントには定量的（機械的・明確な仕様がある）な作業のみを委譲\n設計判断が必要な作業はメインエージェントが実施\nワークパッケージは自己完結的に作成し、サブエージェントがコードベース探索を行わなくて済むようにする\n同一ファイルを同一バッチ内の複数サブエージェントに割り当てない制約で競合を防止\n\n期待される効果\nコスト削減（推定: 6ファイル×150行の実装タスク）\n\n\n\nメインモデル\nコスト削減率\nメインモデルの入力トークン削減\nメインモデルの出力トークン削減\n\n\n\n\nSonnet\n~34%\n~51%\n~58%\n\n\nOpus\n~77%\n~51%\n~58%\n\n\n\nファイル数別の削減率（Sonnet メイン）\n\n\n\nファイル数\n削減率\n備考\n\n\n\n\n2-3\n+7%（増加）\nオーバーヘッドが上回る → スキップ閾値で直接実装\n\n\n4\n-18%\n効果出始め\n\n\n6\n-34%\n標準的な効果\n\n\n10\n-46%\n大規模タスクで最大効果\n\n\n\n実装速度の向上\n依存関係のないファイルを並列実装できるため、ファイル数が多いほど速度向上の恩恵が大きい。\n変更前: [file1] → [file2] → [file3] → [file4] → [file5] → [file6]\n\n変更後: [file1] [file2] [file3]  →  [file4] [file5] [file6]\n        ~~~~~ 並列 ~~~~~            ~~~~~ 並列 ~~~~~\n\nただし、タスク分解（Step 4.1）と検証・統合（Step 4.3）のオーバーヘッドがあるため、小規模タスクでは効果が限定的。\n\n\n\nファイル数\n速度向上の目安\n\n\n\n\n2-3\n変わらないか微増\n\n\n4-6\n30-50%短縮\n\n\n8-10\n50-60%短縮\n\n\n\n🤖 Generated with Claude Code\nhttps://claude.ai/code/session_01Eiz6GELCc73Z7ECWsBzAK3",
+          "reviewDecision": null,
+          "headRefName": "claude/parallel-code-generation-0gQM4",
+          "baseRefName": "main",
+          "additions": 58,
+          "deletions": 12,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "bright-room/br-claude-plugins"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "Issue",
+          "number": 113,
+          "title": "Ansible 2.24に向けた ansible_facts 参照形式への修正",
+          "url": "https://github.com/kukv/wsl-setup/issues/113",
+          "updatedAt": "2026-01-26T02:22:41Z",
+          "bodyText": "概要\nAnsibleの実行ログにて、将来のバージョン（ansible-core 2.24）で廃止予定の「ファクトの自動変数注入（INJECT_FACTS_AS_VARS）」に関する警告が出力されています。 これに対応するため、該当箇所の変数参照を推奨される形式に修正します。\n発生している警告\n[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.\n\n修正対象ファイル\nansible/roles/dev_setup/tasks/install_mise.yaml (54行目付近)\n修正内容\nansible_env などのトップレベル変数を直接参照せず、ansible_facts 辞書から取得するように変更します。\n修正前:\nenvironment:\n  PATH: \"{{ mise_bin | dirname }}:{{ ansible_env.PATH }}\"\n修正後（推奨）:\nenvironment:\n  PATH: \"{{ mise_bin | dirname }}:{{ ansible_facts['env']['PATH'] }}\"\n参考\nAnsible 2.24 以降、トップレベルのファクト（ansible_で始まる変数）は自動的にインジェクトされなくなるため、ansible_facts[\"xxx\"] 形式での記述が必須となります。",
+          "author": {
+            "login": "nonaka-koki"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/wsl-setup"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 63,
+          "title": "TODOアプリのバックエンドをリファクタリング",
+          "url": "https://github.com/kukv/todo-app/pull/63",
+          "isDraft": true,
+          "updatedAt": "2025-10-13T15:33:02Z",
+          "bodyText": "",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "refactor-todo-api",
+          "baseRefName": "main",
+          "additions": 1407,
+          "deletions": 287,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/todo-app"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "check-lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "check-migration",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "check-test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

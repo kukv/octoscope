@@ -49,7 +49,7 @@ type lister interface {
 // takes: unlike lister's operations, none of these are "the contents of one
 // named repository".
 type crossRepoLister interface {
-	ListWork(ctx context.Context) (gh.Work, error)
+	ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)
 	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
 }
 
@@ -211,7 +211,25 @@ func (u *Usecase) EditAssignees(ref gh.ItemRef, add, remove []string) error {
 	return u.assignees.EditIssueAssignees(ref.Repo, ref.Number, add, remove)
 }
 
-func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) { return u.crossRepo.ListWork(ctx) }
+func (u *Usecase) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+	return u.crossRepo.ListWorkSection(ctx, s)
+}
+
+// ListWork fills the whole board one column at a time. It is what keeps the
+// board compiling while it still expects the four columns to arrive
+// together; the next change has the board ask for them one by one and this
+// goes away.
+func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) {
+	var w gh.Work
+	for _, s := range gh.WorkSections() {
+		items, err := u.crossRepo.ListWorkSection(ctx, s)
+		if err != nil {
+			return gh.Work{}, err
+		}
+		w[s] = items
+	}
+	return w, nil
+}
 
 func (u *Usecase) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
 	return u.crossRepo.RepoCounts(ctx, repos)

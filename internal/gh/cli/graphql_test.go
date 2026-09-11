@@ -14,58 +14,106 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 )
 
-const workJSON = `{"data":{
-  "reviewRequested":{"nodes":[
-    {"__typename":"PullRequest","number":12,"title":"fix the thing",
-     "url":"https://github.com/kukv/octoscope/pull/12","isDraft":false,
-     "updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"REVIEW_REQUIRED",
-     "author":{"login":"someone"},
-     "repository":{"nameWithOwner":"kukv/octoscope"},
-     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
-        {"__typename":"CheckRun","conclusion":"SUCCESS","status":"COMPLETED"},
-        {"__typename":"CheckRun","conclusion":"","status":"IN_PROGRESS"},
-        {"__typename":"CheckRun","conclusion":"FAILURE","status":"COMPLETED"}
-     ]}}}}]}}
-  ]},
-  "yourPRs":{"nodes":[]},
-  "assigned":{"nodes":[
-    {"__typename":"Issue","number":7,"title":"an issue",
-     "url":"https://github.com/kukv/octoscope/issues/7",
-     "updatedAt":"2026-09-05T12:00:00Z","author":{"login":"kukv"},
-     "repository":{"nameWithOwner":"kukv/octoscope"}}
-  ]},
-  "mentioned":{"nodes":[]}
-}}`
+const workJSON = `{"data":{"results":{"nodes":[
+  {"__typename":"PullRequest","number":12,"title":"fix the thing",
+   "url":"https://github.com/kukv/octoscope/pull/12","isDraft":false,
+   "updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"REVIEW_REQUIRED",
+   "author":{"login":"someone"},
+   "repository":{"nameWithOwner":"kukv/octoscope"},
+   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+      {"__typename":"CheckRun","conclusion":"SUCCESS","status":"COMPLETED"},
+      {"__typename":"CheckRun","conclusion":"","status":"IN_PROGRESS"},
+      {"__typename":"CheckRun","conclusion":"FAILURE","status":"COMPLETED"}
+   ]}}}}]}},
+  {"__typename":"Issue","number":7,"title":"an issue",
+   "url":"https://github.com/kukv/octoscope/issues/7",
+   "updatedAt":"2026-09-05T12:00:00Z","author":{"login":"kukv"},
+   "repository":{"nameWithOwner":"kukv/octoscope"}}
+]}}}`
 
-func TestListWorkBuildsOneGraphQLRequest(t *testing.T) {
+const emptyColumnJSON = `{"data":{"results":{"nodes":[]}}}`
+
+// One request per column, each carrying only its own search string. Four
+// searches in one request is what made GitHub's front end stop answering.
+func TestListWorkSectionSendsOneSearch(t *testing.T) {
 	t.Parallel()
 
-	var got []string
 	c := New("/tmp", "")
+	var got []string
 	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		got = args
-		return []byte(workJSON), nil
+		return []byte(emptyColumnJSON), nil
 	}
 
-	if _, err := c.ListWork(context.Background()); err != nil {
-		t.Fatalf("ListWork: %v", err)
+	if _, err := c.ListWorkSection(context.Background(), gh.SectionAssigned); err != nil {
+		t.Fatalf("ListWorkSection: %v", err)
 	}
 
 	if len(got) < 2 || got[0] != "api" || got[1] != "graphql" {
 		t.Fatalf("got args %v, want them to start with api graphql", got)
 	}
-	query := flagValue(t, got, "-f")
-	for _, want := range []string{
-		"review-requested:@me", "author:@me", "assignee:@me", "mentions:@me",
-		"reviewDecision", "statusCheckRollup",
-	} {
-		if !strings.Contains(query, want) {
-			t.Errorf("query is missing %q:\n%s", want, query)
+	joined := strings.Join(got, " ")
+	if n := strings.Count(joined, "search("); n != 1 {
+		t.Errorf("the document holds %d searches, want 1:\n%s", n, joined)
+	}
+	if !strings.Contains(joined, "assignee:@me") {
+		t.Errorf("the assigned column's search string is missing:\n%s", joined)
+	}
+	if strings.Contains(joined, "review-requested:@me") {
+		t.Errorf("another column's search string came along:\n%s", joined)
+	}
+	for _, want := range []string{"reviewDecision", "statusCheckRollup"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("the document is missing %q:\n%s", want, joined)
 		}
 	}
 }
 
-func TestListWorkTranslatesToDomainValues(t *testing.T) {
+// Every column has to be reachable, and each has to send its own search.
+func TestEverySectionHasItsOwnSearch(t *testing.T) {
+	t.Parallel()
+
+	seen := map[string]gh.WorkSection{}
+	for _, s := range gh.WorkSections() {
+		c := New("/tmp", "")
+		var search string
+		c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			for _, a := range args {
+				if strings.HasPrefix(a, "search=") {
+					search = a
+				}
+			}
+			return []byte(emptyColumnJSON), nil
+		}
+		if _, err := c.ListWorkSection(context.Background(), s); err != nil {
+			t.Fatalf("section %d: %v", s, err)
+		}
+		if search == "" {
+			t.Fatalf("section %d sent no search variable", s)
+		}
+		if prev, dup := seen[search]; dup {
+			t.Errorf("sections %d and %d send the same search %q", prev, s, search)
+		}
+		seen[search] = s
+	}
+}
+
+// A section outside the board is a bug in the caller, not a search GitHub
+// should be asked to run.
+func TestListWorkSectionRejectsASectionTheBoardDoesNotHave(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		t.Error("an unknown section was sent to gh")
+		return []byte(emptyColumnJSON), nil
+	}
+	if _, err := c.ListWorkSection(context.Background(), gh.WorkSectionCount); err == nil {
+		t.Error("ListWorkSection accepted a section the board does not have")
+	}
+}
+
+func TestListWorkSectionTranslatesToDomainValues(t *testing.T) {
 	t.Parallel()
 
 	c := New("/tmp", "")
@@ -73,16 +121,15 @@ func TestListWorkTranslatesToDomainValues(t *testing.T) {
 		return []byte(workJSON), nil
 	}
 
-	w, err := c.ListWork(context.Background())
+	items, err := c.ListWorkSection(context.Background(), gh.SectionReviewRequested)
 	if err != nil {
-		t.Fatalf("ListWork: %v", err)
+		t.Fatalf("ListWorkSection: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("the column holds %d items, want 2", len(items))
 	}
 
-	rr := w[gh.SectionReviewRequested]
-	if len(rr) != 1 {
-		t.Fatalf("review requested holds %d items, want 1", len(rr))
-	}
-	item := rr[0]
+	item := items[0]
 	if item.Ref.Kind != gh.ItemPR {
 		t.Errorf("kind: got %v, want ItemPR", item.Ref.Kind)
 	}
@@ -100,16 +147,12 @@ func TestListWorkTranslatesToDomainValues(t *testing.T) {
 		t.Errorf("checks state: got %v, want CheckFailure", item.Checks.State)
 	}
 
-	assigned := w[gh.SectionAssigned]
-	if len(assigned) != 1 || assigned[0].Ref.Kind != gh.ItemIssue {
-		t.Fatalf("assigned column: got %+v, want one issue", assigned)
-	}
-	if n := len(w[gh.SectionYourPRs]); n != 0 {
-		t.Errorf("your PRs holds %d items, want 0", n)
+	if items[1].Ref.Kind != gh.ItemIssue {
+		t.Errorf("second item: got %v, want ItemIssue", items[1].Ref.Kind)
 	}
 }
 
-func TestListWorkReportsAFailure(t *testing.T) {
+func TestListWorkSectionReportsAFailure(t *testing.T) {
 	t.Parallel()
 
 	c := New("/tmp", "")
@@ -117,62 +160,54 @@ func TestListWorkReportsAFailure(t *testing.T) {
 		return []byte("not json"), nil
 	}
 
-	if _, err := c.ListWork(context.Background()); err == nil {
-		t.Error("ListWork accepted a body that is not JSON")
+	if _, err := c.ListWorkSection(context.Background(), gh.SectionAssigned); err == nil {
+		t.Error("ListWorkSection accepted a body that is not JSON")
 	}
 }
 
-func TestListWorkPropagatesRunError(t *testing.T) {
+func TestListWorkSectionPropagatesRunError(t *testing.T) {
 	t.Parallel()
 
-	wantErr := errors.New("gh api: HTTP 502")
+	wantErr := errors.New("gh api: no such host")
 	c := New("/tmp", "")
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		return nil, wantErr
 	}
 
-	w, err := c.ListWork(context.Background())
+	items, err := c.ListWorkSection(context.Background(), gh.SectionAssigned)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("err = %v, want %v", err, wantErr)
 	}
-	for _, s := range gh.WorkSections() {
-		if n := len(w[s]); n != 0 {
-			t.Errorf("section %v holds %d items, want 0", s, n)
-		}
+	if len(items) != 0 {
+		t.Errorf("the column holds %d items, want 0", len(items))
 	}
 }
 
 func TestChecksNoCommitsYieldsCheckNone(t *testing.T) {
 	t.Parallel()
 
-	const noRollupJSON = `{"data":{
-	  "reviewRequested":{"nodes":[
-	    {"__typename":"PullRequest","number":1,"title":"no checks yet",
-	     "url":"https://github.com/kukv/octoscope/pull/1","isDraft":false,
-	     "updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"",
-	     "author":{"login":"someone"},
-	     "repository":{"nameWithOwner":"kukv/octoscope"},
-	     "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}
-	  ]},
-	  "yourPRs":{"nodes":[]},
-	  "assigned":{"nodes":[]},
-	  "mentioned":{"nodes":[]}
-	}}`
+	const noRollupJSON = `{"data":{"results":{"nodes":[
+	  {"__typename":"PullRequest","number":1,"title":"no checks yet",
+	   "url":"https://github.com/kukv/octoscope/pull/1","isDraft":false,
+	   "updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"",
+	   "author":{"login":"someone"},
+	   "repository":{"nameWithOwner":"kukv/octoscope"},
+	   "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}
+	]}}}`
 
 	c := New("/tmp", "")
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		return []byte(noRollupJSON), nil
 	}
 
-	w, err := c.ListWork(context.Background())
+	items, err := c.ListWorkSection(context.Background(), gh.SectionReviewRequested)
 	if err != nil {
-		t.Fatalf("ListWork: %v", err)
+		t.Fatalf("ListWorkSection: %v", err)
 	}
-	rr := w[gh.SectionReviewRequested]
-	if len(rr) != 1 {
-		t.Fatalf("review requested holds %d items, want 1", len(rr))
+	if len(items) != 1 {
+		t.Fatalf("the column holds %d items, want 1", len(items))
 	}
-	if got := rr[0].Checks; !reflect.DeepEqual(got, gh.Checks{State: gh.CheckNone}) {
+	if got := items[0].Checks; !reflect.DeepEqual(got, gh.Checks{State: gh.CheckNone}) {
 		t.Errorf("checks = %+v, want zero counts with CheckNone", got)
 	}
 }
@@ -209,33 +244,28 @@ func TestCheckOutcome(t *testing.T) {
 func TestEachCheckKeepsItsOwnName(t *testing.T) {
 	t.Parallel()
 
-	const namedJSON = `{"data":{
-	  "reviewRequested":{"nodes":[
-	    {"__typename":"PullRequest","number":1,"title":"named checks",
-	     "url":"https://github.com/kukv/octoscope/pull/1","isDraft":false,
-	     "bodyText":"the body","updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"",
-	     "author":{"login":"someone"},
-	     "repository":{"nameWithOwner":"kukv/octoscope"},
-	     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
-	        {"__typename":"CheckRun","name":"build","conclusion":"SUCCESS","status":"COMPLETED"},
-	        {"__typename":"StatusContext","context":"ci/legacy","state":"FAILURE"}
-	     ]}}}}]}}
-	  ]},
-	  "yourPRs":{"nodes":[]},
-	  "assigned":{"nodes":[]},
-	  "mentioned":{"nodes":[]}
-	}}`
+	const namedJSON = `{"data":{"results":{"nodes":[
+	  {"__typename":"PullRequest","number":1,"title":"named checks",
+	   "url":"https://github.com/kukv/octoscope/pull/1","isDraft":false,
+	   "bodyText":"the body","updatedAt":"2026-09-06T12:00:00Z","reviewDecision":"",
+	   "author":{"login":"someone"},
+	   "repository":{"nameWithOwner":"kukv/octoscope"},
+	   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+	      {"__typename":"CheckRun","name":"build","conclusion":"SUCCESS","status":"COMPLETED"},
+	      {"__typename":"StatusContext","context":"ci/legacy","state":"FAILURE"}
+	   ]}}}}]}}
+	]}}}`
 
 	c := New("/tmp", "")
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		return []byte(namedJSON), nil
 	}
 
-	w, err := c.ListWork(context.Background())
+	items, err := c.ListWorkSection(context.Background(), gh.SectionReviewRequested)
 	if err != nil {
-		t.Fatalf("ListWork: %v", err)
+		t.Fatalf("ListWorkSection: %v", err)
 	}
-	item := w[gh.SectionReviewRequested][0]
+	item := items[0]
 	want := []gh.CheckRun{
 		{Name: "build", State: gh.CheckSuccess, Kind: gh.CheckKindRun},
 		{Name: "ci/legacy", State: gh.CheckFailure, Kind: gh.CheckKindStatus},
@@ -246,18 +276,6 @@ func TestEachCheckKeepsItsOwnName(t *testing.T) {
 	if item.Body != "the body" {
 		t.Errorf("body = %q, want the body the drawer shows", item.Body)
 	}
-}
-
-// flagValue returns the argument that follows the last occurrence of flag.
-func flagValue(t *testing.T, args []string, flag string) string {
-	t.Helper()
-	for i := len(args) - 2; i >= 0; i-- {
-		if args[i] == flag {
-			return args[i+1]
-		}
-	}
-	t.Fatalf("flag %q not found in %v", flag, args)
-	return ""
 }
 
 // querySelections is the query document with its comments stripped. A field
@@ -309,16 +327,14 @@ func TestTheQueryAsksForEveryFieldWeParse(t *testing.T) {
 	}
 }
 
-// TestTheQueryCarriesEveryAliasWeReadBack guards the other seam: ListWork
-// keys the columns by the aliases in workSearches, and a column whose alias
-// is absent from the document reads back empty rather than failing.
-func TestTheQueryCarriesEveryAliasWeReadBack(t *testing.T) {
+// TestTheQueryCarriesTheAliasWeReadBack guards the other seam:
+// ListWorkSection reads the column out of "results", and a document that
+// aliased the search differently would read back empty rather than failing.
+func TestTheQueryCarriesTheAliasWeReadBack(t *testing.T) {
 	t.Parallel()
 
-	for _, s := range workSearches {
-		if !strings.Contains(workQuery, s.alias+": search(") {
-			t.Errorf("the query has no search aliased %q", s.alias)
-		}
+	if !strings.Contains(workQuery, "results: search(") {
+		t.Errorf("the query has no search aliased %q:\n%s", "results", workQuery)
 	}
 }
 
@@ -358,10 +374,10 @@ func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
 	}
 }
 
-// A recording is the only way to know the four aliases the query declares
-// still match the keys the answer carries.
-func TestListWorkParsesARecordedResponse(t *testing.T) {
-	raw := readTestdata(t, "work.json")
+// A recording is the only way to know the alias the query declares still
+// matches the key the answer carries.
+func TestListWorkSectionParsesARecordedResponse(t *testing.T) {
+	raw := readTestdata(t, "work_section.json")
 
 	var doc struct {
 		Data map[string]json.RawMessage `json:"data"`
@@ -369,39 +385,39 @@ func TestListWorkParsesARecordedResponse(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
 		t.Fatalf("unmarshal recording: %v", err)
 	}
-	wantAliases := []string{"assigned", "mentioned", "reviewRequested", "yourPRs"}
 	gotAliases := make([]string, 0, len(doc.Data))
 	for k := range doc.Data {
 		gotAliases = append(gotAliases, k)
 	}
 	slices.Sort(gotAliases)
-	if !slices.Equal(gotAliases, wantAliases) {
-		t.Errorf("recorded aliases = %v, want %v", gotAliases, wantAliases)
+	if !slices.Equal(gotAliases, []string{"results"}) {
+		t.Errorf("recorded aliases = %v, want [results]", gotAliases)
 	}
 
 	c, _ := newTestClient(raw, nil)
-	w, err := c.ListWork(t.Context())
+	items, err := c.ListWorkSection(t.Context(), gh.SectionAssigned)
 	if err != nil {
-		t.Fatalf("ListWork: %v", err)
+		t.Fatalf("ListWorkSection: %v", err)
 	}
-	total := 0
-	for _, section := range gh.WorkSections() {
-		total += len(w[section])
-	}
-	if total == 0 {
+	if len(items) == 0 {
 		t.Fatal("no work items parsed out of the recording")
 	}
-	for _, section := range gh.WorkSections() {
-		for _, item := range w[section] {
-			if item.Ref.Repo == "" {
-				t.Errorf("section %d: %q has no repo; the card cannot be opened", section, item.Title)
-			}
-			if item.Ref.Number == 0 {
-				t.Errorf("section %d: %q has no number", section, item.Title)
-			}
-			if item.URL == "" {
-				t.Errorf("section %d: %q has no url", section, item.Title)
-			}
+	kinds := map[gh.ItemKind]bool{}
+	for _, item := range items {
+		kinds[item.Ref.Kind] = true
+		if item.Ref.Repo == "" {
+			t.Errorf("%q has no repo; the card cannot be opened", item.Title)
 		}
+		if item.Ref.Number == 0 {
+			t.Errorf("%q has no number", item.Title)
+		}
+		if item.URL == "" {
+			t.Errorf("%q has no url", item.Title)
+		}
+	}
+	// The assigned column is the one recorded because it mixes the two
+	// shapes: a recording of pull requests alone never runs the Issue branch.
+	if !kinds[gh.ItemPR] || !kinds[gh.ItemIssue] {
+		t.Errorf("the recording holds only %v; it must exercise both branches", kinds)
 	}
 }
