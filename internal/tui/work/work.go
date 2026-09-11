@@ -4,6 +4,7 @@ package work
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -14,12 +15,18 @@ import (
 
 // Source is what the Work board needs from the GitHub layer.
 type Source interface {
-	ListWork(ctx context.Context) (gh.Work, error)
+	ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)
 }
 
 type (
-	workMsg gh.Work
-	errMsg  struct{ err error }
+	workMsg struct {
+		section gh.WorkSection
+		items   []gh.WorkItem
+	}
+	errMsg struct {
+		section gh.WorkSection
+		err     error
+	}
 )
 
 // OpenDetailMsg asks the parent to show the detail view for the selected card.
@@ -39,15 +46,19 @@ type Model struct {
 	src Source
 
 	width, height int
-	loading       bool
 	spin          spinner.Model
 	work          gh.Work
 	col, row      int
 
-	// fetchedAt is when the board's data arrived. The cards show relative
+	// loading is per column: each one is its own request, and they answer at
+	// very different speeds. A column still waiting draws a spinner where its
+	// cards will go rather than holding the whole board back.
+	loading [gh.WorkSectionCount]bool
+
+	// fetchedAt is when each column's data arrived. The cards show relative
 	// times, and View must render the same string from the same state, so the
 	// clock is read once in Update rather than on every draw.
-	fetchedAt time.Time
+	fetchedAt [gh.WorkSectionCount]time.Time
 
 	// cancel stops the in-flight fetch. The board is the one place where a
 	// request outlives the user's interest in it: they can switch tabs or ask
@@ -68,12 +79,22 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	m.Cancel()
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	m.loading = true
-	src := m.src
 	// The spinner ticks from here rather than from an Init the board does not
 	// have: the animation starts with the fetch it belongs to.
-	return m, tea.Batch(m.spin.Tick, func() tea.Msg {
-		w, err := src.ListWork(ctx)
+	cmds := []tea.Cmd{m.spin.Tick}
+	for _, s := range gh.WorkSections() {
+		m.loading[s] = true
+		cmds = append(cmds, fetchSection(ctx, m.src, s))
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// fetchSection asks for one column. The four columns share a context so one
+// Cancel still stops all of them, but they travel as four requests: asking
+// for all four in one is what made GitHub's front end stop answering.
+func fetchSection(ctx context.Context, src Source, s gh.WorkSection) tea.Cmd {
+	return func() tea.Msg {
+		items, err := src.ListWorkSection(ctx, s)
 		// A cancelled fetch is not a failure: the user refreshed, left the tab
 		// or quit. Bubble Tea drops a nil message, so the stale fetch reports
 		// nothing instead of an error screen. The context is what says so —
@@ -83,10 +104,10 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 			return nil
 		}
 		if err != nil {
-			return errMsg{err}
+			return errMsg{section: s, err: err}
 		}
-		return workMsg(w)
-	})
+		return workMsg{section: s, items: items}
+	}
 }
 
 // Cancel stops the in-flight fetch. The parent calls it when the user quits.
@@ -96,9 +117,13 @@ func (m Model) Cancel() {
 	}
 }
 
-// releaseFetch frees the context of the fetch that just landed, so a finished
-// request leaves nothing behind to cancel.
+// releaseFetch frees the context once every column has answered, so a
+// finished board leaves nothing behind to cancel. The four columns share the
+// context, so dropping it on the first answer would orphan the other three.
 func (m *Model) releaseFetch() {
+	if slices.Contains(m.loading[:], true) {
+		return
+	}
 	m.Cancel()
 	m.cancel = nil
 }
@@ -112,13 +137,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
 	case workMsg:
-		m.loading = false
+		m.loading[msg.section] = false
 		m.releaseFetch()
-		m.work = gh.Work(msg)
-		m.fetchedAt = time.Now()
+		m.work[msg.section] = msg.items
+		m.fetchedAt[msg.section] = time.Now()
 		m.clampCursor()
 	case errMsg:
-		m.loading = false
+		m.loading[msg.section] = false
 		m.releaseFetch()
 		err := msg.err
 		return m, func() tea.Msg { return ErrorMsg{err} }
@@ -212,7 +237,7 @@ type Summary struct {
 // Summary counts the board. Attention is what has been asked of the user;
 // Failing is every pull request whose checks are red, wherever it sits.
 func (m Model) Summary() Summary {
-	s := Summary{FetchedAt: m.fetchedAt, Ready: !m.loading && !m.fetchedAt.IsZero()}
+	s := Summary{FetchedAt: m.oldestFetch(), Ready: m.ready()}
 	s.Attention = len(m.work[gh.SectionReviewRequested])
 	for _, items := range m.work {
 		for _, it := range items {
@@ -222,6 +247,34 @@ func (m Model) Summary() Summary {
 		}
 	}
 	return s
+}
+
+// ready reports whether the age is worth showing. Until every column has
+// answered the number would describe part of a board, and a board missing a
+// column is not one the user should read an age off.
+func (m Model) ready() bool {
+	for _, at := range m.fetchedAt {
+		if at.IsZero() {
+			return false
+		}
+	}
+	return !slices.Contains(m.loading[:], true)
+}
+
+// oldestFetch is the age on screen: the age of the oldest thing on it. The
+// columns answer seconds apart, and naming the newest would claim the board
+// is fresher than what the user is looking at.
+func (m Model) oldestFetch() time.Time {
+	var oldest time.Time
+	for _, at := range m.fetchedAt {
+		if at.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || at.Before(oldest) {
+			oldest = at
+		}
+	}
+	return oldest
 }
 
 // SelectedRef names the card under the cursor. ok is false when the column is

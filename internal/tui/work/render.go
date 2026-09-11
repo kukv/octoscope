@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -52,9 +53,6 @@ func (m Model) View() string {
 	// and every budget below would go negative.
 	if m.width <= 0 {
 		return ""
-	}
-	if m.loading {
-		return clip(m.spin.View()+" "+i18n.T("common.loading"), m.width)
 	}
 
 	var lines []string
@@ -159,10 +157,17 @@ func (m Model) board(height int) []string {
 }
 
 // columnLines draws one column: its heading, then as many cards as the height
-// allows, starting from the offset that keeps the cursor in view.
+// allows, starting from the offset that keeps the cursor in view. A column
+// still waiting on its own request shows a spinner in the space its cards
+// will take, so the columns that have answered stay readable.
 func (m Model) columnLines(s gh.WorkSection, w, height int) []string {
 	items := m.work[s]
 	lines := []string{m.heading(s, len(items), w)}
+	if m.loading[s] {
+		// The spinner carries its own colour, so it is not wrapped in a style
+		// that would end at the spinner's own reset.
+		return append(lines, fit(gutter+m.spin.View()+" "+i18n.T("common.loading"), w))
+	}
 	if len(items) == 0 {
 		return append(lines, theme.Dim().Render(fit(gutter+i18n.T("work.empty_column"), w)))
 	}
@@ -173,7 +178,7 @@ func (m Model) columnLines(s gh.WorkSection, w, height int) []string {
 		last = min(first+m.visibleCards(height), len(items))
 	}
 	for i := first; i < last; i++ {
-		lines = append(lines, m.card(items[i], w, s == m.section() && i == m.row)...)
+		lines = append(lines, m.card(items[i], m.fetchedAt[s], w, s == m.section() && i == m.row)...)
 	}
 	return lines
 }
@@ -217,17 +222,17 @@ func (m Model) cardWindow(s gh.WorkSection, height int) int {
 // it is doing on the second. Wide enough, each card gets a box of its own and
 // the selection is the box's colour; narrow, the box is dropped and the cursor
 // gutter marks the selection instead.
-func (m Model) card(it gh.WorkItem, w int, selected bool) []string {
+func (m Model) card(it gh.WorkItem, at time.Time, w int, selected bool) []string {
 	if !m.boxed() {
 		return []string{
 			fit(m.cardTitle(it, w-len(gutter), selected, gutter), w),
-			fit(gutter+m.cardMeta(it, w-len(gutter)), w),
+			fit(gutter+m.cardMeta(it, at, w-len(gutter)), w),
 		}
 	}
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
-	body := m.cardTitle(it, inner, selected, "") + "\n" + m.cardMeta(it, inner)
+	body := m.cardTitle(it, inner, selected, "") + "\n" + m.cardMeta(it, at, inner)
 	return strings.Split(theme.Card(selected).Width(w).Render(body), "\n")
 }
 
@@ -250,14 +255,14 @@ func (m Model) cardTitle(it gh.WorkItem, w int, selected bool, marker string) st
 // doing, and how long it has sat there. The repository is named without its
 // owner — a column is too narrow for "owner/name", and the drawer gives the
 // full reference.
-func (m Model) cardMeta(it gh.WorkItem, w int) string {
+func (m Model) cardMeta(it gh.WorkItem, at time.Time, w int) string {
 	parts := []string{theme.Dim().Render(shortRepo(it.Ref.Repo))}
 	if bar := checksBar(it.Checks); bar != "" {
 		parts = append(parts, bar)
 	} else if word := reviewWord(it); word != "" {
 		parts = append(parts, word)
 	}
-	age := theme.Dim().Render(i18n.RelTime(m.fetchedAt, it.UpdatedAt))
+	age := theme.Dim().Render(i18n.RelTime(at, it.UpdatedAt))
 
 	// Labels are offered whatever the rest of the line has not already spent,
 	// so a badge is either drawn whole or left out. Measuring against the

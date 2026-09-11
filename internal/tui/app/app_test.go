@@ -29,25 +29,39 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work       gh.Work
-	prs        []gh.PR
-	pr         gh.PR
-	prErr      error
-	labels     []gh.Label
-	files      []gh.FileDiff
-	diffErr    error
-	checks     gh.Checks
-	checksErr  error
-	workCalls  int
-	prCalls    int
-	prRepos    []string
-	issueRepos []string
-	countCalls [][]string
+	work      gh.Work
+	prs       []gh.PR
+	pr        gh.PR
+	prErr     error
+	labels    []gh.Label
+	files     []gh.FileDiff
+	diffErr   error
+	checks    gh.Checks
+	checksErr error
+	// workSections is every board column that was asked for. The board makes
+	// one request per column now, so a refresh that dropped a column and one
+	// that did not are told apart by which columns were asked for, not by how
+	// many requests went out.
+	workSections []gh.WorkSection
+	prCalls      int
+	prRepos      []string
+	issueRepos   []string
+	countCalls   [][]string
 }
 
-func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
-	f.workCalls++
-	return f.work, nil
+func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+	f.workSections = append(f.workSections, s)
+	return f.work[s], nil
+}
+
+// refreshedTheBoard reports whether every column was asked for. A column left
+// out stays on screen as it was, which is what a refresh is meant to undo.
+func (f *fakeSource) refreshedTheBoard() bool {
+	seen := map[gh.WorkSection]bool{}
+	for _, s := range f.workSections {
+		seen[s] = true
+	}
+	return len(seen) == gh.WorkSectionCount
 }
 
 func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
@@ -502,8 +516,8 @@ func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	resolve(t, m, cmd)
 
-	if f.workCalls == 0 {
-		t.Error("the board was not refreshed after a submitted review")
+	if !f.refreshedTheBoard() {
+		t.Errorf("the board was not fully refreshed after a submitted review; asked for %v", f.workSections)
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a submitted review")
@@ -523,8 +537,8 @@ func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	resolve(t, m, cmd)
 
-	if f.workCalls == 0 {
-		t.Error("the board was not refreshed after a merge")
+	if !f.refreshedTheBoard() {
+		t.Errorf("the board was not fully refreshed after a merge; asked for %v", f.workSections)
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a merge")

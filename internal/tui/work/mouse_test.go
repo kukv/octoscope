@@ -52,7 +52,7 @@ func TestClickingACardSelectsIt(t *testing.T) {
 		for _, width := range []int{80, 120, 160} {
 			m := New(&fakeSource{work: alignedWork()})
 			m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-			m, _ = m.Update(workMsg(alignedWork()))
+			m = answered(m, alignedWork())
 
 			for i := range m.columns() {
 				token := fmt.Sprintf("title-%d", i)
@@ -191,7 +191,7 @@ func TestClickingACardInAScrolledColumn(t *testing.T) {
 	}
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
-	m, _ = m.Update(workMsg(w))
+	m = answered(m, w)
 	if !m.boxed() {
 		t.Fatal("the cards are not boxed at 120 columns; this test covers nothing")
 	}

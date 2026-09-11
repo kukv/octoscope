@@ -41,8 +41,10 @@ func goldenModel(width int) Model { return goldenBoard(overlongWork(), width, 40
 func goldenBoard(w gh.Work, width, height int) Model {
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
-	m, _ = m.Update(workMsg(w))
-	m.fetchedAt = goldenFetchedAt
+	m = answered(m, w)
+	for _, s := range gh.WorkSections() {
+		m.fetchedAt[s] = goldenFetchedAt
+	}
 	return m
 }
 
@@ -113,6 +115,31 @@ func TestGoldenIconSets(t *testing.T) {
 			icon.Use(set)
 			t.Cleanup(func() { icon.Use(icon.Unicode) })
 			golden.Assert(t, "work_icons_"+name, goldenModel(120).View())
+		})
+	}
+}
+
+// TestGoldenAPartiallyFilledBoard records the state the board spends its
+// first seconds in: one column has answered and the other three are still
+// waiting on requests of their own. 120 columns is the narrowest width that
+// still shows all four, which is the point of the recording.
+func TestGoldenAPartiallyFilledBoard(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		t.Run(lang.name, func(t *testing.T) {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+			m := New(&fakeSource{work: overlongWork()})
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+			m, _ = m.Refresh()
+			t.Cleanup(m.Cancel)
+
+			m, _ = m.Update(workMsg{
+				section: gh.SectionReviewRequested,
+				items:   overlongWork()[gh.SectionReviewRequested],
+			})
+			m.fetchedAt[gh.SectionReviewRequested] = goldenFetchedAt
+			golden.Assert(t, "work_partial_"+lang.name+"_120", m.View())
 		})
 	}
 }
