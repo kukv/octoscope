@@ -248,6 +248,22 @@ gh search repos lipgloss --limit 5 --json fullName,stargazersCount,isPrivate \
   > internal/gh/cli/testdata/search_repos.json
 ```
 
+## `own_repos.json`
+
+`ListOwnRepos` に対する実出力。録った日: 2026-09-11。**`gh repo list` は private
+リポジトリの名前も返すので、`jq` で公開ぶんだけに絞って先頭 5 件を残した。**
+これは秘密情報の除去であって、テストを通すための編集ではない。
+
+```bash
+gh repo list --limit 100 --json nameWithOwner,isPrivate \
+  | jq '[.[] | select(.isPrivate == false)][:5]' \
+  > internal/gh/cli/testdata/own_repos.json
+```
+
+`ListOrgs` の録画は置いていない。所属 Org 名そのものが伏せる対象であり、
+`--jq '[.[].login]'` が返すのは文字列の配列だけなので、テストはその形の
+リテラルを `c.run` から返せば足りる。
+
 ## `sample.diff`
 
 `git diff` 形式のパース用。unified diff の hunk ヘッダ、追加、削除、文脈行を含む。
