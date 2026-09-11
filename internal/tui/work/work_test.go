@@ -365,15 +365,15 @@ func TestRefreshCancelsThePreviousFetch(t *testing.T) {
 func TestRefreshMarksEveryColumnLoading(t *testing.T) {
 	m := New(&fakeSource{work: sampleWork()})
 	for _, s := range gh.WorkSections() {
-		if m.loading[s] {
-			t.Errorf("New returned column %d loading; the parent starts the first fetch", s)
+		if m.state[s] != colUnfetched {
+			t.Errorf("New returned column %d already in state %d; the parent starts the first fetch", s, m.state[s])
 		}
 	}
 	m, _ = m.Refresh()
 	t.Cleanup(m.Cancel)
 	for _, s := range gh.WorkSections() {
-		if !m.loading[s] {
-			t.Errorf("Refresh did not mark column %d loading", s)
+		if m.state[s] != colLoading {
+			t.Errorf("Refresh left column %d in state %d, want colLoading", s, m.state[s])
 		}
 	}
 
@@ -385,8 +385,8 @@ func TestRefreshMarksEveryColumnLoading(t *testing.T) {
 	}
 	m = answeredAll(m, sampleWork())
 	for _, s := range gh.WorkSections() {
-		if m.loading[s] {
-			t.Errorf("column %d is still loading after its data arrived", s)
+		if m.state[s] != colLoaded {
+			t.Errorf("column %d is in state %d after its data arrived, want colLoaded", s, m.state[s])
 		}
 	}
 	if m.cancel != nil {
@@ -404,8 +404,8 @@ func TestRKeyRefetchesTheBoard(t *testing.T) {
 		t.Fatal("r produced no command")
 	}
 	for _, s := range gh.WorkSections() {
-		if !m.loading[s] {
-			t.Errorf("r did not mark column %d loading", s)
+		if m.state[s] != colLoading {
+			t.Errorf("r left column %d in state %d, want colLoading", s, m.state[s])
 		}
 	}
 	for _, msg := range fetchMsgs(t, cmd) {
@@ -440,13 +440,28 @@ func TestAColumnIsDrawnBeforeTheOthersArrive(t *testing.T) {
 	}
 }
 
-// One column failing must not cost the other three.
+// One column failing must not cost the other three: not their cards, not the
+// clock their cards are dated by, and not the waiting they had already done.
 func TestAFailedColumnLeavesTheOthersAlone(t *testing.T) {
 	m := sized(New(&fakeSource{}))
+	m, _ = m.Refresh()
+	t.Cleanup(m.Cancel)
 	m, _ = m.Update(workMsg{section: gh.SectionAssigned, items: sampleItems()})
 	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
-	if view := ansi.Strip(m.View()); !strings.Contains(view, sampleItems()[0].Title) {
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, sampleItems()[0].Title) {
 		t.Errorf("a failure in one column emptied another:\n%s", view)
+	}
+	if m.state[gh.SectionAssigned] != colLoaded {
+		t.Errorf("the column that answered is in state %d, want colLoaded", m.state[gh.SectionAssigned])
+	}
+	if m.fetchedAt[gh.SectionAssigned].IsZero() {
+		t.Error("the column that answered lost the clock its cards are dated by")
+	}
+	// Only the two columns that have not answered yet are still waiting.
+	if got, want := strings.Count(view, i18n.T("common.loading")), gh.WorkSectionCount-2; got != want {
+		t.Errorf("%d columns are waiting, want %d:\n%s", got, want, view)
 	}
 }
 
@@ -463,6 +478,27 @@ func TestTheSummaryWaitsForEveryColumn(t *testing.T) {
 	m, _ = m.Update(workMsg{section: gh.WorkSections()[gh.WorkSectionCount-1], items: nil})
 	if !m.Summary().Ready {
 		t.Error("the summary never became ready")
+	}
+}
+
+// A refresh replaces the board, so the counts and the age stop describing
+// anything until the new answers arrive. Left ready, the tab row would go on
+// reporting an age for a board that is being thrown away.
+func TestARefreshMakesTheSummaryUnready(t *testing.T) {
+	m := answeredAll(sized(New(&fakeSource{work: sampleWork()})), sampleWork())
+	if !m.Summary().Ready {
+		t.Fatal("the summary was not ready to begin with; this test covers nothing")
+	}
+
+	m, _ = m.Refresh()
+	t.Cleanup(m.Cancel)
+	if m.Summary().Ready {
+		t.Error("the summary stayed ready through a refresh that has not answered yet")
+	}
+
+	m = answeredAll(m, sampleWork())
+	if !m.Summary().Ready {
+		t.Error("the summary never came back after the refresh answered")
 	}
 }
 

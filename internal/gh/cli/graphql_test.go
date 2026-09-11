@@ -69,32 +69,51 @@ func TestListWorkSectionSendsOneSearch(t *testing.T) {
 	}
 }
 
-// Every column has to be reachable, and each has to send its own search.
+// TestEverySectionHasItsOwnSearch pins what each column of the board means.
+// The search string is not an implementation detail the code happens to
+// build: "review requested" is defined by review-requested:@me and by
+// nothing else, and a column paired with the wrong one silently shows the
+// wrong work. Asserting only that the four differ leaves two of them free to
+// swap.
 func TestEverySectionHasItsOwnSearch(t *testing.T) {
 	t.Parallel()
 
-	seen := map[string]gh.WorkSection{}
-	for _, s := range gh.WorkSections() {
-		c := New("/tmp", "")
-		var search string
-		c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-			for _, a := range args {
-				if strings.HasPrefix(a, "search=") {
-					search = a
+	tests := []struct {
+		name    string
+		section gh.WorkSection
+		search  string
+	}{
+		{"review requested", gh.SectionReviewRequested, "is:open is:pr review-requested:@me"},
+		{"your PRs", gh.SectionYourPRs, "is:open is:pr author:@me"},
+		{"assigned", gh.SectionAssigned, "is:open assignee:@me"},
+		{"mentioned", gh.SectionMentioned, "is:open mentions:@me"},
+	}
+	// A column added without a line here would go untested rather than fail.
+	if len(tests) != gh.WorkSectionCount {
+		t.Fatalf("the table covers %d columns, the board has %d", len(tests), gh.WorkSectionCount)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := New("/tmp", "")
+			var search string
+			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				for _, a := range args {
+					if rest, ok := strings.CutPrefix(a, "search="); ok {
+						search = rest
+					}
 				}
+				return []byte(emptyColumnJSON), nil
 			}
-			return []byte(emptyColumnJSON), nil
-		}
-		if _, err := c.ListWorkSection(context.Background(), s); err != nil {
-			t.Fatalf("section %d: %v", s, err)
-		}
-		if search == "" {
-			t.Fatalf("section %d sent no search variable", s)
-		}
-		if prev, dup := seen[search]; dup {
-			t.Errorf("sections %d and %d send the same search %q", prev, s, search)
-		}
-		seen[search] = s
+			if _, err := c.ListWorkSection(context.Background(), tt.section); err != nil {
+				t.Fatalf("ListWorkSection: %v", err)
+			}
+			if search != tt.search {
+				t.Errorf("%s sends %q, want %q", tt.name, search, tt.search)
+			}
+		})
 	}
 }
 
@@ -309,7 +328,7 @@ func jsonNames(t reflect.Type) []string {
 }
 
 // TestTheQueryAsksForEveryFieldWeParse ties work.graphql to the structs
-// ListWork unmarshals into. A field the query stops selecting still parses,
+// ListWorkSection unmarshals into. A field the query stops selecting still parses,
 // as a zero value that looks like real data -- an empty title, a draft that
 // is never a draft -- and no other test notices.
 func TestTheQueryAsksForEveryFieldWeParse(t *testing.T) {

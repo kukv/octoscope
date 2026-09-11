@@ -42,6 +42,23 @@ type OpenChecksMsg struct{ Ref gh.ItemRef }
 // ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
+// colState is where one column stands. It is one value rather than a bool
+// per condition: "loading" and "answered" as two bools name four states of
+// which one is nonsense, and every reader would have to know which
+// (.claude/rules/tui.md).
+type colState uint8
+
+const (
+	colUnfetched colState = iota // nothing has been asked for yet
+	colLoading
+	colLoaded
+	colFailed
+)
+
+// answered reports whether the column has come back at all. A failure counts:
+// it is not coming back on its own, and the board cannot go on waiting for it.
+func (s colState) answered() bool { return s == colLoaded || s == colFailed }
+
 type Model struct {
 	src Source
 
@@ -50,16 +67,10 @@ type Model struct {
 	work          gh.Work
 	col, row      int
 
-	// loading is per column: each one is its own request, and they answer at
-	// very different speeds. A column still waiting draws a spinner where its
-	// cards will go rather than holding the whole board back.
-	loading [gh.WorkSectionCount]bool
-
-	// answered is whether each column has come back at all, a failure
-	// included. It is not fetchedAt's zero value: a column that failed has
-	// answered but has no time to report, and the tab row waits on the
-	// former while it dates itself by the latter.
-	answered [gh.WorkSectionCount]bool
+	// state is where each column stands. Each column is its own request and
+	// they answer at very different speeds, so the board is almost never in
+	// one state as a whole.
+	state [gh.WorkSectionCount]colState
 
 	// fetchedAt is when each column's data arrived. The cards show relative
 	// times, and View must render the same string from the same state, so the
@@ -89,11 +100,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	// have: the animation starts with the fetch it belongs to.
 	cmds := []tea.Cmd{m.spin.Tick}
 	for _, s := range gh.WorkSections() {
-		m.loading[s] = true
-		// A column that is loading has not answered this round. Today ready()
-		// also looks at loading, so nothing downstream can tell; the two are
-		// kept in step so that stays true of whatever reads them next.
-		m.answered[s] = false
+		m.state[s] = colLoading
 		cmds = append(cmds, fetchSection(ctx, m.src, s))
 	}
 	return m, tea.Batch(cmds...)
@@ -131,7 +138,7 @@ func (m Model) Cancel() {
 // finished board leaves nothing behind to cancel. The four columns share the
 // context, so dropping it on the first answer would orphan the other three.
 func (m *Model) releaseFetch() {
-	if slices.Contains(m.loading[:], true) {
+	if slices.Contains(m.state[:], colLoading) {
 		return
 	}
 	m.Cancel()
@@ -147,15 +154,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
 	case workMsg:
-		m.loading[msg.section] = false
-		m.answered[msg.section] = true
+		m.state[msg.section] = colLoaded
 		m.releaseFetch()
 		m.work[msg.section] = msg.items
 		m.fetchedAt[msg.section] = time.Now()
 		m.clampCursor()
 	case errMsg:
-		m.loading[msg.section] = false
-		m.answered[msg.section] = true
+		m.state[msg.section] = colFailed
 		m.releaseFetch()
 		err := msg.err
 		return m, func() tea.Msg { return ErrorMsg{err} }
@@ -262,12 +267,16 @@ func (m Model) Summary() Summary {
 }
 
 // ready reports whether the counts are worth showing. Until every column has
-// answered they would describe part of a board. A column that failed counts
-// as answered: it is not coming back on its own, and a tab row that stayed
-// blank for the rest of the session would report nothing about the three
-// columns that did arrive.
+// answered they would describe part of a board -- and a refresh puts every
+// column back to waiting, so the old counts do not outlive the board they
+// counted.
 func (m Model) ready() bool {
-	return !slices.Contains(m.answered[:], false) && !slices.Contains(m.loading[:], true)
+	for _, s := range m.state {
+		if !s.answered() {
+			return false
+		}
+	}
+	return true
 }
 
 // oldestFetch is the age on screen: the age of the oldest thing on it. The

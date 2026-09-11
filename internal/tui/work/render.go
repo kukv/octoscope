@@ -163,7 +163,7 @@ func (m Model) board(height int) []string {
 func (m Model) columnLines(s gh.WorkSection, w, height int) []string {
 	items := m.work[s]
 	lines := []string{m.heading(s, len(items), w)}
-	if m.loading[s] {
+	if m.state[s] == colLoading {
 		// The spinner carries its own colour, so it is not wrapped in a style
 		// that would end at the spinner's own reset.
 		return append(lines, fit(gutter+m.spin.View()+" "+i18n.T("common.loading"), w))
