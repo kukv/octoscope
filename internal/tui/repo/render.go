@@ -44,7 +44,7 @@ func (m Model) View() string {
 		lines = append(lines, m.summary()...)
 	}
 	if m.sidebarCols() > 0 {
-		lines = joinPanes(m.sidebar(), lines, sidebarWidth)
+		lines = layout.JoinPanes(m.sidebar(), lines, sidebarWidth)
 	}
 	lines = append(lines, "")
 	if n := m.noticeLine(); n != "" {

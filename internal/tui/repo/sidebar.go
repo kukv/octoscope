@@ -2,9 +2,6 @@ package repo
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -112,30 +109,4 @@ func (m Model) sidebar() []string {
 // counting the drawn lines a second time.
 func (m Model) addRowY() int {
 	return sidebarTop + min(m.sidebarRows(), len(m.rows)) + 1
-}
-
-// joinPanes puts the sidebar beside the body, padding whichever is shorter so
-// the rule runs the full height of the taller one.
-func joinPanes(left, right []string, leftWidth int) []string {
-	n := max(len(left), len(right))
-	out := make([]string, n)
-	for i := range n {
-		l, r := "", ""
-		if i < len(left) {
-			l = left[i]
-		}
-		if i < len(right) {
-			r = right[i]
-		}
-		out[i] = padExact(l, leftWidth) + theme.Rule().Render("│") + r
-	}
-	return out
-}
-
-// padExact pads s out to exactly w columns with no ellipsis. sidebar()
-// already fits every line to leftWidth; running it through layout.Pad here
-// would reserve Pad's usual one-column margin and clip a name that already
-// fits.
-func padExact(s string, w int) string {
-	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
 }
