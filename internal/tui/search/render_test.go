@@ -89,6 +89,22 @@ func TestAFullPageSaysItMayHaveBeenCutShort(t *testing.T) {
 	}
 }
 
+// The capped count is one catalogue string, not a number glued to a word cut
+// out of another one: a catalogue that put the unit first would silently lose
+// it.
+func TestTheCappedCountComesFromOneString(t *testing.T) {
+	t.Parallel()
+
+	m := sized(t, 120, make([]gh.WorkItem, searchCap))
+	view := m.View()
+	if !strings.Contains(view, "50+") {
+		t.Errorf("the capped count is missing:\n%s", view)
+	}
+	if strings.Contains(view, "50+  ") {
+		t.Errorf("the capped count has a hole where a word was cut out:\n%s", view)
+	}
+}
+
 // Under a hundred columns the filter pane folds away and the query and the
 // results take the whole width.
 func TestTheFilterPaneFoldsAwayWhenNarrow(t *testing.T) {
