@@ -308,6 +308,12 @@ func TestAFailureToOpenTheBrowserIsNotFatal(t *testing.T) {
 	if strings.Contains(view, i18n.T("notice.fetch_failed")) {
 		t.Errorf("the notice blames the fetch for the browser:\n%s", view)
 	}
+	// "no browser to open ..." is octoscope's own English, and this line is
+	// drawn in whatever language the user asked for. The prefix already says
+	// what happened; the address is what is left to act on.
+	if strings.Contains(view, "no browser") {
+		t.Errorf("the notice carries octoscope's own English:\n%s", view)
+	}
 	if !strings.Contains(view, i18n.T("notice.open_failed")) {
 		t.Errorf("the notice does not say what could not be done:\n%s", view)
 	}
@@ -336,14 +342,19 @@ func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
 }
 
 // The other half: a tab that answered must not carry the other one's
-// complaint.
+// complaint. The Issues tab is loaded before the move, so switching to it
+// starts no fetch -- which is the case where nothing else would clear the
+// notice on the way.
 func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
+	m, _ = m.Update(issueListMsg{gen: m.gen, issues: f.issues})
 	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
 
-	m, cmd := m.Update(key("tab")) // to Issues, which fetches
-	m, _ = m.Update(cmd())
+	m, cmd := m.Update(key("tab"))
+	if cmd != nil {
+		t.Fatalf("setup: the move refetched, which would clear the notice by itself: %T", cmd())
+	}
 
 	view := ansi.Strip(m.View())
 	if !strings.Contains(view, "an issue") {
@@ -351,6 +362,28 @@ func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 	}
 	if strings.Contains(view, "HTTP 502") {
 		t.Errorf("the other tab's notice followed the user onto a tab that answered:\n%s", view)
+	}
+}
+
+// The address of an item nothing could open is the only way the user has left
+// to reach it. A fetch answers the list, not the browser, so it must not take
+// that line away.
+func TestAFetchDoesNotClearTheBrowsersNotice(t *testing.T) {
+	url := samplePRs()[0].URL
+	f := &fakeSource{prs: samplePRs(), webErr: &browser.NoneError{URL: url}}
+	m := currentModel(f, 120)
+
+	m, cmd := m.Update(key("o"))
+	m, _ = m.Update(cmd())
+	if !strings.Contains(ansi.Strip(m.View()), url) {
+		t.Fatalf("setup: the address is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+
+	m, _ = m.Update(key("r")) // the list is asked again and answers
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+
+	if !strings.Contains(ansi.Strip(m.View()), url) {
+		t.Errorf("a fetch took away the address nothing could open:\n%s", ansi.Strip(m.View()))
 	}
 }
 

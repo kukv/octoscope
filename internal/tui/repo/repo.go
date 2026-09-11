@@ -3,12 +3,14 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 )
 
@@ -98,6 +100,29 @@ func (k noticeKind) prefixID() string {
 		return "notice.open_failed"
 	}
 	return "notice.fetch_failed"
+}
+
+// answeredFetch drops the notice of a tab whose fetch has just come back. It
+// leaves an o's notice alone: no fetch answers a browser that would not
+// start, and the address in that line is the only way the user has left to
+// reach the item.
+func (m *Model) answeredFetch(t tabID) {
+	if m.notice[t].kind == noticeFetch {
+		m.notice[t] = notice{}
+	}
+}
+
+// noticeText is what the line carries after the words in front of it. A
+// machine with no browser is octoscope's own finding, said in octoscope's own
+// English, and the address is the whole of what the user can act on -- so
+// that is what the line carries. Anything else was said by something outside
+// octoscope and is shown as it was said (.claude/rules/errors.md).
+func noticeText(err error) string {
+	var noBrowser *browser.NoneError
+	if errors.As(err, &noBrowser) {
+		return noBrowser.URL
+	}
+	return err.Error()
 }
 
 // notice is what went wrong with the last fetch or the last o: the list
@@ -241,9 +266,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading[m.tab] = true
-	// The notice goes with the answer it described: a list that is being
-	// asked again has no failure to report until the new request answers.
-	m.notice[m.tab] = notice{}
+	// A tab that is being asked again has no failure to report until the new
+	// request answers.
+	m.answeredFetch(m.tab)
 	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
@@ -331,7 +356,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.prs = msg.prs
 		m.loaded[tabPRs] = true
-		m.notice[tabPRs] = notice{}
+		m.answeredFetch(tabPRs)
 		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
@@ -344,7 +369,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.issues = msg.issues
 		m.loaded[tabIssues] = true
-		m.notice[tabIssues] = notice{}
+		m.answeredFetch(tabIssues)
 		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
@@ -367,7 +392,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			err := msg.err
 			return m, func() tea.Msg { return FatalMsg{err} }
 		}
-		m.notice[msg.tab] = notice{kind: msg.kind, text: msg.err.Error()}
+		m.notice[msg.tab] = notice{kind: msg.kind, text: noticeText(msg.err)}
 		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
