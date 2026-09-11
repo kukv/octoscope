@@ -693,18 +693,18 @@ func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
 	}
 }
 
-// TestEscLeavesAnUnrelatedOverlayStanding covers the reachable path a board
-// or Repos-list failure takes while an overlay is open: submit a review from
-// the diff, the root refreshes the board, and the board's own fetch fails
-// with the diff still on top. That failure belongs to neither overlay on the
-// stack, so esc must clear it without discarding a diff that never failed.
+// TestEscLeavesAnUnrelatedOverlayStanding covers the reachable path a tab's
+// failure takes while an overlay is open: submit a review from the diff, the
+// root refreshes the board, and the board finds gh gone with the diff still
+// on top. That failure belongs to neither overlay on the stack, so esc must
+// clear it without discarding a diff that never failed.
 func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
-	next, _ = m.Update(work.FatalMsg{Err: errors.New("boom")})
+	next, _ = m.Update(work.FatalMsg{Err: gh.ErrGhNotFound})
 	m = next.(Model)
 	if m.errText == "" {
 		t.Fatal("the error screen did not show")
@@ -725,7 +725,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 // back to, so it must keep quitting like q does.
 func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.FatalMsg{Err: errors.New("boom")})
+		Update(work.FatalMsg{Err: gh.ErrGhNotFound})
 	m := next.(Model)
 	if len(m.stack) != 0 {
 		t.Fatalf("stack = %v, want empty for this case", m.stack)

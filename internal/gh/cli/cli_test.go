@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -595,11 +594,19 @@ func TestMissingCredentialsAreTold(t *testing.T) {
 }
 
 // The original text is what GitHub said, and the UI shows it as it was said
-// (.claude/rules/errors.md). Classifying must not replace it.
-func TestClassifyKeepsTheOriginalText(t *testing.T) {
-	err := classify(errors.New("gh api: gh: HTTP 502"))
-	if !strings.Contains(err.Error(), "HTTP 502") {
-		t.Errorf("the original text was lost: %v", err)
+// (.claude/rules/errors.md). Classifying must not replace it, and must not
+// add to it either: a sentinel's own words are a sentence octoscope wrote in
+// English, and the notice that carries this text is shown in the user's own
+// language. The classification travels by errors.Is, not by the text.
+func TestClassifyLeavesTheTextExactlyAsGhSaidIt(t *testing.T) {
+	for _, said := range []string{
+		"gh api: gh: HTTP 502: Bad gateway",
+		"gh pr list: gh: Bad credentials",
+	} {
+		err := classify(errors.New(said))
+		if err.Error() != said {
+			t.Errorf("classify rewrote the text:\n got %q\nwant %q", err.Error(), said)
+		}
 	}
 }
 

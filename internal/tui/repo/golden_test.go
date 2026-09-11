@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -86,7 +85,9 @@ func goldenModel(width int) Model {
 	return m
 }
 
-// goldenFailure is what GitHub says when its front end will not answer. It is
+// goldenFailure is what the user is actually shown when GitHub's front end
+// will not answer: the notice carries the classified error, so a recording
+// built from a plain errors.New would not be the line they see. It is
 // long on purpose: the notice has to survive a narrow terminal.
 const goldenFailure = "gh api: HTTP 502: Bad gateway (https://api.github.com/graphql)"
 
@@ -100,7 +101,7 @@ func TestGolden(t *testing.T) {
 				// The list the user is left with when a refetch fails: the
 				// rows it already had, and a line saying what GitHub said.
 				failed := goldenModel(w)
-				failed, _ = failed.Update(errMsg{gen: failed.gen, err: errors.New(goldenFailure)})
+				failed, _ = failed.Update(errMsg{gen: failed.gen, err: gh.Classify(gh.ErrTransient, goldenFailure)})
 				golden.Assert(t, fmt.Sprintf("repo_failed_%s_%d", lang.name, w), failed.View())
 
 				// The other failure that reaches the same line, which must

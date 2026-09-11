@@ -253,6 +253,25 @@ type RepoCount struct {
 	Unavailable bool
 }
 
+// classified is what gh said, kept apart from the sentinel that names what
+// kind of failure it is. errors.Is finds the sentinel through Unwrap, while
+// Error is gh's own text and nothing else: wrapping with fmt.Errorf would put
+// the sentinel's English sentence in front of it, and the UI shows this text
+// to a user who may have asked for another language (.claude/rules/errors.md
+// leaves only what GitHub said untranslated).
+type classified struct {
+	kind error
+	msg  string
+}
+
+func (e *classified) Error() string { return e.msg }
+func (e *classified) Unwrap() error { return e.kind }
+
+// Classify pairs what gh said with the sentinel that says what it was.
+func Classify(kind error, msg string) error {
+	return &classified{kind: kind, msg: msg}
+}
+
 // IsFatal reports whether the user has to act before anything can work. Every
 // other failure is worth a line above the key bar and another try.
 //

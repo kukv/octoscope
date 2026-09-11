@@ -73,6 +73,7 @@ type (
 	repoCountsMsg []gh.RepoCount
 	errMsg        struct {
 		gen  int
+		tab  tabID
 		kind noticeKind
 		err  error
 	}
@@ -154,9 +155,12 @@ type Model struct {
 	loaded  [2]bool
 	loading [2]bool
 
-	// notice is the failure the list carries on despite. A successful fetch
-	// clears it, so a stale complaint never outlives what it described.
-	notice notice
+	// notice is the failure each tab carries on despite. It is per tab for the
+	// same reason loaded and loading are: the two tabs are fetched separately,
+	// so one answering says nothing about the other, and a single notice would
+	// both vanish while the tab it described was still broken and follow the
+	// user onto a tab that answered.
+	notice [2]notice
 
 	// gen counts how many times selectRow has run. A fetch or the errMsg it
 	// can produce carries the generation it started in; Update drops one
@@ -214,7 +218,7 @@ func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.gen++
 	m.prs, m.issues = nil, nil
 	m.loaded, m.cursors = [2]bool{}, [2]int{}
-	m.notice = notice{}
+	m.notice = [2]notice{}
 	if len(m.rows) == 0 {
 		return m, nil
 	}
@@ -239,7 +243,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	m.loading[m.tab] = true
 	// The notice goes with the answer it described: a list that is being
 	// asked again has no failure to report until the new request answers.
-	m.notice = notice{}
+	m.notice[m.tab] = notice{}
 	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
@@ -259,13 +263,13 @@ func fetchList(src Source, t tabID, repo string, gen int) tea.Cmd {
 		if t == tabPRs {
 			prs, err := src.ListPRs(ctx, repo)
 			if err != nil {
-				return errMsg{gen: gen, err: err}
+				return errMsg{gen: gen, tab: t, err: err}
 			}
 			return prListMsg{gen: gen, prs: prs}
 		}
 		issues, err := src.ListIssues(ctx, repo)
 		if err != nil {
-			return errMsg{gen: gen, err: err}
+			return errMsg{gen: gen, tab: t, err: err}
 		}
 		return issueListMsg{gen: gen, issues: issues}
 	}
@@ -284,10 +288,10 @@ func fetchCounts(src repoCounter, repos []string) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, url string, gen int) tea.Cmd {
+func openWeb(src Source, url string, t tabID, gen int) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
-			return errMsg{gen: gen, kind: noticeOpen, err: err}
+			return errMsg{gen: gen, tab: t, kind: noticeOpen, err: err}
 		}
 		return nil
 	}
@@ -327,7 +331,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.prs = msg.prs
 		m.loaded[tabPRs] = true
-		m.notice = notice{}
+		m.notice[tabPRs] = notice{}
 		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
@@ -340,7 +344,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.issues = msg.issues
 		m.loaded[tabIssues] = true
-		m.notice = notice{}
+		m.notice[tabIssues] = notice{}
 		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
@@ -354,12 +358,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.gen != m.gen {
 			return m, nil
 		}
-		m.loading[m.tab] = false
+		// Only a fetch's failure ends a fetch. A browser that would not start
+		// leaves whatever is in flight in flight.
+		if msg.kind == noticeFetch {
+			m.loading[msg.tab] = false
+		}
 		if gh.IsFatal(msg.err) {
 			err := msg.err
 			return m, func() tea.Msg { return FatalMsg{err} }
 		}
-		m.notice = notice{kind: msg.kind, text: msg.err.Error()}
+		m.notice[msg.tab] = notice{kind: msg.kind, text: msg.err.Error()}
 		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -417,7 +425,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		if url, ok := m.selectedURL(); ok {
-			return m, openWeb(m.src, url, m.gen)
+			return m, openWeb(m.src, url, m.tab, m.gen)
 		}
 		return m, nil
 	case "d":

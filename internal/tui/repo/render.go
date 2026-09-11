@@ -53,11 +53,12 @@ func (m Model) View() string {
 // terminal rather than the table's own width: the sidebar is not what
 // failed, and a message cut to the narrower pane would lose what GitHub said.
 func (m Model) noticeLine() string {
-	if m.notice.text == "" {
+	n := m.notice[m.tab]
+	if n.text == "" {
 		return ""
 	}
 	return theme.Error().Render(
-		layout.Notice(i18n.T(m.notice.kind.prefixID())+" · "+m.notice.text, m.width))
+		layout.Notice(i18n.T(n.kind.prefixID())+" · "+n.text, m.width))
 }
 
 func (m Model) keyBar() string {
@@ -120,7 +121,7 @@ func (m Model) body() []string {
 		// The empty-tab text would report an outage as "no open pull
 		// requests". Only a tab that has never been answered is empty in the
 		// first place: a failed refetch keeps the rows it had.
-		if !m.loaded[m.tab] && m.notice.kind == noticeFetch && m.notice.text != "" {
+		if !m.loaded[m.tab] && m.notice[m.tab].kind == noticeFetch && m.notice[m.tab].text != "" {
 			return []string{theme.Error().Render(clip(i18n.T("notice.fetch_failed"), m.bodyWidth()))}
 		}
 		empty := i18n.T("list.no_open_prs")
@@ -148,7 +149,7 @@ func (m Model) visibleRows() int {
 		return m.itemCount() // no budget yet: draw them all
 	}
 	rows := m.height - listTop - summaryHeight - footerHeight
-	if m.notice.text != "" {
+	if m.notice[m.tab].text != "" {
 		rows--
 	}
 	return max(rows, 1)

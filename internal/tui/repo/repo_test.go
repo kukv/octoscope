@@ -313,6 +313,47 @@ func TestAFailureToOpenTheBrowserIsNotFatal(t *testing.T) {
 	}
 }
 
+// The two tabs are fetched separately, so one answering says nothing about
+// the other: the Issues tab is still broken while the user is reading the
+// pull requests.
+func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := currentModel(f, 120)
+	m, cmd := m.Update(key("tab")) // to Issues, which fetches
+	m, _ = m.Update(cmd())         // the fetch answers; drop it and fail instead
+	m, _ = m.Update(errMsg{gen: m.gen, tab: tabIssues, err: errors.New("gh: HTTP 502")})
+	if !strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
+		t.Fatalf("setup: the Issues tab does not carry the notice:\n%s", ansi.Strip(m.View()))
+	}
+
+	m, _ = m.Update(key("tab")) // back to the pull requests
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	m, _ = m.Update(key("tab")) // and back to Issues, which never recovered
+
+	if !strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
+		t.Errorf("a fetch on the other tab cleared this tab's notice:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// The other half: a tab that answered must not carry the other one's
+// complaint.
+func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := currentModel(f, 120)
+	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
+
+	m, cmd := m.Update(key("tab")) // to Issues, which fetches
+	m, _ = m.Update(cmd())
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "an issue") {
+		t.Fatalf("setup: the Issues tab did not load:\n%s", view)
+	}
+	if strings.Contains(view, "HTTP 502") {
+		t.Errorf("the other tab's notice followed the user onto a tab that answered:\n%s", view)
+	}
+}
+
 // The notice takes a line, and it has to come out of the table rather than
 // out of the terminal: without that the key bar is pushed off the bottom on
 // the day something fails.
@@ -367,8 +408,8 @@ func TestAStaleFetchFailureIsDropped(t *testing.T) {
 	if !m.loading[tabPRs] {
 		t.Error("a stale error cleared the loading of the row now on screen")
 	}
-	if m.notice.text != "" {
-		t.Errorf("a stale error complained about the row now on screen: %q", m.notice.text)
+	if m.notice[tabPRs].text != "" {
+		t.Errorf("a stale error complained about the row now on screen: %q", m.notice[tabPRs].text)
 	}
 }
 

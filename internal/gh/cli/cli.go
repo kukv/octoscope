@@ -67,11 +67,11 @@ func classify(err error) error {
 	msg := err.Error()
 	for _, status := range []string{"HTTP 502", "HTTP 503", "HTTP 504"} {
 		if strings.Contains(msg, status) {
-			return fmt.Errorf("%w: %s", gh.ErrTransient, msg)
+			return gh.Classify(gh.ErrTransient, msg)
 		}
 	}
 	if strings.Contains(msg, "Bad credentials") || strings.Contains(msg, "gh auth login") {
-		return fmt.Errorf("%w: %s", gh.ErrUnauthenticated, msg)
+		return gh.Classify(gh.ErrUnauthenticated, msg)
 	}
 	return err
 }

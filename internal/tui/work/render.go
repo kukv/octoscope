@@ -2,6 +2,7 @@ package work
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -91,6 +92,13 @@ func (m Model) noticeLine() string {
 	return ""
 }
 
+// hasNotice is the question the height budget asks. It is not noticeLine() !=
+// "": that reads the catalog and styles a line, and the budget is worked out
+// for every frame.
+func (m Model) hasNotice() bool {
+	return slices.ContainsFunc(m.notice[:], func(s string) bool { return s != "" })
+}
+
 func (m Model) keyBar() string {
 	return theme.Dim().Render(clip(i18n.T("footer.work"), m.width))
 }
@@ -121,7 +129,7 @@ func (m Model) boardHeight() int {
 	if m.drawerShown() {
 		h -= drawerHeight
 	}
-	if m.noticeLine() != "" {
+	if m.hasNotice() {
 		h--
 	}
 	return max(h, headingHeight+m.cardHeight())

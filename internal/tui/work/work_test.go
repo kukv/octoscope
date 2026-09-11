@@ -280,7 +280,10 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 func TestATransientFailureKeepsTheBoard(t *testing.T) {
 	m := sized(New(&fakeSource{}))
 	m, _ = m.Update(workMsg{section: gh.SectionAssigned, items: sampleItems()})
-	m, cmd := m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+	m, cmd := m.Update(errMsg{
+		section: gh.SectionYourPRs,
+		err:     gh.Classify(gh.ErrTransient, "gh api: gh: HTTP 502"),
+	})
 	if cmd != nil {
 		if _, fatal := cmd().(FatalMsg); fatal {
 			t.Error("a transient failure reached the full-screen error")
@@ -292,6 +295,11 @@ func TestATransientFailureKeepsTheBoard(t *testing.T) {
 	}
 	if !strings.Contains(view, "HTTP 502") {
 		t.Errorf("the notice does not say what GitHub said:\n%s", view)
+	}
+	// The sentinel's own words are a sentence octoscope wrote in English, and
+	// this line is drawn in whatever language the user asked for.
+	if strings.Contains(view, gh.ErrTransient.Error()) {
+		t.Errorf("the notice carries octoscope's own English:\n%s", view)
 	}
 }
 

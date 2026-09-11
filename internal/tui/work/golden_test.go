@@ -1,7 +1,6 @@
 package work
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -145,7 +144,9 @@ func TestGoldenAPartiallyFilledBoard(t *testing.T) {
 	}
 }
 
-// goldenFailure is what GitHub says when its front end will not answer. It is
+// goldenFailure is what the user is actually shown when GitHub's front end
+// will not answer: the notice carries the classified error, so a recording
+// built from a plain errors.New would not be the line they see. It is
 // long on purpose: the notice has to survive a narrow terminal.
 const goldenFailure = "gh api: HTTP 502: Bad gateway (https://api.github.com/graphql)"
 
@@ -162,7 +163,7 @@ func failedBoard(width, height int) Model {
 		m, _ = m.Update(workMsg{section: s, items: overlongWork()[s]})
 		m.fetchedAt[s] = goldenFetchedAt
 	}
-	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New(goldenFailure)})
+	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: gh.Classify(gh.ErrTransient, goldenFailure)})
 	return m
 }
 
@@ -190,7 +191,7 @@ func TestAFailedBoardStillFitsTheTerminal(t *testing.T) {
 	m := New(&fakeSource{work: tallWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
 	m = answeredAll(m, tallWork())
-	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New(goldenFailure)})
+	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: gh.Classify(gh.ErrTransient, goldenFailure)})
 
 	out := m.View()
 	if got := len(strings.Split(out, "\n")); got > height {
