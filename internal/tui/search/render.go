@@ -29,6 +29,10 @@ const (
 	numberColumn = 6
 	ageColumn    = 8
 
+	// promptCols is the "> " textinput draws in front of what is typed
+	// (internal/tui/dialog uses the same figure for the same reason).
+	promptCols = 2
+
 	// queryRowHeight is the query line and the blank line under it;
 	// footerHeight is the blank line and the key bar.
 	queryRowHeight = 2
@@ -84,7 +88,11 @@ func (m Model) resultWidth() int {
 // runs it.
 func (m Model) queryRow() string {
 	if m.mode == modeRaw {
-		return "q " + m.input.View()
+		line := "q " + m.input.View()
+		if m.width <= 0 {
+			return line
+		}
+		return layout.Clip(line, m.width)
 	}
 	query := m.query()
 	count := m.countText()
@@ -163,7 +171,7 @@ func (m Model) filterPane() []string {
 func (m Model) filterRow(id FilterID) string {
 	label := layout.Pad(theme.Dim().Render(i18n.T(filterLabelID(id))), filterNameWidth)
 	if m.mode == modeField && id == m.cursor {
-		return label + m.input.View()
+		return layout.Clip(label+m.input.View(), filterPaneWidth)
 	}
 
 	value := m.filters.Value(id)

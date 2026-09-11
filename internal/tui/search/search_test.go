@@ -266,3 +266,21 @@ func TestSDoesNothingYet(t *testing.T) {
 		t.Error("s did something; it is reserved for saving a query")
 	}
 }
+
+// Under 100 columns the filter pane is not drawn (spec section 4.6), so a
+// cursor left on it is a cursor nothing on screen answers to. j, k, space
+// and enter must not silently land on an invisible pane.
+func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
+	t.Parallel()
+
+	m := sized(t, 80, []gh.WorkItem{{
+		Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 1},
+	}})
+	_, cmd := press(m, "enter")
+	if cmd == nil {
+		t.Fatal("enter did nothing; the cursor is stuck on the folded filter pane")
+	}
+	if _, ok := cmd().(OpenDetailMsg); !ok {
+		t.Errorf("sent %T, want OpenDetailMsg", cmd())
+	}
+}

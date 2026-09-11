@@ -122,3 +122,43 @@ func TestTheFilterPaneFoldsAwayWhenNarrow(t *testing.T) {
 		t.Errorf("the narrow view lost the query:\n%s", narrow)
 	}
 }
+
+// The raw editor's own width follows the terminal, unlike the rest of the
+// query row which is fixed to what was typed: a long query must not push it
+// past the edge.
+func TestTheRawEditorFitsTheTerminal(t *testing.T) {
+	t.Parallel()
+
+	for _, w := range []int{80, 120, 160} {
+		m := sized(t, w, nil)
+		m, _ = press(m, "e")
+		for _, r := range strings.Repeat("x", 200) {
+			m, _ = press(m, string(r))
+		}
+		row, _, _ := strings.Cut(m.View(), "\n")
+		if got := ansi.StringWidth(row); got > w {
+			t.Errorf("width %d: the raw editor's row is %d columns:\n%s", w, got, row)
+		}
+	}
+}
+
+// A typed filter's field is sized to the value column, so a long name
+// scrolls inside it rather than pushing the result pane's rule out of line.
+func TestATypedFilterFitsThePane(t *testing.T) {
+	t.Parallel()
+
+	for _, w := range []int{120, 160} {
+		m := sized(t, w, nil)
+		m, _ = press(m, "j") // type -> state
+		m, _ = press(m, "j") // state -> org
+		m, _ = press(m, "enter")
+		for _, r := range strings.Repeat("x", 200) {
+			m, _ = press(m, string(r))
+		}
+		for i, line := range strings.Split(m.View(), "\n") {
+			if got := ansi.StringWidth(line); got > w {
+				t.Errorf("width %d: line %d is %d columns:\n%s", w, i, got, m.View())
+			}
+		}
+	}
+}

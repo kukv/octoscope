@@ -164,6 +164,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.paneCols() == 0 {
+			m.pane = paneResults
+		}
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -301,11 +304,14 @@ func (m Model) selectedRef() (gh.ItemRef, bool) {
 	return m.items[m.sel].Ref, true
 }
 
-// openField opens the input for the typed filter under the cursor.
+// openField opens the input for the typed filter under the cursor, sized to
+// the value column so a long name scrolls inside it rather than pushing the
+// result pane's rule out of line.
 func (m Model) openField() Model {
 	m.mode = modeField
 	m.input = textinput.New()
 	m.input.SetValue(m.filters.Value(m.cursor))
+	m.input.SetWidth(max(filterPaneWidth-filterNameWidth-promptCols, 1))
 	m.input.Focus()
 	return m
 }
@@ -317,7 +323,7 @@ func (m Model) openRaw() Model {
 	m.input = textinput.New()
 	m.input.SetValue(m.query())
 	if m.width > 0 {
-		m.input.SetWidth(max(m.width-len("q "), 1))
+		m.input.SetWidth(max(m.width-len("q ")-promptCols, 1))
 	}
 	m.input.Focus()
 	return m
