@@ -1,0 +1,217 @@
+package search
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/icon"
+	"github.com/kukv/octoscope/internal/tui/layout"
+	"github.com/kukv/octoscope/internal/tui/theme"
+)
+
+// The panes and the result table's columns, in display columns. The mockup
+// puts the filter names in a ten-column field and the results beside them.
+const (
+	filterPaneWidth = 30
+	paneRule        = 1
+	filterNameWidth = 10
+
+	// minPaneWidth is where the filter pane folds away (spec section 4.6).
+	minPaneWidth = 100
+
+	stateColumn  = 2
+	repoColumn   = 16
+	numberColumn = 6
+	ageColumn    = 7
+
+	// queryRowHeight is the query line and the blank line under it;
+	// footerHeight is the blank line and the key bar.
+	queryRowHeight = 2
+	footerHeight   = 2
+
+	// searchCap is what one search asks GitHub for. A page of exactly this
+	// many may have been cut short.
+	searchCap = 50
+)
+
+func (m Model) View() string {
+	if m.width <= 0 {
+		return ""
+	}
+	lines := []string{m.queryRow(), ""}
+	if m.paneCols() > 0 {
+		lines = append(lines, layout.JoinPanes(m.filterPane(), m.resultPane(), filterPaneWidth)...)
+	} else {
+		lines = append(lines, m.resultPane()...)
+	}
+	lines = append(lines, "")
+	if m.notice != "" {
+		lines = append(lines, theme.Error().Render(layout.Notice(m.notice, m.width)))
+	}
+	return strings.Join(append(lines, m.keyBar()), "\n")
+}
+
+// paneCols is how much of the terminal the filter pane takes, rule
+// included. Zero means it is folded away and the results take the whole
+// width.
+func (m Model) paneCols() int {
+	if m.width < minPaneWidth {
+		return 0
+	}
+	return filterPaneWidth + paneRule
+}
+
+// resultWidth is what is left for the result pane once the filter pane has
+// taken its share.
+func (m Model) resultWidth() int {
+	return max(m.width-m.paneCols(), 1)
+}
+
+// queryRow is the raw query above the panes, with the count of what it
+// found at the right edge.
+func (m Model) queryRow() string {
+	query := m.filters.Query()
+	count := m.countText()
+	left := "q " + theme.Dim().Render(query)
+	room := max(m.width-ansi.StringWidth(count), 0)
+	return layout.Pad(left, room) + count
+}
+
+// countText is what the query row says it found: the exact count, or
+// search.truncated once a full page may have been cut short.
+func (m Model) countText() string {
+	if len(m.items) >= searchCap {
+		return i18n.T("search.truncated")
+	}
+	return i18n.Tn("search.result_count", len(m.items))
+}
+
+// countBadge is the same count, without the translated unit word: the
+// result pane already names itself "Results", so repeating the word there
+// would read as "Results 2 results".
+func (m Model) countBadge() string {
+	if len(m.items) >= searchCap {
+		return i18n.T("search.truncated")
+	}
+	return strconv.Itoa(len(m.items))
+}
+
+func (m Model) keyBar() string {
+	return theme.Dim().Render(layout.FitKeyBar(m.footerHints(), m.width))
+}
+
+// footerHints is the Search tab's own key bar. Task 4 wires the keys these
+// name; this slice only draws them.
+func (m Model) footerHints() []string {
+	return []string{
+		i18n.T("footer.search.field"),
+		i18n.T("footer.search.cycle"),
+		i18n.T("footer.search.results"),
+		i18n.T("footer.search.raw"),
+	}
+}
+
+// filterPane draws the eight filters, one per row: its name in a fixed
+// field, then its value.
+func (m Model) filterPane() []string {
+	lines := []string{theme.Heading().Render(i18n.T("search.filters")), ""}
+	for id := FilterType; id < filterCount; id++ {
+		value := m.filters.Value(id)
+		if value == "" {
+			value = i18n.T("search.unset")
+		}
+		lines = append(lines,
+			layout.Pad(theme.Dim().Render(i18n.T(filterLabelID(id))), filterNameWidth)+value)
+	}
+	return lines
+}
+
+// filterLabelID names the message ID for one filter's label, which is
+// GitHub's own qualifier name and stays the same in every language
+// (.claude/rules/tui.md).
+func filterLabelID(id FilterID) string {
+	return [filterCount]string{
+		FilterType:   "search.filter.type",
+		FilterState:  "search.filter.state",
+		FilterOrg:    "search.filter.org",
+		FilterRepo:   "search.filter.repo",
+		FilterAuthor: "search.filter.author",
+		FilterLabel:  "search.filter.label",
+		FilterReview: "search.filter.review",
+		FilterSort:   "search.filter.sort",
+	}[id]
+}
+
+// resultPane draws the heading and the table of items, or what stands in
+// for it while there is nothing to show.
+func (m Model) resultPane() []string {
+	width := m.resultWidth()
+	heading := theme.Heading().Render(i18n.T("search.results")) + " " + m.countBadge()
+	lines := []string{layout.Clip(heading, width)}
+
+	if m.loading {
+		return append(lines, layout.Clip(m.spin.View()+" "+i18n.T("common.loading"), width))
+	}
+	if len(m.items) == 0 {
+		return append(lines, theme.Dim().Render(layout.Clip(i18n.T("search.no_results"), width)))
+	}
+
+	rows := m.resultRows()
+	first := m.resultWindow(rows)
+	for i := first; i < min(first+rows, len(m.items)); i++ {
+		lines = append(lines, m.resultRow(i, width))
+	}
+	return lines
+}
+
+// resultRows is how many item rows fit under the result pane's heading.
+// Search has neither Repos' sub-tabs nor its summary block, so its budget
+// is only the query row and the key bar.
+func (m Model) resultRows() int {
+	if m.height <= 0 {
+		return len(m.items)
+	}
+	rows := m.height - queryRowHeight - footerHeight - 1 // 1: the pane's own heading
+	if m.notice != "" {
+		rows--
+	}
+	return max(rows, 1)
+}
+
+// resultWindow is the first item drawn, chosen to keep the cursor in view.
+func (m Model) resultWindow(rows int) int {
+	if m.sel < rows {
+		return 0
+	}
+	return m.sel - rows + 1
+}
+
+// resultRow draws one line of the table: state, repository (owner
+// dropped), number, title, and relative age.
+func (m Model) resultRow(i int, width int) string {
+	item := m.items[i]
+
+	state := theme.Dim().Render(icon.Issue())
+	if item.Ref.Kind == gh.ItemPR {
+		state = theme.Review(item.Review, item.IsDraft).Render(icon.Review(item.Review, item.IsDraft))
+	}
+	_, name, _ := gh.SplitRepo(item.Ref.Repo)
+	number := "#" + strconv.Itoa(item.Ref.Number)
+	age := i18n.RelTime(m.fetchedAt, item.UpdatedAt)
+
+	titleWidth := max(width-stateColumn-repoColumn-numberColumn-ageColumn, 1)
+	line := layout.Pad(state, stateColumn) +
+		layout.Pad(name, repoColumn) +
+		layout.Pad(theme.Dim().Render(number), numberColumn) +
+		layout.Pad(item.Title, titleWidth) +
+		layout.Right(theme.Dim().Render(age), ageColumn)
+
+	if i == m.sel {
+		return theme.Selected().Render(layout.Clip(line, width))
+	}
+	return layout.Clip(line, width)
+}

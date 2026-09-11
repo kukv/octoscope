@@ -2,7 +2,9 @@ package search
 
 import (
 	"context"
+	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -54,10 +56,22 @@ type Model struct {
 	// notice is what GitHub said about a query it would not run. The tab
 	// keeps its filters and its last results; the user edits and tries again.
 	notice string
+
+	spin          spinner.Model
+	width, height int
+
+	// sel is the cursor into items, drawn by the result pane.
+	sel int
+
+	// fetchedAt is when items last arrived, for the rows' relative ages:
+	// View must not read the clock itself (.claude/rules/tui.md).
+	fetchedAt time.Time
 }
 
 func New(src Source) Model {
-	return Model{src: src, loading: true}
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	return Model{src: src, loading: true, spin: s}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -76,12 +90,25 @@ func runSearch(src searcher, query string, gen int) tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		// The first size arrives after Init, so the spinner's tick loop
+		// starts here rather than being batched with the search there.
+		return m, m.spin.Tick
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
 	case itemsMsg:
 		if msg.gen != m.gen {
 			return m, nil
 		}
 		m.items = msg.items
 		m.loading = false
+		m.fetchedAt = time.Now()
+		if m.sel >= len(m.items) {
+			m.sel = max(len(m.items)-1, 0)
+		}
 		return m, nil
 	case errMsg:
 		if msg.gen != m.gen {
