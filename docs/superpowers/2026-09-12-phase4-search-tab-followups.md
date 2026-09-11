@@ -93,7 +93,19 @@ Repos タブは `internal/tui/repo/mouse.go` を持つが、Search タブに同�
 **直さなかった理由:** Work 板から引き継いだ制約で、設計（spec の §1）が
 切り詰めの解消を別の機会に送っている。Search も同じ上限になる。
 
-### 3. `s` は未割当
+### 3. `searchCap` が `work.graphql` の `first: 50` と黙って結合している
+
+`internal/tui/search/render.go:44` の `searchCap = 50` は、
+`internal/gh/cli/work.graphql:11` の `first: 50` と一致していることが前提の
+値である。片方だけを変えても、それを検知するテストは無く、`50+` の表示が
+実態と食い違ったまま緑が続く。
+
+**直さなかった理由:** `internal/tui` は `internal/gh/cli` を import できないので、
+一致を保証する定数を置くなら `internal/gh` になる。ドメイン型のパッケージに
+UI の表示都合の定数を置く判断が要り、この局面で決めるより、ページングを
+入れる機会（積み残し 2 番）に一緒に決めるほうが筋が良い。
+
+### 4. `s` は未割当
 
 `internal/tui/search/search.go` はフィルタ・結果どちらのペインでも `s` に
 何も割り当てていない（`TestSDoesNothingYet` がそれを確認している）。
@@ -101,20 +113,20 @@ Repos タブは `internal/tui/repo/mouse.go` を持つが、Search タブに同�
 **直さなかった理由:** 3-3（保存クエリ）で使う予約であり、このスライスの
 範囲外。
 
-### 4. 生クエリからフィルタへの逆解析をしない
+### 5. 生クエリからフィルタへの逆解析をしない
 
 `e` で編集した生クエリは左のフィルタに戻らない。
 
 **直さなかった理由:** 設計が「生クエリの編集は一方向とする」と明記している
 （`docs/superpowers/specs/2026-09-08-phase4-design.md:113`）。
 
-### 5. チップを選んで入力欄に入れる操作が無い
+### 6. チップを選んで入力欄に入れる操作が無い
 
 label / author のチップは表示だけで、選ぶと入力欄に入る、という操作は無い。
 
 **直さなかった理由:** brief の範囲外で、モックアップにもその操作は無い。
 
-### 6. 候補の取得中に再要求を防いでいない
+### 7. 候補の取得中に再要求を防いでいない
 
 `maybeFetchCandidates` はカーソルが `FilterLabel` / `FilterAuthor` の行に来た
 瞬間にだけ評価し、同じリポジトリを 2 度は引かない（取得済みならキャッシュが効く）。
@@ -123,17 +135,58 @@ label / author のチップは表示だけで、選ぶと入力欄に入る、�
 **直さなかった理由:** 「1 打鍵ごとに引かない」という要求は満たしている。
 取得は速く、応答待ちの間に往復すること自体が稀なので許容範囲と判断した。
 
-### 7. `internal/tui/repo/render.go` の `badges()` と同型のコードがチップにある
+### 8. 設計 §5 の「結果の表を Repos と共有する」を満たしておらず、複製になっている
 
-`labelChips` / `authorChips`（`internal/tui/search/render.go:215,231`）は
-「入らないものは落とす」ルールが `internal/tui/repo/render.go:279` の
-`badges()` と同じ形をしている。`badges()` が非公開で呼べないための重複。
+設計（`docs/superpowers/specs/2026-09-08-phase4-design.md:119-120`）は
+「結果の表は Repos の右ペインと同じ描き方をする。`internal/tui/repo` の表の部分を
+切り出して両方から使う」と書いているが、実際には次の形で重複している。
 
-**直さなかった理由:** 共通化はこのスライスの範囲外。2 パッケージ間の関数を
-`internal/tui/layout` などに出す判断は、3 人目の利用者が付くか、Work/Checks/Diff
-の `clip`/`fit` 重複（3-1 の積み残し 4 番）とまとめて扱う機会に送る。
+- `internal/tui/search/render.go:328` の `resultRow` と
+  `internal/tui/repo/render.go:196` の `row` が同型
+- 同じく `resultWindow`（`search/render.go:319`）と `rowWindow`
+  （`repo/render.go:187`）が実質同一
+- `stateColumn` / `numberColumn` / `ageColumn`（`search/render.go:28-31` と
+  `repo/render.go:20-23`）、`footerHeight`（`search/render.go:40` と
+  `repo/render.go:31`）が両パッケージで別々に宣言されている
+- 加えて `labelChips` / `authorChips`（`internal/tui/search/render.go:215,231`）は
+  「入らないものは落とす」ルールが `internal/tui/repo/render.go:279` の
+  `badges()` と同じ形をしている（`badges()` が非公開で呼べないための重複。
+  同じ 2 パッケージ間の同じ判断なので、ここに統合する）
 
-### 8. 生クエリを空にして確定すると、フィルタから組み立て直した結果に戻る
+**直さなかった理由:** 列構成が違う（Search は `rp`（repo）があり `ck`（checks）が
+無い）ため、行の描画関数をそのまま共有できない。共通化するなら「どちらの
+列構成も描ける関数」を設計するところからになる。このスライスは計画の前提 1
+（桁の道具だけを共通化し、`layout.Clip` / `Pad` / `Right` / `JoinPanes` はすでに
+統合済み）でこの判断を一度しており、実際に 2 つ並べてみた結果を持ち越す。
+3 人目の利用者が付く機会か、3-1 の積み残し 4 番（`work`/`checks`/`diff` の
+`clip`/`fit` 重複）とまとめて扱う。
+
+### 9. en のキーバーだけコロンの後に空白がある
+
+`internal/i18n/locales/active.en.yaml` の Search のキーバー（`footer.search.*`、
+274 行目以降）は `j/k: field` のようにコロンの後に空白があるが、既存の他タブ
+（`footer.list.*`、249 行目以降）は `j/k:move` / `g:import` のように空白が無い。
+ja は `j/k:項目` のようにどちらも既存と揃っている（空白は無い）。
+en だけ 1 桁ずつ幅を食うため、`FitKeyBar` が ja より早くヒントを落とす。
+
+**直さなかった理由:** 実装計画がこの形（コロンの後に空白）を指定しており、
+揃える先（既存の詰めた形に寄せるか、Search の形に全部寄せるか）は Search
+だけの話ではなく文言全体の話になる。このスライスで片側だけ変えない。
+
+### 10. 起動時に必ず 1 回 `is:open` の検索が走る
+
+`internal/tui/app/app.go:436` は最初の取得で `m.repo.Init()` と並べて
+`m.search.Init()` を呼んでいる。`search.Model.Init()`（`internal/tui/search/search.go:162`）
+は `runSearch` を即座に投げるため、利用者が `3` を押して Search タブを
+開かなくても `gh` が 1 本増え、`repo:` も `org:` も指定していない検索
+（フィルタの既定値だけの `is:open` 相当、GitHub 全体からの 50 件）が返る。
+
+**直さなかった理由:** タブを開いた瞬間に結果が出ているほうが速く感じられ、
+Repos タブも同じ形（起動時に一覧を取り終えている）。ただし「最初に `3` を
+押したときに走らせる」選択肢はあり、実端末で起動直後の遅さが気になったら
+見直す。
+
+### 11. 生クエリを空にして確定すると、フィルタから組み立て直した結果に戻る
 
 `e` で生クエリを全部消して enter すると、`m.raw` が空文字列になり、
 「フィルタから組み立て直す」の扱いに戻る。空クエリそのものを検索したい、
