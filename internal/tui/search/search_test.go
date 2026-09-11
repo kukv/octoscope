@@ -15,6 +15,12 @@ type fakeSource struct {
 	query string
 	items []gh.WorkItem
 	err   error
+
+	labels    []gh.Label
+	labelRepo string
+
+	users      []string
+	authorRepo string
 }
 
 func (f *fakeSource) SearchItems(_ context.Context, query string) ([]gh.WorkItem, error) {
@@ -23,6 +29,16 @@ func (f *fakeSource) SearchItems(_ context.Context, query string) ([]gh.WorkItem
 }
 
 func (f *fakeSource) OpenWeb(string) error { return nil }
+
+func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]gh.Label, error) {
+	f.labelRepo = repo
+	return f.labels, nil
+}
+
+func (f *fakeSource) ListAssignees(_ context.Context, repo string) ([]string, error) {
+	f.authorRepo = repo
+	return f.users, nil
+}
 
 // resolve runs a command the model handed back and feeds its message in, the
 // way Bubble Tea would. A batch is expanded and each of its commands run in
@@ -282,5 +298,123 @@ func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
 	}
 	if _, ok := cmd().(OpenDetailMsg); !ok {
 		t.Errorf("sent %T, want OpenDetailMsg", cmd())
+	}
+}
+
+// onFilter moves the filter pane's cursor onto id with j/k, the way the user
+// would, discarding whatever a landing along the way started.
+func onFilter(t *testing.T, m Model, id FilterID) Model {
+	t.Helper()
+
+	for m.cursor != id {
+		if m.cursor < id {
+			m, _ = press(m, "j")
+		} else {
+			m, _ = press(m, "k")
+		}
+	}
+	return m
+}
+
+// withRepo types the golden repository into the repo filter's field, the
+// way the user would, and resolves the search that committing a filter
+// always starts. Every test that needs a named repository needs this one:
+// it is the repository the candidate fixtures below belong to.
+func withRepo(t *testing.T, m Model) Model {
+	t.Helper()
+
+	m = onFilter(t, m, FilterRepo)
+	m, _ = press(m, "enter")
+	for _, r := range "kukv/octoscope" {
+		m, _ = press(m, string(r))
+	}
+	m, cmd := press(m, "enter")
+	return resolve(t, m, cmd)
+}
+
+// resolveCandidates runs the candidate fetch the cursor's current filter
+// (FilterLabel or FilterAuthor) starts, and feeds its answer back into
+// Update, the way a landing on that row does once repo: names a repository.
+func resolveCandidates(t *testing.T, m Model) Model {
+	t.Helper()
+
+	_, cmd := m.maybeFetchCandidates()
+	if cmd == nil {
+		t.Fatal("no candidate fetch to resolve")
+	}
+	return resolve(t, m, cmd)
+}
+
+// GitHub has no cross-repository list of labels, so there is nothing to
+// offer until the search names one repository.
+func TestNoCandidatesUntilARepositoryIsNamed(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labels: []gh.Label{{Name: "bug"}}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = onFilter(t, m, FilterLabel)
+
+	if strings.Contains(m.View(), "bug") {
+		t.Errorf("candidates were offered with no repo: in the query:\n%s", m.View())
+	}
+	if src.labelRepo != "" {
+		t.Errorf("asked for the labels of %q", src.labelRepo)
+	}
+}
+
+func TestTheLabelsOfTheNamedRepositoryAreOffered(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labels: []gh.Label{{Name: "bug"}, {Name: "enhancement"}}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+	m = onFilter(t, m, FilterLabel)
+	m = resolveCandidates(t, m)
+
+	if !strings.Contains(m.View(), "bug") {
+		t.Errorf("the repository's labels are not offered:\n%s", m.View())
+	}
+}
+
+// The same repository is not asked for a second time.
+func TestTheSameRepositoryIsNotAskedForTwice(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labels: []gh.Label{{Name: "bug"}}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+	m = onFilter(t, m, FilterLabel)
+	m = resolveCandidates(t, m)
+	src.labelRepo = ""
+
+	m = onFilter(t, m, FilterAuthor)
+	onFilter(t, m, FilterLabel)
+	if src.labelRepo != "" {
+		t.Errorf("asked for the labels of %q again", src.labelRepo)
+	}
+}
+
+// author: offers the repository's assignable users the same way label: does.
+func TestTheAuthorsOfTheNamedRepositoryAreOffered(t *testing.T) {
+	t.Parallel()
+
+	// octocat is not part of the repo name on screen, so a match cannot be
+	// the repo: value bleeding through instead of an actual chip.
+	src := &fakeSource{users: []string{"octocat"}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+	m = onFilter(t, m, FilterAuthor)
+	m = resolveCandidates(t, m)
+
+	if !strings.Contains(m.View(), "octocat") {
+		t.Errorf("the repository's authors are not offered:\n%s", m.View())
 	}
 }

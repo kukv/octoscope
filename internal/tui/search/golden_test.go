@@ -60,6 +60,15 @@ func goldenModel(t *testing.T, width int, items []gh.WorkItem) Model {
 	return m
 }
 
+// goldenLabels is what the candidates golden state's repository offers.
+func goldenLabels() []gh.Label {
+	return []gh.Label{
+		{Name: "bug", Color: "d73a4a"},
+		{Name: "enhancement", Color: "a2eeef"},
+		{Name: "documentation", Color: "0075ca"},
+	}
+}
+
 func windowSize(width int) tea.WindowSizeMsg {
 	return tea.WindowSizeMsg{Width: width, Height: 40}
 }
@@ -90,6 +99,19 @@ func TestGolden(t *testing.T) {
 
 				empty := goldenModel(t, w, nil)
 				golden.Assert(t, fmt.Sprintf("search_empty_%s_%d", lang.name, w), empty.View())
+
+				// The cursor is moved to FilterLabel and the fetch resolved
+				// before the window is sized, since a narrow width would
+				// otherwise send j/k to the result pane instead of the
+				// filter pane (the same fold-away this tab always has).
+				candidates := New(&fakeSource{items: goldenItems(), labels: goldenLabels()})
+				candidates = resolve(t, candidates, candidates.Init())
+				candidates = withRepo(t, candidates)
+				candidates = onFilter(t, candidates, FilterLabel)
+				candidates = resolveCandidates(t, candidates)
+				candidates, _ = candidates.Update(windowSize(w))
+				candidates.fetchedAt = goldenFetchedAt
+				golden.Assert(t, fmt.Sprintf("search_candidates_%s_%d", lang.name, w), candidates.View())
 			})
 		}
 	}

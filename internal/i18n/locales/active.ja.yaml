@@ -96,6 +96,8 @@ search:
       other: "sort"
   unset:
     other: "—"
+  candidates:
+    other: "候補"
 
 dialog:
   add_repo_title:

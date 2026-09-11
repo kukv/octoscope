@@ -168,13 +168,68 @@ func (m Model) footerHints() []string {
 // filterPane draws the eight filters, one per row: its name in a fixed
 // field, then its value. The row under the pane's own cursor is reversed,
 // and the whole pane is dimmed while the raw editor holds the query instead:
-// the filters are not rebuilt from what is typed there.
+// the filters are not rebuilt from what is typed there. Under them, the
+// repository's labels or authors are offered as chips while the cursor sits
+// on the filter they belong to.
 func (m Model) filterPane() []string {
 	lines := []string{theme.Heading().Render(i18n.T("search.filters"))}
 	for id := FilterType; id < filterCount; id++ {
 		lines = append(lines, m.filterRow(id))
 	}
+	if chips := m.candidateChips(); chips != "" {
+		lines = append(lines, "", theme.Heading().Render(i18n.T("search.candidates")), chips)
+	}
 	return lines
+}
+
+// candidateChips is the chip row for whichever filter the cursor is on, or
+// empty while the cursor is elsewhere, the raw editor is open, or nothing
+// has arrived yet for the named repository.
+func (m Model) candidateChips() string {
+	if m.mode == modeRaw || m.pane != paneFilters {
+		return ""
+	}
+	switch m.cursor {
+	case FilterLabel:
+		return labelChips(m.labelCandidates, filterPaneWidth)
+	case FilterAuthor:
+		return authorChips(m.authorCandidates, filterPaneWidth)
+	}
+	return ""
+}
+
+// labelChips draws a repository's labels as chips in the colour GitHub gave
+// them, the same "drop whatever does not fit" rule internal/tui/repo's
+// badges() uses for the same reason: a wrapped chip row would push the rest
+// of the pane down by an amount that depends on the repository.
+func labelChips(labels []gh.Label, room int) string {
+	var b strings.Builder
+	for _, l := range labels {
+		text := " " + l.Name + " "
+		cost := ansi.StringWidth(text) + 1
+		if cost > room {
+			break
+		}
+		b.WriteString(" " + theme.Badge(l.Color).Render(text))
+		room -= cost
+	}
+	return b.String()
+}
+
+// authorChips draws logins the same way. A login has no colour of its own;
+// theme.Badge falls back to its muted style for an unusable hex.
+func authorChips(users []string, room int) string {
+	var b strings.Builder
+	for _, u := range users {
+		text := " " + u + " "
+		cost := ansi.StringWidth(text) + 1
+		if cost > room {
+			break
+		}
+		b.WriteString(" " + theme.Badge("").Render(text))
+		room -= cost
+	}
+	return b.String()
 }
 
 func (m Model) filterRow(id FilterID) string {

@@ -22,10 +22,19 @@ type webOpener interface {
 	OpenWeb(url string) error
 }
 
+// candidateSource fills the label and author chips under the filter pane:
+// GitHub's own listings for one repository. There is no cross-repository
+// listing, so these are only asked for once repo: names one.
+type candidateSource interface {
+	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
+	ListAssignees(ctx context.Context, repo string) ([]string, error)
+}
+
 // Source is what the Search tab needs from the GitHub layer.
 type Source interface {
 	searcher
 	webOpener
+	candidateSource
 }
 
 // OpenDetailMsg asks the parent to show the detail view for one item.
@@ -53,6 +62,19 @@ type errMsg struct {
 // search generation: the query the item came from may since have changed,
 // but the browser call that failed has nothing to do with it.
 type webErrMsg struct{ err error }
+
+// labelCandidatesMsg and authorCandidatesMsg carry what a repository offers
+// for the label and author chips. repo guards against a stale answer: the
+// user may have typed a different repo: by the time it arrives.
+type labelCandidatesMsg struct {
+	repo   string
+	labels []gh.Label
+}
+
+type authorCandidatesMsg struct {
+	repo  string
+	users []string
+}
 
 // pane says which half of the split screen j/k and enter act on.
 type pane int
@@ -99,6 +121,14 @@ type Model struct {
 	// notice is what GitHub said about a query it would not run. The tab
 	// keeps its filters and its last results; the user edits and tries again.
 	notice string
+
+	// labelCandidates and authorCandidates are what the named repository
+	// offers for the chips under the filter pane, kept with the repo they
+	// were fetched for so the same repository is not asked for twice.
+	labelCandidates      []gh.Label
+	labelCandidatesRepo  string
+	authorCandidates     []string
+	authorCandidatesRepo string
 
 	spin          spinner.Model
 	width, height int
@@ -160,6 +190,54 @@ func openWeb(src webOpener, url string) tea.Cmd {
 	}
 }
 
+// fetchLabelCandidates and fetchAuthorCandidates ask for one repository's
+// chips. A failure here is not shown: the chips are a convenience, and there
+// is nothing the user has to act on, so it is dropped rather than taking the
+// notice line (.claude/rules/errors.md).
+func fetchLabelCandidates(src candidateSource, repo string) tea.Cmd {
+	return func() tea.Msg {
+		labels, err := src.ListLabels(context.Background(), repo)
+		if err != nil {
+			return nil
+		}
+		return labelCandidatesMsg{repo: repo, labels: labels}
+	}
+}
+
+func fetchAuthorCandidates(src candidateSource, repo string) tea.Cmd {
+	return func() tea.Msg {
+		users, err := src.ListAssignees(context.Background(), repo)
+		if err != nil {
+			return nil
+		}
+		return authorCandidatesMsg{repo: repo, users: users}
+	}
+}
+
+// maybeFetchCandidates asks for the chips of the filter pane's own cursor,
+// once per repository. It is called on every cursor move rather than kept as
+// a size-independent effect of the repo filter, since the chips are only
+// worth having while the cursor sits on the row they belong to.
+func (m Model) maybeFetchCandidates() (Model, tea.Cmd) {
+	repo := m.filters.Value(FilterRepo)
+	if repo == "" {
+		return m, nil
+	}
+	switch m.cursor {
+	case FilterLabel:
+		if m.labelCandidatesRepo == repo {
+			return m, nil
+		}
+		return m, fetchLabelCandidates(m.src, repo)
+	case FilterAuthor:
+		if m.authorCandidatesRepo == repo {
+			return m, nil
+		}
+		return m, fetchAuthorCandidates(m.src, repo)
+	}
+	return m, nil
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -196,6 +274,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case webErrMsg:
 		m.notice = msg.err.Error()
 		return m, nil
+	case labelCandidatesMsg:
+		if msg.repo != m.filters.Value(FilterRepo) {
+			return m, nil
+		}
+		m.labelCandidates = msg.labels
+		m.labelCandidatesRepo = msg.repo
+		return m, nil
+	case authorCandidatesMsg:
+		if msg.repo != m.filters.Value(FilterRepo) {
+			return m, nil
+		}
+		m.authorCandidates = msg.users
+		m.authorCandidatesRepo = msg.repo
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -222,12 +314,12 @@ func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if m.cursor < filterCount-1 {
 			m.cursor++
 		}
-		return m, nil
+		return m.maybeFetchCandidates()
 	case "k", "up":
 		if m.cursor > 0 {
 			m.cursor--
 		}
-		return m, nil
+		return m.maybeFetchCandidates()
 	case "space":
 		m.filters = m.filters.Cycle(m.cursor)
 		m.raw = ""
