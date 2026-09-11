@@ -6,11 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 var errSaveFailed = errors.New("open config.yaml: permission denied")
+
+func backspace() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyBackspace} }
 
 func TestAOpensTheAddDialog(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{Repositories: []string{"kukv/octoscope"}}), 120)
@@ -185,6 +189,36 @@ func TestAStaleTimerSearchesForNothing(t *testing.T) {
 	drain(t, cmd)
 	if f.searches != 0 {
 		t.Errorf("%d searches ran from a stale timer, want none", f.searches)
+	}
+}
+
+// Clearing the field searches for nothing, so nothing answers the tick it
+// scheduled. Saying "searching" until the next keystroke would hide the
+// field behind a request that is never coming.
+func TestClearingTheFieldStopsSayingItIsSearching(t *testing.T) {
+	f := &fakeSource{found: []gh.RepoCandidate{{Name: "charmbracelet/lipgloss"}}}
+	m := sized(New(f, Options{}), 120)
+	m, _ = m.Update(key("a"))
+	m = typeInto(m, "l")
+	m, cmd := m.Update(searchTickMsg{gen: m.searchGen})
+	for _, msg := range drain(t, cmd) {
+		m, _ = m.Update(msg)
+	}
+	if !strings.Contains(m.View(), "charmbracelet/lipgloss") {
+		t.Fatalf("setup: the suggestion never arrived:\n%s", m.View())
+	}
+
+	m, _ = m.Update(backspace())
+	m, cmd = m.Update(searchTickMsg{gen: m.searchGen})
+	for _, msg := range drain(t, cmd) {
+		m, _ = m.Update(msg)
+	}
+	view := m.View()
+	if strings.Contains(view, i18n.T("dialog.searching")) {
+		t.Errorf("an empty field is still searching:\n%s", view)
+	}
+	if strings.Contains(view, "charmbracelet/lipgloss") {
+		t.Errorf("the suggestion for a query that is gone is still listed:\n%s", view)
 	}
 }
 

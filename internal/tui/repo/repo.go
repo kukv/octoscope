@@ -283,6 +283,13 @@ func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 // root asks for once the lookup that finds it answers.
 func (m Model) Current() string { return m.opts.Current }
 
+// Capturing says every key belongs to this view for now. The root acts on q,
+// 1 and 2 before it hands a key to the tab, and a repository name carrying
+// one of them would quit octoscope or jump to the board mid-word. An overlay
+// on the root's own stack gets the same treatment; this is how a tab asks
+// for it.
+func (m Model) Capturing() bool { return m.mode == modeAdd }
+
 // selectRow is the single way the sidebar's cursor moves: from a key, from
 // the mouse, and from the lookup that names the current repository. It
 // clears the previous row's lists and starts fetching the new row's, which
@@ -389,6 +396,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// The pause is over only for the query it was started for: every
 		// keystroke schedules one, and all but the last are stale by now.
 		if msg.gen != m.searchGen || m.mode != modeAdd {
+			return m, nil
+		}
+		// An empty field has nothing to search for, so nothing would answer
+		// the request: saying "searching" here would leave that word on
+		// screen until the next keystroke.
+		if m.dlg.Query() == "" {
+			m.dlg = m.dlg.SetCandidates(nil)
 			return m, nil
 		}
 		m.dlg = m.dlg.Searching()

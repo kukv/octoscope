@@ -368,6 +368,33 @@ func TestAddingARepositoryFromTheReposTab(t *testing.T) {
 	}
 }
 
+// q quits and 1 and 2 switch tabs, and the root acts on all three before it
+// hands a key to the tab. A repository whose name carries one of them -- and
+// q is not rare -- would quit octoscope or jump to the board mid-word.
+func TestTypingAQuitKeyIntoTheDialogTypesIt(t *testing.T) {
+	f := &scenarioSource{pr: scenarioPR()}
+	m := scenarioModelWithRepos(t, f, []string{"kukv/octoscope"})
+
+	m = run(t, m, "2", "h", "j")
+	m = press(m, "a")
+
+	for _, k := range []string{"q", "1", "/", "2"} {
+		next, cmd := m.Update(key(k))
+		if isQuit(cmd) {
+			t.Fatalf("%q quit octoscope instead of reaching the field", k)
+		}
+		m = next.(Model)
+		if m.tab != tabRepos {
+			t.Fatalf("%q left the Repos tab", k)
+		}
+	}
+
+	m = run(t, m, "enter")
+	if !slices.Contains(f.saved, "q1/2") {
+		t.Errorf("saved = %v, want the name that was typed", f.saved)
+	}
+}
+
 // The same route for x, including the pane move h that has to reach the
 // sidebar first.
 func TestRemovingARepositoryFromTheReposTab(t *testing.T) {

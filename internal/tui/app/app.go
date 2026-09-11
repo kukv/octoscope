@@ -569,6 +569,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	var cmd tea.Cmd
+
+	// A tab with a field open takes every key, the same way an overlay does.
+	// Without this, typing a repository name with a q in it would quit.
+	if m.tab == tabRepos && m.repo.Capturing() {
+		m.repo, cmd = m.repo.Update(msg)
+		return m, cmd
+	}
+
 	switch msg.String() {
 	case "q":
 		return m, m.quit()
@@ -580,7 +589,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	var cmd tea.Cmd
 	if m.tab == tabWork {
 		m.work, cmd = m.work.Update(msg)
 	} else {
