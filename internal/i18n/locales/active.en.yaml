@@ -294,6 +294,10 @@ footer:
       other: "o: open"
     quit:
       other: "q: quit"
+    cancel:
+      other: "esc: cancel"
+    apply:
+      other: "enter: apply"
   close:
     other: "x:close"
   reopen:

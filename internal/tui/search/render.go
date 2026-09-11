@@ -130,7 +130,15 @@ func (m Model) keyBar() string {
 
 // footerHints is the key bar for whichever pane has the focus, most
 // important first. h/l cross between them, so each side names the other.
+//
+// While a field or the raw editor is open, every other key types into it
+// (.claude/rules/tui.md: mode, not a bool, decides what is drawn), so the
+// bar names only the way out and the way to confirm. esc leads because
+// FitKeyBar never drops the first hint: it is the only way out.
 func (m Model) footerHints() []string {
+	if m.Capturing() {
+		return []string{i18n.T("footer.search.cancel"), i18n.T("footer.search.apply")}
+	}
 	if m.pane == paneResults {
 		hints := []string{i18n.T("footer.search.move"), i18n.T("footer.search.open")}
 		if m.paneCols() > 0 {
