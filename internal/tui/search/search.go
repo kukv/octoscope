@@ -163,6 +163,13 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, runSearch(m.src, m.query(), m.gen))
 }
 
+// Refresh re-runs the current search. The parent calls it after an event
+// elsewhere changes what the results show — a submitted review or a merge,
+// say — the same way pressing r does.
+func (m Model) Refresh() (Model, tea.Cmd) {
+	return m.startSearch()
+}
+
 // startSearch runs the query for the filters or raw text as they stand now.
 func (m Model) startSearch() (Model, tea.Cmd) {
 	m.gen++
@@ -244,6 +251,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		if m.paneCols() == 0 {
 			m.pane = paneResults
+			// A typed filter's field is drawn inside the filter pane, which
+			// just folded away; the raw editor draws its own row above the
+			// panes regardless of width, so it is left open.
+			if m.mode == modeField {
+				m.mode = modeBrowse
+			}
 		}
 		return m, nil
 	case spinner.TickMsg:
@@ -326,6 +339,11 @@ func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		if m.cursor.Choices() != nil {
+			// space (above) clears raw when it moves a picked filter; enter
+			// on the same row must mean the same thing, or committing a
+			// filter here would silently run the untouched raw query
+			// instead of what the filters now mean.
+			m.raw = ""
 			return m.startSearch()
 		}
 		return m.openField(), nil

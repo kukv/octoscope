@@ -14,8 +14,8 @@ import (
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
-// The panes and the result table's columns, in display columns. The mockup
-// puts the filter names in a ten-column field and the results beside them.
+// The panes and the result table's columns, in display columns: the filter
+// names sit in a ten-column field, with the results beside them.
 const (
 	filterPaneWidth = 30
 	paneRule        = 1

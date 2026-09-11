@@ -56,9 +56,11 @@ type fakeSource struct {
 	saved       []string
 
 	searchItems []gh.WorkItem
+	searchCalls int
 }
 
 func (f *fakeSource) SearchItems(context.Context, string) ([]gh.WorkItem, error) {
+	f.searchCalls++
 	return f.searchItems, nil
 }
 
@@ -653,6 +655,38 @@ func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a merge")
+	}
+}
+
+// TestAMergeRefreshesSearchToo guards against Search being treated
+// differently from Work and Repos: reached through the root's own key
+// routing (3, then l, then enter), a pull request merged from Search's
+// detail view must re-run Search's own query too, not only the board and
+// the Repos list.
+func TestAMergeRefreshesSearchToo(t *testing.T) {
+	f := &fakeSource{searchItems: []gh.WorkItem{{
+		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
+		Title: "a result",
+	}}}
+	next, cmd := New(f, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+	m = press(m, "3")
+	m = press(m, "l")
+	m, cmd = pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+	if len(m.stack) == 0 {
+		t.Fatal("setup: opening the search result did not open a detail view")
+	}
+	before := f.searchCalls
+
+	_, cmd = m.Update(merge.MergedMsg{})
+	if cmd == nil {
+		t.Fatal("merge.MergedMsg produced no command")
+	}
+	resolve(t, m, cmd)
+
+	if f.searchCalls <= before {
+		t.Error("Search was not refreshed after a merge")
 	}
 }
 

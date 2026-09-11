@@ -251,6 +251,34 @@ func TestTheEditedQueryIsWhatIsSearchedFor(t *testing.T) {
 	}
 }
 
+// enter on a picked filter must drop a raw query the same way space does:
+// otherwise committing "a filter" on top of an edited raw query looks like
+// it applied the filter but silently keeps running the untouched raw text.
+func TestEnterOnAPickedFilterDropsTheRawQuery(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{}
+	m := New(src)
+	m = resolve(t, m, m.Init())
+
+	m, _ = press(m, "e")
+	for _, r := range " author:kukv" {
+		m, _ = press(m, string(r))
+	}
+	m, cmd := press(m, "enter")
+	m = resolve(t, m, cmd)
+	if src.query != "is:open author:kukv" {
+		t.Fatalf("setup: searched for %q, want the raw query", src.query)
+	}
+
+	m, cmd = press(m, "enter") // cursor is still on FilterType, a picked filter
+	resolve(t, m, cmd)
+
+	if src.query != "is:open" {
+		t.Errorf("searched for %q, want the filters' query with the raw query dropped", src.query)
+	}
+}
+
 func TestEnterOnAResultOpensIt(t *testing.T) {
 	t.Parallel()
 
@@ -300,6 +328,26 @@ func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
 	}
 	if _, ok := cmd().(OpenDetailMsg); !ok {
 		t.Errorf("sent %T, want OpenDetailMsg", cmd())
+	}
+}
+
+// Narrowing below the fold takes the filter pane off screen, and a typed
+// filter's field is drawn inside it. If mode stayed modeField, every key
+// after that would vanish into a field nothing on screen still shows.
+func TestNarrowingWhileATypedFieldIsOpenClosesIt(t *testing.T) {
+	t.Parallel()
+
+	m := sized(t, 120, nil)
+	m, _ = press(m, "j") // type -> state
+	m, _ = press(m, "j") // state -> org
+	m, _ = press(m, "enter")
+	if !m.Capturing() {
+		t.Fatal("setup: the field did not open")
+	}
+
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	if m.Capturing() {
+		t.Error("a field left open after the filter pane folded away eats every key silently")
 	}
 }
 
