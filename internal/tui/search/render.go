@@ -162,7 +162,7 @@ func (m Model) footerHints() []string {
 // and the whole pane is dimmed while the raw editor holds the query instead:
 // the filters are not rebuilt from what is typed there.
 func (m Model) filterPane() []string {
-	lines := []string{theme.Heading().Render(i18n.T("search.filters")), ""}
+	lines := []string{theme.Heading().Render(i18n.T("search.filters"))}
 	for id := FilterType; id < filterCount; id++ {
 		lines = append(lines, m.filterRow(id))
 	}
