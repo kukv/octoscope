@@ -91,9 +91,14 @@ func (m Model) summary() string {
 	if s.Failing > 0 {
 		parts = append(parts, theme.Error().Render(i18n.Tn("summary.failing", s.Failing)))
 	}
-	parts = append(parts, theme.Dim().Render(i18n.Tf("summary.updated", map[string]any{
-		"Ago": i18n.RelTime(m.now, s.FetchedAt),
-	})))
+	// A board every column of which failed is ready and has never been
+	// answered: there is no time to report, and the zero time would be dated
+	// from the year one.
+	if !s.FetchedAt.IsZero() {
+		parts = append(parts, theme.Dim().Render(i18n.Tf("summary.updated", map[string]any{
+			"Ago": i18n.RelTime(m.now, s.FetchedAt),
+		})))
+	}
 	return strings.Join(parts, theme.Dim().Render(" · "))
 }
 

@@ -365,6 +365,42 @@ func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 	}
 }
 
+// A fetch answers the tab it was started for, not whichever tab the user is
+// on when it comes back. Switching tabs does not bump gen -- only moving to
+// another repository does -- so the generation guard does not cover this: the
+// pull requests are still loading when the user moves to Issues, and their
+// fetch then fails.
+func TestAFailureLandsOnTheTabItsFetchWasStartedFor(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
+	if !m.loading[tabPRs] {
+		t.Fatal("setup: the pull requests are not being fetched")
+	}
+
+	m, cmd := m.Update(key("tab")) // to Issues, whose own fetch is now in flight
+	m, _ = m.Update(cmd())         // and answers
+	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
+
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, "HTTP 502") {
+		t.Errorf("the pull requests' failure landed on the Issues tab:\n%s", view)
+	}
+	if !strings.Contains(view, "an issue") {
+		t.Errorf("the Issues tab was not drawn:\n%s", view)
+	}
+	if m.loading[tabIssues] {
+		t.Error("the pull requests' failure stopped the Issues tab's spinner")
+	}
+	if m.loading[tabPRs] {
+		t.Error("the pull requests are still spinning after their own fetch failed")
+	}
+
+	m, _ = m.Update(key("tab")) // back to the pull requests
+	if got := ansi.Strip(m.View()); !strings.Contains(got, "HTTP 502") {
+		t.Errorf("the failure did not land on the tab whose fetch it was:\n%s", got)
+	}
+}
+
 // The address of an item nothing could open is the only way the user has left
 // to reach it. A fetch answers the list, not the browser, so it must not take
 // that line away.

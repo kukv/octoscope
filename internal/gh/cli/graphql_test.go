@@ -119,6 +119,30 @@ func TestEverySectionHasItsOwnSearch(t *testing.T) {
 
 // A section outside the board is a bug in the caller, not a search GitHub
 // should be asked to run.
+// The board is where the 502s were being seen: four searches leave GitHub's
+// front end four chances to refuse, and a column that gives up on the first
+// refusal is the failure this retry exists for.
+func TestAWorkSectionIsAskedAgainAfterATransientFailure(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	calls := 0
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		calls++
+		if calls == 1 {
+			return nil, gh.Classify(gh.ErrTransient, "gh api: gh: HTTP 502")
+		}
+		return []byte(emptyColumnJSON), nil
+	}
+
+	if _, err := c.ListWorkSection(context.Background(), gh.SectionAssigned); err != nil {
+		t.Fatalf("ListWorkSection: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("gh ran %d times, want 2: the column gave up on a failure worth retrying", calls)
+	}
+}
+
 func TestListWorkSectionRejectsASectionTheBoardDoesNotHave(t *testing.T) {
 	t.Parallel()
 

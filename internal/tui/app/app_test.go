@@ -44,6 +44,7 @@ type fakeSource struct {
 	// that did not are told apart by which columns were asked for, not by how
 	// many requests went out.
 	workSections []gh.WorkSection
+	workErr      error
 	prCalls      int
 	prRepos      []string
 	issueRepos   []string
@@ -52,7 +53,7 @@ type fakeSource struct {
 
 func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
 	f.workSections = append(f.workSections, s)
-	return f.work[s], nil
+	return f.work[s], f.workErr
 }
 
 // refreshedTheBoard reports whether every column was asked for. A column left
@@ -186,6 +187,24 @@ func press(m Model, k string) Model {
 func pressCmd(m Model, k string) (Model, tea.Cmd) {
 	next, cmd := m.Update(key(k))
 	return next.(Model), cmd
+}
+
+// A board every column of which failed has answered, but has never been
+// answered with anything: there is no age to report, and the zero time read
+// as an age is a hundred thousand days. Starting octoscope with no network
+// reaches this.
+func TestATabRowReportsNoAgeWhenNothingWasFetched(t *testing.T) {
+	f := &fakeSource{workErr: errors.New("gh api: gh: HTTP 502")}
+	m := New(f, Options{})
+	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, next.(Model), cmd)
+
+	if !m.work.Summary().Ready {
+		t.Fatal("setup: the board has not answered, so the row says nothing anyway")
+	}
+	if got := m.summary(); got != "" {
+		t.Errorf("the tab row dates a board that was never fetched: %q", ansi.Strip(got))
+	}
 }
 
 // resolve runs cmd and feeds every message it produces back into the model.
