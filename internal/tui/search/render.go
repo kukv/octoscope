@@ -41,6 +41,12 @@ const (
 
 func (m Model) View() string {
 	if m.width <= 0 {
+		// The root routes keys to this tab before the first size arrives, so
+		// the raw editor must show what was typed even without one to lay
+		// the rest of the screen out against.
+		if m.mode == modeRaw {
+			return m.queryRow()
+		}
 		return ""
 	}
 	lines := []string{m.queryRow(), ""}
@@ -73,9 +79,14 @@ func (m Model) resultWidth() int {
 }
 
 // queryRow is the raw query above the panes, with the count of what it
-// found at the right edge.
+// found at the right edge. While the raw editor is open it draws the field
+// itself instead, with no count: what it will find is not known until enter
+// runs it.
 func (m Model) queryRow() string {
-	query := m.filters.Query()
+	if m.mode == modeRaw {
+		return "q " + m.input.View()
+	}
+	query := m.query()
 	count := m.countText()
 	left := "q " + theme.Dim().Render(query)
 	room := max(m.width-ansi.StringWidth(count), 0)
@@ -108,34 +119,66 @@ func (m Model) keyBar() string {
 	return theme.Dim().Render(layout.FitKeyBar(m.footerHints(), m.width))
 }
 
-// footerHints is the key bar for the filter pane's focus: the only one
-// there is until a later slice gives the result pane its own (which will
-// use footer.search.open instead of edit_field/results). Task 4 wires the
-// keys these name; this slice only draws them, most important first.
+// footerHints is the key bar for whichever pane has the focus, most
+// important first. h/l cross between them, so each side names the other.
 func (m Model) footerHints() []string {
-	return []string{
+	if m.pane == paneResults {
+		hints := []string{i18n.T("footer.search.move"), i18n.T("footer.search.open")}
+		if m.paneCols() > 0 {
+			hints = append(hints, i18n.T("footer.search.back"))
+		}
+		return append(hints,
+			i18n.T("footer.search.diff"),
+			i18n.T("footer.search.web"),
+			i18n.T("footer.search.raw"),
+			i18n.T("footer.search.refresh"),
+			i18n.T("footer.search.quit"))
+	}
+	hints := []string{
 		i18n.T("footer.search.field"),
 		i18n.T("footer.search.cycle"),
 		i18n.T("footer.search.edit_field"),
-		i18n.T("footer.search.results"),
-		i18n.T("footer.search.raw"),
-		i18n.T("footer.search.quit"),
 	}
+	if m.paneCols() > 0 {
+		hints = append(hints, i18n.T("footer.search.results"))
+	}
+	return append(hints,
+		i18n.T("footer.search.raw"),
+		i18n.T("footer.search.refresh"),
+		i18n.T("footer.search.quit"))
 }
 
 // filterPane draws the eight filters, one per row: its name in a fixed
-// field, then its value.
+// field, then its value. The row under the pane's own cursor is reversed,
+// and the whole pane is dimmed while the raw editor holds the query instead:
+// the filters are not rebuilt from what is typed there.
 func (m Model) filterPane() []string {
 	lines := []string{theme.Heading().Render(i18n.T("search.filters")), ""}
 	for id := FilterType; id < filterCount; id++ {
-		value := m.filters.Value(id)
-		if value == "" {
-			value = i18n.T("search.unset")
-		}
-		lines = append(lines,
-			layout.Pad(theme.Dim().Render(i18n.T(filterLabelID(id))), filterNameWidth)+value)
+		lines = append(lines, m.filterRow(id))
 	}
 	return lines
+}
+
+func (m Model) filterRow(id FilterID) string {
+	label := layout.Pad(theme.Dim().Render(i18n.T(filterLabelID(id))), filterNameWidth)
+	if m.mode == modeField && id == m.cursor {
+		return label + m.input.View()
+	}
+
+	value := m.filters.Value(id)
+	if value == "" {
+		value = i18n.T("search.unset")
+	}
+	line := label + value
+
+	if m.mode == modeRaw {
+		return theme.Dim().Render(line)
+	}
+	if m.pane == paneFilters && id == m.cursor {
+		return theme.Selected().Render(line)
+	}
+	return line
 }
 
 // filterLabelID names the message ID for one filter's label, which is

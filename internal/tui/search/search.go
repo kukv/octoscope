@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -27,6 +28,12 @@ type Source interface {
 	webOpener
 }
 
+// OpenDetailMsg asks the parent to show the detail view for one item.
+type OpenDetailMsg struct{ Ref gh.ItemRef }
+
+// OpenDiffMsg asks the parent to show the diff of the selected pull request.
+type OpenDiffMsg struct{ Ref gh.ItemRef }
+
 // FatalMsg carries a failure the parent shows on its error screen. Only what
 // the user has to act on travels this way; a rejected query stays here as a
 // notice (see gh.IsFatal).
@@ -42,11 +49,47 @@ type errMsg struct {
 	err error
 }
 
+// webErrMsg carries a failure to open the browser. It is not tied to a
+// search generation: the query the item came from may since have changed,
+// but the browser call that failed has nothing to do with it.
+type webErrMsg struct{ err error }
+
+// pane says which half of the split screen j/k and enter act on.
+type pane int
+
+const (
+	paneFilters pane = iota
+	paneResults
+)
+
+// mode says which overlay is up: none, a typed filter's field, or the raw
+// query editor. It does not stack with pane (.claude/rules/tui.md).
+type mode int
+
+const (
+	modeBrowse mode = iota
+	modeField
+	modeRaw
+)
+
 type Model struct {
 	src Source
 
 	filters Filters
-	items   []gh.WorkItem
+	// raw is what the user typed into the raw query editor, and what a
+	// search uses once it is set. Touching a filter clears it, since the
+	// filters are not parsed back out of what was typed.
+	raw string
+	// cursor is the filter pane's own cursor, drawn as its selected row.
+	cursor FilterID
+
+	items []gh.WorkItem
+	// sel is the cursor into items, drawn by the result pane.
+	sel int
+
+	pane  pane
+	mode  mode
+	input textinput.Model
 
 	// gen counts the searches started. An answer that names an older one is
 	// dropped, which is what a query the user has since changed means.
@@ -60,9 +103,6 @@ type Model struct {
 	spin          spinner.Model
 	width, height int
 
-	// sel is the cursor into items, drawn by the result pane.
-	sel int
-
 	// fetchedAt is when items last arrived, for the rows' relative ages:
 	// View must not read the clock itself (.claude/rules/tui.md).
 	fetchedAt time.Time
@@ -74,8 +114,31 @@ func New(src Source) Model {
 	return Model{src: src, loading: true, spin: s}
 }
 
+// Capturing says every key belongs to the field or the raw editor while
+// either is open. The root acts on q, 1, 2 and 3 before a tab sees them, and
+// typing one of those into a query would quit octoscope or jump tabs
+// mid-word.
+func (m Model) Capturing() bool { return m.mode != modeBrowse }
+
+// query is what a search runs for: the raw query once the user has edited
+// one, otherwise what the filters mean.
+func (m Model) query() string {
+	if m.raw != "" {
+		return m.raw
+	}
+	return m.filters.Query()
+}
+
 func (m Model) Init() tea.Cmd {
-	return runSearch(m.src, m.filters.Query(), m.gen)
+	return tea.Batch(m.spin.Tick, runSearch(m.src, m.query(), m.gen))
+}
+
+// startSearch runs the query for the filters or raw text as they stand now.
+func (m Model) startSearch() (Model, tea.Cmd) {
+	m.gen++
+	m.loading = true
+	m.notice = ""
+	return m, runSearch(m.src, m.query(), m.gen)
 }
 
 func runSearch(src searcher, query string, gen int) tea.Cmd {
@@ -88,13 +151,20 @@ func runSearch(src searcher, query string, gen int) tea.Cmd {
 	}
 }
 
+func openWeb(src webOpener, url string) tea.Cmd {
+	return func() tea.Msg {
+		if err := src.OpenWeb(url); err != nil {
+			return webErrMsg{err: err}
+		}
+		return nil
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		// The first size arrives after Init, so the spinner's tick loop
-		// starts here rather than being batched with the search there.
-		return m, m.spin.Tick
+		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
@@ -120,6 +190,166 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.notice = msg.err.Error()
 		return m, nil
+	case webErrMsg:
+		m.notice = msg.err.Error()
+		return m, nil
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
 	}
 	return m, nil
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch m.mode {
+	case modeField:
+		return m.handleFieldKey(msg)
+	case modeRaw:
+		return m.handleRawKey(msg)
+	}
+	if m.pane == paneFilters {
+		return m.handleFilterKey(msg)
+	}
+	return m.handleResultKey(msg)
+}
+
+// handleFilterKey is browse mode with the filter pane focused.
+func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "j", "down":
+		if m.cursor < filterCount-1 {
+			m.cursor++
+		}
+		return m, nil
+	case "k", "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		return m, nil
+	case "space":
+		m.filters = m.filters.Cycle(m.cursor)
+		m.raw = ""
+		return m, nil
+	case "enter":
+		if m.cursor.Choices() != nil {
+			return m.startSearch()
+		}
+		return m.openField(), nil
+	case "l", "right":
+		if m.paneCols() > 0 {
+			m.pane = paneResults
+		}
+		return m, nil
+	case "e":
+		return m.openRaw(), nil
+	case "r":
+		return m.startSearch()
+	}
+	return m, nil
+}
+
+// handleResultKey is browse mode with the result pane focused.
+func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "j", "down":
+		if m.sel < len(m.items)-1 {
+			m.sel++
+		}
+		return m, nil
+	case "k", "up":
+		if m.sel > 0 {
+			m.sel--
+		}
+		return m, nil
+	case "h", "left":
+		if m.paneCols() > 0 {
+			m.pane = paneFilters
+		}
+		return m, nil
+	case "enter":
+		ref, ok := m.selectedRef()
+		if !ok {
+			return m, nil
+		}
+		return m, func() tea.Msg { return OpenDetailMsg{Ref: ref} }
+	case "d":
+		ref, ok := m.selectedRef()
+		// An issue has no diff. Opening an empty diff view would be a worse
+		// answer than doing nothing.
+		if !ok || ref.Kind != gh.ItemPR {
+			return m, nil
+		}
+		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
+	case "o":
+		if len(m.items) == 0 {
+			return m, nil
+		}
+		return m, openWeb(m.src, m.items[m.sel].URL)
+	case "e":
+		return m.openRaw(), nil
+	case "r":
+		return m.startSearch()
+	}
+	return m, nil
+}
+
+// selectedRef names the item under the result cursor. ok is false when
+// there is nothing to select.
+func (m Model) selectedRef() (gh.ItemRef, bool) {
+	if m.sel < 0 || m.sel >= len(m.items) {
+		return gh.ItemRef{}, false
+	}
+	return m.items[m.sel].Ref, true
+}
+
+// openField opens the input for the typed filter under the cursor.
+func (m Model) openField() Model {
+	m.mode = modeField
+	m.input = textinput.New()
+	m.input.SetValue(m.filters.Value(m.cursor))
+	m.input.Focus()
+	return m
+}
+
+// openRaw opens the raw query editor on what the filters currently mean, or
+// on what was last typed into it.
+func (m Model) openRaw() Model {
+	m.mode = modeRaw
+	m.input = textinput.New()
+	m.input.SetValue(m.query())
+	if m.width > 0 {
+		m.input.SetWidth(max(m.width-len("q "), 1))
+	}
+	m.input.Focus()
+	return m
+}
+
+func (m Model) handleFieldKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = modeBrowse
+		return m, nil
+	case "enter":
+		m.filters = m.filters.Set(m.cursor, m.input.Value())
+		m.raw = ""
+		m.mode = modeBrowse
+		return m.startSearch()
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleRawKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = modeBrowse
+		return m, nil
+	case "enter":
+		m.raw = m.input.Value()
+		m.mode = modeBrowse
+		return m.startSearch()
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }

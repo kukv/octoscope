@@ -272,6 +272,16 @@ footer:
       other: "e:生クエリ"
     open:
       other: "enter:詳細"
+    move:
+      other: "j/k:移動"
+    back:
+      other: "h:フィルタへ"
+    refresh:
+      other: "r:再検索"
+    diff:
+      other: "d:diff"
+    web:
+      other: "o:Web"
     quit:
       other: "q:終了"
   close:

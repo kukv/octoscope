@@ -282,6 +282,16 @@ footer:
       other: "e: raw query"
     open:
       other: "enter: detail"
+    move:
+      other: "j/k: move"
+    back:
+      other: "h: filters"
+    refresh:
+      other: "r: search again"
+    diff:
+      other: "d: diff"
+    web:
+      other: "o: open"
     quit:
       other: "q: quit"
   close:
