@@ -82,12 +82,21 @@ func (m Model) queryRow() string {
 }
 
 // countText is what the query row says it found: the exact count, or
-// search.truncated once a full page may have been cut short.
+// search.truncated with the count's own unit word once a full page may
+// have been cut short ("50+ results"): "50+" is not a real quantity, so it
+// borrows the word rather than asking Tn to pluralize it.
 func (m Model) countText() string {
 	if len(m.items) >= searchCap {
-		return i18n.T("search.truncated")
+		return i18n.T("search.truncated") + " " + resultUnit()
 	}
 	return i18n.Tn("search.result_count", len(m.items))
+}
+
+// resultUnit is the word search.result_count puts after the number, split
+// out for countText's truncated case.
+func resultUnit() string {
+	_, unit, _ := strings.Cut(i18n.Tn("search.result_count", 2), " ")
+	return unit
 }
 
 // countBadge is the same count, without the translated unit word: the
@@ -104,14 +113,18 @@ func (m Model) keyBar() string {
 	return theme.Dim().Render(layout.FitKeyBar(m.footerHints(), m.width))
 }
 
-// footerHints is the Search tab's own key bar. Task 4 wires the keys these
-// name; this slice only draws them.
+// footerHints is the key bar for the filter pane's focus: the only one
+// there is until a later slice gives the result pane its own (which will
+// use footer.search.open instead of edit_field/results). Task 4 wires the
+// keys these name; this slice only draws them, most important first.
 func (m Model) footerHints() []string {
 	return []string{
 		i18n.T("footer.search.field"),
 		i18n.T("footer.search.cycle"),
+		i18n.T("footer.search.edit_field"),
 		i18n.T("footer.search.results"),
 		i18n.T("footer.search.raw"),
+		i18n.T("footer.search.quit"),
 	}
 }
 
