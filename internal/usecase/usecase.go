@@ -51,6 +51,7 @@ type lister interface {
 type crossRepoLister interface {
 	ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)
 	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
+	SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error)
 }
 
 // repoFinder is what the add dialog offers: candidates while it is typed

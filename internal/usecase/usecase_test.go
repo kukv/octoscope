@@ -414,6 +414,38 @@ func TestRerunWorkflowReachesTheBackend(t *testing.T) {
 	}
 }
 
+// fakeCrossRepo records the query SearchItems was asked to run.
+type fakeCrossRepo struct {
+	searchQuery string
+	err         error
+}
+
+func (f *fakeCrossRepo) ListWorkSection(_ context.Context, _ gh.WorkSection) ([]gh.WorkItem, error) {
+	return nil, f.err
+}
+
+func (f *fakeCrossRepo) RepoCounts(_ context.Context, _ []string) ([]gh.RepoCount, error) {
+	return nil, f.err
+}
+
+func (f *fakeCrossRepo) SearchItems(_ context.Context, query string) ([]gh.WorkItem, error) {
+	f.searchQuery = query
+	return nil, f.err
+}
+
+func TestSearchItemsReachesTheGitHubLayer(t *testing.T) {
+	t.Parallel()
+
+	f := &fakeCrossRepo{}
+	u := &Usecase{crossRepo: f}
+	if _, err := u.SearchItems(t.Context(), "is:open is:pr"); err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+	if f.searchQuery != "is:open is:pr" {
+		t.Errorf("the query reached the layer as %q", f.searchQuery)
+	}
+}
+
 func TestEditAssigneesPicksTheCallByKind(t *testing.T) {
 	t.Parallel()
 
