@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -84,12 +85,22 @@ func goldenModel(width int) Model {
 	return m
 }
 
+// goldenFailure is what GitHub says when its front end will not answer. It is
+// long on purpose: the notice has to survive a narrow terminal.
+const goldenFailure = "gh api: HTTP 502: Bad gateway (https://api.github.com/graphql)"
+
 func TestGolden(t *testing.T) {
 	for _, lang := range goldenLanguages {
 		for _, w := range goldenWidths {
 			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+				// The list the user is left with when a refetch fails: the
+				// rows it already had, and a line saying what GitHub said.
+				failed := goldenModel(w)
+				failed, _ = failed.Update(errMsg{gen: failed.gen, err: errors.New(goldenFailure)})
+				golden.Assert(t, fmt.Sprintf("repo_failed_%s_%d", lang.name, w), failed.View())
 
 				prs := goldenModel(w)
 				issues, cmd := prs.Update(key("tab"))

@@ -22,6 +22,13 @@ func ClipLines(s string, w int) string {
 	return strings.Join(lines, "\n")
 }
 
+// Notice renders one line of what went wrong, cut to the terminal's width.
+// It is a line of its own rather than part of the key bar: the Japanese key
+// bar already fills eighty columns.
+func Notice(text string, width int) string {
+	return ClipLines(text, width)
+}
+
 // FitKeyBar joins hints in order and drops from the low-priority end (the
 // tail of the slice) until the joined line fits width. No ellipsis: a bar
 // that shows fewer hints cleanly beats one that shows more but cuts one off

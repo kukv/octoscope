@@ -11,6 +11,7 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
+	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -67,7 +68,27 @@ func (m Model) View() string {
 	if m.drawerShown() {
 		lines = append(lines, m.drawer()...)
 	}
-	return strings.Join(append(lines, "", m.keyBar()), "\n")
+	lines = append(lines, "")
+	if n := m.noticeLine(); n != "" {
+		lines = append(lines, n)
+	}
+	return strings.Join(append(lines, m.keyBar()), "\n")
+}
+
+// noticeLine is what the board could not fetch, above the key bar. Several
+// columns can fail at once and only one line is on offer, so it is the first
+// in the order the columns are drawn in: the notice names no column, and any
+// other choice would be one the user cannot follow. Which column failed is
+// told by the column itself (see columnLines).
+func (m Model) noticeLine() string {
+	for _, s := range gh.WorkSections() {
+		if m.notice[s] == "" {
+			continue
+		}
+		text := i18n.T("notice.fetch_failed") + " · " + m.notice[s]
+		return theme.Error().Render(layout.Notice(text, m.width))
+	}
+	return ""
 }
 
 func (m Model) keyBar() string {
@@ -99,6 +120,9 @@ func (m Model) boardHeight() int {
 	h := m.height - m.boardTop() - footerHeight
 	if m.drawerShown() {
 		h -= drawerHeight
+	}
+	if m.noticeLine() != "" {
+		h--
 	}
 	return max(h, headingHeight+m.cardHeight())
 }
@@ -169,6 +193,12 @@ func (m Model) columnLines(s gh.WorkSection, w, height int) []string {
 		return append(lines, fit(gutter+m.spin.View()+" "+i18n.T("common.loading"), w))
 	}
 	if len(items) == 0 {
+		// The empty-column text would report an outage as good news. Only a
+		// column that has never been answered is empty in the first place: a
+		// failed refetch keeps the cards it had, which is the point.
+		if m.state[s] == colFailed {
+			return append(lines, theme.Error().Render(fit(gutter+i18n.T("notice.fetch_failed"), w)))
+		}
 		return append(lines, theme.Dim().Render(fit(gutter+i18n.T("work.empty_column"), w)))
 	}
 

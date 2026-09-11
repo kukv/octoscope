@@ -252,3 +252,14 @@ type RepoCount struct {
 	PRs, Issues int
 	Unavailable bool
 }
+
+// IsFatal reports whether the user has to act before anything can work. Every
+// other failure is worth a line above the key bar and another try.
+//
+// It lives here rather than in each view because the sentinels it asks about
+// are this package's own: a second copy of the list would be free to fall
+// behind the sentinels it names, and the Work board and the Repos list would
+// then disagree about what costs the user their screen.
+func IsFatal(err error) bool {
+	return errors.Is(err, ErrGhNotFound) || errors.Is(err, ErrUnauthenticated)
+}

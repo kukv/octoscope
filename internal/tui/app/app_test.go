@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -577,8 +578,8 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 		open bool
 		msg  tea.Msg
 	}{
-		"work":   {msg: work.ErrorMsg{Err: errors.New("boom")}},
-		"repo":   {msg: repo.ErrorMsg{Err: errors.New("boom")}},
+		"work":   {msg: work.FatalMsg{Err: errors.New("boom")}},
+		"repo":   {msg: repo.FatalMsg{Err: errors.New("boom")}},
 		"detail": {open: true, msg: detail.ErrorMsg{Err: errors.New("boom")}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -601,10 +602,20 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 
 func TestGhNotFoundIsTranslated(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: gh.ErrGhNotFound})
+		Update(work.FatalMsg{Err: gh.ErrGhNotFound})
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.gh_not_found")) {
 		t.Errorf("gh_not_found was not translated:\n%s", view)
+	}
+}
+
+// Credentials are the user's to fix, and gh's own wording does not say how.
+func TestUnauthenticatedIsTranslated(t *testing.T) {
+	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
+		Update(work.FatalMsg{Err: fmt.Errorf("gh pr list: %w", gh.ErrUnauthenticated)})
+	view := content(next.(Model))
+	if !strings.Contains(view, i18n.T("error.unauthenticated")) {
+		t.Errorf("unauthenticated was not translated:\n%s", view)
 	}
 }
 
@@ -614,7 +625,7 @@ func TestGhNotFoundIsTranslated(t *testing.T) {
 func TestNoBrowserShowsTheAddress(t *testing.T) {
 	const url = "https://github.com/kukv/octoscope/pull/55"
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: &browser.NoneError{URL: url}})
+		Update(work.FatalMsg{Err: &browser.NoneError{URL: url}})
 	view := content(next.(Model))
 	if !strings.Contains(view, url) {
 		t.Errorf("the error screen does not carry the address:\n%s", view)
@@ -625,7 +636,7 @@ func TestErrorScreenKeysQuit(t *testing.T) {
 	for _, k := range []string{"q", "esc", "ctrl+c"} {
 		t.Run(k, func(t *testing.T) {
 			next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-				Update(work.ErrorMsg{Err: errors.New("boom")})
+				Update(work.FatalMsg{Err: errors.New("boom")})
 			_, cmd := next.(Model).Update(key(k))
 			if !isQuit(cmd) {
 				t.Errorf("%s did not quit from the error screen", k)
@@ -693,7 +704,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
-	next, _ = m.Update(work.ErrorMsg{Err: errors.New("boom")})
+	next, _ = m.Update(work.FatalMsg{Err: errors.New("boom")})
 	m = next.(Model)
 	if m.errText == "" {
 		t.Fatal("the error screen did not show")
@@ -714,7 +725,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 // back to, so it must keep quitting like q does.
 func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: errors.New("boom")})
+		Update(work.FatalMsg{Err: errors.New("boom")})
 	m := next.(Model)
 	if len(m.stack) != 0 {
 		t.Fatalf("stack = %v, want empty for this case", m.stack)
@@ -738,7 +749,7 @@ func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
 	}
 
 	noOverlay, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: errors.New("boom")})
+		Update(work.FatalMsg{Err: errors.New("boom")})
 	view = content(noOverlay.(Model))
 	if strings.Contains(view, i18n.T("footer.error.esc")) {
 		t.Errorf("key bar offers esc:back with nothing to go back to:\n%s", view)
@@ -987,7 +998,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 	item, cmd := reposM.Update(key("enter"))
 	item = resolve(t, item.(Model), cmd)
 
-	failed, _ := board.Update(work.ErrorMsg{Err: errors.New(overlongTitle)})
+	failed, _ := board.Update(work.FatalMsg{Err: errors.New(overlongTitle)})
 
 	// An error tied to an overlay draws a different key bar (esc:back, not
 	// just q:quit) from the board/Repos-list case above, and that bar's IDs

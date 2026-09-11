@@ -56,8 +56,10 @@ type OpenDiffMsg struct{ Ref gh.ItemRef }
 // request.
 type OpenChecksMsg struct{ Ref gh.ItemRef }
 
-// ErrorMsg carries a failure the parent shows on its error screen.
-type ErrorMsg struct{ Err error }
+// FatalMsg carries a failure the parent shows on its error screen. Only what
+// the user has to act on travels this way; everything else stays on the list
+// as a notice (see gh.IsFatal).
+type FatalMsg struct{ Err error }
 
 type (
 	prListMsg struct {
@@ -120,6 +122,11 @@ type Model struct {
 	loaded  [2]bool
 	loading [2]bool
 
+	// notice is what went wrong with the last fetch or the last o: the list
+	// carries on with what it already has, and r asks again. A successful
+	// fetch clears it, so a stale complaint never outlives what it described.
+	notice string
+
 	// gen counts how many times selectRow has run. A fetch or the errMsg it
 	// can produce carries the generation it started in; Update drops one
 	// whose generation no longer matches, which is what a row the cursor has
@@ -176,6 +183,7 @@ func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.gen++
 	m.prs, m.issues = nil, nil
 	m.loaded, m.cursors = [2]bool{}, [2]int{}
+	m.notice = ""
 	if len(m.rows) == 0 {
 		return m, nil
 	}
@@ -198,6 +206,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading[m.tab] = true
+	// The notice goes with the answer it described: a list that is being
+	// asked again has no failure to report until the new request answers.
+	m.notice = ""
 	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
@@ -285,6 +296,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.prs = msg.prs
 		m.loaded[tabPRs] = true
+		m.notice = ""
 		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
@@ -297,6 +309,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.issues = msg.issues
 		m.loaded[tabIssues] = true
+		m.notice = ""
 		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
@@ -311,8 +324,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading[m.tab] = false
-		err := msg.err
-		return m, func() tea.Msg { return ErrorMsg{err} }
+		if gh.IsFatal(msg.err) {
+			err := msg.err
+			return m, func() tea.Msg { return FatalMsg{err} }
+		}
+		m.notice = msg.err.Error()
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:

@@ -275,18 +275,69 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 	}
 }
 
-func TestFetchFailureBecomesAnErrorMsg(t *testing.T) {
-	m := New(&fakeSource{err: errors.New("boom")})
-	_, cmd := m.Update(errMsg{section: gh.SectionAssigned, err: errors.New("boom")})
+// A failure the user can do nothing about must not cost them the board they
+// already have. It says what happened above the key bar and r asks again.
+func TestATransientFailureKeepsTheBoard(t *testing.T) {
+	m := sized(New(&fakeSource{}))
+	m, _ = m.Update(workMsg{section: gh.SectionAssigned, items: sampleItems()})
+	m, cmd := m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+	if cmd != nil {
+		if _, fatal := cmd().(FatalMsg); fatal {
+			t.Error("a transient failure reached the full-screen error")
+		}
+	}
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, sampleItems()[0].Title) {
+		t.Errorf("the board was lost:\n%s", view)
+	}
+	if !strings.Contains(view, "HTTP 502") {
+		t.Errorf("the notice does not say what GitHub said:\n%s", view)
+	}
+}
+
+// Only what the user must act on takes the whole screen.
+func TestAMissingGhIsFatal(t *testing.T) {
+	m := sized(New(&fakeSource{}))
+	_, cmd := m.Update(errMsg{section: gh.SectionYourPRs, err: gh.ErrGhNotFound})
 	if cmd == nil {
-		t.Fatal("no command returned for a failed fetch")
+		t.Fatal("a missing gh produced no message")
 	}
-	got, ok := cmd().(ErrorMsg)
-	if !ok {
-		t.Fatalf("got %T, want ErrorMsg", cmd())
+	if _, fatal := cmd().(FatalMsg); !fatal {
+		t.Errorf("a missing gh produced %T, want FatalMsg", cmd())
 	}
-	if got.Err.Error() != "boom" {
-		t.Errorf("got %q, want boom", got.Err)
+}
+
+// A complaint that outlives what it described is a lie.
+func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
+	m := sized(New(&fakeSource{}))
+	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(workMsg{section: gh.SectionYourPRs, items: sampleItems()})
+	if strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
+		t.Errorf("the notice outlived the failure:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// A column nobody has anything for and a column GitHub would not answer look
+// the same until one of them says so: both are empty. Before the board stayed
+// on screen the full-screen error hid that; now nothing else would.
+func TestAFailedColumnDoesNotReadAsAnEmptyOne(t *testing.T) {
+	board := func(msg tea.Msg) string {
+		m := sized(New(&fakeSource{}))
+		for _, s := range []gh.WorkSection{gh.SectionReviewRequested, gh.SectionAssigned, gh.SectionMentioned} {
+			m, _ = m.Update(workMsg{section: s, items: sampleItems()})
+		}
+		m, _ = m.Update(msg)
+		return ansi.Strip(m.View())
+	}
+
+	empty := board(workMsg{section: gh.SectionYourPRs})
+	failed := board(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+
+	if !strings.Contains(empty, i18n.T("work.empty_column")) {
+		t.Fatalf("an empty column does not say it is empty:\n%s", empty)
+	}
+	if strings.Contains(failed, i18n.T("work.empty_column")) {
+		t.Errorf("a column GitHub would not answer is drawn as an empty one:\n%s", failed)
 	}
 }
 

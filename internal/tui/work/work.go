@@ -39,8 +39,10 @@ type OpenDiffMsg struct{ Ref gh.ItemRef }
 // request.
 type OpenChecksMsg struct{ Ref gh.ItemRef }
 
-// ErrorMsg carries a failure the parent shows on its error screen.
-type ErrorMsg struct{ Err error }
+// FatalMsg carries a failure the parent shows on its error screen. Only what
+// the user has to act on travels this way; everything else stays on the board
+// as a notice (see gh.IsFatal).
+type FatalMsg struct{ Err error }
 
 // colState is where one column stands. It is one value rather than a bool
 // per condition: "loading" and "answered" as two bools name four states of
@@ -72,6 +74,11 @@ type Model struct {
 	// one state as a whole.
 	state [gh.WorkSectionCount]colState
 
+	// notice is what GitHub said about a column the board carries on without:
+	// the previous answer is still on screen and r asks again. A successful
+	// fetch clears it, so a stale complaint never outlives what it described.
+	notice [gh.WorkSectionCount]string
+
 	// fetchedAt is when each column's data arrived. The cards show relative
 	// times, and View must render the same string from the same state, so the
 	// clock is read once in Update rather than on every draw.
@@ -99,6 +106,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	// The spinner ticks from here rather than from an Init the board does not
 	// have: the animation starts with the fetch it belongs to.
 	cmds := []tea.Cmd{m.spin.Tick}
+	// The notices go with the answers they described: a column that is being
+	// asked again has no failure to report until the new request answers.
+	m.notice = [gh.WorkSectionCount]string{}
 	for _, s := range gh.WorkSections() {
 		m.state[s] = colLoading
 		cmds = append(cmds, fetchSection(ctx, m.src, s))
@@ -155,6 +165,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, cmd
 	case workMsg:
 		m.state[msg.section] = colLoaded
+		m.notice[msg.section] = ""
 		m.releaseFetch()
 		m.work[msg.section] = msg.items
 		m.fetchedAt[msg.section] = time.Now()
@@ -162,8 +173,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case errMsg:
 		m.state[msg.section] = colFailed
 		m.releaseFetch()
-		err := msg.err
-		return m, func() tea.Msg { return ErrorMsg{err} }
+		if gh.IsFatal(msg.err) {
+			err := msg.err
+			return m, func() tea.Msg { return FatalMsg{err} }
+		}
+		m.notice[msg.section] = msg.err.Error()
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
