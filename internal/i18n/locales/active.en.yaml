@@ -59,6 +59,8 @@ repos:
     other: "No repositories yet"
   add_button:
     other: "+ Add a repository"
+  seed_hint:
+    other: "Press g to pick from the repositories you already have"
 
 dialog:
   add_repo_title:
@@ -218,6 +220,8 @@ footer:
       other: "a:add"
     remove:
       other: "x:remove"
+    seed:
+      other: "g:import"
     diff:
       other: "d:diff"
     checks:

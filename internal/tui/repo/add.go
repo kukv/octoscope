@@ -34,6 +34,25 @@ func (m Model) openAddDialog() (Model, tea.Cmd) {
 	return m, nil
 }
 
+// seed opens the dialog on the repositories the user already has, which is
+// the only way out of a first run's empty list that does not mean typing
+// every name by hand. They are offered rather than added: an account can
+// hold dozens, and adding all of them would leave x as the only way back.
+func (m Model) seed() (Model, tea.Cmd) {
+	m, _ = m.openAddDialog()
+	m.dlg = m.dlg.Searching()
+	m.searchGen++
+	gen := m.searchGen
+	src := m.src
+	return m, func() tea.Msg {
+		found, err := src.SeedCandidates(context.Background())
+		if err != nil {
+			return candidatesMsg{gen: gen}
+		}
+		return candidatesMsg{gen: gen, candidates: found}
+	}
+}
+
 func (m Model) handleAddKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":

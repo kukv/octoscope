@@ -483,6 +483,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.openAddDialog()
 	case "x":
 		return m.removeSelected()
+	case "g":
+		return m.seed()
 	case "tab":
 		if m.tab == tabPRs {
 			return m.showTab(tabIssues, true)

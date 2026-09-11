@@ -10,4 +10,4 @@ kukv/koto                    [38;2;139;148;158m—[m[38;2;38;45;57m│[m
                               [38;2;38;45;57m│[m[38;2;139;148;158mchecks なし[m
                               [38;2;38;45;57m│[m
 
-[38;2;139;148;158mj/k:移動  enter:詳細  h/l:ペイン  tab:PR/Issue  q:終了  r:更新  a:追加  x:削除  d:diff  s:checks  o:Web[m
+[38;2;139;148;158mj/k:移動  enter:詳細  h/l:ペイン  tab:PR/Issue  q:終了  r:更新  a:追加  x:削除  g:取り込み  d:diff  s:checks  o:Web[m

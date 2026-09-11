@@ -83,6 +83,7 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.list.refresh"),
 		i18n.T("footer.list.add"),
 		i18n.T("footer.list.remove"),
+		i18n.T("footer.list.seed"),
 		i18n.T("footer.list.diff"),
 		i18n.T("footer.list.checks"),
 		i18n.T("footer.list.web"),
@@ -147,11 +148,15 @@ func (m Model) body() []string {
 		if len(m.rows) == 0 && !m.currentSettled {
 			return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
 		}
+		if len(m.rows) == 0 {
+			return []string{
+				theme.Dim().Render(clip(i18n.T("repos.none"), m.bodyWidth())),
+				"",
+				theme.Accent().Render(clip(i18n.T("repos.seed_hint"), m.bodyWidth())),
+			}
+		}
 		empty := i18n.T("list.no_open_prs")
-		switch {
-		case len(m.rows) == 0:
-			empty = i18n.T("repos.none")
-		case m.tab == tabIssues:
+		if m.tab == tabIssues {
 			empty = i18n.T("list.no_open_issues")
 		}
 		return []string{theme.Dim().Render(clip(empty, m.bodyWidth()))}

@@ -59,6 +59,8 @@ repos:
     other: "リポジトリがまだありません"
   add_button:
     other: "＋ リポジトリを追加"
+  seed_hint:
+    other: "g で自分のリポジトリから選べます"
 
 dialog:
   add_repo_title:
@@ -212,6 +214,8 @@ footer:
       other: "a:追加"
     remove:
       other: "x:削除"
+    seed:
+      other: "g:取り込み"
     diff:
       other: "d:diff"
     checks:
