@@ -304,6 +304,13 @@ func TestAFailureToOpenTheBrowserIsNotFatal(t *testing.T) {
 	if !strings.Contains(view, samplePRs()[0].URL) {
 		t.Errorf("the notice does not name the address to open by hand:\n%s", view)
 	}
+	// A browser that would not start has nothing to do with fetching.
+	if strings.Contains(view, i18n.T("notice.fetch_failed")) {
+		t.Errorf("the notice blames the fetch for the browser:\n%s", view)
+	}
+	if !strings.Contains(view, i18n.T("notice.open_failed")) {
+		t.Errorf("the notice does not say what could not be done:\n%s", view)
+	}
 }
 
 // The notice takes a line, and it has to come out of the table rather than
@@ -360,8 +367,8 @@ func TestAStaleFetchFailureIsDropped(t *testing.T) {
 	if !m.loading[tabPRs] {
 		t.Error("a stale error cleared the loading of the row now on screen")
 	}
-	if m.notice != "" {
-		t.Errorf("a stale error complained about the row now on screen: %q", m.notice)
+	if m.notice.text != "" {
+		t.Errorf("a stale error complained about the row now on screen: %q", m.notice.text)
 	}
 }
 

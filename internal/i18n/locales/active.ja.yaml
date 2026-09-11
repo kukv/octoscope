@@ -25,6 +25,8 @@ error:
 notice:
   fetch_failed:
     other: "取得できませんでした"
+  open_failed:
+    other: "開けませんでした"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same

@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
@@ -101,6 +102,16 @@ func TestGolden(t *testing.T) {
 				failed := goldenModel(w)
 				failed, _ = failed.Update(errMsg{gen: failed.gen, err: errors.New(goldenFailure)})
 				golden.Assert(t, fmt.Sprintf("repo_failed_%s_%d", lang.name, w), failed.View())
+
+				// The other failure that reaches the same line, which must
+				// not blame the fetch for what the browser did.
+				noBrowser := goldenModel(w)
+				noBrowser, _ = noBrowser.Update(errMsg{
+					gen:  noBrowser.gen,
+					kind: noticeOpen,
+					err:  &browser.NoneError{URL: "https://github.com/kukv/octoscope/pull/1"},
+				})
+				golden.Assert(t, fmt.Sprintf("repo_no_browser_%s_%d", lang.name, w), noBrowser.View())
 
 				prs := goldenModel(w)
 				issues, cmd := prs.Update(key("tab"))

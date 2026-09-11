@@ -72,10 +72,42 @@ type (
 	}
 	repoCountsMsg []gh.RepoCount
 	errMsg        struct {
-		gen int
-		err error
+		gen  int
+		kind noticeKind
+		err  error
 	}
 )
+
+// noticeKind says which failure the line above the key bar is reporting. The
+// words in front of what the environment said differ: a browser that would
+// not start has nothing to do with fetching, and saying it could not fetch
+// would be a lie. The zero value is the fetch, which is where all but one of
+// these come from.
+type noticeKind uint8
+
+const (
+	noticeFetch noticeKind = iota
+	noticeOpen
+)
+
+// prefixID is the catalog key for the words in front of the notice. What the
+// environment said follows them untranslated (.claude/rules/errors.md).
+func (k noticeKind) prefixID() string {
+	if k == noticeOpen {
+		return "notice.open_failed"
+	}
+	return "notice.fetch_failed"
+}
+
+// notice is what went wrong with the last fetch or the last o: the list
+// carries on with what it already has, and r asks again. text is what the
+// environment said, untranslated and so never empty while there is anything
+// to report; the words around it are chosen when the line is drawn, because
+// the language can change between two draws of the same model.
+type notice struct {
+	kind noticeKind
+	text string
+}
 
 type tabID int
 
@@ -122,10 +154,9 @@ type Model struct {
 	loaded  [2]bool
 	loading [2]bool
 
-	// notice is what went wrong with the last fetch or the last o: the list
-	// carries on with what it already has, and r asks again. A successful
-	// fetch clears it, so a stale complaint never outlives what it described.
-	notice string
+	// notice is the failure the list carries on despite. A successful fetch
+	// clears it, so a stale complaint never outlives what it described.
+	notice notice
 
 	// gen counts how many times selectRow has run. A fetch or the errMsg it
 	// can produce carries the generation it started in; Update drops one
@@ -183,7 +214,7 @@ func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.gen++
 	m.prs, m.issues = nil, nil
 	m.loaded, m.cursors = [2]bool{}, [2]int{}
-	m.notice = ""
+	m.notice = notice{}
 	if len(m.rows) == 0 {
 		return m, nil
 	}
@@ -208,7 +239,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	m.loading[m.tab] = true
 	// The notice goes with the answer it described: a list that is being
 	// asked again has no failure to report until the new request answers.
-	m.notice = ""
+	m.notice = notice{}
 	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
@@ -256,7 +287,7 @@ func fetchCounts(src repoCounter, repos []string) tea.Cmd {
 func openWeb(src Source, url string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
-			return errMsg{gen: gen, err: err}
+			return errMsg{gen: gen, kind: noticeOpen, err: err}
 		}
 		return nil
 	}
@@ -296,7 +327,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.prs = msg.prs
 		m.loaded[tabPRs] = true
-		m.notice = ""
+		m.notice = notice{}
 		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
@@ -309,7 +340,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.issues = msg.issues
 		m.loaded[tabIssues] = true
-		m.notice = ""
+		m.notice = notice{}
 		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
@@ -328,7 +359,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			err := msg.err
 			return m, func() tea.Msg { return FatalMsg{err} }
 		}
-		m.notice = msg.err.Error()
+		m.notice = notice{kind: msg.kind, text: msg.err.Error()}
 		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)

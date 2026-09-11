@@ -25,6 +25,8 @@ error:
 notice:
   fetch_failed:
     other: "Could not fetch"
+  open_failed:
+    other: "Could not open"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same
