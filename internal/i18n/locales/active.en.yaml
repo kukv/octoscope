@@ -27,6 +27,8 @@ notice:
     other: "Could not fetch"
   open_failed:
     other: "Could not open"
+  save_failed:
+    other: "Could not save the repository list"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same
@@ -55,6 +57,8 @@ repos:
     other: "Repositories"
   none:
     other: "No repositories yet"
+  add_button:
+    other: "+ Add a repository"
 
 dialog:
   add_repo_title:
@@ -210,6 +214,10 @@ footer:
       other: "tab:PR/Issue"
     refresh:
       other: "r:refresh"
+    add:
+      other: "a:add"
+    remove:
+      other: "x:remove"
     diff:
       other: "d:diff"
     checks:
@@ -222,6 +230,13 @@ footer:
     other: "x:close"
   reopen:
     other: "x:reopen"
+  dialog:
+    close:
+      other: "esc:close"
+    add:
+      other: "enter:add"
+    candidates:
+      other: "tab:suggestions"
   picker:
     other: "space:toggle  enter:apply  esc:cancel"
   compose:

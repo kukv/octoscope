@@ -12,6 +12,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/tui/dialog"
 )
 
 // prSource is the pull-request half of what the list needs.
@@ -38,6 +39,15 @@ type repoCounter interface {
 	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
 }
 
+// repoEditor is how the sidebar's own list changes: what to offer while the
+// add dialog is typed into, what a first run can be seeded from, and where
+// the result survives a restart.
+type repoEditor interface {
+	SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error)
+	SeedCandidates(ctx context.Context) ([]gh.RepoCandidate, error)
+	SaveRepositories(repos []string) error
+}
+
 // Source is what the repository list needs from the GitHub layer. A command
 // that acts on one kind takes that half; the ones that pick the kind at run
 // time take the whole.
@@ -46,6 +56,7 @@ type Source interface {
 	issueSource
 	repoCounter
 	webOpener
+	repoEditor
 }
 
 // OpenDetailMsg asks the parent to show the detail view for one item.
@@ -73,7 +84,18 @@ type (
 		issues []gh.Issue
 	}
 	repoCountsMsg []gh.RepoCount
-	errMsg        struct {
+
+	// searchTickMsg fires once the typing has paused, and candidatesMsg
+	// carries what the search it started found. Both name the generation of
+	// the query they belong to, counted apart from the sidebar's own: moving
+	// the cursor must not throw away suggestions being typed for.
+	searchTickMsg struct{ gen int }
+	candidatesMsg struct {
+		gen        int
+		candidates []gh.RepoCandidate
+	}
+
+	errMsg struct {
 		gen  int
 		tab  tabID
 		kind noticeKind
@@ -91,15 +113,20 @@ type noticeKind uint8
 const (
 	noticeFetch noticeKind = iota
 	noticeOpen
+	noticeSave
 )
 
 // prefixID is the catalog key for the words in front of the notice. What the
 // environment said follows them untranslated (.claude/rules/errors.md).
 func (k noticeKind) prefixID() string {
-	if k == noticeOpen {
+	switch k {
+	case noticeOpen:
 		return "notice.open_failed"
+	case noticeSave:
+		return "notice.save_failed"
+	default:
+		return "notice.fetch_failed"
 	}
-	return "notice.fetch_failed"
 }
 
 // answeredFetch drops the notice of a tab whose fetch has just come back. It
@@ -142,6 +169,14 @@ const (
 	tabIssues
 )
 
+// mode says which overlay is up. The list is what is drawn when none is.
+type mode uint8
+
+const (
+	modeList mode = iota
+	modeAdd
+)
+
 // pane says which half of the split screen the arrow keys move: the
 // repository list on the left, or the table on the right.
 type pane int
@@ -172,6 +207,14 @@ type Model struct {
 	rows     []row
 	selected int
 	focus    pane
+
+	mode mode
+	dlg  dialog.Model
+
+	// searchGen counts the query the dialog is on. A tick or an answer from
+	// an earlier one is dropped, which is what a query the user has since
+	// typed past means.
+	searchGen int
 
 	tab     tabID
 	cursors [2]int
@@ -220,7 +263,7 @@ func New(src Source, opts Options) Model {
 func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 	m.opts.Current = name
 	rows, selected := buildRows(m.opts.Repositories, name)
-	m.rows = rows
+	m = m.setRows(rows)
 	next, cmd := m.selectRow(selected)
 	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()))
 }
@@ -326,9 +369,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.dlg = m.dlg.SetWidth(msg.Width)
 		if m.sidebarCols() == 0 {
 			m.focus = paneList
 		}
+		return m, nil
+	case searchTickMsg:
+		// The pause is over only for the query it was started for: every
+		// keystroke schedules one, and all but the last are stale by now.
+		if msg.gen != m.searchGen || m.mode != modeAdd {
+			return m, nil
+		}
+		m.dlg = m.dlg.Searching()
+		return m, m.runSearch(msg.gen)
+	case candidatesMsg:
+		if msg.gen != m.searchGen || m.mode != modeAdd {
+			return m, nil
+		}
+		m.dlg = m.dlg.SetCandidates(msg.candidates)
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -380,7 +438,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Symmetric with prListMsg/issueListMsg above: a row the cursor has
 		// left can still fail, and its failure must not touch the row now on
 		// screen -- neither its loading spinner nor the full-screen error.
-		if msg.gen != m.gen {
+		// A save is not a fetch and belongs to no row, so it is never stale.
+		if msg.kind != noticeSave && msg.gen != m.gen {
 			return m, nil
 		}
 		// Only a fetch's failure ends a fetch. A browser that would not start
@@ -405,7 +464,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.mode == modeAdd {
+		return m.handleAddKey(msg)
+	}
 	switch msg.String() {
+	case "a":
+		return m.openAddDialog()
+	case "x":
+		return m.removeSelected()
 	case "tab":
 		if m.tab == tabPRs {
 			return m.showTab(tabIssues, true)

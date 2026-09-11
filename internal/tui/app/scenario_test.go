@@ -29,6 +29,23 @@ type scenarioSource struct {
 
 	prRepos    []string
 	issueRepos []string
+
+	found []gh.RepoCandidate
+	seed  []gh.RepoCandidate
+	saved []string
+}
+
+func (f *scenarioSource) SearchRepos(context.Context, string, int) ([]gh.RepoCandidate, error) {
+	return f.found, nil
+}
+
+func (f *scenarioSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+	return f.seed, nil
+}
+
+func (f *scenarioSource) SaveRepositories(repos []string) error {
+	f.saved = repos
+	return nil
 }
 
 func (f *scenarioSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {

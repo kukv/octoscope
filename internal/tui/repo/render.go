@@ -35,6 +35,10 @@ func (m Model) View() string {
 	if m.width <= 0 {
 		return ""
 	}
+	if m.mode == modeAdd {
+		return m.dlg.View() + "\n" +
+			theme.Dim().Render(layout.FitKeyBar(addDialogHints(), m.width))
+	}
 	lines := append(m.header(), m.body()...)
 	if m.itemCount() > 0 && !m.loading[m.tab] {
 		lines = append(lines, m.summary()...)
@@ -77,9 +81,22 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.list.kind"),
 		i18n.T("footer.list.quit"),
 		i18n.T("footer.list.refresh"),
+		i18n.T("footer.list.add"),
+		i18n.T("footer.list.remove"),
 		i18n.T("footer.list.diff"),
 		i18n.T("footer.list.checks"),
 		i18n.T("footer.list.web"),
+	}
+}
+
+// addDialogHints is the dialog's key bar, most important first. esc leads
+// because FitKeyBar never drops the first hint: it is the only way out of
+// the popup.
+func addDialogHints() []string {
+	return []string{
+		i18n.T("footer.dialog.close"),
+		i18n.T("footer.dialog.add"),
+		i18n.T("footer.dialog.candidates"),
 	}
 }
 

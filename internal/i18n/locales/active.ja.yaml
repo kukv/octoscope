@@ -27,6 +27,8 @@ notice:
     other: "取得できませんでした"
   open_failed:
     other: "開けませんでした"
+  save_failed:
+    other: "リポジトリ一覧を保存できませんでした"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same
@@ -55,6 +57,8 @@ repos:
     other: "リポジトリ"
   none:
     other: "リポジトリがまだありません"
+  add_button:
+    other: "＋ リポジトリを追加"
 
 dialog:
   add_repo_title:
@@ -204,6 +208,10 @@ footer:
       other: "tab:PR/Issue"
     refresh:
       other: "r:更新"
+    add:
+      other: "a:追加"
+    remove:
+      other: "x:削除"
     diff:
       other: "d:diff"
     checks:
@@ -216,6 +224,13 @@ footer:
     other: "x:クローズ"
   reopen:
     other: "x:再オープン"
+  dialog:
+    close:
+      other: "esc:閉じる"
+    add:
+      other: "enter:追加"
+    candidates:
+      other: "tab:候補へ"
   picker:
     other: "space:選択  enter:適用  esc:中止"
   compose:

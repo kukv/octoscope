@@ -49,6 +49,11 @@ type fakeSource struct {
 	prRepos      []string
 	issueRepos   []string
 	countCalls   [][]string
+
+	searchedFor []string
+	found       []gh.RepoCandidate
+	seed        []gh.RepoCandidate
+	saved       []string
 }
 
 func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
@@ -82,6 +87,20 @@ func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/de
 func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]gh.RepoCount, error) {
 	f.countCalls = append(f.countCalls, repos)
 	return nil, nil
+}
+
+func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]gh.RepoCandidate, error) {
+	f.searchedFor = append(f.searchedFor, query)
+	return f.found, nil
+}
+
+func (f *fakeSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+	return f.seed, nil
+}
+
+func (f *fakeSource) SaveRepositories(repos []string) error {
+	f.saved = repos
+	return nil
 }
 
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
