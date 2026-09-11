@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -85,7 +86,7 @@ func (m Model) sidebarWindow() int {
 // open in it. A repository whose count could not be fetched keeps its row and
 // loses its numbers.
 func (m Model) sidebar() []string {
-	lines := []string{theme.Dim().Render(pad(i18n.T("repos.sidebar"), sidebarWidth)), ""}
+	lines := []string{theme.Dim().Render(layout.Pad(i18n.T("repos.sidebar"), sidebarWidth)), ""}
 	first := m.sidebarWindow()
 	for i := first; i < min(first+m.sidebarRows(), len(m.rows)); i++ {
 		r := m.rows[i]
@@ -93,8 +94,8 @@ func (m Model) sidebar() []string {
 		if r.counted {
 			badge = fmt.Sprintf("%d/%d", r.prs, r.issues)
 		}
-		line := pad(r.name, sidebarWidth-badgeColumn) +
-			right(theme.Dim().Render(badge), badgeColumn)
+		line := layout.Pad(r.name, sidebarWidth-badgeColumn) +
+			layout.Right(theme.Dim().Render(badge), badgeColumn)
 		switch {
 		case i == m.selected && m.focus == paneSidebar:
 			line = theme.Selected().Render(line)
@@ -103,7 +104,7 @@ func (m Model) sidebar() []string {
 		}
 		lines = append(lines, line)
 	}
-	return append(lines, "", theme.Dim().Render(pad(i18n.T("repos.add_button"), sidebarWidth)))
+	return append(lines, "", theme.Dim().Render(layout.Pad(i18n.T("repos.add_button"), sidebarWidth)))
 }
 
 // addRowY is the line the add button is drawn on: under the repositories on
@@ -132,8 +133,9 @@ func joinPanes(left, right []string, leftWidth int) []string {
 }
 
 // padExact pads s out to exactly w columns with no ellipsis. sidebar()
-// already fits every line to leftWidth; running it through pad() here would
-// reserve pad's usual one-column margin and clip a name that already fits.
+// already fits every line to leftWidth; running it through layout.Pad here
+// would reserve Pad's usual one-column margin and clip a name that already
+// fits.
 func padExact(s string, w int) string {
 	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
 }
