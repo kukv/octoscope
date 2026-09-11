@@ -71,6 +71,8 @@ func press(m Model, key string) (Model, tea.Cmd) {
 		return m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	case "space":
 		return m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	case "backspace":
+		return m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	default:
 		return m.Update(tea.KeyPressMsg{Code: []rune(key)[0], Text: key})
 	}
@@ -306,14 +308,26 @@ func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
 func onFilter(t *testing.T, m Model, id FilterID) Model {
 	t.Helper()
 
+	m, _ = onFilterCmd(t, m, id)
+	return m
+}
+
+// onFilterCmd is onFilter, but also hands back the tea.Cmd the landing step
+// on id produced (nil if id was already the cursor, or if that filter
+// already had its candidates), so a caller can check whether a fetch was
+// actually started.
+func onFilterCmd(t *testing.T, m Model, id FilterID) (Model, tea.Cmd) {
+	t.Helper()
+
+	var cmd tea.Cmd
 	for m.cursor != id {
 		if m.cursor < id {
-			m, _ = press(m, "j")
+			m, cmd = press(m, "j")
 		} else {
-			m, _ = press(m, "k")
+			m, cmd = press(m, "k")
 		}
 	}
-	return m
+	return m, cmd
 }
 
 // withRepo types the golden repository into the repo filter's field, the
@@ -380,7 +394,9 @@ func TestTheLabelsOfTheNamedRepositoryAreOffered(t *testing.T) {
 	}
 }
 
-// The same repository is not asked for a second time.
+// The same repository is not asked for a second time: the first landing on
+// FilterLabel must start a fetch, and a later landing on the same repository
+// must not start another one.
 func TestTheSameRepositoryIsNotAskedForTwice(t *testing.T) {
 	t.Parallel()
 
@@ -389,14 +405,16 @@ func TestTheSameRepositoryIsNotAskedForTwice(t *testing.T) {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())
 	m = withRepo(t, m)
-	m = onFilter(t, m, FilterLabel)
-	m = resolveCandidates(t, m)
-	src.labelRepo = ""
+
+	m, cmd := onFilterCmd(t, m, FilterLabel)
+	if cmd == nil {
+		t.Fatal("landing on label with a newly named repo did not start a fetch")
+	}
+	m = resolve(t, m, cmd)
 
 	m = onFilter(t, m, FilterAuthor)
-	onFilter(t, m, FilterLabel)
-	if src.labelRepo != "" {
-		t.Errorf("asked for the labels of %q again", src.labelRepo)
+	if _, cmd = onFilterCmd(t, m, FilterLabel); cmd != nil {
+		t.Error("asked for the same repository's labels again")
 	}
 }
 
@@ -416,5 +434,36 @@ func TestTheAuthorsOfTheNamedRepositoryAreOffered(t *testing.T) {
 
 	if !strings.Contains(m.View(), "octocat") {
 		t.Errorf("the repository's authors are not offered:\n%s", m.View())
+	}
+}
+
+// "repo: not set means no candidates" applies to what is drawn, not only to
+// what is fetched: clearing repo: must hide labels fetched for the
+// repository it used to name, even though they are still cached.
+func TestClearingTheRepoHidesItsStaleCandidates(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labels: []gh.Label{{Name: "bug"}}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+	m, cmd := onFilterCmd(t, m, FilterLabel)
+	m = resolve(t, m, cmd)
+	if !strings.Contains(m.View(), "bug") {
+		t.Fatal("candidates never showed up; nothing to test clearing against")
+	}
+
+	m = onFilter(t, m, FilterRepo)
+	m, _ = press(m, "enter")
+	for range "kukv/octoscope" {
+		m, _ = press(m, "backspace")
+	}
+	m, cmd = press(m, "enter")
+	m = resolve(t, m, cmd)
+
+	m = onFilter(t, m, FilterLabel)
+	if strings.Contains(m.View(), "bug") {
+		t.Errorf("a stale chip from the since-cleared repo: is still shown:\n%s", m.View())
 	}
 }

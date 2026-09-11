@@ -183,16 +183,26 @@ func (m Model) filterPane() []string {
 }
 
 // candidateChips is the chip row for whichever filter the cursor is on, or
-// empty while the cursor is elsewhere, the raw editor is open, or nothing
-// has arrived yet for the named repository.
+// empty while the cursor is elsewhere, the raw editor is open, nothing has
+// arrived yet for the named repository, or repo: has since changed or been
+// cleared: "no repo:, no candidates" applies to what is drawn as much as to
+// what is fetched, so a cached answer for a repository that is no longer
+// named must not still be on screen.
 func (m Model) candidateChips() string {
 	if m.mode == modeRaw || m.pane != paneFilters {
 		return ""
 	}
+	repo := m.filters.Value(FilterRepo)
 	switch m.cursor {
 	case FilterLabel:
+		if m.labelCandidatesRepo != repo {
+			return ""
+		}
 		return labelChips(m.labelCandidates, filterPaneWidth)
 	case FilterAuthor:
+		if m.authorCandidatesRepo != repo {
+			return ""
+		}
 		return authorChips(m.authorCandidates, filterPaneWidth)
 	}
 	return ""
