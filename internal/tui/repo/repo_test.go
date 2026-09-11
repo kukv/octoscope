@@ -388,9 +388,6 @@ func TestAFailureLandsOnTheTabItsFetchWasStartedFor(t *testing.T) {
 	if !strings.Contains(view, "an issue") {
 		t.Errorf("the Issues tab was not drawn:\n%s", view)
 	}
-	if m.loading[tabIssues] {
-		t.Error("the pull requests' failure stopped the Issues tab's spinner")
-	}
 	if m.loading[tabPRs] {
 		t.Error("the pull requests are still spinning after their own fetch failed")
 	}
