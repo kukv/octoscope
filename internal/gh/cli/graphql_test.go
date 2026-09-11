@@ -117,8 +117,6 @@ func TestEverySectionHasItsOwnSearch(t *testing.T) {
 	}
 }
 
-// A section outside the board is a bug in the caller, not a search GitHub
-// should be asked to run.
 // The board is where the 502s were being seen: four searches leave GitHub's
 // front end four chances to refuse, and a column that gives up on the first
 // refusal is the failure this retry exists for.
@@ -143,6 +141,8 @@ func TestAWorkSectionIsAskedAgainAfterATransientFailure(t *testing.T) {
 	}
 }
 
+// A section outside the board is a bug in the caller, not a search GitHub
+// should be asked to run.
 func TestListWorkSectionRejectsASectionTheBoardDoesNotHave(t *testing.T) {
 	t.Parallel()
 
