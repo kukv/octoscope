@@ -26,7 +26,7 @@ const (
 	stateColumn  = 2
 	repoColumn   = 16
 	numberColumn = 6
-	ageColumn    = 7
+	ageColumn    = 8
 
 	// queryRowHeight is the query line and the blank line under it;
 	// footerHeight is the blank line and the key bar.
