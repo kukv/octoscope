@@ -266,6 +266,19 @@ gh repo list --limit 100 --json nameWithOwner,isPrivate \
 `--jq '[.[].login]'` が返すのは文字列の配列だけなので、テストはその形の
 リテラルを `c.run` から返せば足りる。
 
+## `search_items.json`
+
+`work.graphql` を利用者のクエリで叩いた実レスポンス。録った日: 2026-09-12、
+対象: `repo:kukv/octoscope`。`is:pr sort:updated-desc` を付けた版は録り直した
+時点で `kukv/octoscope` に開いている PR が 1 つも無く CLOSED / MERGED しか
+入らなかったため、絞り込みを外して録っている（open な Issue が 2 件あり、
+これで OPEN / CLOSED / MERGED の 3 状態が揃う）。
+
+```bash
+gh api graphql -F query=@internal/gh/cli/work.graphql \
+  -f search='repo:kukv/octoscope' | jq . > internal/gh/cli/testdata/search_items.json
+```
+
 ## `sample.diff`
 
 `git diff` 形式のパース用。unified diff の hunk ヘッダ、追加、削除、文脈行を含む。

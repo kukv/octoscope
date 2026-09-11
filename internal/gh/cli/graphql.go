@@ -84,25 +84,38 @@ func (n checkNode) name() string {
 	return n.Name
 }
 
-// ListWorkSection fetches one column of the Work board. The document itself
-// travels as gh's own "query" parameter, so the column's search string has to
-// go under a different name.
+// ListWorkSection fetches one column of the Work board. Its search string is
+// fixed text embedded at build time, not anything the user typed.
 func (c *Client) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
 	if s < 0 || int(s) >= len(workSearches) {
 		return nil, fmt.Errorf("unknown work section %d", s)
 	}
-	// The search string is fixed text embedded at build time, not data that
-	// varies per call (unlike RepoCounts' per-repository names). An "errors"
-	// array therefore means the document itself is broken -- there is no
-	// partial body worth salvaging, so bail out.
+	return c.searchItems(ctx, workSearches[s])
+}
+
+// SearchItems runs one GitHub issue search and returns what it found. The
+// query is the user's, so a rejected one is an ordinary failure to report
+// rather than a broken document.
+func (c *Client) SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error) {
+	return c.searchItems(ctx, query)
+}
+
+// searchItems is the one call behind both. The document itself travels as
+// gh's own "query" parameter, so the search string has to go under a
+// different name.
+//
+// Unlike RepoCounts there is no partial body worth salvaging: a search has
+// one result set, and half of one would be read as "that is all there is".
+// The error carries what GitHub said, which is what a user has to act on.
+func (c *Client) searchItems(ctx context.Context, search string) ([]gh.WorkItem, error) {
 	out, err := c.read(ctx, c.dir, "api", "graphql",
-		"-f", "query="+workQuery, "-f", "search="+workSearches[s])
+		"-f", "query="+workQuery, "-f", "search="+search)
 	if err != nil {
 		return nil, err
 	}
 	var resp workResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
-		return nil, fmt.Errorf("parse work search: %w", err)
+		return nil, fmt.Errorf("parse search: %w", err)
 	}
 	nodes := resp.Data.Results.Nodes
 	items := make([]gh.WorkItem, 0, len(nodes))

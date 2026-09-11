@@ -1,0 +1,3023 @@
+{
+  "data": {
+    "results": {
+      "nodes": [
+        {
+          "__typename": "PullRequest",
+          "number": 73,
+          "title": "feat: grow the Repos sidebar's list from the UI",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/73",
+          "isDraft": false,
+          "updatedAt": "2026-09-11T14:38:34Z",
+          "bodyText": "Phase 4 スライス 2-3。実装計画は docs/superpowers/plans/2026-09-11-phase4-repos-dialog.md（Task 1〜12）。\n入ったもの\n\n\n\n機能\n内容\n\n\n\n\na\n追加ダイアログ。候補は打鍵を止めてから 1 回だけ引く（1 回の検索は実測 1.35 秒、デバウンス 400ms）。一時行にカーソルがあればその名前でプリフィルし、enter が一覧への昇格になる\n\n\nx\n一覧から削除。サイドバーにフォーカスがあるときだけ効く（80 桁ではサイドバーが畳まれ、見えない行を消してしまうため）。一時行には効かない\n\n\ng\n初回投入。自分と所属 Org のリポジトリをダイアログの候補として出す\n\n\n保存\nconfig.Store.SaveRepositories が temp + rename。解析できないファイルの上には書かない\n\n\n＋ 行\nサイドバー末尾の追加ボタン。クリックで開く（カーソルは止まらない）\n\n\nちらつき\nRepoName の判定が返るまで「リポジトリがまだありません」と言わない\n\n\n\n判断した前提（設計書にもモックアップにも答えが無かったもの）\n\nダイアログは画面を暗くして浮かせない。 既存のポップアップ（review / merge）と同じく画面を置き換える。合成の仕組みがコードベースに無い\nx は確認を取らない。 消えるのは設定ファイルの 1 行で、a で足し直せる\n追加時に存在確認をしない。 形（owner/name）だけ弾き、存在しない名前はバッジ「—」が知らせる\n候補はスター数つき。 モックアップが正。設計 §2 の description は 60 桁の箱に収まらない\n初回投入は全件を自動で入れない。 実測で gh repo list --limit 100 は 45 件・6.7 秒、gh api user/orgs は 6.1 秒、Org ごとにもう 1 回。45 件を黙って入れると RepoCounts が 45 alias になり、x の 1 件ずつしか戻す手段が無くなる\na は一時行（カレントのリポジトリ）を一覧に昇格させる。 これが唯一の永続化経路\n\n実装中に見つけて直した実バグ 4 件\nレビューが捕まえた（テストも golden も緑だった）:\n\nq / 1 / 2 がダイアログの入力を横取りしていた。 app.handleKey はこの 3 つをタブに配る前に処理するため、kukv/quokka と打つと q で octoscope が終了し、koto2 と打つと 2 がタブ切替に化けていた。シナリオテストが a/b という短い名前しか打っていなかったため通っていた\n入力を全部消すと「検索中...」が消えなくなっていた\n\ngolden を目で見て捕まえた:\n\nlipgloss の Width は枠線込みの外寸だった。内側の桁数を 2 桁多く見積もり、候補行が 1 行ずつ折り返してスター数が次の行に落ちていた\n\n既存のテストが捕まえた:\n\n＋ 行の 2 行ぶんをサイドバーの高さ計算が見ておらず、40 行の端末に 42 行描いていた\n\n設計書の訂正\ndocs/superpowers/specs/2026-09-08-phase4-design.md を 2 箇所。候補の --json フィールド（description → stargazersCount、語は -- の後ろ）と、初回投入を候補として出すこと。\n検証\nmake check 緑（1180 tests / 0 issues）。新しいテストはすべて、検証対象を一時的に壊して落ちることを確認してからコミットしている。\nレビューで見てほしいところ\n\nrepo.Model.Capturing() による app からの丸ごと委譲（オーバーレイと同じ扱いにしたが、タブ内の状態を app が知る形になっている）\nerrMsg が取得失敗・ブラウザ失敗に続いて保存失敗の 3 つ目を兼ねるようになった。.claude/rules/errors.md の原則から遠ざかる変更で、積み残しに記録済み\n\n実端末での確認\nTTY の無い環境では代行できないため、docs/superpowers/2026-09-11-phase4-repos-dialog-followups.md に依頼を列挙している。特に、設定ファイルを壊した状態で a を押しても潰れないことは実機で 1 度見てほしい。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "feat/repos-dialog",
+          "baseRefName": "main",
+          "additions": 5221,
+          "deletions": 124,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 72,
+          "title": "fix: 取得が 502 で失敗してもアプリを終了せずに済むようにする",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/72",
+          "isDraft": false,
+          "updatedAt": "2026-09-11T10:05:51Z",
+          "bodyText": "Work 板の取得が gh api の 502 で落ちると全画面のエラー画面に遷移し、そこでは esc も q も終了なので、起動直後に 1 回 502 を引くとアプリを終了するしか選べなかった。 この PR はその 2 つ（502 が出ること・出たら終わるしかないこと）を分けて直す。\n設計: docs/superpowers/specs/2026-09-11-fetch-failures-design.md\n実装計画: docs/superpowers/plans/2026-09-11-fetch-failures.md\n原因（実測。推測ではない）\nwork.graphql が 4 つの search を 1 リクエストに詰めていた。各 search の時間が 1 本の HTTP に直列に積み上がり、GitHub の手前のプロキシが待ちきれずに切る（返ってくるのは GraphQL のエラーではなく nginx の HTML）。特定の重いフィールドが原因ではない — statusCheckRollup を丸ごと落としても縮むのは 2 秒ほどだった。\n入れたもの\n\nエラーの種別 — internal/gh に ErrTransient（502/503/504）と ErrUnauthenticated。gh.Classify は Error() が gh の原文だけを返し、Unwrap() がセンチネルを返すので、画面に octoscope 自身の英文が混ざらない\n読み取りの 1 回再試行 — c.read が ErrTransient のときだけ引き直す。書き込みは通さない（502 は「届かなかった」ではなく「答えが返らなかった」で、サーバに届いていた可能性を排除できないため）。マージ・レビュー提出・コメント・close/reopen・ラベル/担当者の編集・rerun の 18 メソッドが c.read を通っていないことをテストで留めている\nWork 板を列ごとの 4 リクエストに分割 — 列の状態は colState enum。1 列が落ちても他の 3 列は描かれ、届いた順に埋まる\n失敗はキーバーの上の 1 行に — 板や一覧は画面に残り、r で引き直せる。成功したら通知は消える。全画面に行くのは gh が無い・認証していないときだけ\n失敗した列・タブは「何も無い」とは違う絵になる\no（ブラウザ）の失敗も 1 行で済むようになった（積み残しの 9 番目）\n\n副産物として直った既存のバグ\n\n取得中にタブを移ると、別のタブのスピナーが止まっていた\n1 列も成功していないとタブ行が 106751d ago と表示されていた（オフライン起動で日常的に踏む）\n\n実測\n\n\n\n\n結果\n\n\n\n\n分割前・30 回\n502 は 0 回、5.8〜13.7 秒\n\n\n分割後・20 回（5 周 × 4 列）\n502 は 0 回。列ごと 1.3〜10.2 秒\n\n\n\n設計 §6 の宿題だった「即時再試行の成功率」は 測れていない — 502 を引く機会が発生しなかった。外挿も推定も書かず、「測れなかった」と明記して現状（遅延なし・1 回だけ）を根拠なしに変えないことにした。§1 の「11 回中 2 回」と並べてあり、同じ日でも 502 の出方が変わることが読める。\n確認のお願い（TTY が要るので代行できない）\n\n通知が出ている Work 板（1 列だけ失敗した状態と、全列成功した状態）\n--lang ja の 80 桁で通知行とキーバーが両方収まること\nr で引き直し、成功したら通知が消えること\ngh を PATH から外したとき・未認証のときに全画面のエラー画面へ行くこと\n\n積み残しは docs/superpowers/2026-09-11-fetch-failures-followups.md に 4 件（理由つき）。\nテスト\nmake check 緑（1117 tests / lint 0 issues）。タスク別レビュー 6 回とブランチ全体レビュー 1 回を経ており、全体レビューでは配線を切って全テストが緑のままかを試す手法で「外れても誰も気づかない」箇所を 4 本検出し、うち 3 本を塞いだ（残る 1 本は runGh → classify で、ネットワークに触らずに主張する手が無いため積み残しに記録）。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "fix/fetch-failures",
+          "baseRefName": "main",
+          "additions": 3785,
+          "deletions": 981,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 71,
+          "title": "feat: Repos タブにリポジトリ一覧のサイドバーを足す",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/71",
+          "isDraft": false,
+          "updatedAt": "2026-09-11T01:21:14Z",
+          "bodyText": "Phase 4 スライス 2-2。Repos タブを常設にし、設定ファイルの repositories を\n左ペインのサイドバーとして描き、選択した行のリポジトリで右ペインを引き直せるようにする。\n設計: docs/superpowers/specs/2026-09-08-phase4-design.md §4・§8・§9\n画面: docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md §4.0・§4.2・§4.6\n実装計画: docs/superpowers/plans/2026-09-09-phase4-repos-sidebar.md\n入ったもの\n\nRepos タブが常設になった。 app.Options.HasRepo を Repo / Repositories に解体。\nカレントのリポジトリが一覧に無ければ一時行として先頭に出て、設定ファイルには書かない\nサイドバー。 設定ファイルの一覧を左ペインに描く。大文字小文字を無視して重複を畳む。\n20〜50 件でもスクロールする\n件数バッジ。 open な PR / Issue を 1 リクエストでまとめて引く。位置で対応させ、\nGitHub が解決した綴りを採用する。引けなかった行は「—」で残る\n選択行のリポジトリを引く。 行を移ると右ペインが切り替わり、古い応答は世代カウンタで捨てる\nh / l でペイン移動、j / k でフォーカス側のカーソル移動。 マウスも対応\n（サイドバーのクリック・ホイール、右ペインの X オフセット）\n100 桁未満でサイドバーを畳む。 ja の 80 桁でもキーバーが 1 行に収まる\n一覧が空でカレントも無いときは repos.none。 初期投入の導線は 2-3\n\n入っていないもの（2-3）\n追加ダイアログ（a）、削除（x）、初期投入の導線、config.Save。\n実測（設計 §2 に追記）\n自分の公開リポジトリ 30 件を buildRepoCountsQuery と同じ形（alias を並べて 1 リクエスト）で\n組み、gh api graphql で 1 回計測。8.13 秒、30 alias 全件解決・errors 無し。\n1 リクエストで足りる。30 件超は未計測。\nレビューで見つけて直したもの\nタスクごとのレビュー 8 回に加えて全ブランチレビューを 1 回。後者でしか出なかったもの:\n\n行が 0 件のとき r を押す、またはレビュー提出後の自動 refresh で全画面エラーに落ちる\n退行（Refresh() / showTab() に行数ガードが無かった）\nSetCurrent がバッジを全消しして引き直さない ため、--repo 無しの既定の起動で\nバッジが常に「—」だった\n設定ファイルの綴りの揺れ（KUKV/Octoscope）で飛行中の一覧が破棄され、\nスピナーが止まらなくなる問題。名前の完全一致を世代カウンタに置き換えて解決\nerrMsg にガードが無く、離れた行の失敗が全画面エラーを起こす問題（同じ世代カウンタで解決）\n空振りテスト 2 本（loading がスピナーを出すため View() ベースの主張が落ちなかった）を\nSelectedRef() ベースに書き直し\n\n積み残し\ndocs/superpowers/2026-09-09-phase4-repos-sidebar-followups.md に 9 件、すべて理由つき。\n実端末での確認が要る（TTY の無い環境では代行できない）:\nサイドバー付きの Repos タブ、--lang ja の 80 桁、h/l と j/k、\nマウスでのサイドバー選択、設定が空のときの repos.none。\n検証\nmake check 緑（1044 tests、lint 0 issues）。golden は en / ja × 80 / 120 / 160。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 3154,
+          "deletions": 501,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 70,
+          "title": "feat: Repos サイドバーのバックエンド（Phase 4 スライス 2-1）",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/70",
+          "isDraft": false,
+          "updatedAt": "2026-09-08T15:55:35Z",
+          "bodyText": "Repos サイドバー（次の PR）が要るものを、画面を変えずに用意した。実装計画は\ndocs/superpowers/plans/2026-09-08-phase4-repos-backend.md。\n設計のスライス 2 は 3 本に割った（docs/superpowers/specs/2026-09-08-phase4-design.md §10）。\nこれはその 1 本目で、残りは 2-2 サイドバー本体、2-3 追加ダイアログ・削除・初回投入。\n入ったもの\n\n設定ファイルの repositories（読むだけ。書き込みは呼び出し元が生まれる 2-3 で）\nListPRs / ListIssues がリポジトリを名指しできる。 空文字はこれまでどおり\nクライアントのリポジトリに落ちるので、既存の呼び出しの意味は変わらない\nRepoCounts — 複数リポジトリの open な PR / Issue 件数を 1 リクエストで引く\n\n件数クエリの作り\nrepository を alias（r0, r1, …）で並べる。alias だけを Go で組み立て、\nowner と name は GraphQL の変数として渡すので、設定ファイルに書かれた文字列は\nクエリ本文に一切入らない。組み立てた文書は schema_test.go の検証にも載せた。\nsearch(type: ISSUE, query: \"repo:a/b repo:c/d\") の 1 発は採らない。issueCount が\nクエリ全体の合計にしかならず、リポジトリごとに割れないため。\n部分的な失敗を捨てない。 一覧に消えたリポジトリが 1 つ混じると gh api graphql は\n終了コード 1 で終わるが、本文には答えられた分が入っている。runGh がそれを捨てて\nいたので、返すように変えた。その行は「—」を描き、行は消さない。\nただし errors だけで data を持たない応答は、エラーとして返す。 そうしないと\nトークンが切れただけの利用者に「全リポジトリが消えている」と見せることになる。\n\"a/\" / \"/b\" / \"a/b/c\" や前後に空白のある行は GitHub に送らず、その行だけを\n「取れなかった」扱いにする。前後の空白は切り詰めずに拒否する — internal/config も\n切り詰めないので、黙って通すと打ち間違いが隠れるため。\n確認したこと\nmake check 緑（1012 テスト、lint 0 件）。golden は 1 枚も変わっていない\n（画面を変えていないことの担保）。internal/tui は internal/gh/cli も\ninternal/config も import していない。\nfixture は実際の gh の出力を録ったもの（録り方は internal/gh/cli/testdata/README.md）。\n1 つだけ手書きの JSON があり、それはトークンを失効させないと録れない応答なので、\n理由をコメントに書いてある。\n次のスライスへの申し送り\ndocs/superpowers/2026-09-08-phase4-repos-backend-followups.md に書いた。\n\n同じリポジトリ名を 2 回書くと同じ行が 2 本出る。重複排除は RepoCounts の外側\ninternal/tui の fake が repo 引数を無視している。fetchList が選択行を渡し\n始めたら主張させること\n実測が 3 リポジトリしかない。現実的な行数（20〜50）で 1 回測ること\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 1413,
+          "deletions": 44,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 69,
+          "title": "feat: 設定ファイルを読む（Phase 4 スライス 1）",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/69",
+          "isDraft": false,
+          "updatedAt": "2026-09-08T13:10:30Z",
+          "bodyText": "Phase 4 の設計と、その 1 本目「設定ファイル」。設計は\ndocs/superpowers/specs/2026-09-08-phase4-design.md、実装計画は\ndocs/superpowers/plans/2026-09-08-phase4-config.md。\n設定ファイルを読む\nos.UserConfigDir() 配下の octoscope/config.yaml を読み、3 つのキーが効くようにした。\nlanguage: ja      # --lang → language → OS ロケール → en\nicons: nerd       # --icons → OCTOSCOPE_ICONS → icons → unicode\ndefault_tab: repos\n\n無くても壊れていても起動する。 ファイルが無いのは既定値であって失敗ではない。\n解析に失敗したら既定値で続け、タブ行に警告を出し、終了時に理由（ファイル名と\n行番号）を stderr に出す\ndefault_tab: repos は、カレントのリポジトリが後から見つかったときにも効く。\nただし利用者がタブを移った後には効かない。--repo は「今回はこれを見に来た」\nという宣言なので設定より強い\n書き込み（保存）は入っていない。呼び出し元が生まれるのは Repos タブと Search\nタブのスライスなので、そこで足す\n\nnerd_font は icons に改名した。グリフの集合は unicode / nerd / ascii の\n3 つあり、真偽値の名前では ascii を指定できない。standalone spec §4.5 / §5 / §5.1 も\n直した。\nPhase 4 の設計\nRepos タブ・Search タブ・設定ファイル・API フォールバックを 1 本の設計にまとめ、\n計画を 4 本に割った。件数バッジ・候補・トークンでの GraphQL は実際に叩いて確かめてある。\nspec が挙げていた githubv4 は採らない。.graphql 文書を 1 組のまま保ち、transport\n（gh api graphql / HTTPS POST）だけ差し替える。struct クエリに書き直すと同じクエリが\n2 つの表現で二重に存在し、schema_test.go の検証が片方にしか効かなくなるため。\n確認したこと\nmake check 緑（990 テスト、lint 0 件）。golden は en / ja × 80 / 120 / 160。\n設定の警告と盤面サマリが ja 80 桁で同居できることを golden で確かめた\n（ちょうど 80 桁、折り返し無し）。\n残っていること\n\n実端末での確認をしていない。 作業環境に TTY が無く、golden で代替した\nja の 80 桁で、リポジトリ判定のタイムアウト警告と設定の警告が同時に立つと\nタブ行が 89 桁になり折り返す。稀な組み合わせで、描画側で切ると別の問題を招くので\n手を付けていない\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 1578,
+          "deletions": 35,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 68,
+          "title": "feat: tell the checks with no run of their own apart, and keep the repository's name",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/68",
+          "isDraft": false,
+          "updatedAt": "2026-09-08T08:24:57Z",
+          "bodyText": "Phase 3 の積み残しだった 2 件。実装計画は\ndocs/superpowers/plans/2026-09-08-checks-other-group.md と\ndocs/superpowers/plans/2026-09-08-repos-tab-ref-repo.md。\n1. 再実行できる run が無い check に見出しを与えた\nGitHub App が作った check run（Codecov、Sonar）と外部 CI の StatusContext は\ncheckSuite.workflowRun が null で返るので、見出しを持たなかった。結果として\n直上の群の続きに見えていた。\n「その他」の見出しでまとめる形にした。\nCI #88\n  ✓ build  3:07\n  ✓ lint  1:02\n  ✓ test  2:14\nその他\n  ✓ codecov/patch\n  ◍ ci/circleci\n\n見出しの意味が変わったので spec §4.4.3 を訂正した。 これまでは\n「見出しがある＝R で再実行できる」だったが、これからは見出しは群の名前であって、\n再実行とログは check ごとの性質である（run を持たない check では R と enter が\n理由を出して断る。振る舞いは変わっていない）。\n採らなかった案: 行の右端に印を出す、群のインデントを外す。\n2. Repos タブがリポジトリ名を落としていた\n--repo kukv/octoscope で起動すると Repos タブが開く。そこから s を押すと\nchecks ビューのタイトルが kukv/octoscope #67 ではなく  #67 になっていた。\ninternal/tui/repo の SelectedRef が gh.ItemRef.Repo を意図的に空で返しており、\nchecks と diff がそれを \"%s #%d\" に流し込むため。\nバックエンドは effectiveRepo が空を補うので動作には影響せず、golden も\nRepo の入った fixture を使うので捕まらなかった。実端末で動かして初めて出た。\n配る側（SelectedRef）が完全な値を作る形にした。描画側に「空なら省く」の\n場合分けは足していない（ビューが増えるたびに同じ分岐が要るため）。\n実端末での確認\ntmux で 80x30 の本物の TTY を用意し、--lang ja で確認した。\n\nchecks ビュー: 2 群の見出しと所要時間、キーバーが 80 桁 ja に収まる。\n成功ジョブの enter で「このジョブに失敗したステップはありません」\nmerge ポップアップ: 3 方式、auto-merge 無効の理由、ブランチ削除の読み取り専用行、\n⚠ 保護ルールに止められています。塞がれているので enter はキーバーに出ず、\n押しても何も送らない。r で取り直しても選んだ方式が戻らない\n（どちらも #65 の最終レビューで直した点で、実機で効いていることを確認した）\n修正後のタイトルが kukv/octoscope #67 になることも確認した\n\n実際のマージは実行していない。 確認用 PR は保護ルールで塞がれており、そもそも送れない。\nこれで docs/superpowers/2026-09-08-phase3-checks-handoff.md と\n-merge-handoff.md の代行できる範囲は済んだ。\nレビューで見つかった空振りテスト 3 本\nこのプロジェクトが繰り返し踏んできた形。すべて落ちる形に直した。\n\n高さ 30 でモデルを開いてスクロールを起こさず、cursorLine を一度も通らないテスト\n行インデックスと行数を比べていて、どう壊しても通るアサーション\n見出しの「行数」しか見ておらず、文字列を検証していないテスト\n\n分かっていて残したもの\nリポジトリ名は非同期に届くので、s / d を押すのが早いと一瞬タイトルから名前が消える。\ninternal/tui/app の resolveRepo が起動時に同じ gh repo view を叩いて名前を捨てているので、\nそこから渡せばこのレースと二重呼び出しが同時に消える。別の変更なので\ndocs/superpowers/2026-09-08-phase3-checks-followups.md に書き残した。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 696,
+          "deletions": 71,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 67,
+          "title": "chore: 実端末での確認用（マージしない）",
+          "state": "CLOSED",
+          "url": "https://github.com/kukv/octoscope/pull/67",
+          "isDraft": false,
+          "updatedAt": "2026-09-08T08:25:34Z",
+          "bodyText": "checks ビューと merge ポップアップを本物の端末で確認するための使い捨て PR。確認が終わったら閉じる。マージしない。",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "tmp/tty-check",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 0,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 66,
+          "title": "fix: stop dropping a review thread's fifty-first comment",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/66",
+          "isDraft": false,
+          "updatedAt": "2026-09-08T05:36:13Z",
+          "bodyText": "Phase 3 の 3 本目、最後。実装計画は docs/superpowers/plans/2026-09-08-phase3-comment-paging.md。\n塞いだ穴\n1 本のレビュースレッドに 51 件目以降のコメントが付いていると、エラーも出ずに黙って落ちていた。\nreview.graphql の comments(first: 50) を追う手段が無かったため。\ncomments は nested connection なので、reviewThreads の cursor では追えない。\n50 件を超えたと自分で言っているスレッドだけ、node(id:) でそのスレッドを名指しして残りを引く\n（thread_comments.graphql）。超えていないスレッドには 1 リクエストも足さない。\nページ数の上限は置かない（reviewThreads が上限なしに全ページ取るのと同じ流儀）。\ninternal/tui は 1 行も触っていない。画面の形は変わらず、今まで消えていた行が出るようになる。\n実物で 1 度確認した\nthread_comments.graphql は録ったスキーマとしか突き合わせていなかったので、実際に叩いた。\nPR #59 のスレッド（PRRT_kwDOTVXF-M6fwhR-）で data.node.comments.nodes が返ることを確認した。\n全体レビューで見つけて直したもの\n繰り越すつもりだった 2 件が、見積もりより悪かったので撤回して直した。\n\n追加取得のガードが cursor を見ていなかった。 hasNextPage: true で endCursor が空の応答に\n対して空カーソルのリクエストを投げる。GitHub がそれを無効なカーソルとして断ると\nPRReviewContext 全体が error になり、diff のレビュー欄が丸ごと消える。\n「無駄な 1 往復」で済む話ではなかった\nカーソルの引き継ぎをテストが見ていなかった。 cursor = page.PageInfo.EndCursor を落としても\nテストは通るが、実物では同じページを問い続ける上限の無い無限ループになる。\nページ数に上限を置かないと決めている以上、これが一番悪い失敗の形\n\nほかに、追加取得のエラーが包まれていなかった件（隣の parse thread comments: と非対称）も直した。\n触らなかったもの\n\n1 ページ目は comments(first: 50) のまま。この 1 ページは全スレッド分まとめて返ってくるので、\n上げると「長いスレッドが 1 本ある PR」ではなく全部の PR の応答が重くなる\nWork 板の work.graphql、search の first: 50、labels の first: 100。\nspec §5 が「別の機会にする」と書いているもの\n\nPhase 3 完了\nchecks（#62）、merge（#65）、ページング（この PR）で 3 本すべて。\ndocs/superpowers/2026-09-08-phase3-checks-followups.md を締めた。\n残っているのは設計判断 1 つだけ: GitHub App が作った check run が、直上のワークフローの\n一員に見える問題。「再実行できる run が無い」ことを示す印を spec で決める必要がある。\n実端末での確認は 2 つの handoff 文書に残っている（checks / merge）。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 521,
+          "deletions": 35,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 65,
+          "title": "feat: merge a pull request from the terminal",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/65",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T22:25:09Z",
+          "bodyText": "Phase 3 の 2 本目。詳細ビューの m から PR をマージできるようにする。\n実装計画は docs/superpowers/plans/2026-09-08-phase3-merge.md。\n入るもの\n\nmergePullRequest / enablePullRequestAutoMerge / disablePullRequestAutoMerge（gh pr merge は使わない）\nリポジトリが許した方式だけを並べるポップアップ。mergeable: UNKNOWN は「計算中」で、r で取り直せる\nauto-merge の有効化と解除。使えないときはその理由を出す\nマージ後は詳細ビューを閉じて Work 板を取り直す\n\n3 本目（各スレッドの comments のページング）の計画も一緒に入っている。実装は次の PR。\nspec の誤りを 2 つ直した\nどちらも 2026-09-08 の introspection の実測で分かったもので、docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md §4.4.4 を訂正してある。\n\nMergePullRequestInput に delete-branch の入力は無い。 モックアップの [x] ブランチを削除する は実装できない。削除はリポジトリの deleteBranchOnMerge に従って GitHub 側が行うので、その値を読み取り専用の 1 行として見せる\nMergeStateStatus に DRAFT は無い。 draft は isDraft で見分け、enter を塞ぐ理由の 1 つとして扱う\n\nenablePullRequestAutoMerge は mergeStateStatus が CLEAN の PR を GitHub が断るので、その場合は選択肢ごと落として理由を出す。\n全体レビューで見つけて直したもの\nタスク別のレビューは全部通っていたが、継ぎ目を通しで見て 6 件出た。重いのは 1 件目:\n\n選んでいない方式でマージが走る経路。 r で取り直すとカーソルが squash に戻り、答えが 2 本走ると古いほうが後から上書きしていた。取り消せない操作なので、contextMsg に世代番号を持たせて古い答えを落とし、カーソルは 0 に戻さずクランプする\nErrorMsg が PR も世代も持たず、閉じたポップアップの失敗が次のポップアップに着地していた\n空の MergeContext が「計算中」と区別できず、**マージ済みの PR で m を押すと永久に「計算中です」**と出ていた。open な PR でだけ m を出す\nポップアップのキーバーが、そのキーの実際の動作と食い違っていた（auto-merge が有効なのに enter:マージ と出る等）。状態からヒントを組み立てる形にした\nautoLine() が、権限が無いときに「待つものはありません」という別の理由を出していた\nauto-merge を有効化・解除しただけで詳細ビューから蹴り出されていた。PR はまだ open なので、取り直して留まる\n\n確かめていないこと\n実端末で見ていない。 このブランチを書いているあいだ kukv/octoscope に open な PR が 1 つも無く、ポップアップは golden の目視でしか確認できていない。\nautoMergeAllowed: false なので auto-merge の 2 経路もこのリポジトリでは動かせない。\n受け渡しの手順は docs/superpowers/2026-09-08-phase3-merge-handoff.md にある。マージは戻せないので、試すなら捨ててよい PR を先に作ること。\n分かっていて残したもの\n\nja 80 桁では m:マージ を入れた分だけ x:クローズ と r:更新 がキーバーから落ちる（キー自体は効く）\ninternal/tui/review/render.go のポップアップ幅に、merge 側で見つけたのと同じずれがあるかもしれない。範囲外として触っていない\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 5362,
+          "deletions": 35,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 64,
+          "title": "chore: keep the working copy LF on every platform",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/64",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T22:15:14Z",
+          "bodyText": "なぜ\nWindows で core.autocrlf=true のままチェックアウトすると、.golden 以外の全ファイルが CRLF になる。実測した影響は次のとおり。\n.go（94 ファイル）— 実害あり。 gofumpt は CRLF を「整形されていない」と判定するため、make lint と make fmt-check が全ファイルで落ちる。\ninternal/usecase/usecase.go:1:1: File is not properly formatted (gofumpt)\n...\n93 issues:\n* gofumpt: 93\n\nmake fmt を毎回挟めば回避できるが、git checkout や git stash のたび再発する。\n.sh（2 ファイル）— 壊れうる。 .claude/hooks/ の PreToolUse フック。CRLF のシェルスクリプトは $'\\r': command not found を起こす。現状は落ちなかったが、read やヒアドキュメントが入れば壊れる。静かに動かなくなる種類のもの。\ntestdata（15 ファイル）— 潜在的。 現在 883 テストは CRLF のまま通っており、パーサは改行に寛容。ただしこれは偶然で、行分割に敏感な処理が入ると「ローカルは通るが CI は落ちる」形で出る。\n何をしたか\n作業コピーを全プラットフォームで LF に固定し、バイト比較が要るものだけ例外にした。\n* text=auto eol=lf\n\n*.golden -text\n\ninternal/gh/cli/testdata/** -text\n\ntext=auto はバイナリを自動判別するので LICENSE などに影響しない。.gitattributes は後の行が勝つため、-text の 2 つが例外として効く。\ninternal/gh/cli/testdata/** を -text にしたのは、これが GitHub から録ったレスポンスそのものだから。改行を変換するのは「録ったファイルの編集」にあたる（.claude/rules/testing.md）。.golden を -text にしているのと同じ理屈。\nインデックスは元から全て LF なので、この PR の差分は .gitattributes の 11 行だけで、既存ファイルは 1 バイトも変わっていない。\n確認\n\n作業ツリーを再チェックアウトし、.golden 以外に CRLF が 0 件\nもう一度再チェックアウトしても git status が clean（べき等）\nmake fmt を挟まずに make check が終了コード 0\n\nCI（Linux）は元から LF なので挙動は変わらない。効くのは Windows のチェックアウトだけ。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "chore/gitattributes-go-eol",
+          "baseRefName": "main",
+          "additions": 11,
+          "deletions": 0,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 63,
+          "title": "refactor: give each way of opening a URL a name",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/63",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T21:51:29Z",
+          "bodyText": "なぜ\ninternal/browser の command() が、プラットフォームごとの argv を switch の各 case に直書きしていた。octoscope が起動しうるプログラムの一覧が 1 つの関数の分岐に散っていて、何が試されるのかが読み取りにくい。\n何をしたか\nopener interface を切り、ブラウザの起動方法ごとに型を用意した。nil が「自分の出番ではない」を意味する。\ntype opener interface {\n\tcommand(env environment) []string\n}\n\nvar openers = []opener{\n\tuserNamed{},       // GH_BROWSER / BROWSER\n\twindowsHandler{},  // rundll32 url.dll,FileProtocolHandler\n\tmacOpen{},         // open\n\twslBridge{},       // powershell.exe -NoProfile -Command Start-Process\n\txdgOpen{},         // xdg-open\n}\n環境変数は名前付き定数にまとめ、goos / wsl / browser を持つ environment 値として呼び出し時に 1 度だけ組み立てる。取得タイミングは変えていない（init には移していない）。このパッケージがマシンから何を読むかがファイル冒頭で一覧できる。\nトレードオフ\n分岐は消えていない。置き場所が変わっただけ。 case goos == \"windows\": が各型の if env.goos != osWindows { return nil } になり、実装は 25 行から約 95 行に増えた。得たのは「コマンドに名前が付く」ことと「一覧が 1 箇所にまとまる」こと。\n順序について\nswitch の上から下への読み順が持っていた優先順位が、スライスの並びという暗黙の前提になった。壊れうる箇所なので、テストで両方向を固定した。\n既存テストは goos: linux でしか「ユーザー指定のブラウザが勝つ」を見ておらず、userNamed{} を後ろに下げても通ってしまう穴があった（Linux では他の opener が nil を返すため順序が結果に出ない）。Windows と macOS のケースを追加した。\n\n\n\n壊した内容\n結果\n\n\n\n\nwslBridge と xdgOpen を入れ替え\nFAIL\n\n\nuserNamed を後ろへ\nFAIL（追加前は PASS）\n\n\n定数 GH_BROWSER / BROWSER を入れ替え\nFAIL\n\n\n\n確認\n\nmake check 終了コード 0（tidy / lint 0 issues / fmt / 883 tests）\n挙動は変えていないため TUI の目視確認は行っていない\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "refactor/browser-openers",
+          "baseRefName": "main",
+          "additions": 174,
+          "deletions": 35,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 62,
+          "title": "feat: read a pull request's checks and rerun them from the terminal",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/62",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T19:39:17Z",
+          "bodyText": "Phase 3 の 1 本目。PR の checks を一覧し、失敗したジョブのログを読み、ワークフローを再実行できる 2 ペインのビューを足す。\n設計は docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md §4.4.3（画面）と\ndocs/superpowers/specs/2026-09-07-phase3-design.md（バックエンドと境界）。\n実装計画は docs/superpowers/plans/2026-09-07-phase3-checks.md。\n入るもの\n\ns で checks ビュー（Work 板 / Repos 一覧 / 詳細画面から。Issue では何もしない）\n左に check の一覧（ワークフロー別、失敗が先頭）、右に選択中の check のログ\nenter で失敗ステップのログ、L で全ログ。折り返さず h / l で横スクロール\nR で再実行（失敗ジョブのみ / ワークフロー全体をポップアップで選ぶ）\n外部 CI（StatusContext）と、再実行できる run を持たない check は、無言で無視せず理由を出す\n更新は r の手動のみ\n\n実測して決めたこと\n推測ではなく実出力で確かめた（spec §2 に日付つきで記録）。\n\nCheckRun.databaseId は Actions のジョブ id（detailsUrl の .../job/<id> と一致）\nrun id は checkSuite.workflowRun.databaseId\n進行中のジョブに gh run view --log は終了コード 1、stderr は\njob <id> is still in progress; logs will be available when it is complete。\nJobLog はこれをそのまま返し、ビューはそのまま出す\n成功したジョブに --log-failed は空・終了コード 0（エラーではない）\nログの形は ジョブ名 \\t ステップ名 \\t タイムスタンプ 本文。メッセージの先頭に BOM がある\n\nD1: Work 板の contexts は first: 100 のまま\nstatusCheckRollup.contexts のページングは checks ビュー自身のクエリだけで行う。\nWork 板は 4 列 × 最大 50 件のカードを 1 リクエストで引いており、カードごとに rollup を\nページングすると往復がカードの数だけ増える。板が要るのは件数の丸めであって\n101 件目以降の 1 件 1 件ではない。\nまだ終わっていないこと\n\n実端末での確認は人手が要る（この環境に TTY が無い）。手順は\ndocs/superpowers/2026-09-07-phase3-checks-handoff.md\n積み残し（docs/superpowers/2026-09-08-phase3-checks-followups.md）のうち、\n設計判断が要らないものはこの PR の中で全部直した。並べ替えのバグ\n（無関係な外部 CI の状態が App の check の位置を動かす）、Actions のジョブを\n持たない check での enter / L の辞退、見出しが画面外に残る問題、\n全ログが空のときの案内、headingLine の桁溢れ、0:… の断片、\nテストヘルパーの重複、そして checks.go からログペインの log.go への分割\n残っているのは設計判断が 1 つだけ: 再実行できる run を持たない check\n（App が作ったもの）を、外部 CI とどう見分けさせるか。今は画面上どちらも\n見出しの無い行で、enter の振る舞いだけが違う\nPhase 3 の残り 2 本（merge、各スレッドの comments のページング）は別 PR\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-fluttering-cuddling-papert",
+          "baseRefName": "main",
+          "additions": 6289,
+          "deletions": 62,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 61,
+          "title": "fix: 詳細画面の c が無反応に見える問題と、--repo の初期タブ",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/61",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T05:52:30Z",
+          "bodyText": "Phase 2 の立て直し（#59 / #60）のあとに残っていた宿題を片付ける。利用者から見える\n不具合が 2 つ、コードの中だけの問題が 4 つ。実装計画は\ndocs/superpowers/plans/2026-09-07-phase2-followups.md。\n詳細画面で c が無反応に見える問題を直した\n「詳細画面で c を押してもコメント欄が開かない」という報告の原因が分かった。\n本文の読み込みが終わるまで c / x / v / l / a は無視されるのに、その間の\n画面はスピナー 1 行だけで、無視した理由がどこにも出ていなかった。\n実端末（pty）で実 API を相手に再現した結果:\n\nenter の 4 秒後に押した c → 何も起きない\n同じ手順で 25 秒後に押した c → コメント欄が開く\n\n断ったときに理由を 1 行出すようにした（diff が既に持っている declined と同じ流儀）。\n⣾  読み込み中...\n本文がまだ届いていません。少し待ってからもう一度\n\n設計書 §3.4 は原因を「端末から届くキーイベントが \"c\" にならない」と推測し、\n--debug-keys を足して切り分ける、としていた。実際は違ったので §3.4.1 に結論を\n追記し、--debug-keys は入れていない。\n--repo を渡したら Repos タブから始まるようにした\nこれまでは --repo kukv/octoscope を渡しても Work タブで始まっていた。spec §4 の\n「起動直後は Work タブ」どおりの動作だったが、フラグを渡すのは「このリポジトリを\n見に来た」という意思表示なので、spec を先に直してから Repos 開始に変えた。\nカレントディレクトリの git remote から後で解決した場合はタブを移さない。\nその答えは盤面が出てから数秒後に届くので、見ている画面を奪うことになる。\nREADME（en / ja）の --repo の説明も追随させた。\n別の item 宛ての応答で画面が入れ替わるのを防いだ\ndetail.Model は item ごとに作り直されるので、利用者が別の item を開いたあとに前の\nitem の応答が届くと、それが今の画面に効いてしまう。itemMsg にはこのガードが元から\nあったが、7 つのメッセージに無かった。全部に ref を持たせて捨てるようにした。\n\n\n\nメッセージ\nガードが無いと\n\n\n\n\npickerCandidatesMsg\n頼んでいないピッカーが、別リポジトリの候補で開く\n\n\npickerAppliedMsg / pickErrorMsg\n押していない l の結果やエラーが出る\n\n\ncommentPostedMsg / stateChangedMsg\n別の item を取り直して本文が入れ替わる\n\n\ncommentErrorMsg / stateErrorMsg\n開いていない item の失敗が画面に出る\n\n\n\nこれで detail の非同期メッセージは全部ガードつきになった（diff は元から全部ついて\nいる）。当初の指摘は pickErrorMsg 1 つだったが、同じ形の穴が 7 つあった。\n読みにくかったコードとテストを直した\n\nmode / phase に String() を足した（detail / diff）。テストの失敗が\nmode = 3 ではなく mode = pick と出る\ndiff.submitCancelled だけ errText を消していなかったので detail に揃えた。\n「modeView は描かないから残してよい」という言い訳コメントは消えた\n空振りしていたテストを直した。 Repos のシナリオ 2 本は、Repos タブが無くても\nWork の enter が同じ詳細画面を開くので通ってしまっていた。タブの前提を確認する\nガードを足し、詳細画面の判定も #12（Repos 一覧も番号を描く）から詳細画面だけが\n描く state: open に替えた\n初期タブを変えたことで app のテストが新たに 3 種類の空振りを起こしたので、\nそちらも直した（シナリオ 3 本が Repos 経由になる、\"2\" が no-op になる、\n幅テストが Repos タブを \"work\" という名前で記録する）\n\n確認\n\nmake check 814 テスト緑、lint 0 件。新しいテストは検証対象を壊して落ちることを\n確認済み\n実端末で見た。 python の pty.fork() + TIOCSWINSZ で端末を作り、実 API 相手に\n120 桁 ja の Work 盤・詳細画面・上の decline 行・--repo での Repos 開始を目視\n見ていないもの: 80 桁の桁ずれ（ANSI を剥がすと erase-line で判定できない。\ngolden が担保）、diff 画面、Web UI 側での Pending の確認、レビューの提出と破棄。\n実在の PR に ctrl+s は送っていない\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-glistening-floating-perlis",
+          "baseRefName": "main",
+          "additions": 589,
+          "deletions": 86,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 60,
+          "title": "refactor: fold the detail and diff views' flags into a mode and a phase",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/60",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T04:23:54Z",
+          "bodyText": "Phase 2 立て直しの Part 2（設計書 §6 の作業順 9 / 6 / 7 / 8）。\n\n設計: docs/superpowers/specs/2026-09-06-phase2-remediation-design.md\n実装計画: docs/superpowers/plans/2026-09-07-phase2-remediation-part2.md\n前提: 作業順 0 / 1 / 1.5 は #56、作業順 2 / 5 / 3 / 4 は #59（Part 1）\n\n何をしたか\n\n\n\n#\n内容\n\n\n\n\n9\ninternal/tui/app/scenario_test.go に、キー入力だけで画面をまたぐシナリオテスト 3 本\n\n\n—\ngolden を 54 本追録（detail 30 / diff 24）。以降の等価性検証のため\n\n\n6\ndetail の bool 10 個 + エラー文字列 4 本、diff の bool 5 個 + エラー文字列 3 本を mode / phase の enum + errText 1 本に畳んだ\n\n\n7\ndetail / diff / app の Update の各 case を名前つき method に分割（141→41 / 123→35 / 82→45 行）\n\n\n8\n非テストコードから実装計画・設計書への参照 27 箇所を削除または事実に書き換え\n\n\n—\n.claude/rules の暫定注記（TRANSIENT）を削除、設計書 §6 に実際の作業順を追記\n\n\n\nリファクタリングは表示を変えていない。 追録した 54 本を含む golden 80 本が、作業順 6 と 7 を通して 1 バイトも変わっていない。\n設計書からの逸脱（実装計画の Decisions に記載）\n\nD1 / D2: 作業順を 9 → golden 追録 → 6 → 7 → 8 に並べ替えた。9 のシナリオテストは 6 が書き換える遷移をそのまま通るので、現行コードの上で先に書けば回帰ネットになる。golden も同じ理由で先に録った（「golden 不変で等価性を確認する」は録れているセルにしか効かない）\nD3: diff の loading は畳まない。c / v / X はレビューコンテキストの到着でゲートされており、差分の取得中でもオーバーレイは開ける\nD4: 送信中かどうかは review.Model の sending に任せ、phase に写さない（真実の出所を 2 つにしない）\nD5: picker が持っていた 4 本目のエラー文字列も 1 本に畳んだ\n\n意図的な挙動変更 2 件（どちらもテストで固定）\n\n詳細画面のホイールが、ピッカー候補の取得中とレビューコンテキストの取得中に本文を動かさなくなった。 それらの状態では本文が描かれておらず、見えていないものをスクロールしていた\n詳細画面の c（コメント入力）が、close 失敗で出ていたエラーも消すようになった。 エラー文字列 1 本化（設計書 §4.4 の要求）の帰結。消さずに入力欄を開くと、close の失敗が入力欄の中に描かれてより悪い\n\n完了条件（設計書 §8）\n\n\n\n#\n条件\n状態\n\n\n\n\n1\n実機で全機能を 1 つずつ確認\n未実施（下記）\n\n\n2\nmake check\n通る（794 tests / lint 0 issues）\n\n\n3\ninterface 1 宣言あたり 6 メソッド以下\nitemSource 6 / candidateSource 2 / reviewOpener 1\n\n\n4\ninternal/tui に bool の mode フラグが無い\ngrep 0\n\n\n5\n非テストコードに実装計画・spec への参照が 0\ngrep 0\n\n\n6\ninternal/gh/cli のパーステストが実物の testdata を使う\nPart 1 で完了\n\n\n7\nキー入力だけのシナリオテストが 3 本以上\n3 本（Work 始まり 1 / Repos 始まり 2）\n\n\n8\nrules 10 項目と depguard\nPart 1 で完了、TRANSIENT は本 PR で削除\n\n\n\n条件 1 は残っている。 gh 認証と tty が要るため、マージ前に手元で次を通す:\ngo run ./cmd/octoscope\ngo run ./cmd/octoscope --lang ja\n差分から見て特に見るべき箇所:\n\n詳細で v / l / a を押した直後の 1 フレーム（View の分岐順を変えた唯一の箇所）\ndiff で提出を失敗させ → esc → c、同じく X（エラーが持ち越されないこと）\n詳細でピッカー取得中にホイール（本文が動かないこと＝意図的変更 1）\n詳細で close 失敗のエラーが出た状態から c（エラーが消えること＝意図的変更 2）\n--lang ja でピッカー / 確認 / 提出ポップアップ / フッターの折返し（全角の桁ずれ）\n\n繰り越した指摘\n\ndiff の submitCancelled だけが errText を残し、開く側（c / v / X）が消す流儀になっている。他の退出経路は出るときに消す\npickErrorMsg に ref が無いための微差（前の detail インスタンスからの遅延メッセージが要る作為的な経路。既存由来）\nmode / phase に String() が無く、テストの失敗メッセージが数値で出る\ndiff/golden_test.go の submittingModel のコメントが pendingCount() の実挙動と食い違う（既存由来）\nTestClosingFromTheReposTabShowsTheNewState の前提ガード（#12）が弱い。Repos 一覧も番号を描くため。本体のアサーションは有効\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-glistening-floating-perlis",
+          "baseRefName": "main",
+          "additions": 3805,
+          "deletions": 702,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 59,
+          "title": "fix: 無音の打ち切りを潰し、internal/usecase を入れる（Phase 2 立て直し Part 1）",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/59",
+          "isDraft": false,
+          "updatedAt": "2026-09-07T01:04:20Z",
+          "bodyText": "Phase 2 立て直し Part 1（設計書の作業順 2 / 5 / 3 / 4）。実装計画は\ndocs/superpowers/plans/2026-09-07-phase2-remediation-part1.md。\n何を直したか\n無音の打ち切り（作業順 2）\n\nreviewThreads を Go 側のループでページングする。GitHub は connection を 100 で\n打ち切り、gh api --paginate は最上位より下の GraphQL カーソルを追えないので、\n101 本目以降のスレッドはエラーも出さずに消えていた\nlabels(first: 10) を 100 に上げた。据え置く connection（スレッド内の\ncomments、Work の search、REST の per_page）には、なぜ据え置くのかを\nコメントで残した\ngh.Work の配列長を section の enum から引くようにし、diff.go の裸の定数に\n名前を付けた\n\n実物の testdata（作業順 5）\n\ninternal/gh/cli のパーステストが、手書き JSON ではなく gh の実出力の\n録りものを読む。手書きだと「GitHub が実際には返さない形」でも通ってしまう\nwork.json は @me 検索なので全リポジトリをなめる。公開リポジトリのノードだけに\n絞り、エイリアスごとに 5 件で打ち切り、公開 PR の本文経由で私有リポジトリ名と\nインフラ構成に触れていた 2 件を落とした。録り方は testdata/README.md にある\n\ninternal/usecase（作業順 4）\n\nPR / Issue の種別振り分け（GetItem / AddComment / SetState / EditLabels /\nEditAssignees）と、レビューの呼び出し順序（PostLineComment / SubmitReview）が\nビューから下りた。ビューは「何をしたいか」を言い、それが何回の API 呼び出しに\nなるかは知らない\ndetail が宣言する interface は 6 / 2 / 1 メソッド（規約の上限は宣言あたり 6）\ncmd/octoscope は cli.New → usecase.New → app.New の 3 行\n\n規約（作業順 3 の後始末）\n\n規約を実装より先に入れたときの暫定注記（TRANSIENT(Part1 ...)）を削除した。\nPart 2 に持ち越す 2 件は意図的に残してある\n\n検証\n\nmake check: 781 テスト / lint 0 件\nmake release-check: goreleaser 設定 OK、Windows / macOS / Linux のクロスコンパイル成功\ngolden は 1 バイトも動いていない（表示を変える変更を含まないため）\n新しいテストはすべて、守っている行を壊して赤くなることを確認してから入れた\n\n確認をお願いしたいこと\n実機での動作確認は未実施です。.claude/rules/tui.md の「テストが通っただけで\n完了にしない」の分が残っています。以下を --lang en / --lang ja、80 桁と 160 桁で:\n\nWork: j / k / enter → 詳細\n詳細: o / c / x → y / l / a / v / d\ndiff: j / k / c → ctrl+s / v / X\nRepos: tab → j → enter → 詳細 → o\n\nPart 2 に持ち越すもの\n\ndetail / diff の bool を enum に畳む、Update の case 分割、コード中の\nspec N / Task N 参照 26 箇所の削除、画面をまたぐシナリオテスト\n既知の未解決 2 件: 詳細画面の c が開かないことがある（再現せず）、\n--repo を渡しても Work タブが出る\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-eventual-singing-gem",
+          "baseRefName": "main",
+          "additions": 6322,
+          "deletions": 486,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Refactoring",
+                "color": "fa8072"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 58,
+          "title": "fix: 実装より先に rules を設計書に合わせる + PreToolUse ゲートが一度も発火していなかったのを直す",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/58",
+          "isDraft": false,
+          "updatedAt": "2026-09-06T18:14:14Z",
+          "bodyText": "実コードは 1 行も変えていない。make check は通る（762 テスト）、golden の変更なし。\n1. PreToolUse ゲートが一度も発火していなかった（aa3b8d1）\nPR #57 で入れたゲートは素通しだった。\nCLAUDE.md は docs/superpowers/specs/ と docs/superpowers/plans/ を「見に行く場所」\nとして書いている。そして CLAUDE.md 全文は transcript に 1 行の JSON として入る。\n元のパターン docs/superpowers/\\(specs\\|plans\\)/[^\"]*\\.md は、その 1 行の中の\nディレクトリ表記と、同じ行の後ろにある .claude/rules/architecture.md を拾って一致していた。\nCLAUDE.md は毎セッション読まれるので、すべてのセッションが通過していた。\n実際の CLAUDE.md から transcript を組んで再現し、修正後に 7 ケースで確認した。\n\n\n\nケース\n期待\n結果\n\n\n\n\nCLAUDE.md のみ + internal/（回帰）\ndeny\n✅ exit 2\n\n\n計画なし + internal/\ndeny\n✅ exit 2\n\n\n計画あり + internal/\n通過\n✅ exit 0\n\n\n設計あり + internal/\n通過\n✅ exit 0\n\n\n計画なし + docs/\n通過\n✅ exit 0\n\n\n計画なし + cmd/\ndeny\n✅ exit 2\n\n\n計画なし + .claude/rules/\n通過\n✅ exit 0\n\n\n\n指摘は Codex の stop-time review gate から出た。\n2. rules を設計書に合わせる（f7b0eb9）\n設計書 §5 が挙げる規約 10 項目 + 1 項目を、実装より先に入れる。\n当初の実装計画は「コードを直してから規約を書く」順だった（architecture.md に\n「interface は 6 メソッドまで」と先に書くと、detail が破っている状態が残るため）。\nこれを覆した。 規約が設計に沿っていない状態で実装を始めるほうが危険で、\n規約を読み込むセッションが誤った方向に進みかねない。\n規約が現状のコードを追い越している 3 箇所には、今それを破っていること・どのタスクで\n直すこと・新しいコードで言い訳にしないことを明記した。\n\n\n\nファイル\n内容\n\n\n\n\narchitecture.md\n依存図に usecase／「層を足す前に」を実測で書き直し／interface は 1 宣言 6 メソッド（embed は数えない）／複数 API 呼び出しと種別振り分けは usecase／usecase.Item を画面の写しにしない\n\n\ntui.md\nUI の状態は mode / phase の enum。並行する bool にしない\n\n\ngo-style.md\n実装計画・設計書への参照をコードに書かない（.claude/rules/* への参照は残してよい）\n\n\ntesting.md\n外部レスポンスは実物を録る／引数のテストは仕様を書く／画面をまたぐ操作はキー入力だけのシナリオテスト\n\n\n.golangci.yml\ntui-layer と usecase-layer を追加、gh / i18n / browser の deny にも usecase\n\n\n\nusecase.Item の項は設計書 §5 に無い 11 項目目。UI だけの修正が usecase に\n波及しない状態を保つ唯一の歯止めで、Item がその経路になり得るため足した。\ndepguard は 5 ルールすべて実際に落とすことをプローブで確認した（既存 2 + 新規 3）。\ni18n-layer:    i18n → gh            ✅\ntui-detail:    detail → diff        ✅\ntui-layer:     work → gh/cli        ✅ (新規)\nusecase-layer: usecase → i18n       ✅ (新規)\nusecase-layer: usecase → tui/detail ✅ (新規)\n\n設計書の訂正\n\n§3.2 の cli/review.go:141 を取り消し。 pending review は 1 ユーザー 1 PR に\n1 つしか存在せず、first: 1 と Nodes[0] は打ち切りではない\n§8 の条件 3 を「detail が宣言する interface が 1 つあたり 6 メソッド以下\n（embed は数えない）」に直す。detail.Source は detail.New と app.Source が\n要求する合成 interface で、§4.3 が候補取得とレビュー提出を別 interface のままと\nしている以上、合成の合計は 6 にならない\n\n実装計画の更新\ndocs/superpowers/plans/2026-09-07-phase2-remediation-part1.md の Task 8 を\n実施済みとして記録し、D4（順序の判断）を覆した経緯を書いた。\n残りは Task 1〜7 と Task 9。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "fix/rules-to-match-spec",
+          "baseRefName": "main",
+          "additions": 401,
+          "deletions": 23,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 57,
+          "title": "chore: rules を paths で読み込ませ、spec を飛ばすセッションを検知する + Phase 2 立て直し Part 1 の実装計画",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/57",
+          "isDraft": false,
+          "updatedAt": "2026-09-06T17:44:54Z",
+          "bodyText": "実コードは 1 行も変えていない。規約の読まれ方を直すのと、次の実装の計画を置くだけ。\nなぜ\n設計書を作ったのに無視して実装を始めるセッションが繰り返し起き、そのたびに\nセッションを捨てていた。原因は 2 つあった。\n\nCLAUDE.md が @.claude/rules/* で全文を常時 context に載せていた。\n常時載せることは「読まれる」ことを保証しない一方で、触ってもいない\nファイルの規約まで毎回積んでいた\n読まなかったことをあとから確かめる手段が無かった\n\n1 つ目のコミット — 規約の読まれ方\n\nCLAUDE.md から @ 参照を削除。.claude/rules/ は Claude Code が自ら探す\n各 rule に paths frontmatter を足し、触るファイルに応じて読み込ませる\n\n\n\n\nrule\npaths\n\n\n\n\narchitecture.md\ninternal/** cmd/** .golangci.yml\n\n\ngo-style.md / errors.md\n**/*.go\n\n\ntesting.md\ninternal/**/*.go **/testdata/**\n\n\ntui.md\ninternal/tui/** internal/i18n/**\n\n\n\ntesting.md を **/*_test.go に絞らなかったのは、「テストを書かずに実装だけ\n進める」セッションにこそ届く必要があるため。tui.md に internal/i18n/** を\n足したのは、カタログがそこにあり「en と ja の両方に足す」規約が i18n を触るときに\n効かないと意味がないため。\n検知は 3 つ。\n\nInstructionsLoaded フック — どの instruction がいつ・なぜ読まれたかを\n.claude/instructions-loaded.log（gitignore）に記録する。context は消費しない\nPreToolUse フック — 設計にも実装計画にも触れていないセッションの\ninternal/ cmd/ への編集を止める\nCodex の stop-time review gate（機械ローカル設定なので、このリポジトリには入らない）\n\nPreToolUse は 4 ケースで実際にフックを叩いて確認した。internal/+計画なし → deny(exit 2) /\ninternal/+計画あり → 通過 / docs/ → 通過 / cmd/+計画なし → deny。\n2 つ目のコミット — Part 1 の実装計画\ndocs/superpowers/specs/2026-09-06-phase2-remediation-design.md の作業順\n2 / 5 / 3 / 4 を 9 タスク・73 ステップに落とした。6〜9 は Part 2 に残す:\n作業順 4 が detail.go と diff.go を作り替えたあとのコードが対象で、\n今それを正確に書こうとするとプレースホルダになる。\n設計書が「実装時に決める」としていた点を全部確定させた（TBD ゼロ）。\n\ninterface の上限は 1 宣言あたり 6 メソッド、embed は数えない。\n設計書 §8 の条件 3 もこの文言に直す\nusecase のミューテーションは ctx を取らない。gh/cli が意図的に取っていない\n作業順 3（規約）は 4 の後に置く。先に書くと「6 メソッドまで」が違反状態を\n記述したままになる\nページングは reviewThreads だけ。labels は 10 → 100。search と\nスレッド内 comments と REST の assignees は据え置き、理由をコードに残す\nreviews(states:[PENDING], first:1) と Nodes[0] は打ち切りではない。\npending review は 1 ユーザー 1 PR につき 1 つしか存在しない（設計書 §3.2 の指摘は誤り）\n\n設計書に無い規約を 1 つ足した。usecase.Item を画面の写しにしない —\n共通フィールドを足してよいのは PR と Issue の両方に GitHub 側の対応物があるときだけで、\nPR 固有のものは Item.PR から読む。UI だけの修正が usecase に波及しない状態は、\nこれが唯一の歯止めになる。\nusecase を入れることの唯一の実コストも計画に書いた: GitHub への新しい操作を\n足すとき、触るファイルが cli + detail の 2 つから cli + usecase + detail の\n3 つに増える。設計書 §2.3 の Q2 は「減るもの」しか挙げておらず、この増分は\n書かれていなかった。\n確認\n\n実コードの変更なし。make check の対象は動いていない\npaths の条件読み込みは、このセッションでは確認できない（起動時点で全 rules が\n読み込まれているため）。新しいセッションで /context を見て確認してほしい\n.claude/settings.json のフックは次のセッションから有効（workspace trust の確認が出る）\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "worktree-eventual-singing-gem",
+          "baseRefName": "main",
+          "additions": 2524,
+          "deletions": 6,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 56,
+          "title": "fix: Phase 2 で実機が動かなかった 3 件を直す（レビュー系 GraphQL / 30 件打ち切り / ブラウザ起動）",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/56",
+          "isDraft": false,
+          "updatedAt": "2026-09-06T15:59:11Z",
+          "bodyText": "Phase 2 立て直し設計書（docs/superpowers/specs/2026-09-06-phase2-remediation-design.md）の\n作業順 0 / 1 / 1.5 を実施した。いずれも独立したバグ修正で、大きなリファクタ（2〜9）には入っていない。\n設計書そのものも未コミットだったので同時に入れている。\n機能チェック表は、内容が設計書 3 章に入りきったので落とした。\n0. レビュー系 GraphQL が必ず失敗していた（最優先）\nreview.graphql が PullRequestReviewComment に無い diffSide を選んでいた。\nGraphQL はクエリ全体を検証してから実行するので、PRReviewContext は 100% 失敗していた。\ndiff のスレッド表示、行コメント、レビューの送信・破棄、詳細画面の v が丸ごと死んでいた。\n修正方針は設計書が「実測してから決める」としていた 3 案のうち 案 A。実 PR（#55）に pending\nreview を作って実測した結果、reviewThreads は pending スレッドを diffSide つきで返すことが\n確認できた。よって未送信レビューからは id だけを取り、二重の情報源\n（pendingCommentNode / threadPosition / dedup）は削除した。\nテストが見逃した理由への対策が本体。run を差し替えたフェイクは手書き JSON を返すだけで\nクエリ文字列を見ないため、構文が不正でも検出できなかった。schema_test.go を追加し、\n全 7 本の .graphql を録ったスキーマ（testdata/schema.json）に突き合わせて歩く。\n空振りでないことを確認済み:\n\ndiffSide を元の位置に戻す → PullRequestReviewComment has no field diffSide で落ちる\nwork.graphql の ... on CheckRun の中で綴りを間違える → 落ちる（フラグメントと union に到達している）\n\n1. Repos タブが 30 件で打ち切られていた\ngh pr list / gh issue list / gh label list はいずれも --limit 省略時の既定が 30 で、\n31 件目以降は警告もなく消える。listLimit = 100 を通した。\nテストは実装が組み立てた引数をそのまま期待値に書いていた（実装の鏡）ので、\n「既定の 30 より大きい --limit が付いていること」という仕様を書く形に置き換えた。\n1.5. o（ブラウザで開く）が WSL で動かなかった\ngh ... --web は xdg-open / x-www-browser / www-browser / wslview の 4 つしか探さず、\nWSL にはどれも無い（wslu は上流の保守終了で Ubuntu 26.04 の apt から削除済み）。\ninternal/browser を新設し、octoscope 自身が開くようにした。\n\n\n\n環境\n起動方法\n\n\n\n\nWindows\nrundll32 url.dll,FileProtocolHandler\n\n\nmacOS\nopen\n\n\nWSL\npowershell.exe -NoProfile -Command Start-Process\n\n\nLinux\nxdg-open\n\n\n\nGH_BROWSER / BROWSER（gh と同じ優先順）が設定されていればそちらが最優先。\nシェルは経由しない。explorer.exe は成功時も終了コード 1 を返すため採らなかった。\nどれも使えないときは browser.NoneError が URL を運び、エラー画面に URL を出して\n手で開けるようにする（en / ja 両カタログ）。\n設計書からの変更点\nOpenWeb は設計書 4.2 では ref gh.ItemRef を取る形だったが、URL を受け取る形に変えた。\nRepos タブの SelectedRef は Repo を空のままにする設計なので、ref から URL を作ると\ngh repo view の往復と GitHub の URL 体系の直書きが UI 側に生まれる。\n設計書 3.3 の「gh.PR.URL は既に取得済みで --web を使う理由が無い」に沿う形。\n設計書側も同じコミットで直した。\n副産物として OpenPRWeb / OpenIssueWeb の 2 本が OpenWeb 1 本になり、\ndetail.Source が 19 → 18 になっている。\n新パッケージなので .golangci.yml の depguard と .claude/rules/architecture.md の\n依存図を同じコミットで更新した。\n実機で確認したこと\n\n既存レビュースレッド: #55 の pending スレッドが LEFT / RIGHT とも正しい行に描画される\nレビューの破棄: アプリ内の X → y で破棄でき、GitHub 側からも消えた（実測用の pending review はこれで後始末済み）\n--limit: cli/cli のオープン PR が 64 件返る\no: WSL で Start-Process が exit 0 / stderr なし\nエラー画面: 80 桁 × en / ja で描画を目視（改行が効いている、桁ずれなし）\n\n確認できていないこと\n\nLinux / macOS / Windows のブラウザ分岐（この環境では踏めない。表テストのみ）\nRepos 一覧での行クリック\n\n残っていること\n\nlistLimit = 100 は無音の打ち切りを 30 → 100 に動かしただけ。解消は作業順 2 のページング\nTestListPRs / TestListIssues は引数の完全一致比較が残っている。実質の担保は新しい仕様テストの側\n--repo owner/name を渡しても Repos タブではなく Work タブが出る。実機確認で見つかったが設計書の §3 にも §6 にも無く、別途扱いが要る\n詳細画面の c（コメント入力欄が開かない）は設計書 3.4 のとおり未解決\n\n検証\nmake check   # 0 issues, 762 tests\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "fix/phase2-blocking-bugs",
+          "baseRefName": "main",
+          "additions": 2570,
+          "deletions": 163,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 55,
+          "title": "feat: PR のレビューを octoscope の中で完結させる（Phase 2）",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/55",
+          "isDraft": false,
+          "updatedAt": "2026-09-06T13:40:04Z",
+          "bodyText": "spec の Phase 2。PR の diff を octoscope の中で読み、行にコメントを付け、レビューを提出できるようにする。\n\n設計: docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md §4.4.1 / §4.4.2\n実装計画: docs/superpowers/plans/2026-09-06-octoscope-phase2.md\n\nできるようになること\nd で diff を開く（Work の カード、Repos の行、詳細ビューのどこからでも）。既存のレビュースレッドは、それが付いている行の下に出る。c でその行にコメント、v で提出、X で破棄。\n未提出のレビューは GitHub 側の pending review として持つ。 octoscope を閉じても書きかけは消えず、Web UI から見えるものと同じ 1 つになる。行コメントを溜めて提出時にまとめて送る方式も検討したが、閉じたら消える代償が大きいので採らなかった（spec §4.4.2）。\n書きかけが無くても v は開く。 diff を読んで何も言うことがなく approve する、というのがレビューで最も多い形なので、そこに未提出レビューを先に作らせる理由が無い。その場合は addPullRequestReview に event を付けて 1 回で送る。\n構成\n\n\n\n追加\n役割\n\n\n\n\ninternal/gh\ndiff とレビューのドメイン型\n\n\ninternal/gh/cli/diff.go\ngh pr diff の unified diff をパース\n\n\ninternal/gh/cli/review.go\nレビューの GraphQL（1 クエリ + 5 mutation）\n\n\ninternal/tui/diff\ndiff ビュー\n\n\ninternal/tui/review\n提出ポップアップ\n\n\n\ninternal/tui/layout に FitKeyBar を足した。キーバーは順序付きのヒント配列になり、幅に入らない分を後ろから落とす。esc だけは落とさない — 80 桁で最初に切り落とされたのがそれだったため。\nルートモデルの showingDetail bool はビューのスタックになった。d は詳細ビューからも押せるので、真偽値では「詳細の上に diff がある」と「diff だけがある」を区別できない。\n設計上の判断\ndiff の各行は旧側・新側の両方の行番号を持つ。 描画だけなら文字列 1 本で足りるが、それでは c を押したときに何を送るか決められない。コメントの投稿先は行番号と、それが旧側か新側かの組で決まる。\nコメントの投稿先は c を押した時点で確定する。 ctrl+s の時点ではない。投稿後の再取得が行を挿入してカーソルがずれても、書き始めたときに見ていた行に付く。\nシンタックスハイライトは theme が返す。 chroma のスタイルは配色そのものなので、ビューが chroma を呼ぶと「色は theme にだけ書く」が崩れる。.claude/rules/tui.md も更新した。\n実装中に見つけて潰したもの\n\nコメントが誰も書いていない行に投稿される — ハンク見出しの関数コンテキストに + / - が含まれると行番号が 0 から振り直されていた。func add(a, b int) int { return a + b } で再現する。「このパーサの存在意義」を名乗るテストが、fixture にその形の見出しを 1 つも持っていなかったため構造的に検出できていなかった\n投稿後の再取得で行がずれ、2 件目のコメントが行 0 に飛ぶ\n@ で始まるコメント本文が gh api -F にローカルファイルとして読まれる — 利用者の入力は -f、-F は数値と {owner} / {repo} の置換だけ\n桁あふれ 4 件（タブの幅を lipgloss と ansi が別々に数える / 5 桁行番号でガターが budget を超える / キーバーが esc を切り落とす / 複数行コメントの改行が下の行を全部ずらす）\n\n300 ファイルを超える PR\ngh pr diff は 300 ファイルで HTTP 406 を返す。pulls/{n}/files へフォールバックする（per_page=100 + --paginate）。GitHub のエラー文で分岐はしていない — 失敗したら試す形にして、両方失敗したら errors.Join で両方出す。\n実際の 418 ファイルの PR で 418 ファイル・526 ハンク・リネーム 14 件を取得できることを確認した。GitHub が patch を返さない巨大ファイルは「差分なし」ではなく「GitHub が差分を返さなかった」と出る。\nエラー画面は esc で戻れる。 失敗したビューが一番上にあるときだけそれを閉じる。起動時の失敗（gh が無い等）は戻る先が無いので従来どおり終了する。\n幅と操作\n\nサイドバーは 22 桁。100 桁未満で畳み、読んでいるファイル名はヘッダへ移る（Work タブがカードの枠を外すのと同じしきい値）\nガターの 11 桁は下限で、9999 行を超えるファイルでは広がる。当たり判定も同じ値を読む\nマウス: サイドバーの行でファイル選択、diff 上のホイールで行移動。選択中の行をもう一度クリックすると畳まれたスレッドが開く。 ダブルクリックは使わない（Bubble Tea が報告しないので、自前で測ると Update に時計が入る）\nc / v / X が断ったときは理由を出す。以前は無言だったので、「この行にはコメントできない」「レビュー情報がまだ来ていない」「キーが壊れている」を利用者が区別できなかった\n\nPhase 2 の範囲外\nスレッドへの返信と解決（読むだけ）、merge（m は Phase 3）、GraphQL のスレッド取得のページング、diff に無いファイルへのコメントの表示。いずれも spec に記録した。\n検証\nmake check 緑（738 テスト、lint 0 件、カバレッジ 89%）。golden は en / ja × 80 / 120 / 160 桁 + 3 つのグリフセット。\nspec §7 の Phase 2 の検証条件「実際の PR にレビューを提出できる」は TTY と実在の PR が要るため、この環境では代行できない。 手順は docs/superpowers/2026-09-06-phase2-handoff.md にある。要点は、コメント後に同じ PR を Web UI で開いて、書いた行に付いていることを確かめること。ここのどのテストもそれは確認できない。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "feat/phase2-review",
+          "baseRefName": "main",
+          "additions": 12436,
+          "deletions": 151,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "Issue",
+          "number": 54,
+          "title": "Workタブのカードのタイトルを3段表記にしたい",
+          "state": "CLOSED",
+          "url": "https://github.com/kukv/octoscope/issues/54",
+          "updatedAt": "2026-09-06T12:10:10Z",
+          "bodyText": "タイトルを3段にして情報を増やす\n1行ごとの文字数はそのまま。3段にすることで情報量を上げる",
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Priority: Medium",
+                "color": "ffd700"
+              },
+              {
+                "name": "Kind: Enhancement",
+                "color": "89058a"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 53,
+          "title": "feat: Phase 1 の積み残しを片付け、画面を Artifact に合わせる",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/53",
+          "isDraft": false,
+          "updatedAt": "2026-09-06T05:24:20Z",
+          "bodyText": "Phase 1 の積み残し（#52 で記録した 1〜8 とその他の宿題）を片付け、そのうえで\nspec が参照している Artifact のモックアップに画面を合わせた。\n経緯は docs/superpowers/2026-09-06-phase1-followups.md にある。\n1 巡目 — 積み残し 1〜7\n\n\n\n\n\n\n\n\n\n1. 描画ハーネス\ninternal/golden。en / ja × 80 / 120 / 160 桁で View() を ANSI ごと録る。make golden で録り直す。TTY の無い環境で画面を見る唯一の手段でもある\n\n\n2. 色\ninternal/tui/theme に集約。v2 に lipgloss.AdaptiveColor は無いので lipgloss.LightDark(isDark)、isDark は tea.RequestBackgroundColor で問い合わせる\n\n\n3. グリフ\nunicode（既定）/ nerd / ascii。--icons と OCTOSCOPE_ICONS。自動判定はしない（端末はフォントも収録範囲も報告しない）\n\n\n4. カード 2 行\n80 桁では 1 列 18 桁しかないため\n\n\n5. ラベル\nGitHub の色で塗りつぶしたバッジ。背景の輝度から白／黒の文字色を選ぶ\n\n\n6. ドロワー\n本文と checks 一覧。失敗した check が先頭\n\n\n7. マウス\nView.MouseMode = tea.MouseModeCellMotion。1 回目で選択、選択中をもう 1 回で詳細。ダブルクリックは使わない（Bubble Tea が報告しない）\n\n\n\nあわせて宿題も: hasRepo の起動時ブロックを外し、gh.PR.State /\nReviewDecision をドメイン型に変換し、prMsg / issueMsg のクロストークを\nref で潰した。\n2 巡目 — Artifact に合わせる\n1 巡目の画面を実際に起動して見たところ、モックアップに全く沿っていなかった。\n1〜7 は「不足していた要素を足す」対応で、レイアウトそのものを作り直しては\nいなかったためである。構造として違っていた 9 点を直した。\n\n\n\nモックアップ\n1 巡目\n2 巡目\n\n\n\n\n画面に収まる\n列が伸びてドロワーとキーバーが画面外へ\n盤面に高さ予算。列内をスクロールし、ドロワーとキーバーは常に見える\n\n\nカードは枠つき\nただの行\nRoundedBorder() の箱（4 行）\n\n\n列は縦罫で分ける\n見出しの下に横罫\n列間に │。中身が尽きた行から下は引かない\n\n\n見出しに件数\n名前だけ\nReview Requested 3\n\n\n#12 タイトル\n番号が落ちていた\n復活\n\n\nメタ行は左から流す\n右寄せ・owner/name フル\nkoto + bar かレビュー語 + ラベル\n\n\nドロワーは 2 面\n縦積み\n左に本文、右に checks。ブランチ名と +218 −31 も\n\n\nタブ行の右に集計\n無し\n3 attention · 1 failing · updated 2m ago\n\n\nRepos 右ペインは表\n1 行 1 printf、桁が揃わない\n固定幅の列、サブタブに件数、下に選択中の要約\n\n\n\n意図的な逸脱が 1 つある。 カードの箱は 100 桁未満でやめる。18 桁の列に\n枠を描くと本文が 14 桁になり、タイトルがほぼ消えるため。spec §4.6 の劣化の段に\n書き足した。spec 側も §4.1 / §4.2 / §4.6 を、作った設計そのものに書き直した。\nレビュー中に見つけて直したもの\n\nリストがスクロールするとクリックが別の行を選ぶ — Repos の当たり判定が\n「画面上の n 行目」ではなく「リストの n 番目」として読んでいた。盤面側は\n正しかったが、枠つき・スクロール中の列をクリックするテストが無かったので\n両方に足した\n--icons nerd で Repos タブが出ない — icons とは無関係だった。\ngh repo view は API を叩き、実測で cold 6.17 秒 / warm 1.17 秒。締め切りが\n5 秒しかなく、しかも失敗を全部「ここはリポジトリではない」と読んでいたため、\nタブが理由も出さずに消えていた。締め切りを 20 秒にし、時間切れは答えと\n区別してタブ行に出す。exec は殺したプロセスを signal: killed と報告して\n締め切りを包まないので、判定は ctx.Err() で行う\n\n範囲外\n\nRepos のサイドバーと追加ダイアログ — 後続 PR。今回は右ペインまで\nSearch タブ — Phase 4\n変更量のスパークライン、d / v / m キー — 見送り / Phase 2・3\nRepoName を 2 回叩いている — ルートの判定と Repos ヘッダで別々に。\n判定の答えに名前を載せれば 1 つ減る。後続 PR で\n\n確認\nmake check 緑（362 テスト、lint 0 件）。この環境には TTY が無いため、\n実端末での目視だけは人手が要る。\ngo run ./cmd/octoscope --lang ja      # 全角で桁がずれていないか\ngo run ./cmd/octoscope --icons nerd\n見る境界: 80 桁で崩れない / 100 桁未満で枠とドロワーが消える /\n60 桁未満で 1 列ページング / クリック位置と選択の一致。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "feat/phase1-followups",
+          "baseRefName": "main",
+          "additions": 5103,
+          "deletions": 523,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 52,
+          "title": "docs: Phase 1 の積み残しを記録する",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/52",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T21:40:25Z",
+          "bodyText": "Phase 1（#46 / #47 / #49 / #51）で満たせていない spec 要件と、後回しにした宿題を docs/superpowers/2026-09-06-phase1-followups.md に書き出した。別セッションでの作業の起点にするためのもの。\n未達の spec 要件\n\n\n\nspec\n要求\n現状\n\n\n\n\n§4.5\n装飾の強度は最大限\nlipgloss を入れておいて AdaptiveColor の使用箇所ゼロ。bold と faint のみ\n\n\n§4.5\nNerd Font グリフ + ASCII 自動フォールバック\n未実装。internal/tui/icon/icon.go のコメントで実装側が勝手に Phase 送りにしていた\n\n\n§4.5\nラベルの実色を再現した塗りつぶしバッジ\nWork カードにラベルが出ていない。GraphQL が取っていない\n\n\n§4.1\n各カードは 2 行\n3 行\n\n\n§4.1\nドロワーに本文と checks 一覧\n本文なし、checks も要約 1 行\n\n\n\n加えてマウス操作が一切効かない（tea.WithMouseCellMotion を渡していない）。spec に記述が無いので実装しなかったが、判断が雑だった。spec §4 への追記も宿題に含めている。\nなぜ通ったか\nこの環境に TTY が無く、実装中に一度も画面を見ないままマージした。テスト 246 本緑・カバレッジ 89% だったが、色・グリフ・カードの行数を検証しているテストが 1 つも無かったため、装飾要件が丸ごと未達でも全部緑のままだった。\nTTY が無くてもテストの中で View() を出力すれば見える。積み残しの 1 番を描画ハーネス（en/ja × 80/120/160 桁の golden test、ANSI エスケープを落とさず保存）にしてあるのはそのため。\n内容の確認方法\nこのブランチにはドキュメント 1 ファイルしか無く、コードの変更は無い。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "docs/phase1-followups",
+          "baseRefName": "main",
+          "additions": 137,
+          "deletions": 0,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Documentation",
+                "color": "40e0d0"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 51,
+          "title": "feat: add the Work board and the tabbed root model (Phase 1)",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/51",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T21:21:40Z",
+          "bodyText": "Base は #49。 #47 → #49 の順にマージされれば自動で main へ付け替わる。\n\nPhase 1 の本体。複数リポジトリを横断して「自分に関係する仕事」を 4 列で見せる Work タブと、タブ切替を持つルートモデル。\nWork タブ（spec §4.1）\n  Review requested              Your PRs                      Assigned                      Mentioned\n  ────────────────────────────  ────────────────────────────  ────────────────────────────  ────────────────────────────\n▸ • fix the thing               (nothing here)                #7 an issue                   (nothing here)\n  kukv/octoscope                                              kukv/octoscope\n  ▰▰▱▱▱▱▱ now                                                 now\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\nkukv/octoscope#12 fix the thing\n1/3 checks passed, 1 failed, 1 running\n\n列の高さがそのまま滞留量になる。「レビューが溜まっている」が読まずに形で分かる、というのがこのレイアウトの狙い。\nGraphQL 横断取得（spec §3.3）\nsearch(type: ISSUE) の 4 エイリアスを 1 つのドキュメントにまとめ、1 リクエストで 4 列すべてを埋める。リポジトリごとに gh pr list を回すとリポジトリ数ぶんのリクエストになる。reviewDecision と isDraft は GraphQL でしか取れない。\nGraphQL の enum（REVIEW_REQUIRED、SUCCESS、IN_PROGRESS…）は internal/gh の中でドメイン値に変換し、TUI には文字列を漏らさない（.claude/rules/architecture.md）。checks は CheckRun と旧来の StatusContext の 2 つの形を両方読む。\nサブモデルへの分割（spec §3.1）\n一覧・詳細・コメント入力・確認・ピッカーが同居していた internal/ui の 1 枚モデルを分割した。\ninternal/tui/app     ルートモデル（タブ、キー経路、エラー画面）\n         ├ work      Work タブ\n         ├ repo      Repos タブの右ペイン（旧 internal/ui の一覧）\n         ├ detail    詳細・コメント・確認・ピッカー\n         ├ icon      状態アイコンと checks 進捗バー\n         └ layout    表示幅の切り詰め\n\n各サブモデルは自分の状態だけを持ち、親とはメッセージ型でのみ話す。必要な interface は使う側のファイルで宣言する。兄弟ビュー間の import は depguard で禁止した。\n取得系のメソッドには context.Context を通し、Work タブの再取得で前の取得をキャンセルする。キャンセルした取得はエラー画面にしない — r を連打してもユーザー自身が起こしたキャンセルでエラーが出ないこと。\nリポジトリが決まらないとき（spec §3.4-3）\n--repo も git remote も無ければ Repos タブを出さず、Work タブだけで動く。\n幅への対応（spec §4.6）\n\n100 桁未満: ドロワーを畳む\n60 桁未満: 1 列表示に切り替え、ヘッダーに column 2/4 を出す\n\n全ビューに「en / ja の両方で、50 / 80 / 100 / 120 桁のどれでも 1 行も端末幅を超えない」テストがある。detail のフッターは 83 桁（en）/ 90 桁（ja）溢れていたので短くした。幅テストが切り詰めで満たされないよう、80 桁でフッターの末尾（esc:back）が残っていることも別に検査している。\nspec の更新を同梱\n§3.2 の「internal/gh に Client interface を定義」を、.claude/rules/architecture.md の「GitHub アクセス層は interface を export しない」に合わせて書き換えた。§3.1 のパッケージ構成を実際の配置に、§4 にタブが段階的に増えること、§6.1 にタブ名を翻訳しないことを追記。§7 と §8 に残っていた同じ主張の矛盾も直した。\n確認したこと\n\nmake check 緑（244 テスト、race 検出つき、lint 0 件、カバレッジ 89.4%）\n全ビューを en / ja × 50 / 80 / 100 / 120 桁で描画して目視（レンダリング結果は各タスクのレポートにある）\n各テストは、検査対象を壊すと落ちることを確認してある\n\n⚠️ 実端末での確認が未了\nサンドボックスに /dev/tty が無く、go run ./cmd/octoscope を起動できていない。 幅も桁ずれもテストで検査してあるが、動いているところを人間が見ていない。マージ前に次を見てほしい。\n\n--lang ja で 80 桁と 50 桁 — Work タブと detail のフッター\nカードで enter → すぐ q（取得が遅い/失敗するもの）— エラー画面ではなくボードに戻ること\nボードで r を素早く 2 回 — 何も起きないこと、スピナーが倍速にならないこと\nc → 日本語を入力 → ctrl+s → 投稿中に ctrl+c — 分割で各ビューから ctrl+c の例外処理を取り除いた経路\ngit remote の無いディレクトリで起動 — Repos タブが出ないこと、最初の 1 フレームまでの待ち時間\n\n既知の申し送り\n\n起動時に最大 5 秒待つ。 --repo 無しのとき、Repos タブを出すかどうかを決めるために gh の応答を待ってから最初のフレームを描く。同じディレクトリで gh repo view を 2 回叩いてもいる。非同期化は、リポジトリ一覧が設定ファイル管理になる Phase 4 で一緒に直すのが素直。\ngh.PR.State / ReviewDecision はまだ生の GitHub 文字列で、TUI 側で switch している。Work タブはドメイン enum を使っているので、今はコードベースに 2 つの流儀が混在している。Phase 2 で揃える。\n別のアイテムの取得結果が、開き直した詳細ビューに流れ込む余地がある（表示のみ。操作は m.ref を見る）。エラー側は今回塞いだので、同じ形で直せる。\n\nPlan: docs/superpowers/plans/2026-09-06-octoscope-phase1.md Task 5–12（#46）\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "feat/octoscope-phase1-work-tab",
+          "baseRefName": "main",
+          "additions": 5615,
+          "deletions": 2562,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Feature",
+                "color": "00bfff"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "Issue",
+          "number": 50,
+          "title": "Moving from a Herdr plugin to a standalone CLI (octoscope)",
+          "state": "OPEN",
+          "url": "https://github.com/kukv/octoscope/issues/50",
+          "updatedAt": "2026-09-05T18:19:11Z",
+          "bodyText": "herdr-plugin-github-dash is becoming octoscope, a standalone GitHub TUI that runs on Windows, macOS and Linux. The Herdr plugin integration is being retired.\nWhat changes\n\nThe repository has been renamed to kukv/octoscope (old URLs redirect).\nThe Herdr-specific launch path is gone: herdr-plugin.toml, open.sh / run.sh, the HERDR_PLUGIN_CONTEXT_JSON context resolution and the GITHUB_DASH_URL link handler.\nIt ships as a single binary named octoscope instead of a plugin.\n\nWhy\nThe tool could only be started from inside a Herdr workspace, which turned out to be the wrong shape for something that is really just \"look at my GitHub work\". It also declared platforms = [\"linux\", \"macos\"] because its launch path was a pair of bash scripts — a limitation of this plugin, not of Herdr, which supports Windows plugins too.\nDropping the plugin wrapper makes it usable anywhere a terminal is, and opens the way to features the plugin shape made awkward: cross-repository views, diffs, reviews, checks, merge.\nUsing it from Herdr\nNothing is lost. Bind a key to run octoscope via keys.command in your Herdr configuration and it opens exactly like before — it just runs as a normal command in a pane rather than as a plugin.\nInstalling\nSee the README — mise, a release archive, go install, or a source build.",
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 49,
+          "title": "refactor: split the GitHub layer and narrow the UI interfaces",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/49",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T21:16:27Z",
+          "bodyText": "Base は #47。 #47 が main にマージされたら自動で main へ付け替わる。\n\nPhase 1 の下準備。挙動は 1 行も変えていない。 型の置き場所と interface の粒度だけが変わる。\ninternal/ghcli → internal/gh + internal/gh/cli（spec §3.1）\nドメイン型（PR / Issue / Label / Comment / Author、センチネル ErrGhNotFound）を internal/gh に、gh コマンドの実行を internal/gh/cli に分けた。Phase 4 で足す internal/gh/api（go-github / githubv4）が同じ型を返せるようにするため。\ngit mv で移したので履歴は追える。JSON タグ、--json のフィールド一覧、エラーの文脈文字列、c.run に渡す引数はすべて手つかず。移設前後でテスト 98 件が同じ本数通る。\ndepguard と gosec の除外パスも同じコミットで追従させた。特に G204 の除外パス（internal/ghcli/ghcli\\.go → internal/gh/cli/cli\\.go）を忘れると lint が落ちる。\n19 メソッドの DataSource を PR / Issue / リポジトリで割った\n.claude/rules/architecture.md の「interface は利用側で定義する」「interface は小さく保つ」に沿って、internal/ui の 1 枚の DataSource を割った。\n最初は画面ごと（listSource / detailSource / pickerSource）に割ったが、レビュー指摘を受けて軸を変えた。画面で割ると 1 つの interface に PR 用と Issue 用が混ざり、「GitHub 層が PR に対して何を提供するのか」がどこにも書かれていない状態になる。\n\n\n\ninterface\nメソッド数\n中身\n\n\n\n\nprSource\n8\nPR の一覧・詳細・ブラウザ・コメント・クローズ / リオープン・ラベル / アサイニー編集\n\n\nissueSource\n8\n同じものの Issue 版\n\n\nrepoNamer\n1\nRepoName。どちらの種別にも属さないので単独\n\n\ncandidateSource\n2\nListLabels / ListAssignees。候補はリポジトリのものなので種別に依らない\n\n\n\n8 + 8 + 1 + 2 = 19 で重複も欠落もない。DataSource は 4 つを埋め込んだ union として残るので、ui.New(src DataSource) も呼び出し側も変わらない。\ntea.Cmd を組み立てる関数のうち、種別に依らない 3 つ（fetchRepoName / fetchLabelPicker / fetchAssigneePicker）は狭い半分だけを受け取る。実行時に種別を選ぶ残りは union のままにした。target.Kind で分岐する以上、両方が本当に要るからである。\nトレードオフ: この分割で fake が小さくなるわけではない。Model は PR を表示するのか Issue を表示するのかをコンパイル時には知らないので、テストの fake は結局 19 メソッドすべてを実装する。得られるのは、GitHub 層が種別ごとに何を提供するのかが型として読めることと、PR 専用のメソッドを足したときに Issue 側の対応の有無が目に入ることである。\nこれは Phase 1 後半で internal/ui をビュー単位のサブモデルへ分割する下準備でもある。分割後は各サブモデルが自分のファイルで自分の interface を宣言する。\nspec §3.2 との差\nspec は「internal/gh に Client interface を定義し、2 つの実装を差し替え可能にする」と書いているが、.claude/rules/architecture.md の「GitHub アクセス層は interface を export しない」と矛盾する。規約を採り、internal/gh はドメイン型とセンチネルだけを公開している。\nバックエンドの差し替えは、各ビューが宣言する利用側 interface を cli と（将来の）api の両方が満たすことで達成できるので、下層に共通 interface を置く必要はない。spec §3.2 の書き換えは PR 4 に含める。\n確認したこと\n\nmake check 緑（116 テスト、lint 0 件）\n移設前後でテスト本数が一致（98 件、うち移設したパッケージ 28 件）\ngo run ./cmd/octoscope --version が octoscope dev を返す\n\nPlan: docs/superpowers/plans/2026-09-06-octoscope-phase1.md Task 3–4（#46）\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "refactor/octoscope-phase1-gh-layer",
+          "baseRefName": "main",
+          "additions": 240,
+          "deletions": 208,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Refactoring",
+                "color": "fa8072"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 48,
+          "title": "docs: expand install instructions with mise and manual download",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/48",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T18:13:02Z",
+          "bodyText": "概要\nREADME（en / ja）のインストール節を 4 つの方法に分けて書き直した。\n\nmise — mise use -g github:kukv/octoscope@latest と mise.toml へのピン留め\n手動ダウンロード — アーカイブ展開、Windows の zip、checksums.txt での検証\ngo install — --version が dev になる点を明記\nソースからビルド — clone → go build -o octoscope ./cmd/octoscope\n\n補足\nmise の github: バックエンドは現行のリリース成果物のまま動く（goreleaser 側の変更は不要）。v0.3.0 で mise x github:kukv/octoscope@0.3.0 -- octoscope --version が通ることを確認済み。ubi: でも動くが mise 2027.1.0 で削除予定のため github: を案内している。\nドキュメントのみの変更。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "docs/install-instructions",
+          "baseRefName": "main",
+          "additions": 70,
+          "deletions": 4,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 47,
+          "title": "feat: guard against mistyped message IDs and localize date formats",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/47",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T21:15:33Z",
+          "bodyText": "Phase 1 の基盤 2 つ。どちらも後続の PR が積み上がる土台なので先に出す。\n翻訳漏れ検出ガード（spec §6.5）\n従来の TestNoUnresolvedIDsInEitherCatalog は i18n.IDs() を回してカタログ自身の ID を i18n.T に渡していた。カタログから取った ID をカタログに引き直すだけなので構造上ほぼ失敗せず、コード側の i18n.T(\"footer.lst\") のようなタイポを検出できない。\n描画結果を走査する形に置き換えた。i18n.render() が未解決 ID に対して返す !<id> を正規表現で拾い、7 画面 × 2 言語を検査する。\n\ni18n.UnresolvedIDs(rendered) []string — 描画結果から未解決 ID を抜き出す\ni18n.AssertNoUnresolvedIDs(t, rendered) — 上を使って失敗させる\ni18n.TestingT — internal/i18n は他の internal パッケージを import できない（depguard）ため、*testing.T ではなく Helper() / Errorf() だけの最小 interface を取る\n\n空振りしないことを確認済み。 footer.list → footer.lst、picker.applying → picker.applyng の 2 箇所をそれぞれ一時的に壊し、en / ja の両方で該当画面のサブテストだけが落ちることを見てから戻している。\nなお、計画のサンプルどおりに step(detail, \"l\") でピッカーへ遷移すると applying フラグが立たず、picker.applying の変異が検出できなかった。ラベルを選んで enter を押し、返ってきた cmd を解決しないことで「適用中」の描画を捉えるようにしている。\n日時書式のカタログ化（spec §6.1）\nupdatedAt.Format(\"2006-01-02 15:04\") という Go のレイアウト直書きを、言語ごとのレイアウトとしてカタログへ移した。\n\n\n\n言語\nレイアウト\n2026-09-06T14:05Z の表示\n\n\n\n\nen\nJan 2, 2006 15:04\nSep 6, 2026 14:05\n\n\nja\n2006年1月2日 15:04\n2026年9月6日 14:05\n\n\n\nカタログに入っているのは表示文字列ではなく Go の参照時刻レイアウトなので、その旨を YAML のコメントに書いてある。\n確認したこと\n\nmake check 緑（116 テスト、race + カバレッジ）\n上記の変異テストで、新しいガードが実際に落ちること\n\n実装・レビューともサンドボックスに /dev/tty が無く、TUI を起動しての目視確認はできていない。日時は表として桁を揃える箇所ではなく glamour で word-wrap されるマークダウン本文の中なので桁ずれの risk は無いと判断しているが、実端末での確認は Phase 1 最後の通し確認（計画 Task 11）で行う。\nPlan: docs/superpowers/plans/2026-09-06-octoscope-phase1.md Task 1–2（#46）\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "feat/octoscope-phase1-i18n",
+          "baseRefName": "main",
+          "additions": 193,
+          "deletions": 10,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Enhancement",
+                "color": "89058a"
+              },
+              {
+                "name": "Kind: Tests",
+                "color": "008000"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 46,
+          "title": "docs: plan the octoscope Phase 1 implementation (Work board and GraphQL)",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/46",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T17:59:26Z",
+          "bodyText": "Phase 1（Work タブと GraphQL バックエンド）の実装計画。spec §7 の Phase 1 の 5 項目を 12 タスクに割り、3 つのコード PR に分けた。\nPR 分割\n\n\n\nPR\n内容\nラベル\n\n\n\n\n1（これ）\n実装計画\nKind: Documentation\n\n\n2\n翻訳漏れ検出ガード、日時書式のカタログ化\nKind: Tests, Kind: Enhancement\n\n\n3\ninternal/gh への移設と利用側 interface、depguard\nKind: Refactoring\n\n\n4\nGraphQL 横断取得、Work タブ、ルートモデル\nKind: Feature\n\n\n\nPR 2 を先に出すのは、ガードが無いと Phase 1 で足す大量の文字列のタイポを検出できないため。既存の TestNoUnresolvedIDsInEitherCatalog は i18n.IDs() を回してカタログ自身の ID を引いており、構造上ほぼ失敗しない。\nPR 4 の中も「各タスクの終わりで make check が緑」を保てる順に並べた（ドメイン型 → GraphQL 取得 → 共有の表示部品 → Work タブ → internal/ui の分割 → 配線）。\nspec から意図的に逸れる 2 点\n1. internal/gh に interface を置かない（spec §3.2 と異なる）\nspec は「internal/gh に Client interface を定義」と書いているが、.claude/rules/architecture.md の「interface は利用側で定義する」「GitHub アクセス層は interface を export しない」と矛盾する。規約に従い、internal/gh はドメイン型のみ、internal/gh/cli は具体型のみを公開する。Phase 4 の api バックエンドは、各ビューが宣言する利用側 interface を満たすことで差し替わる。spec §3.2 の更新は PR 4 に含める。\n2. Phase 1 のタブは 2 つ（spec §4 は 3 つ）\nSearch タブは Phase 4 のため存在しない。既存の「1 リポジトリの PR/Issue 一覧」を Repos タブとして据え、サイドバーは Phase 4 で足す。3 キーは Phase 1 では無視する。\nスコープに入れたもの\nPhase 0 で Phase 1 送りにした spec §3.4-3（--repo も git remote も無い場合は Work タブから開始）を入れた。Work タブは元々リポジトリ非依存なので自然に実現できる。\nSpec: docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "docs/octoscope-phase1-plan",
+          "baseRefName": "main",
+          "additions": 3009,
+          "deletions": 0,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Documentation",
+                "color": "40e0d0"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 45,
+          "title": "fix(deps): update module go.yaml.in/yaml/v3 to v3.0.5",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/45",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T17:34:24Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ngo.yaml.in/yaml/v3\nv3.0.4 → v3.0.5\n\n\n\n\n\n\nRelease Notes\n\nyaml/go-yaml (go.yaml.in/yaml/v3)\nv3.0.5\nCompare Source\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/go.yaml.in-yaml-v3-3.0.x",
+          "baseRefName": "main",
+          "additions": 3,
+          "deletions": 5,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Kind: Dependencies",
+                "color": "ededed"
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 44,
+          "title": "ci: update goreleaser-action to v7.2.3 for Node.js 24",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/44",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T17:11:19Z",
+          "bodyText": "v0.3.0 のリリース実行時に出た警告への対応です。\nNode.js 20 is deprecated. The following actions target Node.js 20 but are being\nforced to run on Node.js 24: goreleaser/goreleaser-action@e435ccd...\n\ngoreleaser-action の action.yml が using: 'node20' を宣言しているのが原因で、こちら側の設定では変えられません。ランタイムを変えるにはアクション自体を上げる必要があります。\nv7.2.3 の action.yml が using: 'node24' になっていることを確認したうえで、そこへ更新しました。SHA は gh api で取得した実体です（org ポリシーどおり full-length commit SHA でピン、行末にタグをコメント）。\nこのワークフローが使っている入力は version と args の 2 つだけで、どちらも v7 系で変わっていません（action.yml の inputs を確認済み）。\n次のタグ push で警告が消えることを確認してください。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "chore/goreleaser-action-node24",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 43,
+          "title": "feat: rebuild as the standalone octoscope CLI (Phase 0)",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/43",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T17:01:02Z",
+          "bodyText": "Phase 0 の実装です。#42 の上に積んでいます（base は docs/octoscope-redesign-plan）。設計と計画は docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md と docs/superpowers/plans/2026-09-06-octoscope-phase0.md にあります。\nHerdr プラグイン専用だった pane プロセスを、Windows / macOS / Linux で動く単一バイナリ octoscope にしました。画面の見た目は文字列以外は従来のままです。 タブ・カンバン・diff・checks・merge は Phase 1 以降です。\n変更\n\n\n\n内容\n主な変更点\n\n\n\n\nモジュールのリネーム\ngithub.com/kukv/octoscope\n\n\nスタンドアローン化\ncmd/octoscope/ へ移設。internal/herdrctx、herdr-plugin.toml、open.sh、run.sh を削除\n\n\n対象リポジトリの解決\n--repo owner/name。省略時はカレントディレクトリの git remote\n\n\n多言語対応\ninternal/i18n（go-i18n + 埋め込みカタログ）。--lang en|ja、既定は OS ロケール\n\n\n配布\nGoReleaser で 3 OS × 2 アーキテクチャ。タグ push で Releases に並ぶ\n\n\nドキュメント\nREADME を全面書き換え\n\n\n\nTarget 型は残しています。Herdr のリンクハンドラ専用に見えますが、Model.detailTarget が詳細画面の再取得・ブラウザ起動・close/reopen で使っており、削除すると壊れます。消したのは ui.New の第 2 引数と、それが有効なときだけ通る起動時の詳細画面分岐だけです。\n多言語対応の線引き\n翻訳するのはツール自身が書く文字列だけです。GitHub 由来の内容（タイトル、本文、ラベル名、ジョブ名）、検索構文、--help の出力は翻訳しません。--help は --lang 自体がフラグである以上、解析し終えるまで言語が決まらないためです。\n英語の文言は一字も変えていないので、英語の文言を検査していた既存テスト 27 箇所は無修正で通ります。\n依存の向きを lint で守る\n.golangci.yml に depguard を入れ、internal/ghcli が UI を import できない・internal/i18n が他の internal に依存できないことを CI が落とすようにしました。当初テストファイルを除外する書き方をしていましたが、レビューで「テスト全域でガードが無効になる」と実測付きで指摘され、具体パッケージ列挙に直しています。\n検証\n\nmake check 緑（96 テスト、lint 0 issues、カバレッジ 81.5%）\nmake release-check 緑（goreleaser check と 3 OS のクロスコンパイル）\nビルドしたバイナリで --version と --help を確認\n\nPhase 1 へ繰り越した項目\n\n翻訳漏れ検出ガード。今のテストは i18n.IDs() を回しておりカタログ自身の ID しか見ないため、コード側の ID タイポを検出できません（レビュアーが render.go の ID を書き換えても全テストが通ることを実証）。各ビューのレンダリング結果を走査する形が必要ですが、Phase 1 で internal/ui をビュー単位に分割するため、今書くと書き直しになります\n日時書式のカタログ化\n\nどちらも spec §7 の Phase 1 の先頭に書いてあります。\nまだ済んでいないこと\nリポジトリ名の変更（GitHub 上のリネームと kukv/structure の Terraform 追従）は手作業として残っています。手順は計画の Task 7 にあります。moved {} ブロック無しでモジュールラベルを変えると destroy/recreate になり、archive_on_destroy = true のためリポジトリがアーカイブされます。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "feat/octoscope-phase0",
+          "baseRefName": "main",
+          "additions": 928,
+          "deletions": 411,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 42,
+          "title": "docs: plan the octoscope standalone redesign and add project rules",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/42",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T16:55:10Z",
+          "bodyText": "Herdr プラグインからスタンドアローン CLI への刷新にあたり、設計と実装計画、そしてプロジェクトの規約を整えます。コードの挙動は変えていません。\n設計 (docs/superpowers/specs/2026-09-05-octoscope-standalone-design.md)\noctoscope という名前で、Windows / macOS / Linux で動く単一バイナリの GitHub ダッシュボード TUI に作り直します。\n\nHerdr 統合は完全に廃止。 bash スクリプト経由の起動が Windows 対応の妨げになっていました\n3 タブ構成。 Work はカンバン、Repos はサイドバー + PR/Issue サブタブ、Search はクエリビルダー\ngh CLI を既定、無ければ API 直叩きにフォールバック。 データ取得の主軸は GraphQL の search\n英語と日本語に対応。 翻訳するのはツール自身の文字列だけで、GitHub 由来の内容と検索構文は翻訳しません\n5 フェーズに分割。 Phase 0 がスタンドアローン化、以降レビュー / CI / merge / Repos・Search と積みます\n\nUI のモックアップ: https://claude.ai/code/artifact/96b1dad5-ed75-4176-b110-20923b1b565e\n実装計画 (docs/superpowers/plans/2026-09-06-octoscope-phase0.md)\nPhase 0 を 7 タスクに分解しました。各タスクは単独で make check が緑になり、動くバイナリを残します。\nリポジトリ名の変更は Terraform 管理下（kukv/structure）のため、moved {} ブロックを使う手順と、terraform plan が ~ update in-place であることの確認を Task 7 に明記しています。archive_on_destroy = true が設定されているため、取り違えるとリポジトリがアーカイブされます。\n規約 (CLAUDE.md, .claude/rules/)\n\narchitecture — 依存の向き、interface は利用側で小さく定義する、gh 固有の値を外に出さない\ngo-style — 命名、コメント、context の導入方針\nerrors — 環境の不備 / GitHub 側の失敗 / バグの 3 分類。翻訳するのは 1 つ目だけ\ntesting — 先にテストを書く、外部プロセスとネットワークは叩かない、日本語は桁ずれの検証に使う\ntui — charm.land/*/v2、表示幅は ansi.StringWidth、翻訳しない文字列の一覧\n\n依存の向きは目視ではなく depguard で CI が落とします。internal/gh は UI を import できず、internal/i18n は他の internal パッケージに依存できません。\nTUI の単一バイナリに不要なもの（UseCase 層、DI コンテナ、ドメインモデルの二重定義）は入れない方針も明記しました。\nその他\n\nMIT ライセンスを追加\nGo 1.27.1 に更新\nHerdr 時代の docs（plugin-development-notes.md と 2026-07 の spec / plan）を削除\n\n検証\nmake check が緑。既存の 91 テストは全て通ります。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "docs/octoscope-redesign-plan",
+          "baseRefName": "main",
+          "additions": 2429,
+          "deletions": 5798,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 41,
+          "title": "chore(deps): update dependency golangci/golangci-lint to v2.13.2",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/41",
+          "isDraft": false,
+          "updatedAt": "2026-09-04T22:04:16Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\ngolangci/golangci-lint\nuses-with\npatch\nv2.13.1 → v2.13.2\n\n\n\n\nRelease Notes\n\ngolangci/golangci-lint (golangci/golangci-lint)\nv2.13.2\nCompare Source\nReleased on 2026-08-28\n\nBug fixes\n\nDecrease cache entropy\n\n\nLinters bug fixes\n\niface: from 1.5.0 to 1.5.1\nstaticcheck: from 0.8.0 to 0.8.1\nunparam: from 3f964bc to 2fa3d84\ncanonicalheader: from v1.1.2 to a temporary fork\n\n\n\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/golangci-golangci-lint-2.13.x",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 40,
+          "title": "fix(deps): update module charm.land/bubbles/v2 to v2.2.1",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/40",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T01:44:32Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ncharm.land/bubbles/v2\nv2.1.1 → v2.2.1\n\n\n\n\n\n\nRelease Notes\n\ncharmbracelet/bubbles (charm.land/bubbles/v2)\nv2.2.1\nCompare Source\nTiny Monday bugfix\nTextarea element had a bug, where you used to be able to go 1 word backwards, even if there was nothing, which resulted in the whole TUI freezing. It was now fixed by @​OxQuasar!\nChangelog\nFixed\n\nf613411: fix(textarea): stop word-left at input boundary (#​1036) (@​OxQuasar)\n\nDocs\n\n87d4458: docs: update godoc link in readme to new package (@​meowgorithm)\n\nOther stuff\n\n10489b5: readme: drop tree section for now (@​meowgorithm)\n4909481: v2.2.1 (@​andrinoff)\n\n\n\nThoughts? Questions? We love hearing from you. Feel free to reach out on X, Discord, Slack, The Fediverse, Bluesky.\nv2.2.0\nCompare Source\nA new Bubble and some new Textarea stuff\nThere are a couple nice features in today's release. Let's check em out!\nIf a tree falls in the forest…\nAt last, the tree Bubble from all star contributor @​dlvhdr’s is here! He built it for DiffNav and graciously contributed to Bubbles. We've been working with Dolev for a long time and were totally stoked when he offerd to contribute.\n\nSelect all, ctrl+c, ctrl+v…done!\nOur own @​andrinoff added a bunch of awesome stuff to Textarea, including the long awaited text selection. Select, copy, and cut your way into mini text editing.\n\nFor more info see the docs.\nAnd special thanks to @​zoriya for adding ctrl+left/right bindings.\nxoxo,\nCharm! 💌\nChangelog\nNew!\n\n8cea431: feat(textarea): support ctrl + left/right/backspace (#​1020) (@​zoriya)\n037ad37: feat: textarea selection (#​1029) (@​andrinoff)\ne97af08: feat: tree bubble (#​893) (@​dlvhdr)\n\nFixed\n\n6484e49: fix(filepicker): don't blank the view when height is unset (#​1026) (@​andrinoff)\n\nOther stuff\n\n355f960: ci: sync dependabot config (#​896) (@​charmcli)\nef8af03: v2.2.0 (@​andrinoff)\n\n\n\nThoughts? Questions? We love hearing from you. Feel free to reach out on X, Discord, Slack, The Fediverse, Bluesky.\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/charm.land-bubbles-v2-2.x",
+          "baseRefName": "main",
+          "additions": 6,
+          "deletions": 6,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 39,
+          "title": "chore(deps): update dependency golangci/golangci-lint to v2.13.1",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/39",
+          "isDraft": false,
+          "updatedAt": "2026-08-29T13:44:14Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\nPending\n\n\n\n\ngolangci/golangci-lint\nuses-with\nminor\nv2.12.2 → v2.13.1\nv2.13.2\n\n\n\n\nRelease Notes\n\ngolangci/golangci-lint (golangci/golangci-lint)\nv2.13.1\nCompare Source\nReleased on 2026-08-20\n\nLinters bug fixes\n\nginkgolinter: from 0.23.1 to 0.24.0\ngofmt: from d62b90e to e84e050\nstaticcheck: from 0.8.0-rc.1 to 0.8.0\nwsl_v5: from 5.8.0 to 5.9.0\n\n\n\nv2.13.0\nCompare Source\nReleased on 2026-08-19\n\nEnhancements\n\n🎉 go1.27 support\n\n\nBug fixes\n\nfix: cache package facts\n\n\nLinters new features or changes\n\ndupword: from 0.1.7 to 0.1.8 (new option skip-raw-strings)\nerrcheck: from 1.10.0 to 1.20.0\nexhaustruct_v5: from 4.0.0 to 5.0.2 (new configuration)\nexhaustruct: deprecated and replaced by exhaustruct_v5\nfatcontext: from 0.9.0 to 0.10.0 (new options: check-loops, check-function-literals)\ngoconst: from 1.10.0 to 1.11.0 (new options: ignore-map-keys, exclude-types)\ngofumpt: from 0.9.2 to 0.11.0 (new options: extra.group-params, extra.clothe-returns, extra.balance-calls)\ngomoddirectives: from 0.8.0 to 0.9.0 (new option: replace-allow-all)\ngosec: from 2.26.1 to 2.27.1\ngovet-modernize: from 0.44.0 to 0.49.0 (fmtappendf is removed. New analyzers atomictypes, embedlit, errorsastype, importcomment, reflecttypeassert, slicesclip, and slicesbackward. waitgroup is renamed waitgroupgo)\niface: from 1.4.3 to 1.5.0 (new analyzer: unusedmethod)\nnoinlineerr: from 1.0.5 to 1.0.6\nnonamedreturns: from 1.0.6 to 1.0.8 (new option: allow-unused-named-returns)\nrecvcheck: from 0.2.0 to 0.3.0 (new default exclusions)\nunparam: from 5beb8c8 to 3f964bc\n\n\nLinters bug fixes\n\nclickhouse-go-linter: from 1.2.0 to 1.2.1\nerrname: from 1.1.1 to 1.1.2\nexhaustruct: from 5.0.2 to 5.0.3\nfuncorder: add missing Function field\nginkgolinter: from 0.23.0 to 0.23.1\ngocheckcompilerdirectives: from 1.3.0 to 1.4.0\ngocritic: from 0.14.3 to 0.14.4\ngomoddirectives: add missing IgnoreForbidden field\niface: from 1.4.2 to 1.4.3\nmirror: from 1.3.0 to 1.3.3\nnilnil: from 1.1.1 to 1.1.2\nprotogetter: from 0.3.20 to 0.3.21\n\n\n\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/golangci-golangci-lint-2.x",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 38,
+          "title": "fix(deps): update module charm.land/bubbletea/v2 to v2.0.9",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/38",
+          "isDraft": false,
+          "updatedAt": "2026-08-29T10:12:25Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ncharm.land/bubbletea/v2\nv2.0.8 → v2.0.9\n\n\n\n\n\n\nWarningSome dependencies could not be looked up. Check the Dependency Dashboard for more information.\n\n\nRelease Notes\n\ncharmbracelet/bubbletea (charm.land/bubbletea/v2)\nv2.0.9\nCompare Source\nSmall patches 🩹\nKeybinds missing!\nMouseButton11 and media record buttons were improperly handled, now fixed! (thanks to @​Ricardo-M-L and @​bunlongheng)\nWeird UI artifacts with some terminals 👽\nSometimes, when switching between tabs in your terminal for example, the screen would not clear, now fixed!\n... And some small corrections to docs!\nHappy coding 🤖\nChangelog\nFixed\n\ndc4b017: fix(key): map media record to ultraviolet code (#​1757) (@​Ricardo-M-L)\n1862dfb: fix: assign MouseButton11 = uv.MouseButton11 (#​1754) (@​bunlongheng)\n930e18c: fix: don't panic in ProgressBarState.String() for out-of-range values (#​1748) (@​ankit090701)\nfaf4dcf: fix: pendingErase in cursedRenderer (#​1755) (@​andrinoff)\n0d3e281: fix: restore kitty keyboard stack on exit (#​1750) (@​deepakganesh78)\n0ef9fc9: fix: typo in doc (#​1756) (@​andrinoff)\n\nDocs\n\nd40db14: docs: fix background color detection example in doc comment (@​meowgorithm)\n882727b: docs: fix links to tutorials & examples (#​1645) (@​mhdna)\n\nOther stuff\n\n708ee75: ci: fix examples workflow (#​1734) (@​kobihikri)\n351d215: ci: sync dependabot config (#​1763) (@​charmcli)\n6fb1f47: examples/sequence: fix milisecond typo in SleepPrintln (@​makoto-developer)\n73b6d91: v2.0.9 (@​andrinoff)\n\n\n\nThoughts? Questions? We love hearing from you. Feel free to reach out on X, Discord, Slack, The Fediverse, Bluesky.\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/charm.land-bubbletea-v2-2.0.x",
+          "baseRefName": "main",
+          "additions": 3,
+          "deletions": 3,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 37,
+          "title": "chore(deps): update google/osv-scanner-action action to v2.5.1",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/37",
+          "isDraft": false,
+          "updatedAt": "2026-08-29T00:42:39Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\ngoogle/osv-scanner-action\naction\npatch\nv2.5.0 → v2.5.1\n\n\n\n\nRelease Notes\n\ngoogle/osv-scanner-action (google/osv-scanner-action)\nv2.5.1\nCompare Source\nThis updates OSV-Scanner to v2.3.8.\nWhat's Changed\n\nUpdate actions/checkout action to v7 by @​renovate-bot in #​133\n\nFixes:\n\nPreserve package namespaces when querying osv.dev API (fixes #​2978).\nRe-add support for the OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY environment variable (fixes #​2983).\nFix local vulnerability matching (--offline-vulnerabilities) not working when network capability is NetworkOnline.\n\nFull Changelog: google/osv-scanner-action@v2.5.0...v2.5.1\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/google-osv-scanner-action-2.5.x",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 36,
+          "title": "fix(deps): update module github.com/charmbracelet/x/ansi to v0.11.8 - autoclosed",
+          "state": "CLOSED",
+          "url": "https://github.com/kukv/octoscope/pull/36",
+          "isDraft": false,
+          "updatedAt": "2026-08-21T22:33:02Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ngithub.com/charmbracelet/x/ansi\nv0.11.7 → v0.11.8\n\n\n\n\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/github.com-charmbracelet-x-ansi-0.11.x",
+          "baseRefName": "main",
+          "additions": 3,
+          "deletions": 3,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 35,
+          "title": "fix(deps): update module charm.land/lipgloss/v2 to v2.0.6",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/35",
+          "isDraft": false,
+          "updatedAt": "2026-08-21T22:32:52Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ncharm.land/lipgloss/v2\nv2.0.5 → v2.0.6\n\n\n\n\n\n\nRelease Notes\n\ncharmbracelet/lipgloss (charm.land/lipgloss/v2)\nv2.0.6\nCompare Source\nMeasure Twice, Draw Once\nMostly a width-measurement release, courtesy of some Ultraviolet and x/ansi bumps, plus a table fix.\nEmoji\nUltraviolet now asks the terminal at startup whether it supports Unicode core mode (DEC mode 2027), and when it does, measures widths the same way the terminal does. No more drifting borders on rows with ⚠️ and friends.\nIt also had a four-column cap on cell width, which meant anything wider was dropped from the screen entirely — 👨‍👩‍👧‍👦 is eight columns. That cap is gone.\nHindi\nTerminals without mode 2027 advance the cursor once per codepoint and don't know about cluster boundaries. Unicode 15.1 merged Indic conjuncts into single clusters, so स्ते is one cluster that those terminals still paint in two columns. Measuring it as a unit put everything after it in the wrong place.\nThe wcwidth path now measures per codepoint, matching what those terminals actually do. If you're rendering through Bubble Tea, Devanagari should line up.\nTables\nColumns no longer shrink to zero. There's now a minimum width floor of padding plus one character, with a fallback to the old behavior when the width budget is impossible. Thanks to @​taciturnaxolotl!\nHeads up\nCanvas.Render() now trims trailing whitespace. Expect goldens to move.\n\nChangelog\nFixed\n\nd231906: fix(table): prevent columns from shrinking to zero width (#​671) (@​taciturnaxolotl)\n\n\n\nThoughts? Questions? We love hearing from you. Feel free to reach out on X, Discord, Slack, The Fediverse, Bluesky.\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/charm.land-lipgloss-v2-2.0.x",
+          "baseRefName": "main",
+          "additions": 18,
+          "deletions": 18,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 34,
+          "title": "chore(deps): update google/osv-scanner-action action to v2.5.0",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/34",
+          "isDraft": false,
+          "updatedAt": "2026-08-15T00:34:21Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\ngoogle/osv-scanner-action\naction\nminor\nv2.3.8 → v2.5.0\n\n\n\n\nRelease Notes\n\ngoogle/osv-scanner-action (google/osv-scanner-action)\nv2.5.0\nCompare Source\nThis updates OSV-Scanner to v2.5.0 as well as:\nWhat's Changed\n\nfeat: gate reusable workflow outputs with a flag by @​another-rex in #​130\nPin download-artifact action to SHA by @​SVilgelm in #​127\nfeat: add runs-on input to reusable workflows by @​BeyondEvil in #​131\nfix: address zizmor warnings by @​another-rex in #​135\nfix: add GOTOOLCHAIN=auto env to osv-scanner calls by @​another-rex in #​138\n\nNew Contributors\n\n@​SVilgelm made their first contribution in #​127\n@​BeyondEvil made their first contribution in #​131\n\nFull Changelog: google/osv-scanner-action@v2.3.8...v2.5.0\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/google-osv-scanner-action-2.x",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 33,
+          "title": "chore(deps): update k1low/octocov-action action to v1.5.2",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/33",
+          "isDraft": false,
+          "updatedAt": "2026-08-07T21:25:20Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\nk1LoW/octocov-action\naction\npatch\nv1.5.1 → v1.5.2\n\n\n\n\nRelease Notes\n\nk1LoW/octocov-action (k1LoW/octocov-action)\nv1.5.2\nCompare Source\nOther Changes\n\nchore(deps): bump k1LoW/gh-setup from 1.11.7 to 1.11.8 in the dependencies group by @​dependabot[bot] in #​38\nchore(deps): bump the dependencies group across 1 directory with 2 updates by @​dependabot[bot] in #​41\nchore(deps): bump k1LoW/gh-setup from 1.11.8 to 1.11.9 by @​k1LoW in #​42\n\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/k1low-octocov-action-1.5.x",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 32,
+          "title": "chore(deps): update actions/checkout action to v7.0.1",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/32",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T13:22:39Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\nactions/checkout\naction\npatch\nv7.0.0 → v7.0.1\n\n\n\n\nRelease Notes\n\nactions/checkout (actions/checkout)\nv7.0.1\nCompare Source\n\nBump github/codeql-action from 3 to 4 by @​dependabot[bot] in #​2475\nBump actions/setup-node from 4 to 6 by @​dependabot[bot] in #​2477\nBump docker/build-push-action from 6.5.0 to 7.2.0 by @​dependabot[bot] in #​2478\nBump docker/login-action from 3.3.0 to 4.2.0 by @​dependabot[bot] in #​2479\nBump actions/checkout from 6 to 7 by @​dependabot[bot] in #​2488\nBump actions/upload-artifact from 4 to 7 by @​dependabot[bot] in #​2476\neslint 9 by @​dependabot[bot] in #​2474\nBump the minor-actions-dependencies group with 2 updates by @​dependabot[bot] in #​2499\nskip running unsafe pr check if input is default by @​aiqiaoy in #​2518\ntrim only ascii whitespace for branch by @​aiqiaoy in #​2521\nescape values passed to --unset by @​aiqiaoy in #​2530\n\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Disabled because a matching PR was automerged previously.\n♻ Rebasing: Whenever PR becomes conflicted, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/actions-checkout-7.0.x",
+          "baseRefName": "main",
+          "additions": 1,
+          "deletions": 1,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 31,
+          "title": "chore: remove repository-fanout distributed files (project retired)",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/31",
+          "isDraft": false,
+          "updatedAt": "2026-08-02T15:17:49Z",
+          "bodyText": "概要\nrepository-fanout の活動終了に伴い、fanout が配布した共通ファイルを除去する(bright-room 側 5 リポと同内容)。\n\npre-commit 設定を削除: .pre-commit-config.yaml(検知は security.yml CI と GitHub push protection が担う)\nsecurity.yml を osv-scanner(sca)のみに縮小: hidden-unicode / secrets / workflow-audit / policy ジョブと fanout 管理ヘッダを削除\nCODEOWNERS / .gitignore の repository-fanout managed マーカーを除去(中身は維持し、以後はリポ側で自由に管理)\n\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "chore/remove-fanout-distributed",
+          "baseRefName": "main",
+          "additions": 0,
+          "deletions": 96,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 30,
+          "title": "chore(deps): update actions/checkout action to v7.0.1",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/30",
+          "isDraft": false,
+          "updatedAt": "2026-07-31T22:57:13Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\nactions/checkout\naction\npatch\nv7.0.0 → v7.0.1\n\n\n\n\nRelease Notes\n\nactions/checkout (actions/checkout)\nv7.0.1\nCompare Source\n\nBump github/codeql-action from 3 to 4 by @​dependabot[bot] in #​2475\nBump actions/setup-node from 4 to 6 by @​dependabot[bot] in #​2477\nBump docker/build-push-action from 6.5.0 to 7.2.0 by @​dependabot[bot] in #​2478\nBump docker/login-action from 3.3.0 to 4.2.0 by @​dependabot[bot] in #​2479\nBump actions/checkout from 6 to 7 by @​dependabot[bot] in #​2488\nBump actions/upload-artifact from 4 to 7 by @​dependabot[bot] in #​2476\neslint 9 by @​dependabot[bot] in #​2474\nBump the minor-actions-dependencies group with 2 updates by @​dependabot[bot] in #​2499\nskip running unsafe pr check if input is default by @​aiqiaoy in #​2518\ntrim only ascii whitespace for branch by @​aiqiaoy in #​2521\nescape values passed to --unset by @​aiqiaoy in #​2530\n\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/actions-checkout-7.0.x",
+          "baseRefName": "main",
+          "additions": 2,
+          "deletions": 2,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 29,
+          "title": "chore(deps): update actions/setup-go action to v7",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/29",
+          "isDraft": false,
+          "updatedAt": "2026-07-24T23:10:06Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nType\nUpdate\nChange\n\n\n\n\nactions/setup-go\naction\nmajor\nv6.5.0 → v7.0.0\n\n\n\n\nRelease Notes\n\nactions/setup-go (actions/setup-go)\nv7.0.0\nCompare Source\nWhat's Changed\n\nMigrate to ESM and upgrade dependencies by @​priyagupta108 in #​763\nchore(deps): bump @​actions/cache to 6.2.0 by @​philip-gai in #​771\n\nNew Contributors\n\n@​philip-gai made their first contribution in #​771\n\nFull Changelog: actions/setup-go@v6...v7.0.0\nv7\nCompare Source\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/actions-setup-go-7.x",
+          "baseRefName": "main",
+          "additions": 2,
+          "deletions": 2,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 28,
+          "title": "chore: distribute common files",
+          "state": "CLOSED",
+          "url": "https://github.com/kukv/octoscope/pull/28",
+          "isDraft": false,
+          "updatedAt": "2026-09-05T16:19:19Z",
+          "bodyText": "🤖 distributed by repository-fanout",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "chore/distribute-common-files",
+          "baseRefName": "main",
+          "additions": 5,
+          "deletions": 1,
+          "author": {
+            "login": "chloe-chan-bot"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 27,
+          "title": "fix(deps): update golang.org/x/net to v0.56.0 and golang.org/x/text to v0.39.0",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/27",
+          "isDraft": false,
+          "updatedAt": "2026-07-22T15:40:50Z",
+          "bodyText": "概要\nosv-scanner(sca ジョブ)が検出している既知の脆弱性 2 件を解消します。main を含む全ブランチの CI がこれで落ちており、renovate の PR #24 / #25 も同じ理由でブロックされています。\n\n\n\nパッケージ\n更新前\n更新後\nOSV\n\n\n\n\ngolang.org/x/net\nv0.55.0\nv0.56.0\nGO-2026-5942\n\n\ngolang.org/x/text\nv0.37.0\nv0.39.0\nGO-2026-5970\n\n\n\nx/sync は x/net の更新に伴い v0.20.0 → v0.21.0 に追従しています。\n検証\n\ngo build ./... パス\ngo test ./... 全パッケージ ok\n\nマージ後、#24 / #25 は rebase すれば sca が通る見込みです。\n🤖 Generated with Claude Code",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "fix/osv-x-net-x-text",
+          "baseRefName": "main",
+          "additions": 9,
+          "deletions": 9,
+          "author": {
+            "login": "kukv"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 26,
+          "title": "chore: distribute common files",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/26",
+          "isDraft": false,
+          "updatedAt": "2026-07-22T15:33:22Z",
+          "bodyText": "🤖 distributed by repository-fanout",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "chore/distribute-common-files",
+          "baseRefName": "main",
+          "additions": 6,
+          "deletions": 2,
+          "author": {
+            "login": "chloe-chan-bot"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "FAILURE"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 25,
+          "title": "fix(deps): update module charm.land/bubbletea/v2 to v2.0.8",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/25",
+          "isDraft": false,
+          "updatedAt": "2026-07-22T15:49:32Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ncharm.land/bubbletea/v2\nv2.0.7 → v2.0.8\n\n\n\n\n\n\nRelease Notes\n\ncharmbracelet/bubbletea (charm.land/bubbletea/v2)\nv2.0.8\nCompare Source\nGraphemes, schmraphemes\nNo terminal can render emojis perfectly, but we can try. This release improves some very specific edge cases around emoji rendering. Enjoy!\nChangelog\n\ndb569ad: fix(deps): bump ultraviolet for emoji-related rendering improvements\n\n\n\nThoughts? Questions? We love hearing from you. Feel free to reach out on X, Discord, Slack, The Fediverse, Bluesky.\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/charm.land-bubbletea-v2-2.0.x",
+          "baseRefName": "main",
+          "additions": 6,
+          "deletions": 6,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "number": 24,
+          "title": "fix(deps): update module charm.land/bubbles/v2 to v2.1.1",
+          "state": "MERGED",
+          "url": "https://github.com/kukv/octoscope/pull/24",
+          "isDraft": false,
+          "updatedAt": "2026-07-22T15:43:42Z",
+          "bodyText": "This PR contains the following updates:\n\n\n\nPackage\nChange\nAge\nConfidence\n\n\n\n\ncharm.land/bubbles/v2\nv2.1.0 → v2.1.1\n\n\n\n\n\n\nRelease Notes\n\ncharmbracelet/bubbles (charm.land/bubbles/v2)\nv2.1.1\nCompare Source\nLil’ Textarea Fix\nThis is a tiny patch to fix a bug in textarea where the prompt character could be missing styling on empty lines. That’s all for now!\nThanks for using Bubbles,\nCharm 🌞\nChangelog\nFixed\n\nd2b2217: fix(textarea): apply prompt style on all lines, including fillers (@​meowgorithm)\n\nDocs\n\na13f110: docs: fix typo in README (#​921) (@​Rohan5commit)\n\n\n\nThoughts? Questions? We love hearing from you. Feel free to reach out on X, Discord, Slack, The Fediverse, Bluesky.\n\n\nConfiguration\n📅 Schedule: (in timezone Asia/Tokyo)\n\nBranch creation\n\n\"before 9am on saturday\"\n\n\nAutomerge\n\nAt any time (no schedule defined)\n\n\n\n🚦 Automerge: Enabled.\n♻ Rebasing: Whenever PR is behind base branch, or you tick the rebase/retry checkbox.\n🔕 Ignore: Close this PR and you won't be reminded about this update again.\n\n\n If you want to rebase/retry this PR, check this box\n\n\nThis PR was generated by Mend Renovate. View the repository job log.",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "headRefName": "renovate/charm.land-bubbles-v2-2.1.x",
+          "baseRefName": "main",
+          "additions": 6,
+          "deletions": 6,
+          "author": {
+            "login": "renovate"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "repository": {
+            "nameWithOwner": "kukv/octoscope"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "hidden-unicode",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "secrets",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "sca",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "workflow-audit",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "policy",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "renovate/stability-days",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

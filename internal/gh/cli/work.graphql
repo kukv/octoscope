@@ -1,6 +1,6 @@
-# One column of the Work board. The search string is the caller's: the four
-# columns differ only in that, and sending them together is what made GitHub
-# stop answering.
+# One GitHub issue search: a column of the Work board, or a query the user
+# built. The search string is the caller's; sending four of them together in
+# one request is what made GitHub stop answering.
 #
 # reviewDecision and isDraft are GraphQL-only: REST does not expose them
 # (spec 3.3).

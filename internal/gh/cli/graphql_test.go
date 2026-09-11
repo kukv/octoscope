@@ -69,6 +69,78 @@ func TestListWorkSectionSendsOneSearch(t *testing.T) {
 	}
 }
 
+func TestSearchItemsSendsTheQueryItWasGiven(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	var got []string
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return []byte(emptyColumnJSON), nil
+	}
+
+	if _, err := c.SearchItems(context.Background(), "is:pr org:kukv label:renovate"); err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+
+	joined := strings.Join(got, " ")
+	if !strings.Contains(joined, "search=is:pr org:kukv label:renovate") {
+		t.Errorf("the query never reached gh:\n%s", joined)
+	}
+	// The query travels as a variable. A query that became part of the
+	// document could not hold a quote or a brace.
+	if strings.Contains(joined, `search(type: ISSUE, first: 50, query: "is:pr`) {
+		t.Errorf("the query was pasted into the document:\n%s", joined)
+	}
+}
+
+// A query the user typed can be one GitHub rejects. What it said is the only
+// thing that tells them how to fix it, so it must not be swallowed.
+func TestSearchItemsReportsWhatGitHubSaidAboutABadQuery(t *testing.T) {
+	t.Parallel()
+
+	const rejected = `{"data":null,"errors":[{"message":"Invalid search query"}]}`
+	c, _ := newTestClient(rejected, errors.New(`gh api: {"message":"Invalid search query"}`))
+
+	_, err := c.SearchItems(t.Context(), "is:nonsense")
+	if err == nil {
+		t.Fatal("SearchItems succeeded on a query GitHub rejected")
+	}
+	if !strings.Contains(err.Error(), "Invalid search query") {
+		t.Errorf("err = %v, want it to carry what GitHub said", err)
+	}
+	// The Search tab shows this on its notice line. A fatal error would
+	// replace the whole screen over one mistyped query.
+	if gh.IsFatal(err) {
+		t.Errorf("err = %v, want it not to be fatal", err)
+	}
+}
+
+func TestSearchItemsParsesARecordedSearch(t *testing.T) {
+	t.Parallel()
+
+	c, _ := newTestClient(readTestdata(t, "search_items.json"), nil)
+	items, err := c.SearchItems(t.Context(), "repo:kukv/octoscope is:pr")
+	if err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+	if len(items) == 0 {
+		t.Fatal("no items parsed out of the recording")
+	}
+	states := map[gh.ItemState]bool{}
+	for _, item := range items {
+		states[item.State] = true
+		if item.Ref.Repo == "" {
+			t.Errorf("%q has no repo; the row cannot be opened", item.Title)
+		}
+	}
+	// The recording was taken with no state qualifier, so it holds more than
+	// open ones. A recording that lost that would stop testing the state.
+	if len(states) < 2 {
+		t.Errorf("the recording holds only %v; re-record it over open and closed items", states)
+	}
+}
+
 // TestEverySectionHasItsOwnSearch pins what each column of the board means.
 // The search string is not an implementation detail the code happens to
 // build: "review requested" is defined by review-requested:@me and by
