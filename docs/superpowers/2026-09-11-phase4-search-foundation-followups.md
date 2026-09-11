@@ -28,7 +28,8 @@ Task 4 で `repo:kukv/octoscope is:pr sort:updated-desc` での録りを計画�
 実行時に該当する open PR が無かったため、`repo:kukv/octoscope` で全件
 （closed を含む）を録った。
 
-**直さなかった理由:** テストは open PR の存在を前提とせず、構造のみ検証する。
+**直さなかった理由:** `TestSearchItemsParsesARecordedSearch` は 2 つ以上の異なる状態が
+入っていることを検査する。状態の多様性が検証対象であり、状態フィルタの有無は問わない。
 理由は `internal/gh/cli/testdata/README.md` に記録済み（スライス 3 の他の逸脱と同じ形）。
 
 ## スライス 3-2（Search タブの UI）に渡すもの
@@ -37,8 +38,8 @@ Task 4 で `repo:kukv/octoscope is:pr sort:updated-desc` での録りを計画�
   Task 1 で `internal/tui/repo` と `internal/tui/dialog` が持っていた同じ関数を統合した。
   次のスライスで結果表の描き分けに使う
 
-- **WorkItem.State:** `internal/gh` に `WorkItem.State` 型を足し、work.graphql で PullRequest と
-  Issue の両方から `state` を選ぶようにした。SearchItems の結果にも含まれる
+- **WorkItem.State:** `internal/gh` に `State`（`gh.ItemState` 型）フィールドを足し、work.graphql で
+  PullRequest と Issue の両方から `state` を選ぶようにした。SearchItems の結果にも含まれる
 
 - **結果行の列構成:** モックアップの S2 どおり `st / rp / num / ttl / ag`（state / repo / number /
   title / age）。Repos の右ペイン（`st / num / ttl / ck / ag`）との違いは
@@ -49,6 +50,6 @@ Task 4 で `repo:kukv/octoscope is:pr sort:updated-desc` での録りを計画�
 - **config.Store の拡張方針:** `SaveRepositories` は既にあり、`save(Config)` の共通パスで書き込んでいる。
   `SaveQueries` を足すときも同じ形に乗せる
 
-- **ダイアログの候補スクロール決定は保留:** Repos スライスからの積み残し 8 番（初回投入の
-  候補に上限がない）が 3-2 で追加ダイアログ用に出た。保存クエリのポップアップも候補を持つため、
-  2 つ一度に整えるのが筋が良い。次のスライスで決める
+- **ダイアログの候補スクロール決定は保留:** 前のスライス（スライス 2-3）の積み残し 8 番
+  （初回投入の候補に上限がない）から引き継いだ。スライス 3-2 で新しく保存クエリのポップアップが
+  2 人目の利用者になるので、2 つの候補一覧を一度に整える方が筋が良い
