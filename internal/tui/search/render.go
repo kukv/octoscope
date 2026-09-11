@@ -21,7 +21,8 @@ const (
 	paneRule        = 1
 	filterNameWidth = 10
 
-	// minPaneWidth is where the filter pane folds away (spec section 4.6).
+	// minPaneWidth is where the filter pane folds away: under it there is
+	// not enough room for both an eight-row field list and a readable table.
 	minPaneWidth = 100
 
 	stateColumn  = 2

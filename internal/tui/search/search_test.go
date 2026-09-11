@@ -213,7 +213,7 @@ func TestTypingAQuitKeyIntoAFieldTypesIt(t *testing.T) {
 }
 
 // e edits the query the filters built; the filters are not parsed back out
-// of what the user writes (spec section 4.3).
+// of what the user writes.
 func TestTheEditedQueryIsWhatIsSearchedFor(t *testing.T) {
 	t.Parallel()
 
@@ -267,9 +267,9 @@ func TestSDoesNothingYet(t *testing.T) {
 	}
 }
 
-// Under 100 columns the filter pane is not drawn (spec section 4.6), so a
-// cursor left on it is a cursor nothing on screen answers to. j, k, space
-// and enter must not silently land on an invisible pane.
+// Under 100 columns the filter pane is not drawn, so a cursor left on it is
+// a cursor nothing on screen answers to. j, k, space and enter must not
+// silently land on an invisible pane.
 func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
 	t.Parallel()
 
