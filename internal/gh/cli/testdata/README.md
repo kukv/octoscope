@@ -237,6 +237,17 @@ gh run view -R kukv/octoscope --job <実行中のジョブ id> --log 2> \
   internal/gh/cli/testdata/job_log_in_progress.txt
 ```
 
+## `search_repos.json`
+
+`SearchRepos` に対する実出力。録った日: 2026-09-11。公開リポジトリの検索なので
+伏せるものは無い。スター数は録った時点の値であり、テストは「どれかが 0 より大きい」
+としか見ていないので、増えても落ちない。
+
+```bash
+gh search repos lipgloss --limit 5 --json fullName,stargazersCount,isPrivate \
+  > internal/gh/cli/testdata/search_repos.json
+```
+
 ## `sample.diff`
 
 `git diff` 形式のパース用。unified diff の hunk ヘッダ、追加、削除、文脈行を含む。

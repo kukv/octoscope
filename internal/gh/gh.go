@@ -267,6 +267,13 @@ type RepoCount struct {
 	Unavailable bool
 }
 
+// RepoCandidate is one row of the add dialog's suggestions.
+type RepoCandidate struct {
+	Name    string
+	Stars   int
+	Private bool
+}
+
 // classified is what gh said, kept apart from the sentinel that names what
 // kind of failure it is. errors.Is finds the sentinel through Unwrap, while
 // Error is gh's own text and nothing else: wrapping with fmt.Errorf would put
