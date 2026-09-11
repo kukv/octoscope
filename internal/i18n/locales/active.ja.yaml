@@ -56,6 +56,22 @@ repos:
   none:
     other: "リポジトリがまだありません"
 
+dialog:
+  add_repo_title:
+    other: "リポジトリを追加"
+  add_repo_hint:
+    other: "owner/name の形式で入力。候補から選ぶこともできます"
+  searching:
+    other: "検索中..."
+  no_candidates:
+    other: "(該当なし)"
+  # これらに続くのは利用者が入力した名前で、octoscope は翻訳しない
+  # （.claude/rules/errors.md）。
+  invalid_name:
+    other: "owner/name の形式ではありません: "
+  already_listed:
+    other: "すでに一覧にあります: "
+
 detail:
   pr_title:
     other: "PR #{{.Number}} {{.Title}}"

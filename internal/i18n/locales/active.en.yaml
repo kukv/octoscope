@@ -56,6 +56,22 @@ repos:
   none:
     other: "No repositories yet"
 
+dialog:
+  add_repo_title:
+    other: "Add a repository"
+  add_repo_hint:
+    other: "Type owner/name, or pick one of the suggestions"
+  searching:
+    other: "searching..."
+  no_candidates:
+    other: "(no matches)"
+  # What follows these is the name the user typed, which octoscope does not
+  # translate (.claude/rules/errors.md).
+  invalid_name:
+    other: "Not an owner/name: "
+  already_listed:
+    other: "Already in the list: "
+
 detail:
   pr_title:
     other: "PR #{{.Number}} {{.Title}}"
