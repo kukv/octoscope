@@ -41,7 +41,7 @@ func goldenModel(width int) Model { return goldenBoard(overlongWork(), width, 40
 func goldenBoard(w gh.Work, width, height int) Model {
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
-	m = answered(m, w)
+	m = answeredAll(m, w)
 	for _, s := range gh.WorkSections() {
 		m.fetchedAt[s] = goldenFetchedAt
 	}

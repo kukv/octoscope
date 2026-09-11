@@ -32,7 +32,7 @@ func overlongWork() gh.Work {
 func overlong() Model {
 	m := New(&fakeSource{work: overlongWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = answered(m, overlongWork())
+	m = answeredAll(m, overlongWork())
 	return press(press(m, "j"), "j")
 }
 
@@ -175,7 +175,7 @@ var boardClock = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
 func boardOf(width int) Model {
 	m := New(&fakeSource{work: sampleWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-	m = answered(m, sampleWork())
+	m = answeredAll(m, sampleWork())
 	for _, s := range gh.WorkSections() {
 		m.fetchedAt[s] = boardClock
 	}
@@ -236,7 +236,7 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 func TestACardIsDatedByItsOwnColumnsAnswer(t *testing.T) {
 	m := New(&fakeSource{work: sampleWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = answered(m, sampleWork())
+	m = answeredAll(m, sampleWork())
 	for _, s := range gh.WorkSections() {
 		m.fetchedAt[s] = boardClock
 	}
@@ -472,7 +472,7 @@ func TestEveryRowStartsItsColumnsAtTheSameOffset(t *testing.T) {
 		for _, width := range []int{80, 100, 120} {
 			m := New(&fakeSource{work: alignedWork()})
 			m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-			m = answered(m, alignedWork())
+			m = answeredAll(m, alignedWork())
 
 			colW := m.columnWidth(m.columns())
 			for _, token := range []string{"title-%d", "repo-%d"} {

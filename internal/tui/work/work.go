@@ -55,6 +55,12 @@ type Model struct {
 	// cards will go rather than holding the whole board back.
 	loading [gh.WorkSectionCount]bool
 
+	// answered is whether each column has come back at all, a failure
+	// included. It is not fetchedAt's zero value: a column that failed has
+	// answered but has no time to report, and the tab row waits on the
+	// former while it dates itself by the latter.
+	answered [gh.WorkSectionCount]bool
+
 	// fetchedAt is when each column's data arrived. The cards show relative
 	// times, and View must render the same string from the same state, so the
 	// clock is read once in Update rather than on every draw.
@@ -84,6 +90,10 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.spin.Tick}
 	for _, s := range gh.WorkSections() {
 		m.loading[s] = true
+		// A column that is loading has not answered this round. Today ready()
+		// also looks at loading, so nothing downstream can tell; the two are
+		// kept in step so that stays true of whatever reads them next.
+		m.answered[s] = false
 		cmds = append(cmds, fetchSection(ctx, m.src, s))
 	}
 	return m, tea.Batch(cmds...)
@@ -138,12 +148,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, cmd
 	case workMsg:
 		m.loading[msg.section] = false
+		m.answered[msg.section] = true
 		m.releaseFetch()
 		m.work[msg.section] = msg.items
 		m.fetchedAt[msg.section] = time.Now()
 		m.clampCursor()
 	case errMsg:
 		m.loading[msg.section] = false
+		m.answered[msg.section] = true
 		m.releaseFetch()
 		err := msg.err
 		return m, func() tea.Msg { return ErrorMsg{err} }
@@ -249,16 +261,13 @@ func (m Model) Summary() Summary {
 	return s
 }
 
-// ready reports whether the age is worth showing. Until every column has
-// answered the number would describe part of a board, and a board missing a
-// column is not one the user should read an age off.
+// ready reports whether the counts are worth showing. Until every column has
+// answered they would describe part of a board. A column that failed counts
+// as answered: it is not coming back on its own, and a tab row that stayed
+// blank for the rest of the session would report nothing about the three
+// columns that did arrive.
 func (m Model) ready() bool {
-	for _, at := range m.fetchedAt {
-		if at.IsZero() {
-			return false
-		}
-	}
-	return !slices.Contains(m.loading[:], true)
+	return !slices.Contains(m.answered[:], false) && !slices.Contains(m.loading[:], true)
 }
 
 // oldestFetch is the age on screen: the age of the oldest thing on it. The

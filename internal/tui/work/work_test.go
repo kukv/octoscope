@@ -73,7 +73,7 @@ func sampleItems() []gh.WorkItem { return sampleWork()[gh.SectionReviewRequested
 
 // loaded returns a model that already received its data.
 func loaded() Model {
-	return answered(sized(New(&fakeSource{work: sampleWork()})), sampleWork())
+	return answeredAll(sized(New(&fakeSource{work: sampleWork()})), sampleWork())
 }
 
 // sized gives a board the size it needs before it can draw: wide enough for
@@ -85,7 +85,7 @@ func sized(m Model) Model {
 
 // answered hands the board every column of w, one answer at a time, the way
 // four separate requests arrive.
-func answered(m Model, w gh.Work) Model {
+func answeredAll(m Model, w gh.Work) Model {
 	for _, s := range gh.WorkSections() {
 		m, _ = m.Update(workMsg{section: s, items: w[s]})
 	}
@@ -383,7 +383,7 @@ func TestRefreshMarksEveryColumnLoading(t *testing.T) {
 	if m.cancel == nil {
 		t.Error("the context was released while three columns were still running")
 	}
-	m = answered(m, sampleWork())
+	m = answeredAll(m, sampleWork())
 	for _, s := range gh.WorkSections() {
 		if m.loading[s] {
 			t.Errorf("column %d is still loading after its data arrived", s)
@@ -396,7 +396,7 @@ func TestRefreshMarksEveryColumnLoading(t *testing.T) {
 
 func TestRKeyRefetchesTheBoard(t *testing.T) {
 	f := &fakeSource{work: sampleWork()}
-	m := answered(New(f), sampleWork())
+	m := answeredAll(New(f), sampleWork())
 
 	m, cmd := m.Update(key("r"))
 	t.Cleanup(m.Cancel)
@@ -466,10 +466,32 @@ func TestTheSummaryWaitsForEveryColumn(t *testing.T) {
 	}
 }
 
+// A column that failed has answered. It is not coming back on its own, so a
+// tab row that went on waiting for it would report nothing about the three
+// columns that did arrive, for the rest of the session.
+func TestAFailedColumnStillCountsAsAnAnswer(t *testing.T) {
+	m := sized(New(&fakeSource{}))
+	for _, s := range gh.WorkSections()[:gh.WorkSectionCount-1] {
+		m, _ = m.Update(workMsg{section: s, items: nil})
+	}
+	last := gh.WorkSections()[gh.WorkSectionCount-1]
+	m, _ = m.Update(errMsg{section: last, err: errors.New("gh: HTTP 502")})
+
+	s := m.Summary()
+	if !s.Ready {
+		t.Error("the summary never became ready after a column failed")
+	}
+	// The failed column has no time to report, so it must not drag the age
+	// back to the zero value.
+	if s.FetchedAt.IsZero() {
+		t.Error("the age is the zero time; the columns that answered have one")
+	}
+}
+
 // The age on screen is the age of the oldest thing on screen.
 func TestTheSummaryReportsTheOldestColumn(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	m = answered(m, gh.Work{})
+	m = answeredAll(m, gh.Work{})
 
 	// The oldest column sits in the middle on purpose: returning the first
 	// column's time, the last one's, or the newest are all shapes a wrong
