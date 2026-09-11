@@ -271,8 +271,9 @@ gh repo list --limit 100 --json nameWithOwner,isPrivate \
 `work.graphql` を利用者のクエリで叩いた実レスポンス。録った日: 2026-09-12、
 対象: `repo:kukv/octoscope`。`is:pr sort:updated-desc` を付けた版は録り直した
 時点で `kukv/octoscope` に開いている PR が 1 つも無く CLOSED / MERGED しか
-入らなかったため、絞り込みを外して録っている（open な Issue が 2 件あり、
-これで OPEN / CLOSED / MERGED の 3 状態が揃う）。
+入らなかったため、絞り込みを外して録っている（open な Issue が 1 件（#50）
+残っており、これで OPEN / CLOSED / MERGED の 3 状態が揃う。内訳は
+OPEN 1 件 / CLOSED 4 件 / MERGED 45 件）。
 
 ```bash
 gh api graphql -F query=@internal/gh/cli/work.graphql \

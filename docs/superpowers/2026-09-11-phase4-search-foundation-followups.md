@@ -32,6 +32,17 @@ Task 4 で `repo:kukv/octoscope is:pr sort:updated-desc` での録りを計画�
 入っていることを検査する。状態の多様性が検証対象であり、状態フィルタの有無は問わない。
 理由は `internal/gh/cli/testdata/README.md` に記録済み（スライス 3 の他の逸脱と同じ形）。
 
+### 4. `clip` / `fit` の重複が `internal/tui/layout.Clip` と共通化されていない
+
+`internal/tui/layout/columns.go:11` の `layout.Clip` と同じ実装の `clip` が
+`internal/tui/work/render.go:392`、`internal/tui/checks/render.go:357`、
+`internal/tui/diff/render.go:570` の 3 箇所に残っている（同型の `fit` も
+それぞれ 397 / 360 / 573 行目に残っている）。
+
+**直さなかった理由:** このスライスのスコープは Search が実際に使う 2 パッケージ
+（`internal/tui/repo` と `internal/tui/dialog`）だけで、Work / Checks / Diff の
+3 つの表示系を巻き込むと golden が動かないことの確認範囲が広がるため。
+
 ## スライス 3-2（Search タブの UI）に渡すもの
 
 - **共通の layout 関数:** `layout.Clip` / `layout.Pad` / `layout.Right` / `layout.JoinPanes`。
@@ -51,5 +62,5 @@ Task 4 で `repo:kukv/octoscope is:pr sort:updated-desc` での録りを計画�
   `SaveQueries` を足すときも同じ形に乗せる
 
 - **ダイアログの候補スクロール決定は保留:** 前のスライス（スライス 2-3）の積み残し 8 番
-  （初回投入の候補に上限がない）から引き継いだ。スライス 3-2 で新しく保存クエリのポップアップが
-  2 人目の利用者になるので、2 つの候補一覧を一度に整える方が筋が良い
+  （初回投入の候補に上限がない）から引き継いだ。このスライス（3-3）で新しく保存クエリの
+  ポップアップが 2 人目の利用者になるので、2 つの候補一覧を一度に整える方が筋が良い

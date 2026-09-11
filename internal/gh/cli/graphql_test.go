@@ -120,7 +120,7 @@ func TestSearchItemsParsesARecordedSearch(t *testing.T) {
 	t.Parallel()
 
 	c, _ := newTestClient(readTestdata(t, "search_items.json"), nil)
-	items, err := c.SearchItems(t.Context(), "repo:kukv/octoscope is:pr")
+	items, err := c.SearchItems(t.Context(), "repo:kukv/octoscope")
 	if err != nil {
 		t.Fatalf("SearchItems: %v", err)
 	}
