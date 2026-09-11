@@ -12,6 +12,14 @@ import (
 // ErrGhNotFound is returned when the gh binary is not on PATH.
 var ErrGhNotFound = errors.New("gh CLI not found; install it and run: gh auth login")
 
+// ErrTransient wraps a failure GitHub's front end produced rather than
+// answered -- 502, 503, 504. The request was well-formed, so asking again
+// is the right response.
+var ErrTransient = errors.New("GitHub did not answer")
+
+// ErrUnauthenticated is returned when gh has no usable credentials.
+var ErrUnauthenticated = errors.New("not authenticated; run: gh auth login")
+
 type Author struct {
 	Login string `json:"login"`
 }

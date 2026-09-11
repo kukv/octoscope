@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
@@ -55,6 +56,25 @@ func (c *Client) effectiveRepo(repo string) string {
 	return c.repo
 }
 
+// classify names the failures a caller acts on differently: one worth
+// asking again for, and one only the user can fix. Everything else keeps
+// the text gh printed and no type at all.
+func classify(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	for _, status := range []string{"HTTP 502", "HTTP 503", "HTTP 504"} {
+		if strings.Contains(msg, status) {
+			return fmt.Errorf("%w: %s", gh.ErrTransient, msg)
+		}
+	}
+	if strings.Contains(msg, "Bad credentials") || strings.Contains(msg, "gh auth login") {
+		return fmt.Errorf("%w: %s", gh.ErrUnauthenticated, msg)
+	}
+	return err
+}
+
 func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return nil, gh.ErrGhNotFound
@@ -68,9 +88,9 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		if msg := bytes.TrimSpace(stderr.Bytes()); len(msg) > 0 {
-			return stdout.Bytes(), fmt.Errorf("gh %s: %s", args[0], msg)
+			return stdout.Bytes(), classify(fmt.Errorf("gh %s: %s", args[0], msg))
 		}
-		return stdout.Bytes(), fmt.Errorf("gh %s: %w", args[0], err)
+		return stdout.Bytes(), classify(fmt.Errorf("gh %s: %w", args[0], err))
 	}
 	return stdout.Bytes(), nil
 }

@@ -3,11 +3,13 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -549,5 +551,54 @@ func TestGetPRParsesARecordedResponse(t *testing.T) {
 	}
 	if pr.Head == "" || pr.Base == "" {
 		t.Errorf("head/base = %q/%q, want both", pr.Head, pr.Base)
+	}
+}
+
+// gh reports GitHub's front end giving up as an HTTP status on stderr; the
+// body is nginx's HTML, not a GraphQL error. Callers retry this and nothing
+// else, so it has to be told apart from a query GitHub actually answered.
+func TestFrontEndFailuresAreTransient(t *testing.T) {
+	for _, status := range []string{"502", "503", "504"} {
+		t.Run(status, func(t *testing.T) {
+			err := classify(fmt.Errorf("gh api: gh: HTTP %s", status))
+			if !errors.Is(err, gh.ErrTransient) {
+				t.Errorf("HTTP %s did not classify as transient: %v", status, err)
+			}
+		})
+	}
+}
+
+func TestAnsweredFailuresAreNotTransient(t *testing.T) {
+	for _, msg := range []string{
+		"gh api: gh: Not Found (HTTP 404)",
+		"gh api: gh: API rate limit exceeded",
+		"gh pr list: no pull requests match",
+	} {
+		if err := classify(errors.New(msg)); errors.Is(err, gh.ErrTransient) {
+			t.Errorf("%q classified as transient", msg)
+		}
+	}
+}
+
+// gh tells an expired or invalid token ("Bad credentials", HTTP 401) apart
+// from having none at all ("gh auth login" in its own stderr); both need the
+// same fix from the user, so both classify the same way.
+func TestMissingCredentialsAreTold(t *testing.T) {
+	for _, msg := range []string{
+		"gh api: gh: Bad credentials (HTTP 401)",
+		"gh api: To get started with GitHub CLI, please run:  gh auth login",
+	} {
+		if err := classify(errors.New(msg)); !errors.Is(err, gh.ErrUnauthenticated) {
+			t.Errorf("%q did not classify as unauthenticated: %v", msg, err)
+		}
+	}
+}
+
+// The original text is what GitHub said, and the UI shows it as it was said
+// (.claude/rules/errors.md). Classifying must not replace it.
+func TestClassifyKeepsTheOriginalText(t *testing.T) {
+	err := classify(errors.New("gh api: gh: HTTP 502"))
+	if !strings.Contains(err.Error(), "HTTP 502") {
+		t.Errorf("the original text was lost: %v", err)
 	}
 }
