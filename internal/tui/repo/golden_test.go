@@ -133,8 +133,13 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("repo_prs_%s_%d", lang.name, w), prs.View())
 				golden.Assert(t, fmt.Sprintf("repo_issues_%s_%d", lang.name, w), issues.View())
 
+				// Two different screens: before the repository lookup has
+				// answered, and after it has answered with nothing.
 				empty := sized(New(&fakeSource{}, Options{}), w)
 				golden.Assert(t, fmt.Sprintf("repo_empty_%s_%d", lang.name, w), empty.View())
+
+				settled, _ := empty.SetCurrent("")
+				golden.Assert(t, fmt.Sprintf("repo_empty_settled_%s_%d", lang.name, w), settled.View())
 
 				// The dialog with suggestions on it, reached the way the user
 				// reaches it rather than by building the state by hand.

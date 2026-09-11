@@ -141,6 +141,12 @@ func (m Model) body() []string {
 		if !m.loaded[m.tab] && m.notice[m.tab].kind == noticeFetch && m.notice[m.tab].text != "" {
 			return []string{theme.Error().Render(clip(i18n.T("notice.fetch_failed"), m.bodyWidth()))}
 		}
+		// An empty list is not an answer until the lookup that names the
+		// working directory's repository has given one: see
+		// Model.currentSettled.
+		if len(m.rows) == 0 && !m.currentSettled {
+			return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
+		}
 		empty := i18n.T("list.no_open_prs")
 		switch {
 		case len(m.rows) == 0:

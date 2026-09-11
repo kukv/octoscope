@@ -238,6 +238,13 @@ type Model struct {
 	// treats every fetch's failure the same way its success is treated.
 	gen int
 
+	// currentSettled says the lookup that names the working directory's
+	// repository has answered, whatever it answered. Before it has, an empty
+	// list is not an answer but a question still open: the lookup is bounded
+	// at twenty seconds and has been measured at over six cold, and for all
+	// that time "no repositories yet" would be a claim octoscope cannot make.
+	currentSettled bool
+
 	// fetchedAt is when the shown list arrived. The rows carry relative
 	// times, and View must render the same string from the same state, so
 	// the clock is read here in Update rather than on every draw.
@@ -249,6 +256,9 @@ func New(src Source, opts Options) Model {
 	s.Spinner = spinner.Dot
 	m := Model{src: src, opts: opts}
 	m.spin = s
+	// --repo settles the question before the first frame; anything else
+	// waits for SetCurrent.
+	m.currentSettled = opts.Current != ""
 	m.rows, m.selected = buildRows(opts.Repositories, opts.Current)
 	if len(m.rows) > 0 {
 		m.loading[m.tab] = true
@@ -262,6 +272,7 @@ func New(src Source, opts Options) Model {
 // returns the fetch that row needs.
 func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 	m.opts.Current = name
+	m.currentSettled = true
 	rows, selected := buildRows(m.opts.Repositories, name)
 	m = m.setRows(rows)
 	next, cmd := m.selectRow(selected)

@@ -258,6 +258,21 @@ func resolve(t *testing.T, m Model, cmd tea.Cmd) Model {
 // about a word is not defeated by the escape codes lipgloss puts inside it.
 func content(m Model) string { return ansi.Strip(m.View().Content) }
 
+// repoResolvedMsg is the only thing that can settle whether the working
+// directory is a repository, so the root has to pass on an empty answer as
+// well as a name. Without that, an empty Repos tab says "no repositories
+// yet" for as long as the lookup takes.
+func TestTheReposTabWaitsForTheLookupBeforeCallingItEmpty(t *testing.T) {
+	m := press(newTestModel(Options{}), "2")
+	if strings.Contains(content(m), i18n.T("repos.none")) {
+		t.Errorf("the tab answered before the lookup did:\n%s", content(m))
+	}
+	next, _ := m.Update(repoResolvedMsg{})
+	if got := content(next.(Model)); !strings.Contains(got, i18n.T("repos.none")) {
+		t.Errorf("the tab never answered:\n%s", got)
+	}
+}
+
 // isQuit reports whether cmd is tea.Quit.
 func isQuit(cmd tea.Cmd) bool {
 	if cmd == nil {

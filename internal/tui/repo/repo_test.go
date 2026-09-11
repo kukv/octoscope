@@ -173,8 +173,11 @@ func TestEmptyPRList(t *testing.T) {
 
 // An empty settings file and no current repository is a different state from
 // a repository with no open pull requests: there is nothing to list at all.
+// It is said once the repository lookup has answered, and not before -- see
+// TestTheEmptySidebarWaitsForTheLookup.
 func TestEmptyListSaysSo(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{}), 120)
+	m, _ = m.SetCurrent("")
 	view := m.View()
 	if !strings.Contains(view, i18n.T("repos.none")) {
 		t.Errorf("an empty Repos tab says nothing:\n%s", view)
