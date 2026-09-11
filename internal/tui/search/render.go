@@ -1,6 +1,7 @@
 package search
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -82,29 +83,23 @@ func (m Model) queryRow() string {
 }
 
 // countText is what the query row says it found: the exact count, or
-// search.truncated with the count's own unit word once a full page may
-// have been cut short ("50+ results"): "50+" is not a real quantity, so it
-// borrows the word rather than asking Tn to pluralize it.
+// search.result_count_capped once a full page may have been cut short
+// ("50+ results" is not a real quantity to pluralize on, so it has its own
+// message rather than one built from search.result_count's pieces).
 func (m Model) countText() string {
 	if len(m.items) >= searchCap {
-		return i18n.T("search.truncated") + " " + resultUnit()
+		return i18n.Tf("search.result_count_capped", map[string]any{"Count": searchCap})
 	}
 	return i18n.Tn("search.result_count", len(m.items))
 }
 
-// resultUnit is the word search.result_count puts after the number, split
-// out for countText's truncated case.
-func resultUnit() string {
-	_, unit, _ := strings.Cut(i18n.Tn("search.result_count", 2), " ")
-	return unit
-}
-
-// countBadge is the same count, without the translated unit word: the
-// result pane already names itself "Results", so repeating the word there
-// would read as "Results 2 results".
+// countBadge is the same count, without the translated words: the result
+// pane already names itself "Results", so repeating "results" there would
+// read as "Results 2 results". "50+" needs no catalog lookup either, since
+// digits and "+" mean the same thing in every language.
 func (m Model) countBadge() string {
 	if len(m.items) >= searchCap {
-		return i18n.T("search.truncated")
+		return fmt.Sprintf("%d+", searchCap)
 	}
 	return strconv.Itoa(len(m.items))
 }

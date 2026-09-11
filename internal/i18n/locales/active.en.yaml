@@ -72,12 +72,13 @@ search:
   no_results:
     other: "Nothing matched this search"
   # The result count, under the cap a search asks for. Above the cap,
-  # search.truncated is shown instead: a full page may have been cut short.
+  # result_count_capped is shown instead: a full page may have been cut
+  # short, so its count is not a real quantity to pluralize on.
   result_count:
     one: "{{.Count}} result"
     other: "{{.Count}} results"
-  truncated:
-    other: "50+"
+  result_count_capped:
+    other: "{{.Count}}+ results"
   # A filter's name is GitHub's own search qualifier and is not translated
   # (.claude/rules/tui.md).
   filter:

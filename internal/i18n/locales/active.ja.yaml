@@ -73,8 +73,8 @@ search:
     other: "一致するものがありません"
   result_count:
     other: "{{.Count}} 件"
-  truncated:
-    other: "50+"
+  result_count_capped:
+    other: "{{.Count}}+ 件"
   # フィルタ名は GitHub の検索構文そのものなので翻訳しない
   # (.claude/rules/tui.md)。
   filter:
