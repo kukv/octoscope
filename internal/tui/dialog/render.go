@@ -32,9 +32,10 @@ func (m Model) View() string {
 	if m.errText != "" {
 		b.WriteString("\n" + theme.Error().Render(m.errText))
 	}
-	// Popup pads by one column on each side, and its border takes one more.
-	// Width is what goes inside the border, so the box ends up boxWidth wide.
-	return theme.Popup().Width(m.boxWidth() - borderCols).Render(b.String())
+	// lipgloss counts Width from the outside in: the border and the padding
+	// come out of it, not on top of it, which is why contentWidth subtracts
+	// both.
+	return theme.Popup().Width(m.boxWidth()).Render(b.String())
 }
 
 // candidateLines is the suggestion list under the field: what is running,

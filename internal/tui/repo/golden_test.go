@@ -70,6 +70,17 @@ func goldenIssues() []gh.Issue {
 	}}
 }
 
+// goldenCandidates are suggestions of the shape the search really returns:
+// one name long enough to need clipping at eighty columns, and star counts
+// of different widths so the column's alignment shows.
+func goldenCandidates() []gh.RepoCandidate {
+	return []gh.RepoCandidate{
+		{Name: "charmbracelet/lipgloss", Stars: 11812},
+		{Name: "marcoroth/lipgloss-ruby", Stars: 58},
+		{Name: "kukv/a-repository-with-a-name-nobody-would-type-twice"},
+	}
+}
+
 func goldenModel(width int) Model {
 	f := &fakeSource{prs: goldenPRs(), issues: goldenIssues()}
 	m := sized(New(f, Options{
@@ -124,6 +135,14 @@ func TestGolden(t *testing.T) {
 
 				empty := sized(New(&fakeSource{}, Options{}), w)
 				golden.Assert(t, fmt.Sprintf("repo_empty_%s_%d", lang.name, w), empty.View())
+
+				// The dialog with suggestions on it, reached the way the user
+				// reaches it rather than by building the state by hand.
+				dlg := goldenModel(w)
+				dlg, _ = dlg.Update(key("a"))
+				dlg = typeInto(dlg, "lip")
+				dlg, _ = dlg.Update(candidatesMsg{gen: dlg.searchGen, candidates: goldenCandidates()})
+				golden.Assert(t, fmt.Sprintf("repo_add_dialog_%s_%d", lang.name, w), dlg.View())
 			})
 		}
 	}

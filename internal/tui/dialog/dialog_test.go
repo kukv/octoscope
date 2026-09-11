@@ -97,6 +97,32 @@ func TestViewDrawsTheTitleHintAndCandidates(t *testing.T) {
 	}
 }
 
+// A suggestion row that overruns the box is wrapped by lipgloss, which puts
+// the star count on a line of its own and makes the list unreadable. The
+// count of border and padding columns is what gets this wrong, so the test
+// is the number of lines, not their width.
+func TestASuggestionStaysOnOneLine(t *testing.T) {
+	t.Parallel()
+
+	for _, width := range []int{80, 120, 160} {
+		m := dialog.New("Add a repository", "Type owner/name").SetWidth(width)
+		m = m.SetCandidates([]gh.RepoCandidate{
+			{Name: "charmbracelet/lipgloss", Stars: 11812},
+			{Name: "marcoroth/lipgloss-ruby", Stars: 58},
+		})
+		lines := strings.Split(m.View(), "\n")
+		for _, want := range []string{"11812", "58"} {
+			for _, line := range lines {
+				text := strings.TrimSpace(ansi.Strip(strings.Trim(ansi.Strip(line), "│")))
+				if text == want {
+					t.Errorf("at %d columns the star count wrapped onto its own line:\n%s",
+						width, ansi.Strip(m.View()))
+				}
+			}
+		}
+	}
+}
+
 // The suggestions are the whole reason the box is wider than the field, and
 // a name cut off at eighty columns cannot be told from its neighbour.
 func TestTheBoxFitsAnEightyColumnTerminal(t *testing.T) {
