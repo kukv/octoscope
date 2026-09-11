@@ -99,7 +99,7 @@ func (c *Client) PRChecks(ctx context.Context, repo string, number int) (gh.Chec
 		if cursor != "" {
 			args = append(args, "-f", "after="+cursor)
 		}
-		out, err := c.run(ctx, c.dir, args...)
+		out, err := c.read(ctx, c.dir, args...)
 		if err != nil {
 			return gh.Checks{}, err
 		}
@@ -147,7 +147,7 @@ func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnl
 	} else {
 		args = append(args, "--log")
 	}
-	out, err := c.run(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
+	out, err := c.read(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
 	if err != nil {
 		return nil, err
 	}

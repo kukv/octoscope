@@ -131,7 +131,7 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		if cursor != "" {
 			args = append(args, "-f", "after="+cursor)
 		}
-		out, err := c.run(ctx, c.dir, args...)
+		out, err := c.read(ctx, c.dir, args...)
 		if err != nil {
 			return gh.ReviewContext{}, err
 		}
@@ -195,7 +195,7 @@ func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]
 			"api", "graphql", "-f", "query=" + threadCommentsQuery,
 			"-f", "threadId=" + threadID, "-f", "after=" + cursor,
 		}
-		out, err := c.run(ctx, c.dir, args...)
+		out, err := c.read(ctx, c.dir, args...)
 		if err != nil {
 			return nil, err
 		}

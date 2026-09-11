@@ -602,3 +602,118 @@ func TestClassifyKeepsTheOriginalText(t *testing.T) {
 		t.Errorf("the original text was lost: %v", err)
 	}
 }
+
+// A read is safe to ask for twice. A transient failure is exactly the case
+// where asking again is likely to work, so the caller never sees the first one.
+func TestAReadIsAskedAgainAfterATransientFailure(t *testing.T) {
+	c := New("", "kukv/demo")
+	calls := 0
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		calls++
+		if calls == 1 {
+			return nil, fmt.Errorf("%w: gh: HTTP 502", gh.ErrTransient)
+		}
+		return []byte("[]"), nil
+	}
+	if _, err := c.ListPRs(context.Background(), ""); err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("gh ran %d times, want 2", calls)
+	}
+}
+
+func TestAReadIsAskedAgainOnlyOnce(t *testing.T) {
+	c := New("", "kukv/demo")
+	calls := 0
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		calls++
+		return nil, fmt.Errorf("%w: gh: HTTP 502", gh.ErrTransient)
+	}
+	if _, err := c.ListPRs(context.Background(), ""); err == nil {
+		t.Fatal("ListPRs succeeded on a failing gh")
+	}
+	if calls != 2 {
+		t.Errorf("gh ran %d times, want 2", calls)
+	}
+}
+
+// A failure GitHub answered will answer the same way again.
+func TestAnAnsweredFailureIsNotAskedAgain(t *testing.T) {
+	c := New("", "kukv/demo")
+	calls := 0
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		calls++
+		return nil, errors.New("gh pr list: gh: Not Found (HTTP 404)")
+	}
+	_, _ = c.ListPRs(context.Background(), "")
+	if calls != 1 {
+		t.Errorf("gh ran %d times, want 1", calls)
+	}
+}
+
+// A cancelled fetch must not be asked again: the user left, refreshed, or quit.
+func TestACancelledReadIsNotAskedAgain(t *testing.T) {
+	c := New("", "kukv/demo")
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+		calls++
+		cancel()
+		return nil, fmt.Errorf("%w: gh: HTTP 502", gh.ErrTransient)
+	}
+	_, _ = c.ListPRs(ctx, "")
+	if calls != 1 {
+		t.Errorf("gh ran %d times, want 1", calls)
+	}
+}
+
+// 502 means "no answer came back", not "it never arrived": GitHub may have
+// applied the change. Asking again could apply it twice.
+func TestWritesAreNeverAskedAgain(t *testing.T) {
+	writes := map[string]func(*Client) error{
+		"AddPRComment":     func(c *Client) error { return c.AddPRComment("kukv/demo", 1, "hi") },
+		"ClosePR":          func(c *Client) error { return c.ClosePR("kukv/demo", 1) },
+		"ReopenPR":         func(c *Client) error { return c.ReopenPR("kukv/demo", 1) },
+		"CloseIssue":       func(c *Client) error { return c.CloseIssue("kukv/demo", 1) },
+		"ReopenIssue":      func(c *Client) error { return c.ReopenIssue("kukv/demo", 1) },
+		"EditPRLabels":     func(c *Client) error { return c.EditPRLabels("kukv/demo", 1, []string{"bug"}, nil) },
+		"EditPRAssignees":  func(c *Client) error { return c.EditPRAssignees("kukv/demo", 1, []string{"kukv"}, nil) },
+		"MergePR":          func(c *Client) error { return c.MergePR("id", gh.MergeSquash) },
+		"EnableAutoMerge":  func(c *Client) error { return c.EnableAutoMerge("id", gh.MergeSquash) },
+		"DisableAutoMerge": func(c *Client) error { return c.DisableAutoMerge("id") },
+		"AddReviewThread":  func(c *Client) error { return c.AddReviewThread("id", gh.PendingComment{}) },
+		"SubmitReview":     func(c *Client) error { return c.SubmitReview("id", gh.EventApprove, "") },
+		"SubmitNewReview":  func(c *Client) error { return c.SubmitNewReview("id", gh.EventApprove, "") },
+		"DiscardReview":    func(c *Client) error { return c.DiscardReview("id") },
+		"RerunWorkflow": func(c *Client) error {
+			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), gh.RerunFailed)
+		},
+	}
+	for name, call := range writes {
+		t.Run(name, func(t *testing.T) {
+			c := New("", "kukv/demo")
+			calls := 0
+			c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+				calls++
+				return nil, fmt.Errorf("%w: gh: HTTP 502", gh.ErrTransient)
+			}
+			_ = call(c)
+			if calls != 1 {
+				t.Errorf("%s ran gh %d times, want 1: a write must never be retried", name, calls)
+			}
+		})
+	}
+	t.Run("StartReview", func(t *testing.T) {
+		c := New("", "kukv/demo")
+		calls := 0
+		c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
+			calls++
+			return nil, fmt.Errorf("%w: gh: HTTP 502", gh.ErrTransient)
+		}
+		_, _ = c.StartReview("id")
+		if calls != 1 {
+			t.Errorf("StartReview ran gh %d times, want 1: a write must never be retried", calls)
+		}
+	})
+}

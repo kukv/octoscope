@@ -92,7 +92,7 @@ func (c *Client) ListWork(ctx context.Context) (gh.Work, error) {
 	// "errors" array therefore means the document itself is broken, not that
 	// one column failed for reasons specific to it -- there is no partial
 	// body worth salvaging, so bail out.
-	out, err := c.run(ctx, c.dir, "api", "graphql", "-f", "query="+workQuery)
+	out, err := c.read(ctx, c.dir, "api", "graphql", "-f", "query="+workQuery)
 	if err != nil {
 		return gh.Work{}, err
 	}
