@@ -19,6 +19,21 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
+	if m.sidebarCols() > 0 && msg.X < sidebarWidth {
+		row, ok := m.sidebarRowAt(msg.Y)
+		if !ok {
+			return m, nil
+		}
+		m.focus = paneSidebar
+		// Clicking the selected repository has nothing to open: the right
+		// pane already shows it.
+		if row == m.selected {
+			return m, nil
+		}
+		return m.selectRow(row)
+	}
+	msg.X -= m.sidebarCols()
+	m.focus = paneList
 	if msg.Y == subTabRow {
 		return m.showTab(m.subTabAt(msg.X))
 	}
@@ -44,7 +59,34 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// sidebarRowAt maps a screen line onto a repository, the same way rows are
+// scrolled into view for drawing. ok is false above the list, in the gap
+// under the heading, and past the last repository.
+func (m Model) sidebarRowAt(y int) (int, bool) {
+	if y < sidebarTop || y >= sidebarTop+m.sidebarRows() {
+		return 0, false
+	}
+	row := y - sidebarTop + m.sidebarWindow()
+	if row >= len(m.rows) {
+		return 0, false
+	}
+	return row, true
+}
+
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
+	if m.sidebarCols() > 0 && msg.X < sidebarWidth {
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			if m.selected > 0 {
+				return m.selectRow(m.selected - 1)
+			}
+		case tea.MouseWheelDown:
+			if m.selected < len(m.rows)-1 {
+				return m.selectRow(m.selected + 1)
+			}
+		}
+		return m, nil
+	}
 	switch msg.Button {
 	case tea.MouseWheelUp:
 		if m.cursors[m.tab] > 0 {
@@ -79,9 +121,9 @@ func (m Model) showTab(t tabID, ok bool) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.tab = t
-	if !m.loaded[m.tab] {
+	if !m.loaded[m.tab] && len(m.rows) > 0 {
 		m.loading[m.tab] = true
-		return m, fetchList(m.src, m.tab)
+		return m, fetchList(m.src, m.tab, m.selectedRepo(), m.gen)
 	}
 	return m, nil
 }

@@ -26,7 +26,7 @@ tab:
   repos:
     other: "Repos"
   repo_lookup_timeout:
-    other: "repository lookup timed out"
+    other: "could not tell which repository this is"
   config_unreadable:
     other: "settings file unreadable; using defaults"
 
@@ -39,6 +39,12 @@ list:
     other: "No open pull requests"
   no_open_issues:
     other: "No open issues"
+
+repos:
+  sidebar:
+    other: "Repositories"
+  none:
+    other: "No repositories yet"
 
 detail:
   pr_title:
@@ -164,8 +170,28 @@ submit:
     other: "Discard the unsubmitted review and every comment on it?"
 
 footer:
+  # the list's key bar is built from these, most important first, and
+  # dropped from the end when the terminal is too narrow for all of them
+  # (internal/tui/layout.FitKeyBar).
   list:
-    other: "j/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  s:checks  q:quit"
+    move:
+      other: "j/k:move"
+    open:
+      other: "enter:detail"
+    pane:
+      other: "h/l:pane"
+    kind:
+      other: "tab:PR/Issue"
+    refresh:
+      other: "r:refresh"
+    diff:
+      other: "d:diff"
+    checks:
+      other: "s:checks"
+    web:
+      other: "o:web"
+    quit:
+      other: "q:quit"
   close:
     other: "x:close"
   reopen:

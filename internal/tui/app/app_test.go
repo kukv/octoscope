@@ -29,17 +29,20 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work      gh.Work
-	prs       []gh.PR
-	pr        gh.PR
-	prErr     error
-	labels    []gh.Label
-	files     []gh.FileDiff
-	diffErr   error
-	checks    gh.Checks
-	checksErr error
-	workCalls int
-	prCalls   int
+	work       gh.Work
+	prs        []gh.PR
+	pr         gh.PR
+	prErr      error
+	labels     []gh.Label
+	files      []gh.FileDiff
+	diffErr    error
+	checks     gh.Checks
+	checksErr  error
+	workCalls  int
+	prCalls    int
+	prRepos    []string
+	issueRepos []string
+	countCalls [][]string
 }
 
 func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
@@ -47,12 +50,23 @@ func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
 	return f.work, nil
 }
 
-func (f *fakeSource) ListPRs(context.Context, string) ([]gh.PR, error) {
+func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
 	f.prCalls++
+	f.prRepos = append(f.prRepos, repo)
 	return f.prs, nil
 }
-func (f *fakeSource) ListIssues(context.Context, string) ([]gh.Issue, error) { return nil, nil }
-func (f *fakeSource) RepoName(context.Context) (string, error)               { return "kukv/demo", nil }
+
+func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]gh.Issue, error) {
+	f.issueRepos = append(f.issueRepos, repo)
+	return nil, nil
+}
+
+func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
+
+func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]gh.RepoCount, error) {
+	f.countCalls = append(f.countCalls, repos)
+	return nil, nil
+}
 
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
 	if ref.Kind == gh.ItemIssue {
@@ -204,10 +218,10 @@ func isQuit(cmd tea.Cmd) bool {
 // which repository the user came for, so they land on it; without the flag
 // there is no repository yet to land on.
 func TestTheFirstTabFollowsTheFlag(t *testing.T) {
-	if m := New(&fakeSource{}, Options{HasRepo: true}); m.tab != tabRepos {
+	if m := New(&fakeSource{}, Options{Repo: "kukv/demo"}); m.tab != tabRepos {
 		t.Errorf("with --repo: tab = %d, want tabRepos", m.tab)
 	}
-	if m := New(&fakeSource{}, Options{HasRepo: false}); m.tab != tabWork {
+	if m := New(&fakeSource{}, Options{}); m.tab != tabWork {
 		t.Errorf("without --repo: tab = %d, want tabWork", m.tab)
 	}
 }
@@ -216,8 +230,8 @@ func TestTheFirstTabFollowsTheFlag(t *testing.T) {
 // directory's repository is answered seconds after the board is already on
 // screen, and swapping the tab under the user then is not a courtesy.
 func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
-	m := newTestModel(Options{HasRepo: false})
-	next, _ := m.Update(repoResolvedMsg{found: true})
+	m := newTestModel(Options{})
+	next, _ := m.Update(repoResolvedMsg{name: "kukv/demo"})
 	if got := next.(Model); got.tab != tabWork {
 		t.Errorf("tab = %d after the repository was resolved, want tabWork", got.tab)
 	}
@@ -225,7 +239,7 @@ func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
 
 func TestTabKeysSwitchTabs(t *testing.T) {
 	// --repo starts on Repos, so 1 is the key that has somewhere to go first.
-	m := press(newTestModel(Options{HasRepo: true}), "1")
+	m := press(newTestModel(Options{Repo: "kukv/demo"}), "1")
 	if m.tab != tabWork {
 		t.Errorf("after 1: got %d, want tabWork", m.tab)
 	}
@@ -234,16 +248,72 @@ func TestTabKeysSwitchTabs(t *testing.T) {
 	}
 }
 
-// TestReposTabIsUnreachableWithoutARepository guards spec 3.4: with neither
-// --repo nor a git remote there is nothing for the Repos tab to show, so the
-// app stays on Work rather than surfacing gh's "no git remotes found".
-func TestReposTabIsUnreachableWithoutARepository(t *testing.T) {
-	m := press(newTestModel(Options{HasRepo: false}), "2")
-	if m.tab != tabWork {
-		t.Errorf("tab: got %v, want it to stay on tabWork", m.tab)
+// The Repos tab lists what the settings file holds, so it is there whether or
+// not the working directory is a repository.
+func TestReposTabExistsWithoutACurrentRepository(t *testing.T) {
+	m := press(newTestModel(Options{}), "2")
+	if m.tab != tabRepos {
+		t.Error("2 did not reach the Repos tab")
 	}
-	if strings.Contains(content(m), i18n.T("tab.repos")) {
-		t.Error("the Repos tab is offered even though no repository is known")
+	if !strings.Contains(content(m), i18n.T("tab.repos")) {
+		t.Errorf("the tab row does not offer Repos:\n%s", content(m))
+	}
+}
+
+// The lookup's answer names the repository, which is what the list needs to
+// put a temporary row at the top of the sidebar.
+func TestResolvedRepositoryReachesTheList(t *testing.T) {
+	m := newTestModel(Options{})
+	next, _ := m.Update(repoResolvedMsg{name: "kukv/demo"})
+	if got := next.(Model).repo.Current(); got != "kukv/demo" {
+		t.Errorf("the list's current repository = %q, want kukv/demo", got)
+	}
+}
+
+// The lookup's answer replaces the list's rows, which resets every badge to
+// uncounted; without a fresh count fetch, a row counted before the answer
+// arrived would be stuck showing its old numbers.
+func TestResolvedRepositoryFetchesCounts(t *testing.T) {
+	f := &fakeSource{}
+	m := newTestModelWith(f, Options{})
+	_, cmd := m.Update(repoResolvedMsg{name: "kukv/demo"})
+	resolve(t, m, cmd)
+	if len(f.countCalls) == 0 {
+		t.Error("RepoCounts was not called after the repository was resolved")
+	}
+}
+
+// TestSidebarMoveAsksListPRsForTheNewRow covers the argument fetchList hands
+// down through the routing that reaches this package's Source: moving the
+// Repos sidebar's cursor here, not just inside internal/tui/repo, must ask
+// ListPRs for the row the cursor landed on.
+func TestSidebarMoveAsksListPRsForTheNewRow(t *testing.T) {
+	f := &fakeSource{}
+	next, cmd := New(f, Options{
+		Repo:         "kukv/octoscope",
+		Repositories: []string{"kukv/octoscope", "kukv/koto"},
+	}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+
+	m = press(m, "h") // focus the sidebar
+	f.prRepos = nil
+	moved, moveCmd := pressCmd(m, "j") // onto kukv/koto
+	resolve(t, moved, moveCmd)
+
+	if got := f.prRepos; len(got) != 1 || got[0] != "kukv/koto" {
+		t.Errorf("ListPRs got %v, want the row the cursor moved onto", got)
+	}
+}
+
+// --repo is a statement about this run: its repository is current from the
+// start, without waiting for a lookup.
+func TestRepoFlagIsCurrentFromTheStart(t *testing.T) {
+	m := New(&fakeSource{}, Options{Repo: "kukv/flagged"})
+	if got := m.repo.Current(); got != "kukv/flagged" {
+		t.Errorf("the list's current repository = %q, want kukv/flagged", got)
+	}
+	if m.tab != tabRepos {
+		t.Error("--repo did not land on the Repos tab")
 	}
 }
 
@@ -252,7 +322,7 @@ func TestReposTabIsUnreachableWithoutARepository(t *testing.T) {
 // so the first fetch waits for the first size. A later resize must not cancel
 // and restart it.
 func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
-	m := New(&fakeSource{}, Options{HasRepo: true})
+	m := New(&fakeSource{}, Options{Repo: "kukv/demo"})
 	// Init asks the terminal for its background colour; that is all it does.
 	if m.Init() == nil {
 		t.Fatal("Init did not ask the terminal for its background colour")
@@ -266,33 +336,10 @@ func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 	}
 }
 
-// TestTheReposTabAppearsWhenTheRepositoryIsResolved covers what replaced the
-// blocking lookup main used to do before the UI started: the tab is not
-// offered until the answer arrives, and arriving is what starts its fetches.
-func TestTheReposTabAppearsWhenTheRepositoryIsResolved(t *testing.T) {
-	m := newTestModel(Options{}) // no --repo: the answer is not known yet
-	if strings.Contains(content(m), i18n.T("tab.repos")) {
-		t.Error("the Repos tab is offered before the repository is known")
-	}
-
-	next, cmd := m.Update(repoResolvedMsg{found: true})
-	m = next.(Model)
-	if !strings.Contains(content(m), i18n.T("tab.repos")) {
-		t.Error("the Repos tab did not appear once the repository was known")
-	}
-	if cmd == nil {
-		t.Error("the repository list was never asked to fetch anything")
-	}
-	if press(m, "2").tab != tabRepos {
-		t.Error("the Repos tab cannot be reached even though it is offered")
-	}
-}
-
-// TestALateRepositoryStillGetsTheTerminalWidth is the case the asynchronous
-// lookup created: the list is not part of the broadcast until the answer
-// arrives, so it never saw the size everything else was given. An unsized
-// list clips nothing, and every long title runs off the terminal until the
-// user happens to resize the window.
+// TestALateRepositoryStillGetsTheTerminalWidth guards the row the lookup's
+// answer adds to an already-sized list: it must wrap within the width every
+// other row already respects, not run off the terminal like an unsized one
+// would.
 func TestALateRepositoryStillGetsTheTerminalWidth(t *testing.T) {
 	const width = 120
 	src := &fakeSource{prs: []gh.PR{{
@@ -313,33 +360,32 @@ func TestALateRepositoryStillGetsTheTerminalWidth(t *testing.T) {
 	}
 }
 
-func TestNoRepositoryLeavesTheReposTabOff(t *testing.T) {
+// TestANotFoundRepositoryStartsNoFetch covers the case a lookup answers with
+// neither a repository nor a timeout: a directory that is not a repository
+// gives the list nothing new to show.
+func TestANotFoundRepositoryStartsNoFetch(t *testing.T) {
 	m := newTestModel(Options{})
-	next, cmd := m.Update(repoResolvedMsg{found: false})
-	if cmd != nil {
+	if _, cmd := m.Update(repoResolvedMsg{}); cmd != nil {
 		t.Error("a directory with no repository still started a fetch")
-	}
-	if strings.Contains(content(next.(Model)), i18n.T("tab.repos")) {
-		t.Error("the Repos tab is offered for a directory with no repository")
 	}
 }
 
-// TestTheFirstSizeAsksWhetherThereIsARepository is the other half: without
-// this, the answer never arrives and the tab never appears.
-func TestTheFirstSizeAsksWhetherThereIsARepository(t *testing.T) {
+// TestTheFirstSizeAsksWhichRepositoryThisIs is the other half: without this,
+// the lookup never runs and the list's current repository is never learned.
+func TestTheFirstSizeAsksWhichRepositoryThisIs(t *testing.T) {
 	m := New(&fakeSource{}, Options{})
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if cmd == nil {
 		t.Fatal("the first size started nothing")
 	}
 	resolved := resolve(t, next.(Model), cmd)
-	if !resolved.opts.HasRepo {
-		t.Error("the lookup ran but its answer did not reach the model")
+	if got := resolved.repo.Current(); got != "kukv/demo" {
+		t.Errorf("the list's current repository = %q, want kukv/demo", got)
 	}
 }
 
 func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{
 		Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3},
 	})
@@ -354,7 +400,7 @@ func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 }
 
 func TestRepoOpenDetailMsgShowsTheDetailView(t *testing.T) {
-	next, _ := newTestModel(Options{HasRepo: true}).Update(repo.OpenDetailMsg{
+	next, _ := newTestModel(Options{Repo: "kukv/demo"}).Update(repo.OpenDetailMsg{
 		Ref: gh.ItemRef{Kind: gh.ItemIssue, Number: 7},
 	})
 	if !next.(Model).has(overlayDetail) {
@@ -365,7 +411,7 @@ func TestRepoOpenDetailMsgShowsTheDetailView(t *testing.T) {
 var someRef = gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3}
 
 func TestDFromTheBoardOpensTheDiffOnItsOwn(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
 	got := next.(Model)
 	if len(got.stack) != 1 || got.stack[0] != overlayDiff {
@@ -374,7 +420,7 @@ func TestDFromTheBoardOpensTheDiffOnItsOwn(t *testing.T) {
 }
 
 func TestDOpensTheDiffOverTheDetailView(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
 	got := next.(Model)
@@ -387,7 +433,7 @@ func TestDOpensTheDiffOverTheDetailView(t *testing.T) {
 }
 
 func TestEscTakesTheDiffOffAndLeavesTheDetailView(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
 	next, _ = next.(Model).Update(diff.ClosedMsg{})
@@ -398,7 +444,7 @@ func TestEscTakesTheDiffOffAndLeavesTheDetailView(t *testing.T) {
 }
 
 func TestSFromTheBoardOpensTheChecksOnItsOwn(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenChecksMsg{Ref: someRef})
 	got := next.(Model)
 	if len(got.stack) != 1 || got.stack[0] != overlayChecks {
@@ -407,7 +453,7 @@ func TestSFromTheBoardOpensTheChecksOnItsOwn(t *testing.T) {
 }
 
 func TestEscTakesTheChecksOffAndLeavesTheDetailView(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenChecksMsg{Ref: someRef})
 	next, _ = next.(Model).Update(checks.ClosedMsg{})
@@ -422,7 +468,7 @@ func TestEscTakesTheChecksOffAndLeavesTheDetailView(t *testing.T) {
 // second one, and a stack must be too, or the next legitimate close pops the
 // tabs instead of nothing.
 func TestAStaleClosedMsgDoesNotPopTwice(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.ClosedMsg{})
 	next, _ = next.(Model).Update(detail.ClosedMsg{})
@@ -436,7 +482,7 @@ func TestAStaleClosedMsgDoesNotPopTwice(t *testing.T) {
 // follows: a request outlives the view that started it, and its failure must
 // not drag a closed view's error onto the screen.
 func TestAClosedDiffsFailureIsNotShown(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(diff.ErrorMsg{Err: errors.New("boom")})
 	if got := next.(Model).errText; got != "" {
 		t.Errorf("error screen shows %q for a diff that is not open", got)
@@ -448,7 +494,7 @@ func TestAClosedDiffsFailureIsNotShown(t *testing.T) {
 // not just in the detail/diff view the reviewer submitted it from.
 func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
 	f := &fakeSource{}
-	m := newTestModelWith(f, Options{HasRepo: true})
+	m := newTestModelWith(f, Options{Repo: "kukv/demo"})
 
 	_, cmd := m.Update(review.SubmittedMsg{})
 	if cmd == nil {
@@ -469,7 +515,7 @@ func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
 // from.
 func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 	f := &fakeSource{}
-	m := newTestModelWith(f, Options{HasRepo: true})
+	m := newTestModelWith(f, Options{Repo: "kukv/demo"})
 
 	_, cmd := m.Update(merge.MergedMsg{})
 	if cmd == nil {
@@ -485,16 +531,6 @@ func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 }
 
-// TestASubmittedReviewWithNoRepoTabDoesNotPanic covers the case where the
-// Repos tab does not exist yet: there is nothing to refresh there, and
-// nothing should try to.
-func TestASubmittedReviewWithNoRepoTabDoesNotPanic(t *testing.T) {
-	m := newTestModel(Options{HasRepo: false})
-	if _, cmd := m.Update(review.SubmittedMsg{}); cmd == nil {
-		t.Error("review.SubmittedMsg produced no command")
-	}
-}
-
 // TestTheDetailViewGetsTheCurrentSize guards the one place a child is built
 // after the WindowSizeMsg has already been seen: without handing it the stored
 // size, its viewport would wrap at its own 80-column default forever.
@@ -506,7 +542,7 @@ func TestTheDetailViewGetsTheCurrentSize(t *testing.T) {
 	// clip itself — that is the detail package's business, not the root's.
 	const width = 76
 
-	m := New(src, Options{HasRepo: true})
+	m := New(src, Options{Repo: "kukv/demo"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 24})
 	m = next.(Model)
 
@@ -532,7 +568,7 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 		"detail": {open: true, msg: detail.ErrorMsg{Err: errors.New("boom")}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			m := newTestModel(Options{HasRepo: true})
+			m := newTestModel(Options{Repo: "kukv/demo"})
 			if tc.open {
 				opened, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 				m = opened.(Model)
@@ -550,7 +586,7 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 }
 
 func TestGhNotFoundIsTranslated(t *testing.T) {
-	next, _ := newTestModel(Options{HasRepo: true}).
+	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
 		Update(work.ErrorMsg{Err: gh.ErrGhNotFound})
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.gh_not_found")) {
@@ -563,7 +599,7 @@ func TestGhNotFoundIsTranslated(t *testing.T) {
 // screen and typed in by hand.
 func TestNoBrowserShowsTheAddress(t *testing.T) {
 	const url = "https://github.com/kukv/octoscope/pull/55"
-	next, _ := newTestModel(Options{HasRepo: true}).
+	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
 		Update(work.ErrorMsg{Err: &browser.NoneError{URL: url}})
 	view := content(next.(Model))
 	if !strings.Contains(view, url) {
@@ -574,7 +610,7 @@ func TestNoBrowserShowsTheAddress(t *testing.T) {
 func TestErrorScreenKeysQuit(t *testing.T) {
 	for _, k := range []string{"q", "esc", "ctrl+c"} {
 		t.Run(k, func(t *testing.T) {
-			next, _ := newTestModel(Options{HasRepo: true}).
+			next, _ := newTestModel(Options{Repo: "kukv/demo"}).
 				Update(work.ErrorMsg{Err: errors.New("boom")})
 			_, cmd := next.(Model).Update(key(k))
 			if !isQuit(cmd) {
@@ -588,7 +624,7 @@ func TestErrorScreenKeysQuit(t *testing.T) {
 // pull request too large for gh: esc must return to what was underneath
 // rather than quitting the whole session (the bug the user hit).
 func TestEscGoesBackFromAnErrorOverAnOverlay(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(diff.ErrorMsg{Err: errors.New("boom")})
@@ -614,7 +650,7 @@ func TestEscGoesBackFromAnErrorOverAnOverlay(t *testing.T) {
 // opened over the detail view fails, and esc must land back on the detail
 // view, not on the tabs.
 func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
@@ -638,7 +674,7 @@ func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
 // with the diff still on top. That failure belongs to neither overlay on the
 // stack, so esc must clear it without discarding a diff that never failed.
 func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
@@ -663,7 +699,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 // fails before anything is on the stack, and there is nowhere for esc to go
 // back to, so it must keep quitting like q does.
 func TestEscStillQuitsWithNoOverlay(t *testing.T) {
-	next, _ := newTestModel(Options{HasRepo: true}).
+	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
 		Update(work.ErrorMsg{Err: errors.New("boom")})
 	m := next.(Model)
 	if len(m.stack) != 0 {
@@ -678,7 +714,7 @@ func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 // TestErrorScreenKeyBarNamesWhatIsAvailable guards the footer: it must say
 // esc:back only when there is something to go back to.
 func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
 	next, _ = next.(Model).Update(diff.ErrorMsg{Err: errors.New("boom")})
 
@@ -687,7 +723,7 @@ func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
 		t.Errorf("key bar does not offer esc:back with an overlay open:\n%s", view)
 	}
 
-	noOverlay, _ := newTestModel(Options{HasRepo: true}).
+	noOverlay, _ := newTestModel(Options{Repo: "kukv/demo"}).
 		Update(work.ErrorMsg{Err: errors.New("boom")})
 	view = content(noOverlay.(Model))
 	if strings.Contains(view, i18n.T("footer.error.esc")) {
@@ -699,7 +735,7 @@ func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
 }
 
 func TestQQuitsOnTheTabs(t *testing.T) {
-	_, cmd := pressCmd(newTestModel(Options{HasRepo: true}), "q")
+	_, cmd := pressCmd(newTestModel(Options{Repo: "kukv/demo"}), "q")
 	if !isQuit(cmd) {
 		t.Error("q did not quit the app")
 	}
@@ -710,7 +746,7 @@ func TestQQuitsOnTheTabs(t *testing.T) {
 func TestQGoesBackInTheDetailView(t *testing.T) {
 	for _, k := range []string{"q", "esc"} {
 		t.Run(k, func(t *testing.T) {
-			m := newTestModel(Options{HasRepo: true})
+			m := newTestModel(Options{Repo: "kukv/demo"})
 			next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 			m, cmd := pressCmd(next.(Model), k)
 			if isQuit(cmd) {
@@ -767,7 +803,7 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 				pr:     gh.PR{Number: 1, Title: "a pr", State: gh.StateOpen},
 				labels: []gh.Label{{Name: "bug", Color: "d73a4a"}},
 			}
-			m := newTestModelWith(src, Options{HasRepo: true})
+			m := newTestModelWith(src, Options{Repo: "kukv/demo"})
 			next, cmd := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 			m = resolve(t, next.(Model), cmd)
 
@@ -783,7 +819,7 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 // Repos tab, then a card opened before the refresh returns. The late list must
 // still reach repo, or its spinner is stuck when the user comes back.
 func TestALateRepoMessageIsNotDropped(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	m = press(m, "2")
 
 	m, refresh := pressCmd(m, "r")
@@ -858,7 +894,7 @@ func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 }
 
 func TestTheTabRowMarksTheActiveTab(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	view := content(m)
 	for _, want := range []string{i18n.T("tab.work"), i18n.T("tab.repos")} {
 		if !strings.Contains(view, want) {
@@ -891,7 +927,7 @@ func TestTheTabRowIsQuietWhenTheSettingsFileIsFine(t *testing.T) {
 }
 
 func TestTheDetailViewHasNoTabRow(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 	if strings.Contains(content(next.(Model)), i18n.T("tab.repos")) {
 		t.Error("the detail view is drawn under the tab row")
@@ -928,7 +964,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 
 	src := overlongSource()
 	// --repo opens on the Repos tab; 1 is what reaches the board from there.
-	next, cmd := New(src, Options{HasRepo: true}).Update(size)
+	next, cmd := New(src, Options{Repo: "kukv/demo"}).Update(size)
 	reposM := resolve(t, next.(Model), cmd)
 
 	next, cmd = reposM.Update(key("1"))
@@ -985,7 +1021,7 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 // the user already left: nothing is on screen for that view any more, so the
 // failure has nowhere to go but away.
 func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
-	m := newTestModel(Options{HasRepo: true})
+	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
 	m = resolve(t, m, cmd)
@@ -1004,7 +1040,7 @@ func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
 // request the user abandoned, while the view now on screen has its own in
 // flight.
 func TestAStaleDetailErrorDoesNotReplaceTheOpenOne(t *testing.T) {
-	m := newTestModelWith(&fakeSource{prErr: errors.New("boom")}, Options{HasRepo: true})
+	m := newTestModelWith(&fakeSource{prErr: errors.New("boom")}, Options{Repo: "kukv/demo"})
 
 	next, first := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
@@ -1058,21 +1094,21 @@ func TestTheTerminalBackgroundReachesThePalette(t *testing.T) {
 	}
 }
 
-// TestASlowLookupSaysSoInsteadOfDroppingTheTab is the difference between the
-// two ways the Repos tab can be missing. `gh repo view` reaches the API and a
-// cold one has been measured at over six seconds; treating that the same as
-// "this directory is not a repository" makes the tab vanish for a reason the
-// screen never gives, and the disappearance gets blamed on whatever else
+// TestASlowLookupSaysSoInsteadOfStayingSilent is the difference between the
+// two ways the current repository can stay unknown. `gh repo view` reaches
+// the API and a cold one has been measured at over six seconds; treating
+// that the same as "this directory is not a repository" leaves no trace on
+// screen, and the missing current repository gets blamed on whatever else
 // changed that day.
-func TestASlowLookupSaysSoInsteadOfDroppingTheTab(t *testing.T) {
+func TestASlowLookupSaysSoInsteadOfStayingSilent(t *testing.T) {
 	m := newTestModel(Options{})
 
-	quiet, _ := m.Update(repoResolvedMsg{found: false})
+	quiet, _ := m.Update(repoResolvedMsg{})
 	if got := content(quiet.(Model)); strings.Contains(got, i18n.T("tab.repo_lookup_timeout")) {
 		t.Errorf("a directory with no repository is reported as a timeout: %q", got)
 	}
 
-	slow, _ := m.Update(repoResolvedMsg{found: false, timedOut: true})
+	slow, _ := m.Update(repoResolvedMsg{timedOut: true})
 	if got := content(slow.(Model)); !strings.Contains(got, i18n.T("tab.repo_lookup_timeout")) {
 		t.Errorf("a lookup that timed out says nothing: %q", got)
 	}
@@ -1091,7 +1127,10 @@ func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 		err  error
 		want repoResolvedMsg
 	}{
-		"a repository": {context.Background(), "kukv/octoscope", nil, repoResolvedMsg{found: true}},
+		"a repository": {
+			context.Background(), "kukv/octoscope", nil,
+			repoResolvedMsg{name: "kukv/octoscope"},
+		},
 		"none here": {
 			context.Background(), "", errors.New("no repository in this directory"),
 			repoResolvedMsg{},
@@ -1110,7 +1149,7 @@ func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 
 // Someone who set default_tab: repos wants the Repos tab even when the
 // repository is found from the working directory rather than named on the
-// command line -- but the tab does not exist until it is found.
+// command line -- but that move waits for the lookup to answer.
 func TestDefaultReposWaitsForTheRepositoryToBeFound(t *testing.T) {
 	m := New(&fakeSource{}, Options{DefaultRepos: true})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -1120,7 +1159,7 @@ func TestDefaultReposWaitsForTheRepositoryToBeFound(t *testing.T) {
 		t.Fatalf("tab before the lookup answered = %v, want tabWork", m.tab)
 	}
 
-	next, _ = m.Update(repoResolvedMsg{found: true})
+	next, _ = m.Update(repoResolvedMsg{name: "kukv/octoscope"})
 	if got := next.(Model).tab; got != tabRepos {
 		t.Errorf("tab after the repository was found = %v, want tabRepos", got)
 	}
@@ -1131,7 +1170,7 @@ func TestDefaultReposWaitsForTheRepositoryToBeFound(t *testing.T) {
 func TestAFoundRepositoryDoesNotMoveTheUserByItself(t *testing.T) {
 	m := New(&fakeSource{}, Options{})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	next, _ = next.(Model).Update(repoResolvedMsg{found: true})
+	next, _ = next.(Model).Update(repoResolvedMsg{name: "kukv/octoscope"})
 
 	if got := next.(Model).tab; got != tabWork {
 		t.Errorf("tab = %v, want tabWork", got)
@@ -1143,10 +1182,10 @@ func TestAFoundRepositoryDoesNotMoveTheUserByItself(t *testing.T) {
 func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
 	m := New(&fakeSource{}, Options{DefaultRepos: true})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	next, _ = next.(Model).Update(repoResolvedMsg{found: true})
+	next, _ = next.(Model).Update(repoResolvedMsg{name: "kukv/octoscope"})
 	onWork := press(next.(Model), "1")
 
-	after, _ := onWork.Update(repoResolvedMsg{found: true})
+	after, _ := onWork.Update(repoResolvedMsg{name: "kukv/octoscope"})
 	if got := after.(Model).tab; got != tabWork {
 		t.Errorf("tab = %v, want tabWork", got)
 	}

@@ -6,4 +6,4 @@
 
 [38;2;139;148;158mNo open pull requests[m
 
-[38;2;139;148;158mj/k:move  enter:detail  tab:PR/Issue  r:refresh  o:web  d:diff  s:checks  q:quit[m
+[38;2;139;148;158mj/k:move  enter:detail  h/l:pane  tab:PR/Issue  q:quit  r:refresh  d:diff[m

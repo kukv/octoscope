@@ -25,6 +25,10 @@ func wheel(up bool) tea.MouseWheelMsg {
 	return tea.MouseWheelMsg{X: 2, Y: listTop, Button: button}
 }
 
+func wheelDown(x, y int) tea.MouseWheelMsg {
+	return tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown}
+}
+
 // tokenAt finds where a token is actually drawn. The tests ask the rendered
 // list where a row is rather than recomputing the layout, so a hit-test that
 // has drifted from the drawing fails here.
@@ -71,7 +75,9 @@ func TestClickingARowSelectsItAndClickingAgainOpensIt(t *testing.T) {
 }
 
 func TestClickingASubTabSwitchesToIt(t *testing.T) {
-	m := sized(loadedModel(&fakeSource{prs: samplePRs()}), 120)
+	// Under 100 columns the sidebar folds away: with one it would sit at
+	// column 0 too, where this test clicks to switch back to Pull Requests.
+	m := currentModel(&fakeSource{prs: samplePRs()}, 90)
 	x, y := tokenAt(t, m, i18n.T("list.tab_issues"))
 
 	next, cmd := m.Update(click(x, y))
@@ -128,6 +134,91 @@ func TestTheWheelMovesTheCursor(t *testing.T) {
 	}
 	if got, _ := up.SelectedRef(); got.Number != 1 {
 		t.Errorf("scrolling past the top selected #%d, want #1", got.Number)
+	}
+}
+
+// A click in the sidebar selects that repository and moves the focus there.
+func TestClickingASidebarRowSelectsIt(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(click(2, sidebarTop+1)) // the second repository
+	drain(t, cmd)
+	if m.selected != 1 || m.focus != paneSidebar {
+		t.Errorf("selected = %d focus = %v, want the clicked row focused", m.selected, m.focus)
+	}
+}
+
+// The sub-tab row starts at the sidebar's right edge, not at column zero: a
+// hit-test that forgot the offset would switch tabs on a sidebar click.
+func TestSubTabHitTestIsOffsetByTheSidebar(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	before := m.tab
+	m, _ = m.Update(click(1, subTabRow))
+	if m.tab != before {
+		t.Error("a click inside the sidebar switched the sub-tab")
+	}
+	// The cursor starts on the PRs tab already, so a click that landed there
+	// by coincidence (offset ignored, or missed entirely) would look the
+	// same as one that hit it correctly. Clicking Issues instead tells the
+	// two apart.
+	issuesAt := ansi.StringWidth(i18n.T("list.tab_prs")) + len(subTabGap)
+	m, cmd := m.Update(click(m.sidebarCols()+issuesAt, subTabRow))
+	drain(t, cmd)
+	if m.tab != tabIssues {
+		t.Error("a click on the second sub-tab, offset by the sidebar, missed it")
+	}
+}
+
+// showTab must not fetch when there are no rows, the same way Refresh must
+// not: it is reached with no rows whenever tab is pressed on an empty Repos
+// tab.
+func TestSwitchingTabWithNoRowsFetchesNothing(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{}), 120)
+	m, cmd := m.showTab(tabIssues, true)
+	if cmd != nil {
+		t.Errorf("cmd = %v, want nil with no rows to fetch", cmd)
+	}
+	if m.loading[tabIssues] {
+		t.Error("loading was set with nothing to load")
+	}
+	if m.tab != tabIssues {
+		t.Error("the tab should still switch even with nothing to show")
+	}
+}
+
+// A click below the last drawn repository must not select one: sidebarRowAt
+// maps it onto a row past the screen (the footer, or further), and only
+// sidebarRows() of the list are ever drawn.
+func TestClickingBelowTheDrawnSidebarRowsSelectsNothing(t *testing.T) {
+	var many []string
+	for i := range 50 {
+		many = append(many, fmt.Sprintf("kukv/repo-%02d", i))
+	}
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Repositories: many}), 120)
+	m, _ = m.Update(prListMsg{prs: f.prs})
+
+	m, cmd := m.Update(click(2, sidebarTop+m.sidebarRows()))
+	if cmd != nil {
+		t.Errorf("clicking below the drawn rows produced a command")
+	}
+	if m.selected != 0 {
+		t.Errorf("selected = %d, want the click below the drawn rows to change nothing", m.selected)
+	}
+}
+
+// The wheel moves whichever pane the pointer is over.
+func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(wheelDown(2, sidebarTop))
+	drain(t, cmd)
+	if m.selected != 1 {
+		t.Errorf("selected = %d, want the wheel to move the sidebar", m.selected)
+	}
+	if m.cursors[m.tab] != 0 {
+		t.Error("the wheel moved the table too")
 	}
 }
 

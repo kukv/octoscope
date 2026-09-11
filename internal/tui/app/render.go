@@ -40,15 +40,11 @@ func (m Model) activeTab() string {
 	return m.work.View()
 }
 
-// tabLabels names the tabs on offer, in display order. Without a target
-// repository the Repos tab is not offered at all. Both the tab row and the
-// mouse hit-test read this, so they cannot disagree about where a label sits.
+// tabLabels names the tabs on offer, in display order. Both the tab row and
+// the mouse hit-test read this, so they cannot disagree about where a label
+// sits.
 func (m Model) tabLabels() []string {
-	labels := []string{"1 " + i18n.T("tab.work")}
-	if m.opts.HasRepo {
-		labels = append(labels, "2 "+i18n.T("tab.repos"))
-	}
-	return labels
+	return []string{"1 " + i18n.T("tab.work"), "2 " + i18n.T("tab.repos")}
 }
 
 // tabRow labels each tab with the key that reaches it, and reports on the

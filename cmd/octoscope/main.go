@@ -61,7 +61,8 @@ func main() {
 	client := cli.New(dir, *repoFlag)
 	uc := usecase.New(client)
 	p := tea.NewProgram(app.New(uc, app.Options{
-		HasRepo:      *repoFlag != "",
+		Repo:         *repoFlag,
+		Repositories: cfg.Repositories,
 		DefaultRepos: cfg.WantsRepos(),
 		ConfigError:  configErr,
 	}))

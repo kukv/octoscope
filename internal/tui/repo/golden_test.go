@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -71,9 +70,16 @@ func goldenIssues() []gh.Issue {
 }
 
 func goldenModel(width int) Model {
-	m := loadedModel(&fakeSource{prs: goldenPRs(), issues: goldenIssues()})
-	m, _ = m.Update(repoNameMsg("kukv/octoscope"))
-	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	f := &fakeSource{prs: goldenPRs(), issues: goldenIssues()}
+	m := sized(New(f, Options{
+		Repositories: []string{"kukv/octoscope", "kukv/koto"},
+		Current:      "kukv/octoscope",
+	}), width)
+	m, _ = m.Update(prListMsg{prs: f.prs})
+	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
+		{Repo: "kukv/koto", Unavailable: true},
+	}))
 	m.fetchedAt = [2]time.Time{goldenFetchedAt, goldenFetchedAt}
 	return m
 }
@@ -92,6 +98,9 @@ func TestGolden(t *testing.T) {
 
 				golden.Assert(t, fmt.Sprintf("repo_prs_%s_%d", lang.name, w), prs.View())
 				golden.Assert(t, fmt.Sprintf("repo_issues_%s_%d", lang.name, w), issues.View())
+
+				empty := sized(New(&fakeSource{}, Options{}), w)
+				golden.Assert(t, fmt.Sprintf("repo_empty_%s_%d", lang.name, w), empty.View())
 			})
 		}
 	}

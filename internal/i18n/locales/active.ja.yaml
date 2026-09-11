@@ -26,7 +26,7 @@ tab:
   repos:
     other: "Repos"
   repo_lookup_timeout:
-    other: "リポジトリの判定がタイムアウトしました"
+    other: "現在のリポジトリを特定できませんでした"
   config_unreadable:
     other: "設定を読めません（既定値で動作）"
 
@@ -39,6 +39,12 @@ list:
     other: "オープンなプルリクエストはありません"
   no_open_issues:
     other: "オープンな Issue はありません"
+
+repos:
+  sidebar:
+    other: "リポジトリ"
+  none:
+    other: "リポジトリがまだありません"
 
 detail:
   pr_title:
@@ -159,8 +165,27 @@ submit:
     other: "未提出のレビューとそのコメントをすべて破棄しますか?"
 
 footer:
+  # list のキーバーはこの並びから組み立てる。重要なものから先に並べ、端末幅が
+  # 足りないときは末尾から落とす（internal/tui/layout.FitKeyBar）。
   list:
-    other: "j/k:移動  enter:詳細  tab:PR/Issue  r:更新  o:Web  d:diff  s:checks  q:終了"
+    move:
+      other: "j/k:移動"
+    open:
+      other: "enter:詳細"
+    pane:
+      other: "h/l:ペイン"
+    kind:
+      other: "tab:PR/Issue"
+    refresh:
+      other: "r:更新"
+    diff:
+      other: "d:diff"
+    checks:
+      other: "s:checks"
+    web:
+      other: "o:Web"
+    quit:
+      other: "q:終了"
   close:
     other: "x:クローズ"
   reopen:
