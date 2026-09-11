@@ -40,6 +40,8 @@ gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D
 （`is:open assignee:@me`）。**4 列を 1 リクエストにまとめていた頃の `work.json`
 の置き換え**で、文書が 1 列ぶんの `results` だけを返すようになったため録り直した。
 
+2026-09-11 に `state` を選ぶようになったのに合わせて録り直した。
+
 assigned 列を選んだのは、この列だけが PR と Issue の両方を返すため。PR しか
 返さない列を録ると `toWorkItem` の Issue 側の分岐を一度も通さないテストになる。
 

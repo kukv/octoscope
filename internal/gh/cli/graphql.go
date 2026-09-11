@@ -34,6 +34,7 @@ type searchNode struct {
 	Typename       string    `json:"__typename"`
 	Number         int       `json:"number"`
 	Title          string    `json:"title"`
+	State          string    `json:"state"`
 	URL            string    `json:"url"`
 	IsDraft        bool      `json:"isDraft"`
 	BodyText       string    `json:"bodyText"`
@@ -119,6 +120,7 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 			Number: n.Number,
 		},
 		Title:     n.Title,
+		State:     gh.ParseItemState(n.State),
 		Body:      n.BodyText,
 		Author:    n.Author.Login,
 		Labels:    n.Labels.Nodes,

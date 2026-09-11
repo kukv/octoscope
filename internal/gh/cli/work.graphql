@@ -18,6 +18,7 @@ fragment WorkItem on SearchResultItem {
   ... on PullRequest {
     number
     title
+    state
     url
     isDraft
     updatedAt
@@ -53,6 +54,7 @@ fragment WorkItem on SearchResultItem {
   ... on Issue {
     number
     title
+    state
     url
     updatedAt
     bodyText

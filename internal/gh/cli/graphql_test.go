@@ -457,10 +457,73 @@ func TestListWorkSectionParsesARecordedResponse(t *testing.T) {
 		if item.URL == "" {
 			t.Errorf("%q has no url", item.Title)
 		}
+		// The recording is is:open assignee:@me, so anything else means the
+		// fixture predates the state field and was not re-recorded.
+		if item.State != gh.StateOpen {
+			t.Errorf("%q came back %v; re-record work_section.json", item.Title, item.State)
+		}
 	}
 	// The assigned column is the one recorded because it mixes the two
 	// shapes: a recording of pull requests alone never runs the Issue branch.
 	if !kinds[gh.ItemPR] || !kinds[gh.ItemIssue] {
 		t.Errorf("the recording holds only %v; it must exercise both branches", kinds)
 	}
+}
+
+// The Work board is always is:open, but the same document answers the Search
+// tab, whose results carry closed and merged items.
+func TestTheSearchDocumentSelectsTheState(t *testing.T) {
+	t.Parallel()
+
+	prBlock, issueBlock := onTypeBlocks(t, workQuery)
+	if !strings.Contains(prBlock, "state") {
+		t.Errorf("the PullRequest selection does not ask for state:\n%s", prBlock)
+	}
+	if !strings.Contains(issueBlock, "state") {
+		t.Errorf("the Issue selection does not ask for state:\n%s", issueBlock)
+	}
+}
+
+func TestAMergedPullRequestComesBackMerged(t *testing.T) {
+	t.Parallel()
+
+	const merged = `{"data":{"results":{"nodes":[
+	  {"__typename":"PullRequest","number":9,"title":"merged one","state":"MERGED",
+	   "url":"https://github.com/kukv/octoscope/pull/9",
+	   "updatedAt":"2026-09-06T12:00:00Z","author":{"login":"kukv"},
+	   "repository":{"nameWithOwner":"kukv/octoscope"}}
+	]}}}`
+
+	c, _ := newTestClient(merged, nil)
+	items, err := c.ListWorkSection(t.Context(), gh.SectionAssigned)
+	if err != nil {
+		t.Fatalf("ListWorkSection: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("got %d items, want 1", len(items))
+	}
+	if items[0].State != gh.StateMerged {
+		t.Errorf("State = %v, want StateMerged", items[0].State)
+	}
+}
+
+// onTypeBlocks cuts the document into what it selects for a pull request and
+// what it selects for an issue. Searching the whole document for "state"
+// would pass while only one of the two branches asked for it.
+func onTypeBlocks(t *testing.T, doc string) (pr, issue string) {
+	t.Helper()
+
+	prAt := strings.Index(doc, "... on PullRequest")
+	issueAt := strings.Index(doc, "... on Issue")
+	if prAt < 0 || issueAt < 0 || prAt > issueAt {
+		t.Fatalf("the document does not hold a PullRequest block before an Issue block:\n%s", doc)
+	}
+	// The fragments below the query select a field called "state" of their
+	// own (StatusContext). An Issue block that ran to the end of the
+	// document would find it and pass whatever the Issue itself selects.
+	end := strings.Index(doc[issueAt:], "\nfragment ")
+	if end < 0 {
+		t.Fatalf("the document has no fragment after the Issue block:\n%s", doc)
+	}
+	return doc[prAt:issueAt], doc[issueAt : issueAt+end]
 }
