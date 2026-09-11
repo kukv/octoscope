@@ -20,6 +20,20 @@ var ErrTransient = errors.New("GitHub did not answer")
 // ErrUnauthenticated is returned when gh has no usable credentials.
 var ErrUnauthenticated = errors.New("not authenticated; run: gh auth login")
 
+// SplitRepo reports whether repo has the shape "owner/name": both halves
+// non-empty, no second "/", and no leading or trailing whitespace that a
+// hand-edited settings file could carry in unnoticed.
+func SplitRepo(repo string) (owner, name string, ok bool) {
+	if repo != strings.TrimSpace(repo) {
+		return "", "", false
+	}
+	owner, name, ok = strings.Cut(repo, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return "", "", false
+	}
+	return owner, name, true
+}
+
 type Author struct {
 	Login string `json:"login"`
 }
@@ -251,6 +265,13 @@ type RepoCount struct {
 	Repo        string
 	PRs, Issues int
 	Unavailable bool
+}
+
+// RepoCandidate is one row of the add dialog's suggestions.
+type RepoCandidate struct {
+	Name    string
+	Stars   int
+	Private bool
 }
 
 // classified is what gh said, kept apart from the sentinel that names what

@@ -27,6 +27,8 @@ notice:
     other: "Could not fetch"
   open_failed:
     other: "Could not open"
+  save_failed:
+    other: "Could not save the repository list"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same
@@ -55,6 +57,26 @@ repos:
     other: "Repositories"
   none:
     other: "No repositories yet"
+  add_button:
+    other: "+ Add a repository"
+  seed_hint:
+    other: "Press g to pick from the repositories you already have"
+
+dialog:
+  add_repo_title:
+    other: "Add a repository"
+  add_repo_hint:
+    other: "Type owner/name, or pick one of the suggestions"
+  searching:
+    other: "searching..."
+  no_candidates:
+    other: "(no matches)"
+  # What follows these is the name the user typed, which octoscope does not
+  # translate (.claude/rules/errors.md).
+  invalid_name:
+    other: "Not an owner/name: "
+  already_listed:
+    other: "Already in the list: "
 
 detail:
   pr_title:
@@ -194,6 +216,12 @@ footer:
       other: "tab:PR/Issue"
     refresh:
       other: "r:refresh"
+    add:
+      other: "a:add"
+    remove:
+      other: "x:remove"
+    seed:
+      other: "g:import"
     diff:
       other: "d:diff"
     checks:
@@ -206,6 +234,13 @@ footer:
     other: "x:close"
   reopen:
     other: "x:reopen"
+  dialog:
+    close:
+      other: "esc:close"
+    add:
+      other: "enter:add"
+    candidates:
+      other: "tab:suggestions"
   picker:
     other: "space:toggle  enter:apply  esc:cancel"
   compose:

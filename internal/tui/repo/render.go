@@ -35,6 +35,10 @@ func (m Model) View() string {
 	if m.width <= 0 {
 		return ""
 	}
+	if m.mode == modeAdd {
+		return m.dlg.View() + "\n" +
+			theme.Dim().Render(layout.FitKeyBar(addDialogHints(), m.width))
+	}
 	lines := append(m.header(), m.body()...)
 	if m.itemCount() > 0 && !m.loading[m.tab] {
 		lines = append(lines, m.summary()...)
@@ -77,9 +81,23 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.list.kind"),
 		i18n.T("footer.list.quit"),
 		i18n.T("footer.list.refresh"),
+		i18n.T("footer.list.add"),
+		i18n.T("footer.list.remove"),
+		i18n.T("footer.list.seed"),
 		i18n.T("footer.list.diff"),
 		i18n.T("footer.list.checks"),
 		i18n.T("footer.list.web"),
+	}
+}
+
+// addDialogHints is the dialog's key bar, most important first. esc leads
+// because FitKeyBar never drops the first hint: it is the only way out of
+// the popup.
+func addDialogHints() []string {
+	return []string{
+		i18n.T("footer.dialog.close"),
+		i18n.T("footer.dialog.add"),
+		i18n.T("footer.dialog.candidates"),
 	}
 }
 
@@ -124,11 +142,21 @@ func (m Model) body() []string {
 		if !m.loaded[m.tab] && m.notice[m.tab].kind == noticeFetch && m.notice[m.tab].text != "" {
 			return []string{theme.Error().Render(clip(i18n.T("notice.fetch_failed"), m.bodyWidth()))}
 		}
+		// An empty list is not an answer until the lookup that names the
+		// working directory's repository has given one: see
+		// Model.currentSettled.
+		if len(m.rows) == 0 && !m.currentSettled {
+			return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
+		}
+		if len(m.rows) == 0 {
+			return []string{
+				theme.Dim().Render(clip(i18n.T("repos.none"), m.bodyWidth())),
+				"",
+				theme.Accent().Render(clip(i18n.T("repos.seed_hint"), m.bodyWidth())),
+			}
+		}
 		empty := i18n.T("list.no_open_prs")
-		switch {
-		case len(m.rows) == 0:
-			empty = i18n.T("repos.none")
-		case m.tab == tabIssues:
+		if m.tab == tabIssues {
 			empty = i18n.T("list.no_open_issues")
 		}
 		return []string{theme.Dim().Render(clip(empty, m.bodyWidth()))}

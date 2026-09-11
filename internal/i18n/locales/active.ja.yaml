@@ -27,6 +27,8 @@ notice:
     other: "取得できませんでした"
   open_failed:
     other: "開けませんでした"
+  save_failed:
+    other: "リポジトリ一覧を保存できませんでした"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same
@@ -55,6 +57,26 @@ repos:
     other: "リポジトリ"
   none:
     other: "リポジトリがまだありません"
+  add_button:
+    other: "＋ リポジトリを追加"
+  seed_hint:
+    other: "g で自分のリポジトリから選べます"
+
+dialog:
+  add_repo_title:
+    other: "リポジトリを追加"
+  add_repo_hint:
+    other: "owner/name の形式で入力。候補から選ぶこともできます"
+  searching:
+    other: "検索中..."
+  no_candidates:
+    other: "(該当なし)"
+  # これらに続くのは利用者が入力した名前で、octoscope は翻訳しない
+  # （.claude/rules/errors.md）。
+  invalid_name:
+    other: "owner/name の形式ではありません: "
+  already_listed:
+    other: "すでに一覧にあります: "
 
 detail:
   pr_title:
@@ -188,6 +210,12 @@ footer:
       other: "tab:PR/Issue"
     refresh:
       other: "r:更新"
+    add:
+      other: "a:追加"
+    remove:
+      other: "x:削除"
+    seed:
+      other: "g:取り込み"
     diff:
       other: "d:diff"
     checks:
@@ -200,6 +228,13 @@ footer:
     other: "x:クローズ"
   reopen:
     other: "x:再オープン"
+  dialog:
+    close:
+      other: "esc:閉じる"
+    add:
+      other: "enter:追加"
+    candidates:
+      other: "tab:候補へ"
   picker:
     other: "space:選択  enter:適用  esc:中止"
   compose:

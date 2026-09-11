@@ -148,6 +148,21 @@ func TestClickingASidebarRowSelectsIt(t *testing.T) {
 	}
 }
 
+// The add button is the one line of the sidebar the keyboard cursor never
+// stops on, so a click is the only way to reach it with the mouse.
+func TestClickingTheAddButtonOpensTheDialog(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	// The heading, its blank line, one line per repository, then a blank
+	// line: counted here rather than read off the model, so a hit-test that
+	// drifted from the drawing would show up.
+	y := sidebarTop + len(m.rows) + 1
+	m, _ = m.Update(click(2, y))
+	if !strings.Contains(m.View(), i18n.T("dialog.add_repo_hint")) {
+		t.Errorf("clicking the add button at y=%d opened nothing:\n%s", y, m.View())
+	}
+}
+
 // The sub-tab row starts at the sidebar's right edge, not at column zero: a
 // hit-test that forgot the offset would switch tabs on a sidebar click.
 func TestSubTabHitTestIsOffsetByTheSidebar(t *testing.T) {

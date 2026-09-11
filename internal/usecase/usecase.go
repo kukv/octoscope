@@ -53,6 +53,19 @@ type crossRepoLister interface {
 	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
 }
 
+// repoFinder is what the add dialog offers: candidates while it is typed
+// into, and the repositories a first run can be seeded from.
+type repoFinder interface {
+	SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error)
+	ListOwnRepos(ctx context.Context, owner string, limit int) ([]gh.RepoCandidate, error)
+	ListOrgs(ctx context.Context) ([]string, error)
+}
+
+// repoStore is where the sidebar's list survives a restart.
+type repoStore interface {
+	SaveRepositories(repos []string) error
+}
+
 type reviewFetcher interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
@@ -91,6 +104,7 @@ type source interface {
 	assigneeEditor
 	lister
 	crossRepoLister
+	repoFinder
 	reviewFetcher
 	reviewer
 	opener
@@ -107,6 +121,8 @@ type Usecase struct {
 	assignees  assigneeEditor
 	lists      lister
 	crossRepo  crossRepoLister
+	repos      repoFinder
+	repoStore  repoStore
 	reviewInfo reviewFetcher
 	reviews    reviewer
 	web        opener
@@ -114,8 +130,9 @@ type Usecase struct {
 	merges     merger
 }
 
-// New wires a Usecase to one backend.
-func New(src source) *Usecase {
+// New wires a Usecase to one backend and the settings file its repository
+// list is written to.
+func New(src source, store repoStore) *Usecase {
 	return &Usecase{
 		items:      src,
 		comments:   src,
@@ -124,6 +141,8 @@ func New(src source) *Usecase {
 		assignees:  src,
 		lists:      src,
 		crossRepo:  src,
+		repos:      src,
+		repoStore:  store,
 		reviewInfo: src,
 		reviews:    src,
 		web:        src,

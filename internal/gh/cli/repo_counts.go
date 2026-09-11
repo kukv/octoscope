@@ -55,7 +55,7 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 	indices := []int{}
 	for i, repo := range repos {
 		counts[i].Repo = repo
-		owner, name, ok := splitOwnerRepo(repo)
+		owner, name, ok := gh.SplitRepo(repo)
 		if !ok {
 			counts[i].Unavailable = true
 			continue
@@ -97,19 +97,4 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 		counts[i].Issues = alias.Issues.TotalCount
 	}
 	return counts, nil
-}
-
-// splitOwnerRepo reports whether repo has the shape "owner/name": both
-// halves non-empty, no second "/", and no leading or trailing whitespace
-// that a hand-edited settings file could carry in unnoticed (the config
-// loader does not trim entries).
-func splitOwnerRepo(repo string) (owner, name string, ok bool) {
-	if repo != strings.TrimSpace(repo) {
-		return "", "", false
-	}
-	owner, name, ok = strings.Cut(repo, "/")
-	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
-		return "", "", false
-	}
-	return owner, name, true
 }

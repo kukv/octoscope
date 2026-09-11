@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +30,23 @@ type scenarioSource struct {
 
 	prRepos    []string
 	issueRepos []string
+
+	found []gh.RepoCandidate
+	seed  []gh.RepoCandidate
+	saved []string
+}
+
+func (f *scenarioSource) SearchRepos(context.Context, string, int) ([]gh.RepoCandidate, error) {
+	return f.found, nil
+}
+
+func (f *scenarioSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+	return f.seed, nil
+}
+
+func (f *scenarioSource) SaveRepositories(repos []string) error {
+	f.saved = repos
+	return nil
 }
 
 func (f *scenarioSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
@@ -182,12 +200,20 @@ func run(t *testing.T, m Model, keys ...string) Model {
 
 func scenarioModel(t *testing.T, f *scenarioSource) Model {
 	t.Helper()
+	return scenarioModelWithRepos(t, f, nil)
+}
+
+// scenarioModelWithRepos starts the app with a settings file that already
+// lists repositories, which is what the sidebar needs before x has anything
+// to take away.
+func scenarioModelWithRepos(t *testing.T, f *scenarioSource, repos []string) Model {
+	t.Helper()
 	i18n.SetLanguage(language.English)
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
 	// No --repo: the repository is the working directory's, so the app starts
 	// on the board and the Repos tab appears when the lookup answers.
-	m := New(f, Options{})
+	m := New(f, Options{Repositories: repos})
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return resolve(t, next.(Model), cmd)
 }
@@ -309,5 +335,88 @@ func TestOpeningTheChecksFromTheReposTabNamesTheRepository(t *testing.T) {
 
 	if got := content(m); !strings.Contains(got, "kukv/demo #12") {
 		t.Errorf("the checks title does not name the repository:\n%s", got)
+	}
+}
+
+// The keys a user actually presses to grow the list. The repo package tests
+// the dialog itself; what this covers is that a, the letters and enter reach
+// the Repos tab through the root's key routing at all.
+func TestAddingARepositoryFromTheReposTab(t *testing.T) {
+	f := &scenarioSource{pr: scenarioPR()}
+	m := scenarioModelWithRepos(t, f, []string{"kukv/octoscope"})
+
+	m = run(t, m, "2")
+	if m.tab != tabRepos {
+		t.Fatalf("precondition: tab = %d, want the Repos tab", m.tab)
+	}
+	if strings.Contains(content(m), "a/b") {
+		t.Fatalf("precondition: a/b is listed before it was added:\n%s", content(m))
+	}
+
+	// Off the temporary row first: standing on it, a opens the dialog with
+	// that repository's name already in the field.
+	m = run(t, m, "h", "j")
+	// Short on purpose: every letter schedules a debounce tick that run waits
+	// out, and what this covers is the routing, not the name.
+	m = run(t, m, "a", "a", "/", "b", "enter")
+
+	if !slices.Contains(f.saved, "a/b") {
+		t.Errorf("saved = %v, want a/b written out", f.saved)
+	}
+	if !strings.Contains(content(m), "a/b") {
+		t.Errorf("the added repository never reached the sidebar:\n%s", content(m))
+	}
+}
+
+// q quits and 1 and 2 switch tabs, and the root acts on all three before it
+// hands a key to the tab. A repository whose name carries one of them -- and
+// q is not rare -- would quit octoscope or jump to the board mid-word.
+func TestTypingAQuitKeyIntoTheDialogTypesIt(t *testing.T) {
+	f := &scenarioSource{pr: scenarioPR()}
+	m := scenarioModelWithRepos(t, f, []string{"kukv/octoscope"})
+
+	m = run(t, m, "2", "h", "j")
+	m = press(m, "a")
+
+	for _, k := range []string{"q", "1", "/", "2"} {
+		next, cmd := m.Update(key(k))
+		if isQuit(cmd) {
+			t.Fatalf("%q quit octoscope instead of reaching the field", k)
+		}
+		m = next.(Model)
+		if m.tab != tabRepos {
+			t.Fatalf("%q left the Repos tab", k)
+		}
+	}
+
+	m = run(t, m, "enter")
+	if !slices.Contains(f.saved, "q1/2") {
+		t.Errorf("saved = %v, want the name that was typed", f.saved)
+	}
+}
+
+// The same route for x, including the pane move h that has to reach the
+// sidebar first.
+func TestRemovingARepositoryFromTheReposTab(t *testing.T) {
+	f := &scenarioSource{pr: scenarioPR()}
+	m := scenarioModelWithRepos(t, f, []string{"kukv/octoscope", "kukv/koto"})
+
+	m = run(t, m, "2")
+	if !strings.Contains(content(m), "kukv/koto") {
+		t.Fatalf("precondition: kukv/koto is not listed to begin with:\n%s", content(m))
+	}
+
+	// kukv/demo is the working directory's repository and leads the list as a
+	// temporary row, so the settings file's two are the second and third.
+	m = run(t, m, "h", "j", "j", "x")
+
+	if strings.Contains(content(m), "kukv/koto") {
+		t.Errorf("x did not remove the row:\n%s", content(m))
+	}
+	if !strings.Contains(content(m), "kukv/octoscope") {
+		t.Errorf("x took the wrong row:\n%s", content(m))
+	}
+	if !slices.Equal(f.saved, []string{"kukv/octoscope"}) {
+		t.Errorf("saved = %v, want [kukv/octoscope]", f.saved)
 	}
 }

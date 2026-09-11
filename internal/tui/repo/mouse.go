@@ -20,6 +20,9 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.sidebarCols() > 0 && msg.X < sidebarWidth {
+		if msg.Y == m.addRowY() {
+			return m.openAddDialog()
+		}
 		row, ok := m.sidebarRowAt(msg.Y)
 		if !ok {
 			return m, nil

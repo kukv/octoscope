@@ -39,7 +39,8 @@ func main() {
 
 	var cfg config.Config
 	var configErr string
-	if path, err := config.Path(); err != nil {
+	path, err := config.Path()
+	if err != nil {
 		configErr = err.Error()
 	} else if cfg, err = config.Load(path); err != nil {
 		configErr = err.Error()
@@ -59,7 +60,9 @@ func main() {
 	// not here: answering it costs a gh subprocess, and waiting for one before
 	// the first frame left the terminal blank for as long as it took.
 	client := cli.New(dir, *repoFlag)
-	uc := usecase.New(client)
+	// The store is built even when config.Path failed: it reports that
+	// failure when something is saved, rather than saving nothing in silence.
+	uc := usecase.New(client, config.NewStore(path))
 	p := tea.NewProgram(app.New(uc, app.Options{
 		Repo:         *repoFlag,
 		Repositories: cfg.Repositories,

@@ -26,6 +26,11 @@ const (
 
 	// minSidebarWidth is where the sidebar folds away (spec §4.6, design §9).
 	minSidebarWidth = 100
+
+	// addButtonHeight is the blank line and the add button under the
+	// repositories. The rows have to give up that much, or the sidebar grows
+	// past the bottom of the terminal.
+	addButtonHeight = 2
 )
 
 // sidebarCols is how much of the terminal the sidebar takes, rule included.
@@ -66,7 +71,7 @@ func (m Model) sidebarRows() int {
 	if m.height <= 0 {
 		return len(m.rows)
 	}
-	return max(m.height-sidebarTop-footerHeight, 1)
+	return max(m.height-sidebarTop-addButtonHeight-footerHeight, 1)
 }
 
 func (m Model) sidebarWindow() int {
@@ -98,7 +103,14 @@ func (m Model) sidebar() []string {
 		}
 		lines = append(lines, line)
 	}
-	return lines
+	return append(lines, "", theme.Dim().Render(pad(i18n.T("repos.add_button"), sidebarWidth)))
+}
+
+// addRowY is the line the add button is drawn on: under the repositories on
+// screen, with one blank line between. The hit-test reads this rather than
+// counting the drawn lines a second time.
+func (m Model) addRowY() int {
+	return sidebarTop + min(m.sidebarRows(), len(m.rows)) + 1
 }
 
 // joinPanes puts the sidebar beside the body, padding whichever is shorter so

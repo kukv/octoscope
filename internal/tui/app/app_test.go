@@ -49,6 +49,11 @@ type fakeSource struct {
 	prRepos      []string
 	issueRepos   []string
 	countCalls   [][]string
+
+	searchedFor []string
+	found       []gh.RepoCandidate
+	seed        []gh.RepoCandidate
+	saved       []string
 }
 
 func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
@@ -82,6 +87,20 @@ func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/de
 func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]gh.RepoCount, error) {
 	f.countCalls = append(f.countCalls, repos)
 	return nil, nil
+}
+
+func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]gh.RepoCandidate, error) {
+	f.searchedFor = append(f.searchedFor, query)
+	return f.found, nil
+}
+
+func (f *fakeSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+	return f.seed, nil
+}
+
+func (f *fakeSource) SaveRepositories(repos []string) error {
+	f.saved = repos
+	return nil
 }
 
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
@@ -238,6 +257,21 @@ func resolve(t *testing.T, m Model, cmd tea.Cmd) Model {
 // content is the rendered view with its styling stripped, so an assertion
 // about a word is not defeated by the escape codes lipgloss puts inside it.
 func content(m Model) string { return ansi.Strip(m.View().Content) }
+
+// repoResolvedMsg is the only thing that can settle whether the working
+// directory is a repository, so the root has to pass on an empty answer as
+// well as a name. Without that, an empty Repos tab says "no repositories
+// yet" for as long as the lookup takes.
+func TestTheReposTabWaitsForTheLookupBeforeCallingItEmpty(t *testing.T) {
+	m := press(newTestModel(Options{}), "2")
+	if strings.Contains(content(m), i18n.T("repos.none")) {
+		t.Errorf("the tab answered before the lookup did:\n%s", content(m))
+	}
+	next, _ := m.Update(repoResolvedMsg{})
+	if got := content(next.(Model)); !strings.Contains(got, i18n.T("repos.none")) {
+		t.Errorf("the tab never answered:\n%s", got)
+	}
+}
 
 // isQuit reports whether cmd is tea.Quit.
 func isQuit(cmd tea.Cmd) bool {

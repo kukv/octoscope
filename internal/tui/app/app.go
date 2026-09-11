@@ -260,14 +260,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
 	m.repoLookupTimedOut = msg.timedOut
+	// An empty name is passed on too, and so is a timeout: the list draws an
+	// empty sidebar differently before the lookup has answered and after,
+	// and only this message can tell it which it is looking at.
+	var cmd tea.Cmd
+	m.repo, cmd = m.repo.SetCurrent(msg.name)
 	if msg.name == "" {
-		return m, nil
+		return m, cmd
 	}
 	// The user stays where they are: the answer arrives seconds after the
 	// board is already on screen -- unless the settings file asked for the
 	// Repos tab, in which case wantRepos moves them there once.
-	var cmd tea.Cmd
-	m.repo, cmd = m.repo.SetCurrent(msg.name)
 	if m.wantRepos {
 		m.wantRepos = false
 		m.tab = tabRepos
@@ -566,6 +569,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	var cmd tea.Cmd
+
+	// A tab with a field open takes every key, the same way an overlay does.
+	// Without this, typing a repository name with a q in it would quit.
+	if m.tab == tabRepos && m.repo.Capturing() {
+		m.repo, cmd = m.repo.Update(msg)
+		return m, cmd
+	}
+
 	switch msg.String() {
 	case "q":
 		return m, m.quit()
@@ -577,7 +589,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	var cmd tea.Cmd
 	if m.tab == tabWork {
 		m.work, cmd = m.work.Update(msg)
 	} else {

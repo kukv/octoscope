@@ -159,6 +159,22 @@ linters:
               desc: review must not depend on the views that hold it
             - pkg: github.com/kukv/octoscope/internal/tui/app
               desc: a child must not import its parent
+        # dialog is a popup, not a view: repo holds it today and search will
+        # hold it too, so it must never import either.
+        tui-dialog:
+          files:
+            - "**/internal/tui/dialog/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/tui/work
+              desc: a popup must not depend on the views that hold it
+            - pkg: github.com/kukv/octoscope/internal/tui/repo
+              desc: a popup must not depend on the views that hold it
+            - pkg: github.com/kukv/octoscope/internal/tui/detail
+              desc: a popup must not depend on the views that hold it
+            - pkg: github.com/kukv/octoscope/internal/tui/diff
+              desc: a popup must not depend on the views that hold it
+            - pkg: github.com/kukv/octoscope/internal/tui/app
+              desc: a child must not import its parent
         # icon and layout sit below the views: they draw glyphs and measure
         # columns, and know nothing of the models that call them.
         tui-icon:

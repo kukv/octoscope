@@ -31,6 +31,39 @@ type fakeSource struct {
 
 	prRepos    []string // the repositories ListPRs was asked for, in call order
 	issueRepos []string
+
+	saved     []string // the list handed to SaveRepositories, most recent last
+	saveErr   error
+	searches  int
+	lastQuery string
+	found     []gh.RepoCandidate
+	searchErr error
+	seed      []gh.RepoCandidate
+	seedErr   error
+}
+
+func (f *fakeSource) SaveRepositories(repos []string) error {
+	f.saved = repos
+	return f.saveErr
+}
+
+func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]gh.RepoCandidate, error) {
+	f.searches++
+	f.lastQuery = query
+	return f.found, f.searchErr
+}
+
+func (f *fakeSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+	return f.seed, f.seedErr
+}
+
+// typeInto presses each character of s in turn, the way the dialog is
+// actually filled in.
+func typeInto(m Model, s string) Model {
+	for _, r := range s {
+		m, _ = m.Update(key(string(r)))
+	}
+	return m
 }
 
 func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
@@ -140,8 +173,11 @@ func TestEmptyPRList(t *testing.T) {
 
 // An empty settings file and no current repository is a different state from
 // a repository with no open pull requests: there is nothing to list at all.
+// It is said once the repository lookup has answered, and not before -- see
+// TestTheEmptySidebarWaitsForTheLookup.
 func TestEmptyListSaysSo(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{}), 120)
+	m, _ = m.SetCurrent("")
 	view := m.View()
 	if !strings.Contains(view, i18n.T("repos.none")) {
 		t.Errorf("an empty Repos tab says nothing:\n%s", view)
