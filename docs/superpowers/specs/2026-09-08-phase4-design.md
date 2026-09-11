@@ -27,7 +27,7 @@ Phase 4 で spec §7 のフェーズ分割は終わる。
 | サイドバーの件数を 1 リクエストで引けるか | **引ける。** `repository` を alias で並べ、各々 `pullRequests(states: OPEN) { totalCount }` / `issues(states: OPEN) { totalCount }` を選ぶ。3 リポジトリで 1 リクエスト・6.5 秒（回線込み） |
 | 一覧に消えた（または改名された）リポジトリが混ざったとき | **`data` は部分的に返り、その alias だけ `null` + `errors[].path` にその alias が入る。** ただし `gh api graphql` は**終了コード 1** を返す |
 | その場合の `gh` の標準出力 | **JSON は出ている。** 落ちるのは `runGh` が終了コード 1 で stdout を捨てる側（§4） |
-| 追加ダイアログの候補 | `gh search repos <語> --limit N --json fullName,description,isPrivate`。5 件で 1.6 秒 |
+| 追加ダイアログの候補 | `gh search repos <語> --limit N --json fullName,stargazersCount,isPrivate`。5 件で 1.35 秒（2026-09-11 に再計測）。**`description` は採らない** — モックアップの候補行はスター数を出しており、説明文は 60 桁の箱に収まらない。語は `--` の後ろに置く（先頭が `-` の語がフラグに化けるため。2026-09-11 に実測） |
 | 初回投入の材料 | `gh repo list --limit N --json nameWithOwner`（6.4 秒）と `gh api user/orgs`。Org のリポジトリは `gh repo list <org>` |
 | トークンだけで GraphQL を叩けるか | **叩ける。** `https://api.github.com/graphql` に `Authorization: bearer <token>` で POST し、`{"query": "..."}` を送ると同じ JSON が返る |
 | サイドバー相当の件数（20〜50 件）で 1 リクエストが持つか（2026-09-09） | **持つ。** `buildRepoCountsQuery` と同じ形（alias を並べて 1 リクエスト）で自分の公開リポジトリ 30 件（`gh repo list --limit 30`）分を組み、`gh api graphql` で 1 回計測。**8.13 秒、30 alias 全件解決・`errors` 無し。** 1 リクエストで足りる。30 件を超えた場合の分割・ページングは未計測 |
@@ -72,6 +72,16 @@ Phase 4 で spec §7 のフェーズ分割は終わる。
 「利用者が育てる一覧」）。
 
 一覧が空でカレントも無いときは、自分と所属 Org のリポジトリを初期投入する導線を出す。
+
+**初期投入は一覧に直接入れず、追加ダイアログの候補として出す**（2026-09-11 に実装時に
+改めた）。実測で `gh repo list --limit 100` は 45 件・6.7 秒、`gh api user/orgs` は
+6.1 秒、Org ごとにもう 1 回かかる。45 件を黙って一覧に入れると `RepoCounts` が
+45 alias の 1 リクエストになり（30 alias で 8.1 秒の実測しかなく 45 は未計測）、
+取り消す手段が `x` の 1 件ずつしか無い。候補として出せば、追加の経路は `a` と同じ 1 本で済む。
+
+**「一覧が空」と言えるのは `RepoName` の判定が返ってからである。** その判定は最長 20 秒
+（cold で 6 秒超の実測）かかるので、返る前は読み込み中として描く。返事が空でも
+`repo.Model` に伝える必要があり、`app` はそのために空の `repoResolvedMsg` も転送する。
 
 ### `internal/gh` 側の変更
 
