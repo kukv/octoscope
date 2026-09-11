@@ -206,5 +206,5 @@ Repos タブも同じ形（起動時に一覧を取り終えている）。た�
   `save(Config)` は共通化済み）
 - `default_tab` に `search` を足す。今は `config.Config.WantsRepos()` が
   `default_tab: repos` かどうかの真偽値で持っている（`internal/config/config.go:29`）
-- 生クエリの「未設定」と「空文字列」を区別しない現状（積み残し 8 番）は、
+- 生クエリの「未設定」と「空文字列」を区別しない現状（積み残し 11 番）は、
   保存クエリが生クエリを保存対象にするなら 3-3 で先に決める
