@@ -69,6 +69,78 @@ func TestListWorkSectionSendsOneSearch(t *testing.T) {
 	}
 }
 
+func TestSearchItemsSendsTheQueryItWasGiven(t *testing.T) {
+	t.Parallel()
+
+	c := New("/tmp", "")
+	var got []string
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return []byte(emptyColumnJSON), nil
+	}
+
+	if _, err := c.SearchItems(context.Background(), "is:pr org:kukv label:renovate"); err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+
+	joined := strings.Join(got, " ")
+	if !strings.Contains(joined, "search=is:pr org:kukv label:renovate") {
+		t.Errorf("the query never reached gh:\n%s", joined)
+	}
+	// The query travels as a variable. A query that became part of the
+	// document could not hold a quote or a brace.
+	if strings.Contains(joined, `search(type: ISSUE, first: 50, query: "is:pr`) {
+		t.Errorf("the query was pasted into the document:\n%s", joined)
+	}
+}
+
+// A query the user typed can be one GitHub rejects. What it said is the only
+// thing that tells them how to fix it, so it must not be swallowed.
+func TestSearchItemsReportsWhatGitHubSaidAboutABadQuery(t *testing.T) {
+	t.Parallel()
+
+	const rejected = `{"data":null,"errors":[{"message":"Invalid search query"}]}`
+	c, _ := newTestClient(rejected, errors.New(`gh api: {"message":"Invalid search query"}`))
+
+	_, err := c.SearchItems(t.Context(), "is:nonsense")
+	if err == nil {
+		t.Fatal("SearchItems succeeded on a query GitHub rejected")
+	}
+	if !strings.Contains(err.Error(), "Invalid search query") {
+		t.Errorf("err = %v, want it to carry what GitHub said", err)
+	}
+	// The Search tab shows this on its notice line. A fatal error would
+	// replace the whole screen over one mistyped query.
+	if gh.IsFatal(err) {
+		t.Errorf("err = %v, want it not to be fatal", err)
+	}
+}
+
+func TestSearchItemsParsesARecordedSearch(t *testing.T) {
+	t.Parallel()
+
+	c, _ := newTestClient(readTestdata(t, "search_items.json"), nil)
+	items, err := c.SearchItems(t.Context(), "repo:kukv/octoscope")
+	if err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+	if len(items) == 0 {
+		t.Fatal("no items parsed out of the recording")
+	}
+	states := map[gh.ItemState]bool{}
+	for _, item := range items {
+		states[item.State] = true
+		if item.Ref.Repo == "" {
+			t.Errorf("%q has no repo; the row cannot be opened", item.Title)
+		}
+	}
+	// The recording was taken with no state qualifier, so it holds more than
+	// open ones. A recording that lost that would stop testing the state.
+	if len(states) < 2 {
+		t.Errorf("the recording holds only %v; re-record it over open and closed items", states)
+	}
+}
+
 // TestEverySectionHasItsOwnSearch pins what each column of the board means.
 // The search string is not an implementation detail the code happens to
 // build: "review requested" is defined by review-requested:@me and by
@@ -457,10 +529,73 @@ func TestListWorkSectionParsesARecordedResponse(t *testing.T) {
 		if item.URL == "" {
 			t.Errorf("%q has no url", item.Title)
 		}
+		// The recording is is:open assignee:@me, so anything else means the
+		// fixture predates the state field and was not re-recorded.
+		if item.State != gh.StateOpen {
+			t.Errorf("%q came back %v; re-record work_section.json", item.Title, item.State)
+		}
 	}
 	// The assigned column is the one recorded because it mixes the two
 	// shapes: a recording of pull requests alone never runs the Issue branch.
 	if !kinds[gh.ItemPR] || !kinds[gh.ItemIssue] {
 		t.Errorf("the recording holds only %v; it must exercise both branches", kinds)
 	}
+}
+
+// The Work board is always is:open, but the same document answers the Search
+// tab, whose results carry closed and merged items.
+func TestTheSearchDocumentSelectsTheState(t *testing.T) {
+	t.Parallel()
+
+	prBlock, issueBlock := onTypeBlocks(t, workQuery)
+	if !strings.Contains(prBlock, "state") {
+		t.Errorf("the PullRequest selection does not ask for state:\n%s", prBlock)
+	}
+	if !strings.Contains(issueBlock, "state") {
+		t.Errorf("the Issue selection does not ask for state:\n%s", issueBlock)
+	}
+}
+
+func TestAMergedPullRequestComesBackMerged(t *testing.T) {
+	t.Parallel()
+
+	const merged = `{"data":{"results":{"nodes":[
+	  {"__typename":"PullRequest","number":9,"title":"merged one","state":"MERGED",
+	   "url":"https://github.com/kukv/octoscope/pull/9",
+	   "updatedAt":"2026-09-06T12:00:00Z","author":{"login":"kukv"},
+	   "repository":{"nameWithOwner":"kukv/octoscope"}}
+	]}}}`
+
+	c, _ := newTestClient(merged, nil)
+	items, err := c.ListWorkSection(t.Context(), gh.SectionAssigned)
+	if err != nil {
+		t.Fatalf("ListWorkSection: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("got %d items, want 1", len(items))
+	}
+	if items[0].State != gh.StateMerged {
+		t.Errorf("State = %v, want StateMerged", items[0].State)
+	}
+}
+
+// onTypeBlocks cuts the document into what it selects for a pull request and
+// what it selects for an issue. Searching the whole document for "state"
+// would pass while only one of the two branches asked for it.
+func onTypeBlocks(t *testing.T, doc string) (pr, issue string) {
+	t.Helper()
+
+	prAt := strings.Index(doc, "... on PullRequest")
+	issueAt := strings.Index(doc, "... on Issue")
+	if prAt < 0 || issueAt < 0 || prAt > issueAt {
+		t.Fatalf("the document does not hold a PullRequest block before an Issue block:\n%s", doc)
+	}
+	// The fragments below the query select a field called "state" of their
+	// own (StatusContext). An Issue block that ran to the end of the
+	// document would find it and pass whatever the Issue itself selects.
+	end := strings.Index(doc[issueAt:], "\nfragment ")
+	if end < 0 {
+		t.Fatalf("the document has no fragment after the Issue block:\n%s", doc)
+	}
+	return doc[prAt:issueAt], doc[issueAt : issueAt+end]
 }

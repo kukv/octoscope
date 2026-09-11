@@ -44,7 +44,7 @@ func (m Model) View() string {
 		lines = append(lines, m.summary()...)
 	}
 	if m.sidebarCols() > 0 {
-		lines = joinPanes(m.sidebar(), lines, sidebarWidth)
+		lines = layout.JoinPanes(m.sidebar(), lines, sidebarWidth)
 	}
 	lines = append(lines, "")
 	if n := m.noticeLine(); n != "" {
@@ -123,9 +123,9 @@ func (m Model) header() []string {
 		}
 	}
 	return []string{
-		clip(theme.Title().Render(name), m.bodyWidth()),
+		layout.Clip(theme.Title().Render(name), m.bodyWidth()),
 		"",
-		clip(strings.Join(labels, subTabGap), m.bodyWidth()),
+		layout.Clip(strings.Join(labels, subTabGap), m.bodyWidth()),
 		"",
 	}
 }
@@ -133,33 +133,33 @@ func (m Model) header() []string {
 // body is the table, or what stands in for it while there is nothing to draw.
 func (m Model) body() []string {
 	if m.loading[m.tab] {
-		return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
+		return []string{layout.Clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
 	}
 	if m.itemCount() == 0 {
 		// The empty-tab text would report an outage as "no open pull
 		// requests". Only a tab that has never been answered is empty in the
 		// first place: a failed refetch keeps the rows it had.
 		if !m.loaded[m.tab] && m.notice[m.tab].kind == noticeFetch && m.notice[m.tab].text != "" {
-			return []string{theme.Error().Render(clip(i18n.T("notice.fetch_failed"), m.bodyWidth()))}
+			return []string{theme.Error().Render(layout.Clip(i18n.T("notice.fetch_failed"), m.bodyWidth()))}
 		}
 		// An empty list is not an answer until the lookup that names the
 		// working directory's repository has given one: see
 		// Model.currentSettled.
 		if len(m.rows) == 0 && !m.currentSettled {
-			return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
+			return []string{layout.Clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
 		}
 		if len(m.rows) == 0 {
 			return []string{
-				theme.Dim().Render(clip(i18n.T("repos.none"), m.bodyWidth())),
+				theme.Dim().Render(layout.Clip(i18n.T("repos.none"), m.bodyWidth())),
 				"",
-				theme.Accent().Render(clip(i18n.T("repos.seed_hint"), m.bodyWidth())),
+				theme.Accent().Render(layout.Clip(i18n.T("repos.seed_hint"), m.bodyWidth())),
 			}
 		}
 		empty := i18n.T("list.no_open_prs")
 		if m.tab == tabIssues {
 			empty = i18n.T("list.no_open_issues")
 		}
-		return []string{theme.Dim().Render(clip(empty, m.bodyWidth()))}
+		return []string{theme.Dim().Render(layout.Clip(empty, m.bodyWidth()))}
 	}
 
 	rows := m.visibleRows()
@@ -213,16 +213,16 @@ func (m Model) row(i int) string {
 
 	titleWidth := max(m.bodyWidth()-stateColumn-numberColumn-checksColumn-ageColumn, 1)
 	title += badges(labels, titleWidth-ansi.StringWidth(title)-1)
-	line := pad(state, stateColumn) +
-		pad(theme.Dim().Render(number), numberColumn) +
-		pad(title, titleWidth) +
-		pad(checks, checksColumn) +
-		right(theme.Dim().Render(age), ageColumn)
+	line := layout.Pad(state, stateColumn) +
+		layout.Pad(theme.Dim().Render(number), numberColumn) +
+		layout.Pad(title, titleWidth) +
+		layout.Pad(checks, checksColumn) +
+		layout.Right(theme.Dim().Render(age), ageColumn)
 
 	if i == m.cursors[m.tab] {
-		return theme.Selected().Render(clip(line, m.bodyWidth()))
+		return theme.Selected().Render(layout.Clip(line, m.bodyWidth()))
 	}
-	return clip(line, m.bodyWidth())
+	return layout.Clip(line, m.bodyWidth())
 }
 
 // summary is the block under the table: what the selected item changes, and
@@ -231,7 +231,7 @@ func (m Model) summary() []string {
 	lines := []string{theme.Rule().Render(strings.Repeat("─", m.bodyWidth()))}
 	if m.tab == tabIssues {
 		issue := m.issues[m.cursors[tabIssues]]
-		return fill(append(lines, clip(theme.Dim().Render(
+		return fill(append(lines, layout.Clip(theme.Dim().Render(
 			fmt.Sprintf("@%s · %s", issue.Author.Login, i18n.DateTime(issue.UpdatedAt))),
 			m.bodyWidth())), summaryHeight)
 	}
@@ -246,19 +246,19 @@ func (m Model) summary() []string {
 		parts = append(parts, theme.Added().Render(fmt.Sprintf("+%d", pr.Additions))+
 			" "+theme.Removed().Render(fmt.Sprintf("−%d", pr.Deletions)))
 	}
-	lines = append(lines, clip(strings.Join(parts, theme.Dim().Render(" · ")), m.bodyWidth()))
+	lines = append(lines, layout.Clip(strings.Join(parts, theme.Dim().Render(" · ")), m.bodyWidth()))
 
 	// The rest of the block lists the checks by name: the bar on the row says
 	// how many passed, but not which.
 	if pr.Checks.Total == 0 {
 		return fill(append(lines,
-			theme.Dim().Render(clip(i18n.T("work.no_checks"), m.bodyWidth()))), summaryHeight)
+			theme.Dim().Render(layout.Clip(i18n.T("work.no_checks"), m.bodyWidth()))), summaryHeight)
 	}
 	for _, run := range pr.Checks.Runs {
 		if len(lines) >= summaryHeight {
 			break
 		}
-		lines = append(lines, clip(
+		lines = append(lines, layout.Clip(
 			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, m.bodyWidth()))
 	}
 	return fill(lines, summaryHeight)
@@ -304,21 +304,4 @@ func fill(lines []string, n int) []string {
 		lines = append(lines, "")
 	}
 	return lines[:n]
-}
-
-// clip cuts s to w display columns. Japanese takes two columns per character,
-// so the count is never a byte or a rune count.
-func clip(s string, w int) string { return ansi.Truncate(s, w, "…") }
-
-// pad clips s to one column short of w and pads it out, so two fields never
-// run into each other.
-func pad(s string, w int) string {
-	s = clip(s, max(w-1, 0))
-	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
-}
-
-// right pads s on the left instead, so a column of ages ends flush.
-func right(s string, w int) string {
-	s = clip(s, w)
-	return strings.Repeat(" ", max(w-ansi.StringWidth(s), 0)) + s
 }

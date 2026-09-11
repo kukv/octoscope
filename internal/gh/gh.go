@@ -217,8 +217,11 @@ type WorkItem struct {
 	Body    string
 	Author  string
 	IsDraft bool
-	Labels  []Label
-	Review  ReviewState
+	// State is open, closed or merged. The Work board's own searches are
+	// all is:open; a search the user wrote is not.
+	State  ItemState
+	Labels []Label
+	Review ReviewState
 	// Head and Base are the branches a pull request moves between, and
 	// Additions and Deletions the size of the change. All four are empty for
 	// an issue.

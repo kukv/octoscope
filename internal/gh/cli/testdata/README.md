@@ -40,6 +40,8 @@ gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D
 （`is:open assignee:@me`）。**4 列を 1 リクエストにまとめていた頃の `work.json`
 の置き換え**で、文書が 1 列ぶんの `results` だけを返すようになったため録り直した。
 
+2026-09-11 に `state` を選ぶようになったのに合わせて録り直した。
+
 assigned 列を選んだのは、この列だけが PR と Issue の両方を返すため。PR しか
 返さない列を録ると `toWorkItem` の Issue 側の分岐を一度も通さないテストになる。
 
@@ -263,6 +265,20 @@ gh repo list --limit 100 --json nameWithOwner,isPrivate \
 `ListOrgs` の録画は置いていない。所属 Org 名そのものが伏せる対象であり、
 `--jq '[.[].login]'` が返すのは文字列の配列だけなので、テストはその形の
 リテラルを `c.run` から返せば足りる。
+
+## `search_items.json`
+
+`work.graphql` を利用者のクエリで叩いた実レスポンス。録った日: 2026-09-12、
+対象: `repo:kukv/octoscope`。`is:pr sort:updated-desc` を付けた版は録り直した
+時点で `kukv/octoscope` に開いている PR が 1 つも無く CLOSED / MERGED しか
+入らなかったため、絞り込みを外して録っている（open な Issue が 1 件（#50）
+残っており、これで OPEN / CLOSED / MERGED の 3 状態が揃う。内訳は
+OPEN 1 件 / CLOSED 4 件 / MERGED 45 件）。
+
+```bash
+gh api graphql -F query=@internal/gh/cli/work.graphql \
+  -f search='repo:kukv/octoscope' | jq . > internal/gh/cli/testdata/search_items.json
+```
 
 ## `sample.diff`
 

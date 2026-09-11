@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/x/ansi"
-
 	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -51,7 +50,7 @@ func (m Model) candidateLines() string {
 	b.WriteString("\n")
 	nameWidth := max(m.contentWidth()-starColumn, 1)
 	for i, c := range m.candidates {
-		line := padTo(c.Name, nameWidth) + rightTo(theme.Dim().Render(stars(c.Stars)), starColumn)
+		line := layout.Pad(c.Name, nameWidth) + layout.Right(theme.Dim().Render(stars(c.Stars)), starColumn)
 		if i == m.cursor {
 			line = theme.Selected().Render(line)
 		}
@@ -82,16 +81,4 @@ func (m Model) boxWidth() int {
 // this makes lipgloss wrap it, which splits a suggestion across two rows.
 func (m Model) contentWidth() int {
 	return max(m.boxWidth()-borderCols-padCols, 1)
-}
-
-// padTo and rightTo count display columns, not bytes: a name in Japanese
-// takes two columns per character.
-func padTo(s string, w int) string {
-	s = ansi.Truncate(s, max(w-1, 0), "…")
-	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
-}
-
-func rightTo(s string, w int) string {
-	s = ansi.Truncate(s, w, "…")
-	return strings.Repeat(" ", max(w-ansi.StringWidth(s), 0)) + s
 }
