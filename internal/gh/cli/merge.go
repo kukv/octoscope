@@ -45,7 +45,7 @@ func (c *Client) PRMergeContext(ctx context.Context, repo string, number int) (g
 	}
 	args := append([]string{"api", "graphql", "-f", "query=" + mergeContextQuery}, repoFields...)
 	args = append(args, "-F", "number="+strconv.Itoa(number))
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return gh.MergeContext{}, err
 	}

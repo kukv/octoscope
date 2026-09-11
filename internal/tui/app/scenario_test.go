@@ -31,15 +31,16 @@ type scenarioSource struct {
 	issueRepos []string
 }
 
-func (f *scenarioSource) ListWork(context.Context) (gh.Work, error) {
-	var w gh.Work
-	w[gh.SectionReviewRequested] = []gh.WorkItem{{
+func (f *scenarioSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+	if s != gh.SectionReviewRequested {
+		return nil, nil
+	}
+	return []gh.WorkItem{{
 		Ref:       gh.ItemRef{Kind: gh.ItemPR, Number: f.pr.Number},
 		Title:     f.pr.Title,
 		Author:    f.pr.Author.Login,
 		UpdatedAt: f.pr.UpdatedAt,
-	}}
-	return w, nil
+	}}, nil
 }
 
 func (f *scenarioSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {

@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
@@ -55,6 +57,25 @@ func (c *Client) effectiveRepo(repo string) string {
 	return c.repo
 }
 
+// classify names the failures a caller acts on differently: one worth
+// asking again for, and one only the user can fix. Everything else keeps
+// the text gh printed and no type at all.
+func classify(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	for _, status := range []string{"HTTP 502", "HTTP 503", "HTTP 504"} {
+		if strings.Contains(msg, status) {
+			return gh.Classify(gh.ErrTransient, msg)
+		}
+	}
+	if strings.Contains(msg, "Bad credentials") || strings.Contains(msg, "gh auth login") {
+		return gh.Classify(gh.ErrUnauthenticated, msg)
+	}
+	return err
+}
+
 func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return nil, gh.ErrGhNotFound
@@ -68,11 +89,22 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		if msg := bytes.TrimSpace(stderr.Bytes()); len(msg) > 0 {
-			return stdout.Bytes(), fmt.Errorf("gh %s: %s", args[0], msg)
+			return stdout.Bytes(), classify(fmt.Errorf("gh %s: %s", args[0], msg))
 		}
-		return stdout.Bytes(), fmt.Errorf("gh %s: %w", args[0], err)
+		return stdout.Bytes(), classify(fmt.Errorf("gh %s: %w", args[0], err))
 	}
 	return stdout.Bytes(), nil
+}
+
+// read runs a gh call that only reads, asking again once when GitHub's front
+// end did not answer. Only reads take this path: a 502 says no answer came
+// back, not that nothing arrived, so a repeated write could apply twice.
+func (c *Client) read(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	out, err := c.run(ctx, dir, args...)
+	if err == nil || ctx.Err() != nil || !errors.Is(err, gh.ErrTransient) {
+		return out, err
+	}
+	return c.run(ctx, dir, args...)
 }
 
 func appendRepo(args []string, repo string) []string {
@@ -84,7 +116,7 @@ func appendRepo(args []string, repo string) []string {
 
 func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
 	args := appendRepo([]string{"pr", "list", "--json", prListFields, "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +129,7 @@ func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
 
 func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
 	args := appendRepo([]string{"issue", "list", "--json", issueListFields, "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +142,7 @@ func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error
 
 func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, error) {
 	args := appendRepo([]string{"pr", "view", strconv.Itoa(number), "--json", prViewFields}, c.effectiveRepo(repo))
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return gh.PR{}, err
 	}
@@ -123,7 +155,7 @@ func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, err
 
 func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error) {
 	args := appendRepo([]string{"issue", "view", strconv.Itoa(number), "--json", issueViewFields}, c.effectiveRepo(repo))
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return gh.Issue{}, err
 	}
@@ -140,7 +172,7 @@ func (c *Client) RepoName(ctx context.Context) (string, error) {
 		args = append(args, c.repo)
 	}
 	args = append(args, "--json", "nameWithOwner")
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return "", err
 	}
@@ -194,7 +226,7 @@ func (c *Client) ReopenIssue(repo string, number int) error {
 
 func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
 	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +249,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	if r := c.effectiveRepo(repo); r != "" {
 		path = "repos/" + r + "/assignees?per_page=100"
 	}
-	out, err := c.run(ctx, c.dir, "api", path)
+	out, err := c.read(ctx, c.dir, "api", path)
 	if err != nil {
 		return nil, err
 	}

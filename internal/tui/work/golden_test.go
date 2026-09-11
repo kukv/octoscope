@@ -41,8 +41,10 @@ func goldenModel(width int) Model { return goldenBoard(overlongWork(), width, 40
 func goldenBoard(w gh.Work, width, height int) Model {
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
-	m, _ = m.Update(workMsg(w))
-	m.fetchedAt = goldenFetchedAt
+	m = answeredAll(m, w)
+	for _, s := range gh.WorkSections() {
+		m.fetchedAt[s] = goldenFetchedAt
+	}
 	return m
 }
 
@@ -114,6 +116,92 @@ func TestGoldenIconSets(t *testing.T) {
 			t.Cleanup(func() { icon.Use(icon.Unicode) })
 			golden.Assert(t, "work_icons_"+name, goldenModel(120).View())
 		})
+	}
+}
+
+// TestGoldenAPartiallyFilledBoard records the state the board spends its
+// first seconds in: one column has answered and the other three are still
+// waiting on requests of their own. 120 columns is the narrowest width that
+// still shows all four, which is the point of the recording.
+func TestGoldenAPartiallyFilledBoard(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		t.Run(lang.name, func(t *testing.T) {
+			i18n.SetLanguage(lang.tag)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+			m := New(&fakeSource{work: overlongWork()})
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+			m, _ = m.Refresh()
+			t.Cleanup(m.Cancel)
+
+			m, _ = m.Update(workMsg{
+				section: gh.SectionReviewRequested,
+				items:   overlongWork()[gh.SectionReviewRequested],
+			})
+			m.fetchedAt[gh.SectionReviewRequested] = goldenFetchedAt
+			golden.Assert(t, "work_partial_"+lang.name+"_120", m.View())
+		})
+	}
+}
+
+// goldenFailure is what the user is actually shown when GitHub's front end
+// will not answer: the notice carries the classified error, so a recording
+// built from a plain errors.New would not be the line they see. It is
+// long on purpose: the notice has to survive a narrow terminal.
+const goldenFailure = "gh api: HTTP 502: Bad gateway (https://api.github.com/graphql)"
+
+// failedBoard is a board whose second column GitHub would not answer. The
+// other three carry their cards, which is the point: the failure costs one
+// column, not the screen.
+func failedBoard(width, height int) Model {
+	m := New(&fakeSource{work: overlongWork()})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	for _, s := range gh.WorkSections() {
+		if s == gh.SectionYourPRs {
+			continue
+		}
+		m, _ = m.Update(workMsg{section: s, items: overlongWork()[s]})
+		m.fetchedAt[s] = goldenFetchedAt
+	}
+	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: gh.Classify(gh.ErrTransient, goldenFailure)})
+	return m
+}
+
+// TestGoldenAFailedColumn records the board the user is left with after one
+// column's fetch failed: the notice above the key bar, and the column itself
+// saying it is not empty but unanswered.
+func TestGoldenAFailedColumn(t *testing.T) {
+	for _, lang := range goldenLanguages {
+		for _, w := range goldenWidths {
+			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
+				i18n.SetLanguage(lang.tag)
+				t.Cleanup(func() { i18n.SetLanguage(language.English) })
+				golden.Assert(t, fmt.Sprintf("work_failed_%s_%d", lang.name, w),
+					failedBoard(w, 40).View())
+			})
+		}
+	}
+}
+
+// The notice takes a line, and it has to come out of the board rather than
+// out of the terminal: without that the key bar is pushed off the bottom on
+// the day something fails.
+func TestAFailedBoardStillFitsTheTerminal(t *testing.T) {
+	const height = 24
+	m := New(&fakeSource{work: tallWork()})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
+	m = answeredAll(m, tallWork())
+	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: gh.Classify(gh.ErrTransient, goldenFailure)})
+
+	out := m.View()
+	if got := len(strings.Split(out, "\n")); got > height {
+		t.Errorf("the board drew %d lines into a terminal %d high", got, height)
+	}
+	if !strings.Contains(ansi.Strip(out), ansi.Strip(m.keyBar())) {
+		t.Errorf("the key bar was pushed off the screen:\n%s", ansi.Strip(out))
+	}
+	if !strings.Contains(ansi.Strip(out), goldenFailure) {
+		t.Errorf("the notice is not on screen:\n%s", ansi.Strip(out))
 	}
 }
 

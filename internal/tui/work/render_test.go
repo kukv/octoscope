@@ -32,7 +32,7 @@ func overlongWork() gh.Work {
 func overlong() Model {
 	m := New(&fakeSource{work: overlongWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = m.Update(workMsg(overlongWork()))
+	m = answeredAll(m, overlongWork())
 	return press(press(m, "j"), "j")
 }
 
@@ -166,13 +166,19 @@ func TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
 	}
 }
 
+// boardClock is when boardOf's columns answered. The cards show relative
+// times, so a test that reads one needs a fixed clock rather than the wall.
+var boardClock = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
+
 // boardOf is a loaded board at one width, for the tests that ask a single
 // piece of the drawing what it produced.
 func boardOf(width int) Model {
 	m := New(&fakeSource{work: sampleWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-	m, _ = m.Update(workMsg(sampleWork()))
-	m.fetchedAt = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
+	m = answeredAll(m, sampleWork())
+	for _, s := range gh.WorkSections() {
+		m.fetchedAt[s] = boardClock
+	}
 	return m
 }
 
@@ -183,7 +189,7 @@ func TestABoxedCardIsFourLines(t *testing.T) {
 	m := boardOf(160)
 	it := sampleWork()[gh.SectionReviewRequested][0] // a PR with failing checks
 
-	lines := m.card(it, w, false)
+	lines := m.card(it, boardClock, w, false)
 	if len(lines) != m.cardHeight() || len(lines) != 4 {
 		t.Fatalf("a boxed card is %d lines, want 4:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
@@ -209,7 +215,7 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 	m := boardOf(80)
 	it := sampleWork()[gh.SectionReviewRequested][0]
 
-	lines := m.card(it, w, false)
+	lines := m.card(it, boardClock, w, false)
 	if len(lines) != m.cardHeight() || len(lines) != 2 {
 		t.Fatalf("an unboxed card is %d lines, want 2:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
@@ -223,6 +229,35 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 	}
 }
 
+// TestACardIsDatedByItsOwnColumnsAnswer covers the clock the ages are
+// measured against: the columns answer at very different speeds, and a card
+// dated by some other column's answer would claim an age nothing on screen
+// has.
+func TestACardIsDatedByItsOwnColumnsAnswer(t *testing.T) {
+	m := New(&fakeSource{work: sampleWork()})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = answeredAll(m, sampleWork())
+	for _, s := range gh.WorkSections() {
+		m.fetchedAt[s] = boardClock
+	}
+	m.fetchedAt[gh.SectionAssigned] = boardClock.Add(48 * time.Hour)
+
+	it := sampleWork()[gh.SectionAssigned][0]
+	own := i18n.RelTime(boardClock.Add(48*time.Hour), it.UpdatedAt)
+	other := i18n.RelTime(boardClock, it.UpdatedAt)
+	if own == other {
+		t.Fatal("the two clocks produce the same age; this test covers nothing")
+	}
+
+	column := ansi.Strip(strings.Join(m.columnLines(gh.SectionAssigned, 40, 0), "\n"))
+	if !strings.Contains(column, own) {
+		t.Errorf("the card is not dated %q:\n%s", own, column)
+	}
+	if strings.Contains(column, other) {
+		t.Errorf("the card carries another column's age %q:\n%s", other, column)
+	}
+}
+
 // TestTheCardMetaNamesTheRepositoryWithoutItsOwner keeps the second line
 // readable in a column thirty wide: the owner is the same for most of them,
 // and the drawer gives the full reference anyway.
@@ -230,7 +265,7 @@ func TestTheCardMetaNamesTheRepositoryWithoutItsOwner(t *testing.T) {
 	m := boardOf(160)
 	it := sampleWork()[gh.SectionReviewRequested][0] // kukv/octoscope
 
-	meta := ansi.Strip(m.cardMeta(it, 60))
+	meta := ansi.Strip(m.cardMeta(it, boardClock, 60))
 	if !strings.Contains(meta, "octoscope") {
 		t.Errorf("the repository is missing: %q", meta)
 	}
@@ -254,18 +289,18 @@ func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
 		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 43},
 		Title: "docs", Review: gh.ReviewApproved,
 	}
-	if got := ansi.Strip(m.cardMeta(approved, 60)); !strings.Contains(got, i18n.T("review.approved")) {
+	if got := ansi.Strip(m.cardMeta(approved, boardClock, 60)); !strings.Contains(got, i18n.T("review.approved")) {
 		t.Errorf("an approved PR with no checks says nothing: %q", got)
 	}
 
 	draft := approved
 	draft.IsDraft = true
-	if got := ansi.Strip(m.cardMeta(draft, 60)); !strings.Contains(got, i18n.T("work.draft")) {
+	if got := ansi.Strip(m.cardMeta(draft, boardClock, 60)); !strings.Contains(got, i18n.T("work.draft")) {
 		t.Errorf("a draft does not say so: %q", got)
 	}
 
 	issue := gh.WorkItem{Ref: gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/koto", Number: 8}, Title: "an issue"}
-	got := ansi.Strip(m.cardMeta(issue, 60))
+	got := ansi.Strip(m.cardMeta(issue, boardClock, 60))
 	if strings.Contains(got, i18n.T("review.approved")) || strings.Contains(got, i18n.T("work.draft")) {
 		t.Errorf("an issue was given a review word: %q", got)
 	}
@@ -278,7 +313,7 @@ func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
 	m := boardOf(160)
 	it := sampleWork()[gh.SectionReviewRequested][0] // carries "bug" and "ci"
 
-	line := m.cardMeta(it, 60)
+	line := m.cardMeta(it, boardClock, 60)
 	for _, l := range it.Labels {
 		if !strings.Contains(ansi.Strip(line), l.Name) {
 			t.Errorf("the label %q is not on the card: %q", l.Name, ansi.Strip(line))
@@ -437,7 +472,7 @@ func TestEveryRowStartsItsColumnsAtTheSameOffset(t *testing.T) {
 		for _, width := range []int{80, 100, 120} {
 			m := New(&fakeSource{work: alignedWork()})
 			m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-			m, _ = m.Update(workMsg(alignedWork()))
+			m = answeredAll(m, alignedWork())
 
 			colW := m.columnWidth(m.columns())
 			for _, token := range []string{"title-%d", "repo-%d"} {

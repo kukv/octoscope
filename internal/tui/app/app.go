@@ -153,11 +153,11 @@ type Model struct {
 	errText string
 
 	// errOverlay names which overlay's fetch produced errText, when any did
-	// (errFromOverlay). A board or Repos-list failure is not tied to an
-	// overlay at all: it can arrive while an overlay sits on top of the
-	// stack (submit a review from the diff, the root refreshes the board,
-	// the board's fetch fails), and esc must then clear the error without
-	// popping a view that never failed.
+	// (errFromOverlay). A tab's failure is not tied to an overlay at all: it
+	// can arrive while an overlay sits on top of the stack (submit a review
+	// from the diff, the root refreshes the board, the board finds gh gone),
+	// and esc must then clear the error without popping a view that never
+	// failed.
 	errOverlay     overlay
 	errFromOverlay bool
 
@@ -240,9 +240,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case checks.ClosedMsg:
 		m.stack = m.pop(overlayChecks)
 		return m, nil
-	case work.ErrorMsg:
+	case work.FatalMsg:
 		return m.fail(msg.Err)
-	case repo.ErrorMsg:
+	case repo.FatalMsg:
 		return m.fail(msg.Err)
 	case detail.ErrorMsg:
 		return m.detailFailed(msg)
@@ -476,8 +476,10 @@ func (m Model) startChecks(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 }
 
 // fail moves to the error screen for a failure that is not tied to any one
-// overlay (the board, or the Repos list). esc on this error must never pop
-// the stack: whatever overlay is on top of it, if any, did not fail.
+// overlay: a tab has found that the user must act before anything can work
+// (gh.IsFatal), everything else being a line on the tab itself. esc on this
+// error must never pop the stack: whatever overlay is on top of it, if any,
+// did not fail.
 func (m Model) fail(err error) (tea.Model, tea.Cmd) {
 	m.errFromOverlay = false
 	return m.showError(err)
@@ -502,6 +504,8 @@ func (m Model) showError(err error) (tea.Model, tea.Cmd) {
 	switch {
 	case errors.Is(err, gh.ErrGhNotFound):
 		m.errText = i18n.T("error.gh_not_found")
+	case errors.Is(err, gh.ErrUnauthenticated):
+		m.errText = i18n.T("error.unauthenticated")
 	case errors.As(err, &noBrowser):
 		m.errText = i18n.Tf("error.no_browser", map[string]any{"URL": noBrowser.URL})
 	default:
@@ -532,9 +536,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, m.quit()
 			}
 			m.errText = ""
-			// Only pop when the view that failed is the one on top: a board
-			// or Repos-list failure (errFromOverlay false) never belongs to
-			// an overlay, and a stale overlay failure can arrive after
+			// Only pop when the view that failed is the one on top: a tab's
+			// failure (errFromOverlay false) never belongs to an overlay,
+			// and a stale overlay failure can arrive after
 			// another overlay was pushed on top of it. Either way the view
 			// on screen did not fail and must stay put.
 			if m.errFromOverlay {

@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
@@ -84,12 +85,34 @@ func goldenModel(width int) Model {
 	return m
 }
 
+// goldenFailure is what the user is actually shown when GitHub's front end
+// will not answer: the notice carries the classified error, so a recording
+// built from a plain errors.New would not be the line they see. It is
+// long on purpose: the notice has to survive a narrow terminal.
+const goldenFailure = "gh api: HTTP 502: Bad gateway (https://api.github.com/graphql)"
+
 func TestGolden(t *testing.T) {
 	for _, lang := range goldenLanguages {
 		for _, w := range goldenWidths {
 			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+				// The list the user is left with when a refetch fails: the
+				// rows it already had, and a line saying what GitHub said.
+				failed := goldenModel(w)
+				failed, _ = failed.Update(errMsg{gen: failed.gen, err: gh.Classify(gh.ErrTransient, goldenFailure)})
+				golden.Assert(t, fmt.Sprintf("repo_failed_%s_%d", lang.name, w), failed.View())
+
+				// The other failure that reaches the same line, which must
+				// not blame the fetch for what the browser did.
+				noBrowser := goldenModel(w)
+				noBrowser, _ = noBrowser.Update(errMsg{
+					gen:  noBrowser.gen,
+					kind: noticeOpen,
+					err:  &browser.NoneError{URL: "https://github.com/kukv/octoscope/pull/1"},
+				})
+				golden.Assert(t, fmt.Sprintf("repo_no_browser_%s_%d", lang.name, w), noBrowser.View())
 
 				prs := goldenModel(w)
 				issues, cmd := prs.Update(key("tab"))

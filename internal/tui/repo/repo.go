@@ -3,12 +3,14 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 )
 
@@ -56,8 +58,10 @@ type OpenDiffMsg struct{ Ref gh.ItemRef }
 // request.
 type OpenChecksMsg struct{ Ref gh.ItemRef }
 
-// ErrorMsg carries a failure the parent shows on its error screen.
-type ErrorMsg struct{ Err error }
+// FatalMsg carries a failure the parent shows on its error screen. Only what
+// the user has to act on travels this way; everything else stays on the list
+// as a notice (see gh.IsFatal).
+type FatalMsg struct{ Err error }
 
 type (
 	prListMsg struct {
@@ -70,10 +74,66 @@ type (
 	}
 	repoCountsMsg []gh.RepoCount
 	errMsg        struct {
-		gen int
-		err error
+		gen  int
+		tab  tabID
+		kind noticeKind
+		err  error
 	}
 )
+
+// noticeKind says which failure the line above the key bar is reporting. The
+// words in front of what the environment said differ: a browser that would
+// not start has nothing to do with fetching, and saying it could not fetch
+// would be a lie. The zero value is the fetch, which is where all but one of
+// these come from.
+type noticeKind uint8
+
+const (
+	noticeFetch noticeKind = iota
+	noticeOpen
+)
+
+// prefixID is the catalog key for the words in front of the notice. What the
+// environment said follows them untranslated (.claude/rules/errors.md).
+func (k noticeKind) prefixID() string {
+	if k == noticeOpen {
+		return "notice.open_failed"
+	}
+	return "notice.fetch_failed"
+}
+
+// answeredFetch drops the notice of a tab whose fetch has just come back. It
+// leaves an o's notice alone: no fetch answers a browser that would not
+// start, and the address in that line is the only way the user has left to
+// reach the item.
+func (m *Model) answeredFetch(t tabID) {
+	if m.notice[t].kind == noticeFetch {
+		m.notice[t] = notice{}
+	}
+}
+
+// noticeText is what the line carries after the words in front of it. A
+// machine with no browser is octoscope's own finding, said in octoscope's own
+// English, and the address is the whole of what the user can act on -- so
+// that is what the line carries. Anything else was said by something outside
+// octoscope and is shown as it was said (.claude/rules/errors.md).
+func noticeText(err error) string {
+	var noBrowser *browser.NoneError
+	if errors.As(err, &noBrowser) {
+		return noBrowser.URL
+	}
+	return err.Error()
+}
+
+// notice is what went wrong with the last fetch or the last o: the list
+// carries on with what it already has, and r asks again. text is what the
+// environment said, untranslated and so never empty while there is anything
+// to report; the words around it are chosen when the line is drawn, because
+// the language can change between two draws of the same model.
+type notice struct {
+	kind noticeKind
+	text string
+}
 
 type tabID int
 
@@ -119,6 +179,13 @@ type Model struct {
 	issues  []gh.Issue
 	loaded  [2]bool
 	loading [2]bool
+
+	// notice is the failure each tab carries on despite. It is per tab for the
+	// same reason loaded and loading are: the two tabs are fetched separately,
+	// so one answering says nothing about the other, and a single notice would
+	// both vanish while the tab it described was still broken and follow the
+	// user onto a tab that answered.
+	notice [2]notice
 
 	// gen counts how many times selectRow has run. A fetch or the errMsg it
 	// can produce carries the generation it started in; Update drops one
@@ -176,6 +243,7 @@ func (m Model) selectRow(i int) (Model, tea.Cmd) {
 	m.gen++
 	m.prs, m.issues = nil, nil
 	m.loaded, m.cursors = [2]bool{}, [2]int{}
+	m.notice = [2]notice{}
 	if len(m.rows) == 0 {
 		return m, nil
 	}
@@ -198,6 +266,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading[m.tab] = true
+	// A tab that is being asked again has no failure to report until the new
+	// request answers.
+	m.answeredFetch(m.tab)
 	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
@@ -217,13 +288,13 @@ func fetchList(src Source, t tabID, repo string, gen int) tea.Cmd {
 		if t == tabPRs {
 			prs, err := src.ListPRs(ctx, repo)
 			if err != nil {
-				return errMsg{gen: gen, err: err}
+				return errMsg{gen: gen, tab: t, err: err}
 			}
 			return prListMsg{gen: gen, prs: prs}
 		}
 		issues, err := src.ListIssues(ctx, repo)
 		if err != nil {
-			return errMsg{gen: gen, err: err}
+			return errMsg{gen: gen, tab: t, err: err}
 		}
 		return issueListMsg{gen: gen, issues: issues}
 	}
@@ -242,10 +313,10 @@ func fetchCounts(src repoCounter, repos []string) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, url string, gen int) tea.Cmd {
+func openWeb(src Source, url string, t tabID, gen int) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
-			return errMsg{gen: gen, err: err}
+			return errMsg{gen: gen, tab: t, kind: noticeOpen, err: err}
 		}
 		return nil
 	}
@@ -285,6 +356,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.prs = msg.prs
 		m.loaded[tabPRs] = true
+		m.answeredFetch(tabPRs)
 		m.fetchedAt[tabPRs] = time.Now()
 		if m.cursors[tabPRs] >= len(m.prs) {
 			m.cursors[tabPRs] = max(len(m.prs)-1, 0)
@@ -297,6 +369,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.issues = msg.issues
 		m.loaded[tabIssues] = true
+		m.answeredFetch(tabIssues)
 		m.fetchedAt[tabIssues] = time.Now()
 		if m.cursors[tabIssues] >= len(m.issues) {
 			m.cursors[tabIssues] = max(len(m.issues)-1, 0)
@@ -310,9 +383,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.gen != m.gen {
 			return m, nil
 		}
-		m.loading[m.tab] = false
-		err := msg.err
-		return m, func() tea.Msg { return ErrorMsg{err} }
+		// Only a fetch's failure ends a fetch. A browser that would not start
+		// leaves whatever is in flight in flight.
+		if msg.kind == noticeFetch {
+			m.loading[msg.tab] = false
+		}
+		if gh.IsFatal(msg.err) {
+			err := msg.err
+			return m, func() tea.Msg { return FatalMsg{err} }
+		}
+		m.notice[msg.tab] = notice{kind: msg.kind, text: noticeText(msg.err)}
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
@@ -369,7 +450,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		if url, ok := m.selectedURL(); ok {
-			return m, openWeb(m.src, url, m.gen)
+			return m, openWeb(m.src, url, m.tab, m.gen)
 		}
 		return m, nil
 	case "d":

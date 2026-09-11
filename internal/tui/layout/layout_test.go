@@ -61,3 +61,13 @@ func TestClipLinesKeepsStyling(t *testing.T) {
 		t.Errorf("the reset sequence was cut away: %q", got)
 	}
 }
+
+// The notice sits on its own line: the ja key bar already fills 80 columns.
+func TestNoticeFitsTheWidth(t *testing.T) {
+	long := "gh api: gh: " + strings.Repeat("very long GitHub message ", 20)
+	for _, w := range []int{80, 120, 160} {
+		if got := ansi.StringWidth(layout.Notice(long, w)); got > w {
+			t.Errorf("at %d columns the notice is %d wide", w, got)
+		}
+	}
+}

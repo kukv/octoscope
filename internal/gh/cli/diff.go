@@ -43,7 +43,7 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.File
 		[]string{"pr", "diff", strconv.Itoa(number), "--color", "never"},
 		c.effectiveRepo(repo),
 	)
-	out, err := c.run(ctx, c.dir, args...)
+	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		files, ferr := c.prFiles(ctx, repo, number)
 		if ferr == nil {
@@ -65,7 +65,7 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.File
 // exists for had 418. per_page=100 cuts that down to 5 requests instead of
 // 14 (ListAssignees in cli.go does the same for its own listing).
 func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
-	out, err := c.run(ctx, c.dir, "api", prFilesPath(c.effectiveRepo(repo), number), "--paginate")
+	out, err := c.read(ctx, c.dir, "api", prFilesPath(c.effectiveRepo(repo), number), "--paginate")
 	if err != nil {
 		return nil, err
 	}

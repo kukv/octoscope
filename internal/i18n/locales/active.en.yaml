@@ -17,6 +17,16 @@ error:
     other: "No browser could be started. Open this address by hand:\n{{.URL}}"
   config_unreadable:
     other: "settings file could not be read; running with defaults"
+  unauthenticated:
+    other: "Not signed in to GitHub. Run: gh auth login"
+
+# The line above the key bar for a failure the view carries on despite. What
+# GitHub said follows it untranslated (.claude/rules/errors.md).
+notice:
+  fetch_failed:
+    other: "Could not fetch"
+  open_failed:
+    other: "Could not open"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same

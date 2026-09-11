@@ -70,7 +70,7 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 
 	query := buildRepoCountsQuery(len(indices))
 	callArgs := append([]string{"api", "graphql", "-f", "query=" + query}, args...)
-	out, runErr := c.run(ctx, c.dir, callArgs...)
+	out, runErr := c.read(ctx, c.dir, callArgs...)
 	var resp repoCountsResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
 		if runErr != nil {

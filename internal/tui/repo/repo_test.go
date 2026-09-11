@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -22,6 +23,7 @@ type fakeSource struct {
 	issues   []gh.Issue
 	err      error
 	webCalls []string // the URLs handed to the browser
+	webErr   error
 
 	counts     []gh.RepoCount
 	countErr   error
@@ -43,7 +45,7 @@ func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]gh.Issue, e
 
 func (f *fakeSource) OpenWeb(url string) error {
 	f.webCalls = append(f.webCalls, url)
-	return nil
+	return f.webErr
 }
 
 func (f *fakeSource) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
@@ -237,19 +239,218 @@ func TestTabSwitchLoadsIssues(t *testing.T) {
 	}
 }
 
-func TestFetchFailureBecomesErrorMsg(t *testing.T) {
-	f := &fakeSource{err: errors.New("gh pr: no git remotes found")}
-	m := New(f, Options{})
-	_, cmd := m.Update(fetchList(f, tabPRs, "", m.gen)())
+// A failure the user can do nothing about must not cost them the list they
+// already have. It says what happened above the key bar and r asks again.
+func TestATransientFailureKeepsTheList(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := loadedModel(f)
+	m, cmd := m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	if cmd != nil {
+		if _, fatal := cmd().(FatalMsg); fatal {
+			t.Error("a transient failure reached the full-screen error")
+		}
+	}
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, samplePRs()[0].Title) {
+		t.Errorf("the list was lost:\n%s", view)
+	}
+	if !strings.Contains(view, "HTTP 502") {
+		t.Errorf("the notice does not say what GitHub said:\n%s", view)
+	}
+}
+
+// Only what the user must act on takes the whole screen.
+func TestAMissingGhIsFatal(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{}), 120)
+	_, cmd := m.Update(errMsg{gen: m.gen, err: gh.ErrGhNotFound})
 	if cmd == nil {
-		t.Fatal("cmd = nil after a failed fetch, want ErrorMsg cmd")
+		t.Fatal("a missing gh produced no message")
 	}
-	msg, ok := cmd().(ErrorMsg)
-	if !ok {
-		t.Fatalf("msg = %T, want ErrorMsg", cmd())
+	if _, fatal := cmd().(FatalMsg); !fatal {
+		t.Errorf("a missing gh produced %T, want FatalMsg", cmd())
 	}
-	if !strings.Contains(msg.Err.Error(), "no git remotes found") {
-		t.Errorf("Err = %v, want the source's error", msg.Err)
+}
+
+// A complaint that outlives what it described is a lie.
+func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
+	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	if strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
+		t.Errorf("the notice outlived the failure:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// A machine with no browser is not a reason to lose the list: o is one key
+// out of nine, and the address it could not open is in the notice.
+func TestAFailureToOpenTheBrowserIsNotFatal(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), webErr: &browser.NoneError{URL: samplePRs()[0].URL}}
+	m := loadedModel(f)
+	m, cmd := m.Update(key("o"))
+	if cmd == nil {
+		t.Fatal("o produced no command")
+	}
+	m, cmd = m.Update(cmd())
+	if cmd != nil {
+		if _, fatal := cmd().(FatalMsg); fatal {
+			t.Error("a browser that would not start reached the full-screen error")
+		}
+	}
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, samplePRs()[0].Title) {
+		t.Errorf("the list was lost:\n%s", view)
+	}
+	if !strings.Contains(view, samplePRs()[0].URL) {
+		t.Errorf("the notice does not name the address to open by hand:\n%s", view)
+	}
+	// A browser that would not start has nothing to do with fetching.
+	if strings.Contains(view, i18n.T("notice.fetch_failed")) {
+		t.Errorf("the notice blames the fetch for the browser:\n%s", view)
+	}
+	// "no browser to open ..." is octoscope's own English, and this line is
+	// drawn in whatever language the user asked for. The prefix already says
+	// what happened; the address is what is left to act on.
+	if strings.Contains(view, "no browser") {
+		t.Errorf("the notice carries octoscope's own English:\n%s", view)
+	}
+	if !strings.Contains(view, i18n.T("notice.open_failed")) {
+		t.Errorf("the notice does not say what could not be done:\n%s", view)
+	}
+}
+
+// The two tabs are fetched separately, so one answering says nothing about
+// the other: the Issues tab is still broken while the user is reading the
+// pull requests.
+func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := currentModel(f, 120)
+	m, cmd := m.Update(key("tab")) // to Issues, which fetches
+	m, _ = m.Update(cmd())         // the fetch answers; drop it and fail instead
+	m, _ = m.Update(errMsg{gen: m.gen, tab: tabIssues, err: errors.New("gh: HTTP 502")})
+	if !strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
+		t.Fatalf("setup: the Issues tab does not carry the notice:\n%s", ansi.Strip(m.View()))
+	}
+
+	m, _ = m.Update(key("tab")) // back to the pull requests
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	m, _ = m.Update(key("tab")) // and back to Issues, which never recovered
+
+	if !strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
+		t.Errorf("a fetch on the other tab cleared this tab's notice:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// The other half: a tab that answered must not carry the other one's
+// complaint. The Issues tab is loaded before the move, so switching to it
+// starts no fetch -- which is the case where nothing else would clear the
+// notice on the way.
+func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := currentModel(f, 120)
+	m, _ = m.Update(issueListMsg{gen: m.gen, issues: f.issues})
+	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
+
+	m, cmd := m.Update(key("tab"))
+	if cmd != nil {
+		t.Fatalf("setup: the move refetched, which would clear the notice by itself: %T", cmd())
+	}
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "an issue") {
+		t.Fatalf("setup: the Issues tab did not load:\n%s", view)
+	}
+	if strings.Contains(view, "HTTP 502") {
+		t.Errorf("the other tab's notice followed the user onto a tab that answered:\n%s", view)
+	}
+}
+
+// A fetch answers the tab it was started for, not whichever tab the user is
+// on when it comes back. Switching tabs does not bump gen -- only moving to
+// another repository does -- so the generation guard does not cover this: the
+// pull requests are still loading when the user moves to Issues, and their
+// fetch then fails.
+func TestAFailureLandsOnTheTabItsFetchWasStartedFor(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
+	if !m.loading[tabPRs] {
+		t.Fatal("setup: the pull requests are not being fetched")
+	}
+
+	m, cmd := m.Update(key("tab")) // to Issues, whose own fetch is now in flight
+	m, _ = m.Update(cmd())         // and answers
+	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
+
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, "HTTP 502") {
+		t.Errorf("the pull requests' failure landed on the Issues tab:\n%s", view)
+	}
+	if !strings.Contains(view, "an issue") {
+		t.Errorf("the Issues tab was not drawn:\n%s", view)
+	}
+	if m.loading[tabPRs] {
+		t.Error("the pull requests are still spinning after their own fetch failed")
+	}
+
+	m, _ = m.Update(key("tab")) // back to the pull requests
+	if got := ansi.Strip(m.View()); !strings.Contains(got, "HTTP 502") {
+		t.Errorf("the failure did not land on the tab whose fetch it was:\n%s", got)
+	}
+}
+
+// The address of an item nothing could open is the only way the user has left
+// to reach it. A fetch answers the list, not the browser, so it must not take
+// that line away.
+func TestAFetchDoesNotClearTheBrowsersNotice(t *testing.T) {
+	url := samplePRs()[0].URL
+	f := &fakeSource{prs: samplePRs(), webErr: &browser.NoneError{URL: url}}
+	m := currentModel(f, 120)
+
+	m, cmd := m.Update(key("o"))
+	m, _ = m.Update(cmd())
+	if !strings.Contains(ansi.Strip(m.View()), url) {
+		t.Fatalf("setup: the address is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+
+	m, _ = m.Update(key("r")) // the list is asked again and answers
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+
+	if !strings.Contains(ansi.Strip(m.View()), url) {
+		t.Errorf("a fetch took away the address nothing could open:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// The notice takes a line, and it has to come out of the table rather than
+// out of the terminal: without that the key bar is pushed off the bottom on
+// the day something fails.
+func TestAListWithANoticeStillFitsTheTerminal(t *testing.T) {
+	const height = 24
+	prs := make([]gh.PR, 50)
+	for i := range prs {
+		prs[i] = gh.PR{Number: i + 1, Title: fmt.Sprintf("pr number %d", i), UpdatedAt: time.Now()}
+	}
+	f := &fakeSource{prs: prs}
+	m := New(f, Options{Current: "kukv/octoscope"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: prs})
+	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+
+	out := m.View()
+	if got := len(strings.Split(out, "\n")); got > height {
+		t.Errorf("the list drew %d lines into a terminal %d high", got, height)
+	}
+	if !strings.Contains(ansi.Strip(out), "HTTP 502") {
+		t.Errorf("the notice is not on screen:\n%s", ansi.Strip(out))
+	}
+}
+
+// A tab that has never been answered must not report an outage as "no open
+// pull requests": that is the same picture as a repository with none.
+func TestAFailedFirstFetchDoesNotReadAsAnEmptyTab(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{Current: "kukv/octoscope"}), 120)
+	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	if got := ansi.Strip(m.View()); strings.Contains(got, i18n.T("list.no_open_prs")) {
+		t.Errorf("a tab GitHub would not answer is drawn as an empty one:\n%s", got)
 	}
 }
 
@@ -272,6 +473,9 @@ func TestAStaleFetchFailureIsDropped(t *testing.T) {
 	}
 	if !m.loading[tabPRs] {
 		t.Error("a stale error cleared the loading of the row now on screen")
+	}
+	if m.notice[tabPRs].text != "" {
+		t.Errorf("a stale error complained about the row now on screen: %q", m.notice[tabPRs].text)
 	}
 }
 

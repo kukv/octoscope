@@ -9,7 +9,7 @@ GitHub の返し方が変わったときに気づけることがこの testdata 
 ## レスポンスの録りもの
 
 `pr_list.json` / `issue_list.json` / `pr_view.json` / `issue_view.json` /
-`work.json` / `pr_files.json` は、`gh` の実出力をそのまま録ったもの。
+`pr_files.json` は、`gh` の実出力をそのまま録ったもの。
 録った日: 2026-09-07、対象: `kukv/octoscope`（PR #55、Issue #50）。
 
 パースのテストは手書きの JSON ではなくこれを読む。手書きだと「GitHub が実際には
@@ -34,24 +34,31 @@ gh issue view 50 --repo kukv/octoscope --json \
 gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D/pr_files.json
 ```
 
-`work.json` は `@me` を含む検索なので、**録った人が見えるリポジトリを全部なめる**。
-録った時点の `kukv/octoscope` にはこの 4 つの検索に該当する項目が無かったので、
-`kukv/octoscope` だけに絞ると 4 エイリアスとも `nodes: []` になり、`ListWork` の
-アイテム変換（`__typename` ごとの分岐、ラベル、チェックの集約）を一つも通さない
-テストになる。守るべきは「秘密情報が入らないこと」であって「対象が
-`kukv/octoscope` であること」自体ではないので、絞り方を**公開リポジトリすべて**に
-広げた。ノードの `repository.nameWithOwner` を集め、`gh repo view <owner/name>
---json nameWithOwner,isPrivate` で 1 つずつ private かどうかを確認し、
+## `work_section.json`
+
+`work.graphql` に対する実レスポンス。録った日: 2026-09-11、対象: assigned 列
+（`is:open assignee:@me`）。**4 列を 1 リクエストにまとめていた頃の `work.json`
+の置き換え**で、文書が 1 列ぶんの `results` だけを返すようになったため録り直した。
+
+assigned 列を選んだのは、この列だけが PR と Issue の両方を返すため。PR しか
+返さない列を録ると `toWorkItem` の Issue 側の分岐を一度も通さないテストになる。
+
+`@me` を含む検索なので、**録った人が見えるリポジトリを全部なめる**。守るべきは
+「秘密情報が入らないこと」であって「対象が `kukv/octoscope` であること」自体では
+ないので、絞り方を**公開リポジトリすべて**に広げてある。ノードの
+`repository.nameWithOwner` を集め、`gh repo view <owner/name> --json
+nameWithOwner,isPrivate` で 1 つずつ private かどうかを確認し、
 `isPrivate: false` のものだけを残す。
 
 ```bash
-gh api graphql -F query=@internal/gh/cli/work.graphql > /tmp/work-raw.json
-jq -r '[.data[].nodes[]?.repository.nameWithOwner] | unique[]' /tmp/work-raw.json
+gh api graphql -F query=@internal/gh/cli/work.graphql \
+  -f search='is:open assignee:@me' > /tmp/work-raw.json
+jq -r '[.data.results.nodes[]?.repository.nameWithOwner] | unique[]' /tmp/work-raw.json
 # 出てきたリポジトリを 1 つずつ確認する
 gh repo view <owner>/<repo> --json nameWithOwner,isPrivate
 # isPrivate:false だったものだけを allowlist に入れ、それだけを残す
-jq --argjson pub '["kukv/os-setup", ...]' \
-  '.data |= with_entries(.value.nodes |= map(select(.repository.nameWithOwner as $r | $pub | index($r))))' \
+jq --argjson pub '["kukv/wsl-setup", ...]' \
+  '.data.results.nodes |= map(select(.repository.nameWithOwner as $r | $pub | index($r)))' \
   /tmp/work-raw.json > /tmp/work-public.json
 ```
 
@@ -64,16 +71,14 @@ IP レンジ・認証情報・私有リポジトリ名が出てくるノード�
 であっても除外し、次の候補に差し替える。
 
 件数はテストの主張に使わない（録り直すたびに変わる）。使うのは
-「4 つのエイリアスが揃っていること」と「`__typename` ごとの変換結果」だけ。
-それでも testdata は人が読んで確認できる大きさに保つため、**各エイリアス最大 5
-件**まで残し、`kukv/*`（このプロジェクト自身のアカウント）を `bright-room/*`
-より優先する。
+「`results` エイリアスがあること」と「`__typename` ごとの変換結果が両方出ること」
+だけ。それでも testdata は人が読んで確認できる大きさに保つため、**最大 5 件**まで
+残し、`kukv/*`（このプロジェクト自身のアカウント）を `bright-room/*` より優先する。
 
 ```bash
-jq '.data.reviewRequested.nodes |= map(select(.number as $n | [<採用した番号...>] | index($n)))
-  | .data.yourPRs.nodes |= map(select(.number as $n | [...] | index($n)))
-  | .data.assigned.nodes |= map(select(.number as $n | [...] | index($n)))' \
-  /tmp/work-public.json > internal/gh/cli/testdata/work.json
+jq '.data.results.nodes |= map(select("\(.repository.nameWithOwner)#\(.number)" as $k
+  | ["kukv/wsl-setup#113", <採用したもの...>] | index($k)))' \
+  /tmp/work-public.json > internal/gh/cli/testdata/work_section.json
 ```
 
 **これは秘密情報の除去であって、「テストを通すための編集」ではない。**

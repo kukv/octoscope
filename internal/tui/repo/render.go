@@ -42,7 +42,23 @@ func (m Model) View() string {
 	if m.sidebarCols() > 0 {
 		lines = joinPanes(m.sidebar(), lines, sidebarWidth)
 	}
-	return strings.Join(append(lines, "", m.keyBar()), "\n")
+	lines = append(lines, "")
+	if n := m.noticeLine(); n != "" {
+		lines = append(lines, n)
+	}
+	return strings.Join(append(lines, m.keyBar()), "\n")
+}
+
+// noticeLine is what went wrong, above the key bar. It spans the whole
+// terminal rather than the table's own width: the sidebar is not what
+// failed, and a message cut to the narrower pane would lose what GitHub said.
+func (m Model) noticeLine() string {
+	n := m.notice[m.tab]
+	if n.text == "" {
+		return ""
+	}
+	return theme.Error().Render(
+		layout.Notice(i18n.T(n.kind.prefixID())+" · "+n.text, m.width))
 }
 
 func (m Model) keyBar() string {
@@ -102,6 +118,12 @@ func (m Model) body() []string {
 		return []string{clip(m.spin.View()+" "+i18n.T("common.loading"), m.bodyWidth())}
 	}
 	if m.itemCount() == 0 {
+		// The empty-tab text would report an outage as "no open pull
+		// requests". Only a tab that has never been answered is empty in the
+		// first place: a failed refetch keeps the rows it had.
+		if !m.loaded[m.tab] && m.notice[m.tab].kind == noticeFetch && m.notice[m.tab].text != "" {
+			return []string{theme.Error().Render(clip(i18n.T("notice.fetch_failed"), m.bodyWidth()))}
+		}
 		empty := i18n.T("list.no_open_prs")
 		switch {
 		case len(m.rows) == 0:
@@ -126,7 +148,11 @@ func (m Model) visibleRows() int {
 	if m.height <= 0 {
 		return m.itemCount() // no budget yet: draw them all
 	}
-	return max(m.height-listTop-summaryHeight-footerHeight, 1)
+	rows := m.height - listTop - summaryHeight - footerHeight
+	if m.notice[m.tab].text != "" {
+		rows--
+	}
+	return max(rows, 1)
 }
 
 // rowWindow is the first row drawn, chosen to keep the cursor in view.

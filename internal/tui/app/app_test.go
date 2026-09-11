@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -29,25 +30,40 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work       gh.Work
-	prs        []gh.PR
-	pr         gh.PR
-	prErr      error
-	labels     []gh.Label
-	files      []gh.FileDiff
-	diffErr    error
-	checks     gh.Checks
-	checksErr  error
-	workCalls  int
-	prCalls    int
-	prRepos    []string
-	issueRepos []string
-	countCalls [][]string
+	work      gh.Work
+	prs       []gh.PR
+	pr        gh.PR
+	prErr     error
+	labels    []gh.Label
+	files     []gh.FileDiff
+	diffErr   error
+	checks    gh.Checks
+	checksErr error
+	// workSections is every board column that was asked for. The board makes
+	// one request per column now, so a refresh that dropped a column and one
+	// that did not are told apart by which columns were asked for, not by how
+	// many requests went out.
+	workSections []gh.WorkSection
+	workErr      error
+	prCalls      int
+	prRepos      []string
+	issueRepos   []string
+	countCalls   [][]string
 }
 
-func (f *fakeSource) ListWork(context.Context) (gh.Work, error) {
-	f.workCalls++
-	return f.work, nil
+func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+	f.workSections = append(f.workSections, s)
+	return f.work[s], f.workErr
+}
+
+// refreshedTheBoard reports whether every column was asked for. A column left
+// out stays on screen as it was, which is what a refresh is meant to undo.
+func (f *fakeSource) refreshedTheBoard() bool {
+	seen := map[gh.WorkSection]bool{}
+	for _, s := range f.workSections {
+		seen[s] = true
+	}
+	return len(seen) == gh.WorkSectionCount
 }
 
 func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
@@ -171,6 +187,24 @@ func press(m Model, k string) Model {
 func pressCmd(m Model, k string) (Model, tea.Cmd) {
 	next, cmd := m.Update(key(k))
 	return next.(Model), cmd
+}
+
+// A board every column of which failed has answered, but has never been
+// answered with anything: there is no age to report, and the zero time read
+// as an age is a hundred thousand days. Starting octoscope with no network
+// reaches this.
+func TestATabRowReportsNoAgeWhenNothingWasFetched(t *testing.T) {
+	f := &fakeSource{workErr: errors.New("gh api: gh: HTTP 502")}
+	m := New(f, Options{})
+	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, next.(Model), cmd)
+
+	if !m.work.Summary().Ready {
+		t.Fatal("setup: the board has not answered, so the row says nothing anyway")
+	}
+	if got := m.summary(); got != "" {
+		t.Errorf("the tab row dates a board that was never fetched: %q", ansi.Strip(got))
+	}
 }
 
 // resolve runs cmd and feeds every message it produces back into the model.
@@ -502,8 +536,8 @@ func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	resolve(t, m, cmd)
 
-	if f.workCalls == 0 {
-		t.Error("the board was not refreshed after a submitted review")
+	if !f.refreshedTheBoard() {
+		t.Errorf("the board was not fully refreshed after a submitted review; asked for %v", f.workSections)
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a submitted review")
@@ -523,8 +557,8 @@ func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	resolve(t, m, cmd)
 
-	if f.workCalls == 0 {
-		t.Error("the board was not refreshed after a merge")
+	if !f.refreshedTheBoard() {
+		t.Errorf("the board was not fully refreshed after a merge; asked for %v", f.workSections)
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a merge")
@@ -563,8 +597,8 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 		open bool
 		msg  tea.Msg
 	}{
-		"work":   {msg: work.ErrorMsg{Err: errors.New("boom")}},
-		"repo":   {msg: repo.ErrorMsg{Err: errors.New("boom")}},
+		"work":   {msg: work.FatalMsg{Err: errors.New("boom")}},
+		"repo":   {msg: repo.FatalMsg{Err: errors.New("boom")}},
 		"detail": {open: true, msg: detail.ErrorMsg{Err: errors.New("boom")}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -587,10 +621,20 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 
 func TestGhNotFoundIsTranslated(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: gh.ErrGhNotFound})
+		Update(work.FatalMsg{Err: gh.ErrGhNotFound})
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.gh_not_found")) {
 		t.Errorf("gh_not_found was not translated:\n%s", view)
+	}
+}
+
+// Credentials are the user's to fix, and gh's own wording does not say how.
+func TestUnauthenticatedIsTranslated(t *testing.T) {
+	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
+		Update(work.FatalMsg{Err: fmt.Errorf("gh pr list: %w", gh.ErrUnauthenticated)})
+	view := content(next.(Model))
+	if !strings.Contains(view, i18n.T("error.unauthenticated")) {
+		t.Errorf("unauthenticated was not translated:\n%s", view)
 	}
 }
 
@@ -600,7 +644,7 @@ func TestGhNotFoundIsTranslated(t *testing.T) {
 func TestNoBrowserShowsTheAddress(t *testing.T) {
 	const url = "https://github.com/kukv/octoscope/pull/55"
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: &browser.NoneError{URL: url}})
+		Update(work.FatalMsg{Err: &browser.NoneError{URL: url}})
 	view := content(next.(Model))
 	if !strings.Contains(view, url) {
 		t.Errorf("the error screen does not carry the address:\n%s", view)
@@ -611,7 +655,7 @@ func TestErrorScreenKeysQuit(t *testing.T) {
 	for _, k := range []string{"q", "esc", "ctrl+c"} {
 		t.Run(k, func(t *testing.T) {
 			next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-				Update(work.ErrorMsg{Err: errors.New("boom")})
+				Update(work.FatalMsg{Err: errors.New("boom")})
 			_, cmd := next.(Model).Update(key(k))
 			if !isQuit(cmd) {
 				t.Errorf("%s did not quit from the error screen", k)
@@ -668,18 +712,18 @@ func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
 	}
 }
 
-// TestEscLeavesAnUnrelatedOverlayStanding covers the reachable path a board
-// or Repos-list failure takes while an overlay is open: submit a review from
-// the diff, the root refreshes the board, and the board's own fetch fails
-// with the diff still on top. That failure belongs to neither overlay on the
-// stack, so esc must clear it without discarding a diff that never failed.
+// TestEscLeavesAnUnrelatedOverlayStanding covers the reachable path a tab's
+// failure takes while an overlay is open: submit a review from the diff, the
+// root refreshes the board, and the board finds gh gone with the diff still
+// on top. That failure belongs to neither overlay on the stack, so esc must
+// clear it without discarding a diff that never failed.
 func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
-	next, _ = m.Update(work.ErrorMsg{Err: errors.New("boom")})
+	next, _ = m.Update(work.FatalMsg{Err: gh.ErrGhNotFound})
 	m = next.(Model)
 	if m.errText == "" {
 		t.Fatal("the error screen did not show")
@@ -700,7 +744,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 // back to, so it must keep quitting like q does.
 func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: errors.New("boom")})
+		Update(work.FatalMsg{Err: gh.ErrGhNotFound})
 	m := next.(Model)
 	if len(m.stack) != 0 {
 		t.Fatalf("stack = %v, want empty for this case", m.stack)
@@ -724,7 +768,7 @@ func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
 	}
 
 	noOverlay, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.ErrorMsg{Err: errors.New("boom")})
+		Update(work.FatalMsg{Err: errors.New("boom")})
 	view = content(noOverlay.(Model))
 	if strings.Contains(view, i18n.T("footer.error.esc")) {
 		t.Errorf("key bar offers esc:back with nothing to go back to:\n%s", view)
@@ -973,7 +1017,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 	item, cmd := reposM.Update(key("enter"))
 	item = resolve(t, item.(Model), cmd)
 
-	failed, _ := board.Update(work.ErrorMsg{Err: errors.New(overlongTitle)})
+	failed, _ := board.Update(work.FatalMsg{Err: errors.New(overlongTitle)})
 
 	// An error tied to an overlay draws a different key bar (esc:back, not
 	// just q:quit) from the board/Repos-list case above, and that bar's IDs

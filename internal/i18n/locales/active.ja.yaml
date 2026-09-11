@@ -17,6 +17,16 @@ error:
     other: "ブラウザを起動できませんでした。次のアドレスを手で開いてください:\n{{.URL}}"
   config_unreadable:
     other: "設定ファイルを読み込めませんでした。既定値で動作します"
+  unauthenticated:
+    other: "GitHub にサインインしていません。次を実行してください: gh auth login"
+
+# The line above the key bar for a failure the view carries on despite. What
+# GitHub said follows it untranslated (.claude/rules/errors.md).
+notice:
+  fetch_failed:
+    other: "取得できませんでした"
+  open_failed:
+    other: "開けませんでした"
 
 tab:
   # Tab names double as the labels for the 1 / 2 keys, so they stay the same

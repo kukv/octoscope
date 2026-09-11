@@ -49,7 +49,7 @@ type lister interface {
 // takes: unlike lister's operations, none of these are "the contents of one
 // named repository".
 type crossRepoLister interface {
-	ListWork(ctx context.Context) (gh.Work, error)
+	ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)
 	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
 }
 
@@ -211,7 +211,9 @@ func (u *Usecase) EditAssignees(ref gh.ItemRef, add, remove []string) error {
 	return u.assignees.EditIssueAssignees(ref.Repo, ref.Number, add, remove)
 }
 
-func (u *Usecase) ListWork(ctx context.Context) (gh.Work, error) { return u.crossRepo.ListWork(ctx) }
+func (u *Usecase) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+	return u.crossRepo.ListWorkSection(ctx, s)
+}
 
 func (u *Usecase) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
 	return u.crossRepo.RepoCounts(ctx, repos)
