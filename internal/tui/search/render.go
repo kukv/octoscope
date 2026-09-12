@@ -166,9 +166,9 @@ func (m Model) footerHints() []string {
 			i18n.T("footer.search.web"),
 			i18n.T("footer.search.raw"),
 			i18n.T("footer.search.save"),
-			i18n.T("footer.search.open_saved"),
 			i18n.T("footer.search.refresh"),
-			i18n.T("footer.search.quit"))
+			i18n.T("footer.search.quit"),
+			i18n.T("footer.search.open_saved"))
 	}
 	hints := []string{
 		i18n.T("footer.search.field"),
@@ -181,9 +181,9 @@ func (m Model) footerHints() []string {
 	return append(hints,
 		i18n.T("footer.search.raw"),
 		i18n.T("footer.search.save"),
-		i18n.T("footer.search.open_saved"),
 		i18n.T("footer.search.refresh"),
-		i18n.T("footer.search.quit"))
+		i18n.T("footer.search.quit"),
+		i18n.T("footer.search.open_saved"))
 }
 
 // filterPane draws the eight filters, one per row: its name in a fixed
