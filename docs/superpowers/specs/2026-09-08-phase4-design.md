@@ -98,8 +98,16 @@ GraphQL の呼び出し口では**終了コードではなく `errors` と `data
 
 ### ダイアログ
 
-`internal/tui/dialog` を新設し、Repos の追加ダイアログと Search の保存クエリ
-ポップアップで共用する。入力中の候補は `gh search repos`（§2）。**1 打鍵ごとには
+`internal/tui/dialog` を新設する。**入力欄と候補一覧の形は Repos の追加ダイアログに
+固有とし、ポップアップの箱の寸法だけ `internal/tui/layout` で共有する**
+（2026-09-12 に訂正。`layout.PopupWidth` / `layout.PopupContentWidth` を
+`internal/tui/dialog` と `internal/tui/search` の両方から呼ぶ）。当初は Search の
+保存クエリポップアップと型ごと共用する予定だったが、`dialog.Model` は
+「打って検索 → 候補が絞り込まれる」操作に固定されており、保存クエリのポップアップは
+「一覧から選ぶだけ」で入力欄が要らない。一般化すると Repos 側は使わない
+「入力欄なし」の分岐を、Search 側は使わない `Searching()` / `SetError` を抱える。
+
+入力中の候補は `gh search repos`（§2）。**1 打鍵ごとには
 叩かない**（1.6 秒かかる）。入力が止まってから引く。
 
 削除は `x`（Phase 2 で予約済み。`X` は diff のコメント破棄）。
