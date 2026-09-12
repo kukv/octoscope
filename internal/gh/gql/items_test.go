@@ -358,3 +358,18 @@ func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {
 		t.Error("body not filled")
 	}
 }
+
+// The detail view's picker shows who an item is assigned to, and these two
+// documents are where that answer comes from. Both recorded fixtures have an
+// empty assignees list, so no decode-based test can notice the selection
+// going away; this reads the document text instead, comments stripped.
+func TestSingleItemDocumentsSelectTheAssignees(t *testing.T) {
+	t.Parallel()
+
+	docs := map[string]string{"pr.graphql": prQuery, "issue.graphql": issueQuery}
+	for name, doc := range docs {
+		if !strings.Contains(stripComments(doc), "assignees(first: 100)") {
+			t.Errorf("%s does not select assignees", name)
+		}
+	}
+}

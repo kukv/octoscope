@@ -270,3 +270,62 @@ func TestListWorkSectionPropagatesRunError(t *testing.T) {
 		t.Errorf("the column holds %d items, want 0", len(items))
 	}
 }
+
+// The five listing calls go through the shared documents now, not through
+// gh's own subcommands. A backend that still shells out to `gh pr list`
+// would be selecting a second, unchecked copy of the same fields.
+func TestTheListingCallsSendAGraphQLDocument(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]func(*Client) error{
+		"ListPRs":    func(c *Client) error { _, err := c.ListPRs(context.Background(), "kukv/octoscope"); return err },
+		"ListIssues": func(c *Client) error { _, err := c.ListIssues(context.Background(), "kukv/octoscope"); return err },
+		"GetPR":      func(c *Client) error { _, err := c.GetPR(context.Background(), "kukv/octoscope", 1); return err },
+		"GetIssue":   func(c *Client) error { _, err := c.GetIssue(context.Background(), "kukv/octoscope", 1); return err },
+		"RepoName":   func(c *Client) error { _, err := c.RepoName(context.Background()); return err },
+	}
+	for name, call := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			c := New("", "kukv/octoscope")
+			var got []string
+			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				got = args
+				return []byte(`{"data":{}}`), nil
+			}
+			if err := call(c); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if len(got) < 2 || got[0] != "api" || got[1] != "graphql" {
+				t.Errorf("%s ran gh %v, want gh api graphql", name, got)
+			}
+			// The document has to name the repository the client was built
+			// for; a call that sends no owner asks GitHub about nothing.
+			if !slices.Contains(got, "owner=kukv") || !slices.Contains(got, "name=octoscope") {
+				t.Errorf("%s ran gh %v, want it to name kukv/octoscope", name, got)
+			}
+		})
+	}
+}
+
+// Inside a checkout with no --repo, gh is the one that knows where we are:
+// it fills {owner} and {repo} from the remote. The api backend cannot, which
+// is why the two spell the same variables differently.
+func TestWithoutARepositoryTheDocumentCarriesGhsPlaceholders(t *testing.T) {
+	t.Parallel()
+
+	c := New("", "")
+	var got []string
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return []byte(`{"data":{}}`), nil
+	}
+	if _, err := c.ListPRs(context.Background(), ""); err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+	joined := strings.Join(got, " ")
+	if !strings.Contains(joined, "owner={owner}") || !strings.Contains(joined, "name={repo}") {
+		t.Errorf("args = %v, want gh's own placeholders", got)
+	}
+}
