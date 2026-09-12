@@ -102,6 +102,8 @@ search:
     other: "クエリの名前"
   save_failed:
     other: "クエリを保存できませんでした"
+  no_saved_queries:
+    other: "保存されたクエリはまだありません"
 
 dialog:
   add_repo_title:

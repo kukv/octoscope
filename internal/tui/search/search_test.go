@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
@@ -576,6 +577,71 @@ func TestTheAuthorsOfTheNamedRepositoryAreOffered(t *testing.T) {
 
 	if !strings.Contains(m.View(), "octocat") {
 		t.Errorf("the repository's authors are not offered:\n%s", m.View())
+	}
+}
+
+// ctrl+o opens the list of saved queries, and enter runs the one it lands on.
+func TestCtrlOOpensTheSavedQueriesAndEnterRunsOne(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "mine", Query: "is:open author:@me"},
+		{Name: "reviews", Query: "is:open review-requested:@me"},
+	})
+	m, _ = press(m, "ctrl+o")
+	if !strings.Contains(m.View(), "reviews") {
+		t.Fatal("the popup does not list the saved queries")
+	}
+	m, _ = press(m, "j")
+	m, cmd := press(m, "enter")
+	if cmd == nil {
+		t.Fatal("enter did not run the query")
+	}
+	if !strings.Contains(m.View(), "review-requested:@me") {
+		t.Error("the raw query row does not show what was picked")
+	}
+}
+
+// The root acts on q and 3 before a tab sees them. Typing over an open popup
+// would quit octoscope or jump tabs.
+func TestThePopupHoldsTheKeys(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m, _ = press(m, "ctrl+o")
+	if !m.Capturing() {
+		t.Error("the popup does not capture keys")
+	}
+}
+
+// Nothing saved yet is a state the popup has to say something about, not an
+// empty box.
+func TestThePopupSaysWhenNothingIsSaved(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m, _ = press(m, "ctrl+o")
+	if !strings.Contains(m.View(), i18n.T("search.no_saved_queries")) {
+		t.Error("the popup does not say the list is empty")
+	}
+}
+
+// esc closes it and changes nothing.
+func TestEscapeClosesThePopup(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open author:@me"}})
+	before := m.View()
+	m, _ = press(m, "ctrl+o")
+	m, _ = press(m, "esc")
+	if m.Capturing() {
+		t.Error("esc left the popup open")
+	}
+	if m.View() != before {
+		t.Error("esc changed the tab")
 	}
 }
 

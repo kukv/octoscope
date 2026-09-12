@@ -98,6 +98,7 @@ const (
 	modeField
 	modeRaw
 	modeName
+	modePicker
 )
 
 type Model struct {
@@ -130,6 +131,8 @@ type Model struct {
 
 	// saved is the Search tab's saved queries, in the order they were saved.
 	saved []usecase.SavedQuery
+	// pick is the picker's own cursor, drawn as its selected row.
+	pick int
 
 	// labelCandidates and authorCandidates are what the named repository
 	// offers for the chips under the filter pane, kept with the repo they
@@ -327,11 +330,52 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleRawKey(msg)
 	case modeName:
 		return m.handleNameKey(msg)
+	case modePicker:
+		return m.handlePickerKey(msg)
+	}
+	// ctrl+o is not a per-pane action: either pane opens the same list, so
+	// it is handled here rather than inside handleFilterKey or
+	// handleResultKey.
+	if msg.String() == "ctrl+o" {
+		return m.openPicker(), nil
 	}
 	if m.pane == paneFilters {
 		return m.handleFilterKey(msg)
 	}
 	return m.handleResultKey(msg)
+}
+
+// openPicker opens the saved-queries list on its first row.
+func (m Model) openPicker() Model {
+	m.mode = modePicker
+	m.pick = 0
+	return m
+}
+
+func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = modeBrowse
+		return m, nil
+	case "j", "down":
+		if m.pick < len(m.saved)-1 {
+			m.pick++
+		}
+		return m, nil
+	case "k", "up":
+		if m.pick > 0 {
+			m.pick--
+		}
+		return m, nil
+	case "enter":
+		if m.pick < 0 || m.pick >= len(m.saved) {
+			return m, nil
+		}
+		m.raw = m.saved[m.pick].Query
+		m.mode = modeBrowse
+		return m.startSearch()
+	}
+	return m, nil
 }
 
 // handleFilterKey is browse mode with the filter pane focused.

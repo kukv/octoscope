@@ -47,12 +47,16 @@ const (
 func (m Model) View() string {
 	if m.width <= 0 {
 		// The root routes keys to this tab before the first size arrives, so
-		// the raw editor and the name field must show what was typed even
-		// without one to lay the rest of the screen out against.
-		if m.mode == modeRaw || m.mode == modeName {
-			return m.queryRow()
+		// whatever a key has just changed -- a typed query, a picked saved
+		// one -- must show without a width to lay the rest of the screen out
+		// against.
+		if m.mode == modePicker {
+			return m.pickerView()
 		}
-		return ""
+		return m.queryRow()
+	}
+	if m.mode == modePicker {
+		return m.pickerView() + "\n" + m.keyBar()
 	}
 	lines := []string{m.queryRow(), ""}
 	if m.paneCols() > 0 {
@@ -103,8 +107,11 @@ func (m Model) queryRow() string {
 		return layout.Clip(line, m.width)
 	}
 	query := m.query()
-	count := m.countText()
 	left := "q " + theme.Dim().Render(query)
+	if m.width <= 0 {
+		return left
+	}
+	count := m.countText()
 	room := max(m.width-ansi.StringWidth(count), 0)
 	return layout.Pad(left, room) + count
 }
