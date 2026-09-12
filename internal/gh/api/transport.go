@@ -13,9 +13,9 @@ import (
 	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
-// endpoint is github.com's GraphQL endpoint. GitHub Enterprise is out of
-// scope for this phase, so GH_HOST is not read.
-const defaultEndpoint = "https://api.github.com/graphql"
+// defaultBase is github.com's API root. GitHub Enterprise is out of scope for
+// this phase, so GH_HOST is not read.
+const defaultBase = "https://api.github.com"
 
 // errorsBody is the part of an answer that says what failed. GitHub puts a
 // top-level "errors" array beside whatever "data" it could resolve; a request
@@ -98,10 +98,10 @@ func requestBody(doc string, vars []gql.Var) ([]byte, error) {
 	return payload, nil
 }
 
-// classify names the failures a caller acts on differently: one worth asking
-// again for, and one only the user can fix. Everything else keeps what
+// statusError names the failures a caller acts on differently: one worth
+// asking again for, and one only the user can fix. Everything else keeps what
 // GitHub said and no type at all.
-func classify(status int, body []byte) error {
+func statusError(status int, body []byte) error {
 	var b errorsBody
 	// A body that is not JSON leaves b zero, which reads as "no words from
 	// GitHub" -- the status alone then describes the failure.
@@ -126,8 +126,19 @@ func classify(status int, body []byte) error {
 			msg = fmt.Sprintf("HTTP %d", status)
 		}
 		return gh.Classify(nil, msg)
-	case msg != "":
-		// 200 with a top-level errors array: a partially resolvable query.
+	}
+	return nil
+}
+
+// classify is statusError plus the one shape only GraphQL has: HTTP 200 with
+// a top-level errors array, which is how a partially resolvable query answers.
+func classify(status int, body []byte) error {
+	if err := statusError(status, body); err != nil {
+		return err
+	}
+	var b errorsBody
+	_ = json.Unmarshal(body, &b)
+	if msg := b.text(); msg != "" {
 		return gh.Classify(nil, msg)
 	}
 	return nil

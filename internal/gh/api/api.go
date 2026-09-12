@@ -32,9 +32,9 @@ type Client struct {
 	dir   string
 	repo  string
 	token string
-	// endpoint is the seam the tests use: a local server in place of
-	// github.com.
-	endpoint string
+	// baseURL is the seam the tests use: a local server in place of
+	// github.com. Both the GraphQL endpoint and every REST path hang off it.
+	baseURL string
 
 	runGit gitFunc
 	mu     sync.Mutex
@@ -61,12 +61,17 @@ func New(dir, repo, token string) *Client {
 	return c
 }
 
-// endpointURL is where the documents go. Tests point it at a local server.
-func (c *Client) endpointURL() string {
-	if c.endpoint != "" {
-		return c.endpoint
+// base is where every request goes. Tests point it at a local server.
+func (c *Client) base() string {
+	if c.baseURL != "" {
+		return c.baseURL
 	}
-	return defaultEndpoint
+	return defaultBase
+}
+
+// endpointURL is where the GraphQL documents go.
+func (c *Client) endpointURL() string {
+	return c.base() + "/graphql"
 }
 
 // OpenWeb shows the item in a browser. It is the same call the cli backend

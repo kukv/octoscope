@@ -1,0 +1,699 @@
+diff --git a/docs/superpowers/2026-09-08-phase3-checks-followups.md b/docs/superpowers/2026-09-08-phase3-checks-followups.md
+index 2bcde08b..ddf059b5 100644
+--- a/docs/superpowers/2026-09-08-phase3-checks-followups.md
++++ b/docs/superpowers/2026-09-08-phase3-checks-followups.md
+@@ -3,7 +3,8 @@
+ checks ビュー（`docs/superpowers/plans/2026-09-07-phase3-checks.md`）を入れたときに
+ 見つかったが、そのブランチでは直さないと決めたもの。**直さないと決めた理由も書く。**
+ 
+-実端末での確認は別で、`docs/superpowers/2026-09-07-phase3-checks-handoff.md` にある。
++実端末での確認は別で、checks は `docs/superpowers/2026-09-07-phase3-checks-handoff.md`、
++merge は `docs/superpowers/2026-09-08-phase3-merge-handoff.md` にある。
+ 
+ **2026-09-08 に、直し方が決まっていたものを全部片付けた。**
+ `arrange` のバケツ分け、`enter` / `L` が出せないログを取りに行く件、`follow()` が
+@@ -40,12 +41,12 @@ run の無い check には見出しを描かない。結果として、そうい
+ 
+ ## Phase 3 の残り
+ 
+-merge（spec §4.4.4）は入った。実端末での確認は
+-`docs/superpowers/2026-09-08-phase3-merge-handoff.md` にある。
++Phase 3 は完了した。checks、merge（spec §4.4.4）、ページング（各スレッドの
++`comments` が 50 件を超えても取れること）の 3 本が全部入った。
++残っているのは、上の設計判断（App が作った check run の見分け）だけである。
+ 
+-残っているのはページングだけである:
+-
+-- **ページング** — 各スレッドの `comments`（`first: 50`）、
+-  `docs/superpowers/plans/2026-09-08-phase3-comment-paging.md`
+-
+-`docs/superpowers/specs/2026-09-07-phase3-design.md` §7 にある。
++`internal/gh/cli/thread_comments.graphql` は PR #59 のスレッド
++`PRRT_kwDOTVXF-M6fwhR-` に対して実際に叩いて確認した。
++`data.node.comments.nodes` にコメント 1 件（`body` / `createdAt` /
++`author.login` / `pullRequestReview.state` を含む）が返り、`pageInfo` も
++一緒に返ってきた。
+diff --git a/internal/gh/cli/review.go b/internal/gh/cli/review.go
+index beda73fb..6c965dc1 100644
+--- a/internal/gh/cli/review.go
++++ b/internal/gh/cli/review.go
+@@ -30,6 +30,9 @@ var reviewAtOnceMutation string
+ //go:embed discard_review.graphql
+ var discardReviewMutation string
+ 
++//go:embed thread_comments.graphql
++var threadCommentsQuery string
++
+ // repoArgs names the repository for a GraphQL call.
+ //
+ // GraphQL's repository() takes owner and name separately, unlike `gh pr`
+@@ -80,6 +83,9 @@ type reviewContextResponse struct {
+ }
+ 
+ type threadNode struct {
++	// ID is not put into the domain type: only thread_comments.graphql
++	// uses it, and it never reaches the screen.
++	ID         string `json:"id"`
+ 	IsResolved bool   `json:"isResolved"`
+ 	IsOutdated bool   `json:"isOutdated"`
+ 	Path       string `json:"path"`
+@@ -89,7 +95,8 @@ type threadNode struct {
+ 	OriginalLine int    `json:"originalLine"`
+ 	DiffSide     string `json:"diffSide"`
+ 	Comments     struct {
+-		Nodes []threadCommentNode `json:"nodes"`
++		PageInfo pageInfo            `json:"pageInfo"`
++		Nodes    []threadCommentNode `json:"nodes"`
+ 	} `json:"comments"`
+ }
+ 
+@@ -106,7 +113,9 @@ type threadCommentNode struct {
+ 
+ // PRReviewContext fetches everything the diff view needs to draw and change
+ // a review. It walks review threads one page at a time itself, since
+-// `gh api --paginate` cannot follow a GraphQL cursor below the top level.
++// `gh api --paginate` cannot follow a GraphQL cursor below the top level,
++// and follows a thread's own comments only when that thread says it has
++// more.
+ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
+ 	repoFields, err := repoArgs(c.effectiveRepo(repo))
+ 	if err != nil {
+@@ -114,6 +123,7 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
+ 	}
+ 
+ 	var rc gh.ReviewContext
++	var nodes []threadNode
+ 	cursor := ""
+ 	for {
+ 		args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
+@@ -142,15 +152,66 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
+ 		if len(pr.Reviews.Nodes) > 0 {
+ 			rc.PendingID = pr.Reviews.Nodes[0].ID
+ 		}
+-		for _, n := range pr.ReviewThreads.Nodes {
+-			rc.Threads = append(rc.Threads, n.toDomain())
+-		}
++		nodes = append(nodes, pr.ReviewThreads.Nodes...)
+ 
+ 		if !pr.ReviewThreads.PageInfo.HasNextPage || pr.ReviewThreads.PageInfo.EndCursor == "" {
+-			return rc, nil
++			break
+ 		}
+ 		cursor = pr.ReviewThreads.PageInfo.EndCursor
+ 	}
++
++	for _, n := range nodes {
++		t := n.toDomain()
++		if n.Comments.PageInfo.HasNextPage && n.Comments.PageInfo.EndCursor != "" {
++			rest, err := c.threadComments(ctx, n.ID, n.Comments.PageInfo.EndCursor)
++			if err != nil {
++				return gh.ReviewContext{}, fmt.Errorf("fetch thread comments: %w", err)
++			}
++			t.Comments = append(t.Comments, rest...)
++		}
++		rc.Threads = append(rc.Threads, t)
++	}
++	return rc, nil
++}
++
++type threadCommentsResponse struct {
++	Data struct {
++		Node struct {
++			Comments struct {
++				PageInfo pageInfo            `json:"pageInfo"`
++				Nodes    []threadCommentNode `json:"nodes"`
++			} `json:"comments"`
++		} `json:"node"`
++	} `json:"data"`
++}
++
++// threadComments reads what did not fit in the page PRReviewContext already
++// has, starting after the cursor that page ended on.
++func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]gh.ThreadComment, error) {
++	var rest []gh.ThreadComment
++	cursor := after
++	for {
++		args := []string{
++			"api", "graphql", "-f", "query=" + threadCommentsQuery,
++			"-f", "threadId=" + threadID, "-f", "after=" + cursor,
++		}
++		out, err := c.run(ctx, c.dir, args...)
++		if err != nil {
++			return nil, err
++		}
++		var resp threadCommentsResponse
++		if err := json.Unmarshal(out, &resp); err != nil {
++			return nil, fmt.Errorf("parse thread comments: %w", err)
++		}
++		page := resp.Data.Node.Comments
++		for _, n := range page.Nodes {
++			rest = append(rest, n.toDomain())
++		}
++		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
++			return rest, nil
++		}
++		cursor = page.PageInfo.EndCursor
++	}
+ }
+ 
+ func (n threadNode) toDomain() gh.ReviewThread {
+@@ -167,18 +228,22 @@ func (n threadNode) toDomain() gh.ReviewThread {
+ 		t.Side = gh.SideLeft
+ 	}
+ 	for _, c := range n.Comments.Nodes {
+-		t.Comments = append(t.Comments, gh.ThreadComment{
+-			Author:    gh.Author{Login: c.Author.Login},
+-			Body:      c.Body,
+-			CreatedAt: c.CreatedAt,
+-			// PENDING is the only review state that means "written but not
+-			// sent"; every other one means the comment is already public.
+-			Pending: c.PullRequestReview.State == "PENDING",
+-		})
++		t.Comments = append(t.Comments, c.toDomain())
+ 	}
+ 	return t
+ }
+ 
++func (c threadCommentNode) toDomain() gh.ThreadComment {
++	return gh.ThreadComment{
++		Author:    gh.Author{Login: c.Author.Login},
++		Body:      c.Body,
++		CreatedAt: c.CreatedAt,
++		// PENDING is the only review state that means "written but not
++		// sent"; every other one means the comment is already public.
++		Pending: c.PullRequestReview.State == "PENDING",
++	}
++}
++
+ // The five mutations take no context. They are changes, not fetches: a
+ // comment that has been sent has been sent, so there is nothing to abandon
+ // half-way. The existing AddPRComment and ClosePR take none for the same
+diff --git a/internal/gh/cli/review.graphql b/internal/gh/cli/review.graphql
+index 69678a0f..a5810966 100644
+--- a/internal/gh/cli/review.graphql
++++ b/internal/gh/cli/review.graphql
+@@ -27,15 +27,21 @@ query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+           endCursor
+         }
+         nodes {
++          id
+           isResolved
+           isOutdated
+           path
+           line
+           originalLine
+           diffSide
+-          # Not paged: it is a nested connection, so following it would need
+-          # one more request per thread.
++          # A nested connection: following it costs one more request per
++          # thread, so only a thread that says hasNextPage gets one
++          # (thread_comments.graphql).
+           comments(first: 50) {
++            pageInfo {
++              hasNextPage
++              endCursor
++            }
+             nodes {
+               body
+               createdAt
+diff --git a/internal/gh/cli/review_test.go b/internal/gh/cli/review_test.go
+index d5643c7a..53d1415f 100644
+--- a/internal/gh/cli/review_test.go
++++ b/internal/gh/cli/review_test.go
+@@ -443,3 +443,100 @@ func TestPRReviewContextWalksEveryPageOfThreads(t *testing.T) {
+ 		t.Errorf("first call = %v, want no cursor", f.calls[0])
+ 	}
+ }
++
++// GitHub caps a thread's comments at what the first page asked for; without
++// a second request the rest of a long conversation vanishes with no error.
++func TestPRReviewContextWalksEveryPageOfAThreadsComments(t *testing.T) {
++	t.Parallel()
++
++	threads := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
++		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T1"},` +
++		`"nodes":[{"id":"THREAD_1","path":"a.go","originalLine":1,"diffSide":"RIGHT",` +
++		`"comments":{"pageInfo":{"hasNextPage":true,"endCursor":"C50"},` +
++		`"nodes":[{"body":"first","author":{"login":"kukv"}}]}}]}}}}}`
++	rest := `{"data":{"node":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C99"},` +
++		`"nodes":[{"body":"fifty-first","author":{"login":"kukv"}}]}}}}`
++
++	f := &fakeSeq{outs: []string{threads, rest}}
++	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
++
++	rc, err := c.PRReviewContext(t.Context(), "", 55)
++	if err != nil {
++		t.Fatalf("PRReviewContext: %v", err)
++	}
++	if len(f.calls) != 2 {
++		t.Fatalf("calls = %d, want 2 (the thread says it has more comments)", len(f.calls))
++	}
++	if !slices.Contains(f.calls[1], "threadId=THREAD_1") {
++		t.Errorf("second call = %v, want it to name the thread", f.calls[1])
++	}
++	// Without the cursor the second request asks for the first fifty again
++	// and the loop never ends.
++	if !slices.Contains(f.calls[1], "after=C50") {
++		t.Errorf("second call = %v, want it to carry after=C50", f.calls[1])
++	}
++	if len(rc.Threads) != 1 {
++		t.Fatalf("Threads = %d, want 1", len(rc.Threads))
++	}
++	got := rc.Threads[0].Comments
++	if len(got) != 2 {
++		t.Fatalf("Comments = %d, want 2 (one from each page)", len(got))
++	}
++	if got[0].Body != "first" || got[1].Body != "fifty-first" {
++		t.Errorf("Comments = %q / %q, want the second page appended after the first",
++			got[0].Body, got[1].Body)
++	}
++}
++
++func TestAThreadThatFitsInOnePageCostsNoExtraRequest(t *testing.T) {
++	t.Parallel()
++
++	threads := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
++		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T1"},` +
++		`"nodes":[{"id":"THREAD_1","path":"a.go","originalLine":1,"diffSide":"RIGHT",` +
++		`"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C1"},` +
++		`"nodes":[{"body":"only","author":{"login":"kukv"}}]}}]}}}}}`
++
++	f := &fakeSeq{outs: []string{threads}}
++	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
++
++	if _, err := c.PRReviewContext(t.Context(), "", 55); err != nil {
++		t.Fatalf("PRReviewContext: %v", err)
++	}
++	if len(f.calls) != 1 {
++		t.Errorf("calls = %d, want 1: a thread with nothing more must not cost a request", len(f.calls))
++	}
++}
++
++func TestAThreadWithThreePagesOfCommentsIsFollowedToTheEnd(t *testing.T) {
++	t.Parallel()
++
++	threads := `{"data":{"repository":{"pullRequest":{"id":"PR_1",` +
++		`"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T1"},` +
++		`"nodes":[{"id":"THREAD_1","path":"a.go","originalLine":1,"diffSide":"RIGHT",` +
++		`"comments":{"pageInfo":{"hasNextPage":true,"endCursor":"C50"},` +
++		`"nodes":[{"body":"one","author":{"login":"kukv"}}]}}]}}}}}`
++	page2 := `{"data":{"node":{"comments":{"pageInfo":{"hasNextPage":true,"endCursor":"C150"},` +
++		`"nodes":[{"body":"two","author":{"login":"kukv"}}]}}}}`
++	page3 := `{"data":{"node":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C250"},` +
++		`"nodes":[{"body":"three","author":{"login":"kukv"}}]}}}}`
++
++	f := &fakeSeq{outs: []string{threads, page2, page3}}
++	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
++
++	rc, err := c.PRReviewContext(t.Context(), "", 55)
++	if err != nil {
++		t.Fatalf("PRReviewContext: %v", err)
++	}
++	if len(f.calls) != 3 {
++		t.Fatalf("calls = %d, want 3: no cap is placed on the number of pages", len(f.calls))
++	}
++	// Without carrying the cursor forward the third call would repeat
++	// after=C50 and the walk would loop on the same page forever.
++	if !slices.Contains(f.calls[2], "after=C150") {
++		t.Errorf("third call = %v, want it to carry after=C150", f.calls[2])
++	}
++	if len(rc.Threads[0].Comments) != 3 {
++		t.Errorf("Comments = %d, want 3", len(rc.Threads[0].Comments))
++	}
++}
+diff --git a/internal/gh/cli/schema_test.go b/internal/gh/cli/schema_test.go
+index 75dd5199..74eb4d51 100644
+--- a/internal/gh/cli/schema_test.go
++++ b/internal/gh/cli/schema_test.go
+@@ -40,15 +40,16 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
+ 	t.Parallel()
+ 
+ 	docs := map[string]string{
+-		"work.graphql":           workQuery,
+-		"review.graphql":         reviewContextQuery,
+-		"start_review.graphql":   startReviewMutation,
+-		"add_thread.graphql":     addThreadMutation,
+-		"submit_review.graphql":  submitReviewMutation,
+-		"review_at_once.graphql": reviewAtOnceMutation,
+-		"discard_review.graphql": discardReviewMutation,
+-		"checks.graphql":         checksQuery,
+-		"merge.graphql":          mergeContextQuery,
++		"work.graphql":            workQuery,
++		"review.graphql":          reviewContextQuery,
++		"start_review.graphql":    startReviewMutation,
++		"add_thread.graphql":      addThreadMutation,
++		"submit_review.graphql":   submitReviewMutation,
++		"review_at_once.graphql":  reviewAtOnceMutation,
++		"discard_review.graphql":  discardReviewMutation,
++		"thread_comments.graphql": threadCommentsQuery,
++		"checks.graphql":          checksQuery,
++		"merge.graphql":           mergeContextQuery,
+ 
+ 		"merge_pr.graphql":           mergePRMutation,
+ 		"enable_auto_merge.graphql":  enableAutoMergeMutation,
+diff --git a/internal/gh/cli/testdata/README.md b/internal/gh/cli/testdata/README.md
+index 1ad58b10..b627252d 100644
+--- a/internal/gh/cli/testdata/README.md
++++ b/internal/gh/cli/testdata/README.md
+@@ -116,7 +116,7 @@ def named: if .name != null then .name else (.ofType | named) end;
+ | from_entries
+ JQ
+ 
+-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload"]' \
++jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload"]' \
+   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/cli/testdata/schema.json
+ ```
+ 
+diff --git a/internal/gh/cli/testdata/schema.json b/internal/gh/cli/testdata/schema.json
+index a0f6c3be..7580fb42 100644
+--- a/internal/gh/cli/testdata/schema.json
++++ b/internal/gh/cli/testdata/schema.json
+@@ -580,6 +580,296 @@
+       "verifyVerifiableDomain": "VerifyVerifiableDomainPayload"
+     }
+   },
++  "Node": {
++    "kind": "INTERFACE",
++    "possibleTypes": [
++      "AddedToMergeQueueEvent",
++      "AddedToProjectEvent",
++      "AddedToProjectV2Event",
++      "App",
++      "AssignedEvent",
++      "AutoMergeDisabledEvent",
++      "AutoMergeEnabledEvent",
++      "AutoRebaseEnabledEvent",
++      "AutoSquashEnabledEvent",
++      "AutomaticBaseChangeFailedEvent",
++      "AutomaticBaseChangeSucceededEvent",
++      "BaseRefChangedEvent",
++      "BaseRefDeletedEvent",
++      "BaseRefForcePushedEvent",
++      "Blob",
++      "BlockedByAddedEvent",
++      "BlockedByRemovedEvent",
++      "BlockingAddedEvent",
++      "BlockingRemovedEvent",
++      "Bot",
++      "BranchProtectionRule",
++      "BypassForcePushAllowance",
++      "BypassPullRequestAllowance",
++      "CWE",
++      "CheckRun",
++      "CheckSuite",
++      "ClosedEvent",
++      "CodeOfConduct",
++      "CommentDeletedEvent",
++      "Commit",
++      "CommitComment",
++      "CommitCommentThread",
++      "Comparison",
++      "ConnectedEvent",
++      "ConvertToDraftEvent",
++      "ConvertedFromDraftEvent",
++      "ConvertedNoteToIssueEvent",
++      "ConvertedToDiscussionEvent",
++      "CrossReferencedEvent",
++      "DemilestonedEvent",
++      "DependencyGraphManifest",
++      "DeployKey",
++      "DeployedEvent",
++      "Deployment",
++      "DeploymentEnvironmentChangedEvent",
++      "DeploymentReview",
++      "DeploymentStatus",
++      "DisconnectedEvent",
++      "Discussion",
++      "DiscussionCategory",
++      "DiscussionComment",
++      "DiscussionPoll",
++      "DiscussionPollOption",
++      "DraftIssue",
++      "Enterprise",
++      "EnterpriseAdministratorInvitation",
++      "EnterpriseIdentityProvider",
++      "EnterpriseMemberInvitation",
++      "EnterpriseRepositoryInfo",
++      "EnterpriseServerInstallation",
++      "EnterpriseServerUserAccount",
++      "EnterpriseServerUserAccountEmail",
++      "EnterpriseServerUserAccountsUpload",
++      "EnterpriseTeam",
++      "EnterpriseUserAccount",
++      "Environment",
++      "ExternalIdentity",
++      "Gist",
++      "GistComment",
++      "HeadRefDeletedEvent",
++      "HeadRefForcePushedEvent",
++      "HeadRefRestoredEvent",
++      "IpAllowListEntry",
++      "Issue",
++      "IssueComment",
++      "IssueCommentPinnedEvent",
++      "IssueCommentUnpinnedEvent",
++      "IssueFieldAddedEvent",
++      "IssueFieldChangedEvent",
++      "IssueFieldDate",
++      "IssueFieldDateValue",
++      "IssueFieldMultiSelect",
++      "IssueFieldMultiSelectValue",
++      "IssueFieldNumber",
++      "IssueFieldNumberValue",
++      "IssueFieldRemovedEvent",
++      "IssueFieldSingleSelect",
++      "IssueFieldSingleSelectOption",
++      "IssueFieldSingleSelectValue",
++      "IssueFieldText",
++      "IssueFieldTextValue",
++      "IssueType",
++      "IssueTypeAddedEvent",
++      "IssueTypeChangedEvent",
++      "IssueTypeRemovedEvent",
++      "Label",
++      "LabeledEvent",
++      "Language",
++      "License",
++      "LinkedBranch",
++      "LockedEvent",
++      "Mannequin",
++      "MarkedAsDuplicateEvent",
++      "MarketplaceCategory",
++      "MarketplaceListing",
++      "MemberFeatureRequestNotification",
++      "MembersCanDeleteReposClearAuditEntry",
++      "MembersCanDeleteReposDisableAuditEntry",
++      "MembersCanDeleteReposEnableAuditEntry",
++      "MentionedEvent",
++      "MergeQueue",
++      "MergeQueueEntry",
++      "MergedEvent",
++      "MigrationSource",
++      "Milestone",
++      "MilestonedEvent",
++      "MovedColumnsInProjectEvent",
++      "OIDCProvider",
++      "OauthApplicationCreateAuditEntry",
++      "OrgAddBillingManagerAuditEntry",
++      "OrgAddMemberAuditEntry",
++      "OrgBlockUserAuditEntry",
++      "OrgConfigDisableCollaboratorsOnlyAuditEntry",
++      "OrgConfigEnableCollaboratorsOnlyAuditEntry",
++      "OrgCreateAuditEntry",
++      "OrgDisableOauthAppRestrictionsAuditEntry",
++      "OrgDisableSamlAuditEntry",
++      "OrgDisableTwoFactorRequirementAuditEntry",
++      "OrgEnableOauthAppRestrictionsAuditEntry",
++      "OrgEnableSamlAuditEntry",
++      "OrgEnableTwoFactorRequirementAuditEntry",
++      "OrgInviteMemberAuditEntry",
++      "OrgInviteToBusinessAuditEntry",
++      "OrgOauthAppAccessApprovedAuditEntry",
++      "OrgOauthAppAccessBlockedAuditEntry",
++      "OrgOauthAppAccessDeniedAuditEntry",
++      "OrgOauthAppAccessRequestedAuditEntry",
++      "OrgOauthAppAccessUnblockedAuditEntry",
++      "OrgRemoveBillingManagerAuditEntry",
++      "OrgRemoveMemberAuditEntry",
++      "OrgRemoveOutsideCollaboratorAuditEntry",
++      "OrgRestoreMemberAuditEntry",
++      "OrgUnblockUserAuditEntry",
++      "OrgUpdateDefaultRepositoryPermissionAuditEntry",
++      "OrgUpdateMemberAuditEntry",
++      "OrgUpdateMemberRepositoryCreationPermissionAuditEntry",
++      "OrgUpdateMemberRepositoryInvitationPermissionAuditEntry",
++      "Organization",
++      "OrganizationIdentityProvider",
++      "OrganizationInvitation",
++      "OrganizationMigration",
++      "Package",
++      "PackageFile",
++      "PackageTag",
++      "PackageVersion",
++      "ParentIssueAddedEvent",
++      "ParentIssueRemovedEvent",
++      "PinnedDiscussion",
++      "PinnedEnvironment",
++      "PinnedEvent",
++      "PinnedIssue",
++      "PinnedIssueComment",
++      "PrivateRepositoryForkingDisableAuditEntry",
++      "PrivateRepositoryForkingEnableAuditEntry",
++      "Project",
++      "ProjectCard",
++      "ProjectColumn",
++      "ProjectV2",
++      "ProjectV2Field",
++      "ProjectV2Item",
++      "ProjectV2ItemFieldDateValue",
++      "ProjectV2ItemFieldIterationValue",
++      "ProjectV2ItemFieldMultiSelectValue",
++      "ProjectV2ItemFieldNumberValue",
++      "ProjectV2ItemFieldSingleSelectValue",
++      "ProjectV2ItemFieldTextValue",
++      "ProjectV2ItemStatusChangedEvent",
++      "ProjectV2IterationField",
++      "ProjectV2MultiSelectField",
++      "ProjectV2SingleSelectField",
++      "ProjectV2StatusUpdate",
++      "ProjectV2View",
++      "ProjectV2Workflow",
++      "PublicKey",
++      "PullRequest",
++      "PullRequestCommit",
++      "PullRequestCommitCommentThread",
++      "PullRequestReview",
++      "PullRequestReviewComment",
++      "PullRequestReviewThread",
++      "PullRequestStack",
++      "PullRequestStackEntry",
++      "PullRequestThread",
++      "Push",
++      "PushAllowance",
++      "Query",
++      "Reaction",
++      "ReadyForReviewEvent",
++      "Ref",
++      "ReferencedEvent",
++      "Release",
++      "ReleaseAsset",
++      "RemovedFromMergeQueueEvent",
++      "RemovedFromProjectEvent",
++      "RemovedFromProjectV2Event",
++      "RenamedTitleEvent",
++      "ReopenedEvent",
++      "RepoAccessAuditEntry",
++      "RepoAddMemberAuditEntry",
++      "RepoAddTopicAuditEntry",
++      "RepoArchivedAuditEntry",
++      "RepoChangeMergeSettingAuditEntry",
++      "RepoConfigDisableAnonymousGitAccessAuditEntry",
++      "RepoConfigDisableCollaboratorsOnlyAuditEntry",
++      "RepoConfigDisableContributorsOnlyAuditEntry",
++      "RepoConfigDisableSockpuppetDisallowedAuditEntry",
++      "RepoConfigEnableAnonymousGitAccessAuditEntry",
++      "RepoConfigEnableCollaboratorsOnlyAuditEntry",
++      "RepoConfigEnableContributorsOnlyAuditEntry",
++      "RepoConfigEnableSockpuppetDisallowedAuditEntry",
++      "RepoConfigLockAnonymousGitAccessAuditEntry",
++      "RepoConfigUnlockAnonymousGitAccessAuditEntry",
++      "RepoCreateAuditEntry",
++      "RepoDestroyAuditEntry",
++      "RepoRemoveMemberAuditEntry",
++      "RepoRemoveTopicAuditEntry",
++      "Repository",
++      "RepositoryCustomProperty",
++      "RepositoryInvitation",
++      "RepositoryMigration",
++      "RepositoryRule",
++      "RepositoryRuleset",
++      "RepositoryRulesetBypassActor",
++      "RepositoryTopic",
++      "RepositoryVisibilityChangeDisableAuditEntry",
++      "RepositoryVisibilityChangeEnableAuditEntry",
++      "RepositoryVulnerabilityAlert",
++      "ReviewDismissalAllowance",
++      "ReviewDismissedEvent",
++      "ReviewRequest",
++      "ReviewRequestRemovedEvent",
++      "ReviewRequestedEvent",
++      "SavedReply",
++      "SecurityAdvisory",
++      "SponsorsActivity",
++      "SponsorsListing",
++      "SponsorsListingFeaturedItem",
++      "SponsorsTier",
++      "Sponsorship",
++      "SponsorshipNewsletter",
++      "Status",
++      "StatusCheckRollup",
++      "StatusContext",
++      "SubIssueAddedEvent",
++      "SubIssueRemovedEvent",
++      "SubscribedEvent",
++      "Tag",
++      "Team",
++      "TeamAddMemberAuditEntry",
++      "TeamAddRepositoryAuditEntry",
++      "TeamChangeParentTeamAuditEntry",
++      "TeamRemoveMemberAuditEntry",
++      "TeamRemoveRepositoryAuditEntry",
++      "Topic",
++      "TransferredEvent",
++      "Tree",
++      "UnassignedEvent",
++      "UnlabeledEvent",
++      "UnlockedEvent",
++      "UnmarkedAsDuplicateEvent",
++      "UnpinnedEvent",
++      "UnsubscribedEvent",
++      "User",
++      "UserBlockedEvent",
++      "UserContentEdit",
++      "UserList",
++      "UserNamespaceRepository",
++      "UserStatus",
++      "VerifiableDomain",
++      "Workflow",
++      "WorkflowRun",
++      "WorkflowRunFile"
++    ],
++    "fields": {
++      "id": "ID"
++    }
++  },
+   "PageInfo": {
+     "kind": "OBJECT",
+     "possibleTypes": [],
+diff --git a/internal/gh/cli/thread_comments.graphql b/internal/gh/cli/thread_comments.graphql
+new file mode 100644
+index 00000000..6097a677
+--- /dev/null
++++ b/internal/gh/cli/thread_comments.graphql
+@@ -0,0 +1,26 @@
++# The rest of one thread's comments. reviewThreads cannot page a nested
++# connection, so a thread with more than the first page asks by node id.
++query ($threadId: ID!, $after: String) {
++  node(id: $threadId) {
++    ... on PullRequestReviewThread {
++      # first is capped at 100 by GitHub. This query only runs on a thread
++      # already known to be long, so it asks for the cap.
++      comments(first: 100, after: $after) {
++        pageInfo {
++          hasNextPage
++          endCursor
++        }
++        nodes {
++          body
++          createdAt
++          author {
++            login
++          }
++          pullRequestReview {
++            state
++          }
++        }
++      }
++    }
++  }
++}
