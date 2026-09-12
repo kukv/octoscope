@@ -323,7 +323,7 @@ Phase 2・Phase 3 と同じ形で `docs/superpowers/` に書く。
 | 6 Search タブと保存クエリ | 満たす | スライス 3-2 / 3-3 |
 | 7 `internal/tui` が両バックエンドを import しない | **満たす（実行して確認）** | `go list -deps ./internal/tui/... \| grep -E 'internal/gh/(cli\|api)$'` が空 |
 | 8 `.graphql` 1 組を両バックエンドが使う | **満たす（実行して確認）** | `internal/gh/gql` に 21 文書。`cli` と `api` の両方が `internal/gh/gql` を import する。`internal/gh/gql/schema_test.go` がその 1 組を検証 |
-| 9 golden が en / ja × 80 / 120 / 160 | 満たす | 314 ファイル中 308 がこの命名。残る 6 は別軸の意図的なもの（`*_icons_ascii` / `*_icons_nerd` のグリフ集合、`work_tall_24` の高さ） |
+| 9 golden が en / ja × 80 / 120 / 160 | 満たす | 314 ファイル中 308 がこの命名。残る 6 は別軸の意図的なもの（`diff_icons_ascii` / `diff_icons_nerd` / `work_icons_ascii` / `work_icons_nerd` のグリフ集合と、`work_tall_24` / `work_tall_40` の高さ） |
 
 **10 の現状。** 当初「人手」としていたが、**取得系は 4-5 で機械的に確認できた。**
 `gh` を PATH から外し `GH_TOKEN` だけで `api` の取得メソッド 16 本を実データに
