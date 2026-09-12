@@ -226,3 +226,88 @@ func TestListPRsRejectsARepositoryWithoutASeparator(t *testing.T) {
 		t.Fatal("want an error for a repository with no owner/name separator")
 	}
 }
+
+// A fixture-based test cannot notice body or comments being dropped from the
+// single-item documents: the recorded fixture already has that data on disk
+// no matter what the document currently asks for. This reads the embedded
+// document text instead, comments stripped. "body" has to be counted rather
+// than just matched: both documents also select a "body" on each comment
+// node, so dropping the item's own body would still leave the word present.
+func TestSingleItemDocumentsSelectTheBodyAndTheConversation(t *testing.T) {
+	t.Parallel()
+
+	docs := map[string]string{"pr.graphql": prQuery, "issue.graphql": issueQuery}
+	for name, doc := range docs {
+		clean := stripComments(doc)
+		if n := strings.Count(clean, "body"); n < 2 {
+			t.Errorf("%s selects body %d times, want at least 2 (the item's own and each comment's)", name, n)
+		}
+		if !strings.Contains(clean, "comments(first: 100)") {
+			t.Errorf("%s does not select comments", name)
+		}
+	}
+}
+
+func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
+	t.Parallel()
+
+	c, _ := fixedTransport(t, "testdata/pr.json")
+	pr, err := c.GetPR(context.Background(), "kukv/octoscope", 61)
+	if err != nil {
+		t.Fatalf("GetPR: %v", err)
+	}
+	if pr.Number == 0 || pr.Title == "" {
+		t.Errorf("number/title not filled: %+v", pr)
+	}
+	if pr.Body == "" {
+		t.Error("body not filled; the list document leaves it empty, the single one must not")
+	}
+	if len(pr.Comments) == 0 {
+		t.Fatal("no comments decoded")
+	}
+	if pr.Comments[0].Author.Login == "" || pr.Comments[0].Body == "" {
+		t.Errorf("comment not filled: %+v", pr.Comments[0])
+	}
+	if pr.Comments[0].CreatedAt.IsZero() {
+		t.Error("comment has no timestamp")
+	}
+}
+
+// The number is a GraphQL Int. A transport that spells it as a string gets
+// the whole document rejected before any of it runs.
+func TestGetPRSendsTheNumberAsANumber(t *testing.T) {
+	t.Parallel()
+
+	c, got := fixedTransport(t, "testdata/pr.json")
+	if _, err := c.GetPR(context.Background(), "kukv/octoscope", 61); err != nil {
+		t.Fatalf("GetPR: %v", err)
+	}
+	for _, v := range *got {
+		if v.Name == "number" {
+			if v.Kind != VarInt {
+				t.Errorf("number is %v, want VarInt", v.Kind)
+			}
+			if v.Int != 61 {
+				t.Errorf("number = %d, want 61", v.Int)
+			}
+			return
+		}
+	}
+	t.Errorf("no number variable in %+v", *got)
+}
+
+func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {
+	t.Parallel()
+
+	c, _ := fixedTransport(t, "testdata/issue.json")
+	issue, err := c.GetIssue(context.Background(), "kukv/octoscope", 50)
+	if err != nil {
+		t.Fatalf("GetIssue: %v", err)
+	}
+	if issue.Number == 0 || issue.Title == "" {
+		t.Errorf("number/title not filled: %+v", issue)
+	}
+	if issue.Body == "" {
+		t.Error("body not filled")
+	}
+}

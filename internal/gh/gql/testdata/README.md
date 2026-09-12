@@ -91,12 +91,15 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection","IssueComment","IssueCommentConnection","User","UserConnection"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/gql/testdata/schema.json
 ```
 
 `PullRequestConnection` と `IssueConnection` は 2026-09-08 に `repo_counts.graphql`
 （`repository.pullRequests` / `repository.issues` の `totalCount`）のために追加した。
+
+`IssueComment`、`IssueCommentConnection`、`User`、`UserConnection` は 2026-09-12 に
+`pr.graphql` / `issue.graphql`（`comments` と `assignees`）のために追加した。
 
 ## `review_context.json`
 
@@ -221,4 +224,30 @@ Dashboard）の 2 件で、両方をそのまま残している。
 D=internal/gh/gql/testdata
 gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
   -f owner=kukv -f name=octoscope | jq '.data.repository.issues.nodes |= .[0:5]' > $D/repo_issues.json
+```
+
+## `pr.json`
+
+`pr.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope#61`。`pr_checks.json` / `merge_context.json` と同じ PR で、
+マージ済みだが body・comments・check roll-up はすべて返る。2 件のコメント
+（`octocov` の Code Metrics Report）が入っており、`TestGetPRFillsTheBodyAndTheConversation`
+が確かめる会話の中身に使う。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/pr.graphql \
+  -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr.json
+```
+
+## `issue.json`
+
+`issue.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope#50`。`search_items.json` と同じ Issue で、body が入っている
+（コメントは 0 件）。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/issue.graphql \
+  -f owner=kukv -f name=octoscope -F number=50 | jq . > $D/issue.json
 ```

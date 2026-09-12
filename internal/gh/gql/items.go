@@ -16,6 +16,12 @@ var repoPRsQuery string
 //go:embed repo_issues.graphql
 var repoIssuesQuery string
 
+//go:embed pr.graphql
+var prQuery string
+
+//go:embed issue.graphql
+var issueQuery string
+
 // prNode is one pull request as the documents in this package select it.
 // The list document leaves Body, Comments and Assignees unselected and they
 // decode as zero values; the single-item document fills them.
@@ -152,6 +158,22 @@ func (n issueNode) toIssue() gh.Issue {
 	}
 }
 
+type prResponse struct {
+	Data struct {
+		Repository struct {
+			PullRequest prNode `json:"pullRequest"`
+		} `json:"repository"`
+	} `json:"data"`
+}
+
+type issueResponse struct {
+	Data struct {
+		Repository struct {
+			Issue issueNode `json:"issue"`
+		} `json:"repository"`
+	} `json:"data"`
+}
+
 type prListResponse struct {
 	Data struct {
 		Repository struct {
@@ -216,4 +238,38 @@ func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error
 		issues[i] = n.toIssue()
 	}
 	return issues, nil
+}
+
+// GetPR returns one pull request with its body and conversation.
+func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, error) {
+	vars, err := c.repoVars(repo)
+	if err != nil {
+		return gh.PR{}, err
+	}
+	out, err := c.Read(ctx, prQuery, append(vars, N("number", number))...)
+	if err != nil {
+		return gh.PR{}, err
+	}
+	var resp prResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return gh.PR{}, fmt.Errorf("parse pull request: %w", err)
+	}
+	return resp.Data.Repository.PullRequest.toPR(), nil
+}
+
+// GetIssue returns one issue with its body and conversation.
+func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error) {
+	vars, err := c.repoVars(repo)
+	if err != nil {
+		return gh.Issue{}, err
+	}
+	out, err := c.Read(ctx, issueQuery, append(vars, N("number", number))...)
+	if err != nil {
+		return gh.Issue{}, err
+	}
+	var resp issueResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return gh.Issue{}, fmt.Errorf("parse issue: %w", err)
+	}
+	return resp.Data.Repository.Issue.toIssue(), nil
 }

@@ -1,0 +1,34 @@
+# One issue, with everything the detail view shows.
+query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      number
+      title
+      state
+      url
+      updatedAt
+      body
+      author {
+        login
+      }
+      labels(first: 100) {
+        nodes { ...LabelFields }
+      }
+      assignees(first: 100) {
+        nodes { login }
+      }
+      comments(first: 100) {
+        nodes {
+          author { login }
+          body
+          createdAt
+        }
+      }
+    }
+  }
+}
+
+fragment LabelFields on Label {
+  name
+  color
+}

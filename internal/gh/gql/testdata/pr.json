@@ -1,0 +1,79 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 61,
+        "title": "fix: 詳細画面の c が無反応に見える問題と、--repo の初期タブ",
+        "state": "MERGED",
+        "url": "https://github.com/kukv/octoscope/pull/61",
+        "isDraft": false,
+        "updatedAt": "2026-09-07T05:52:30Z",
+        "reviewDecision": "REVIEW_REQUIRED",
+        "headRefName": "worktree-glistening-floating-perlis",
+        "baseRefName": "main",
+        "additions": 589,
+        "deletions": 86,
+        "body": "Phase 2 の立て直し（#59 / #60）のあとに残っていた宿題を片付ける。利用者から見える\n不具合が 2 つ、コードの中だけの問題が 4 つ。実装計画は\n`docs/superpowers/plans/2026-09-07-phase2-followups.md`。\n\n## 詳細画面で `c` が無反応に見える問題を直した\n\n「詳細画面で `c` を押してもコメント欄が開かない」という報告の原因が分かった。\n**本文の読み込みが終わるまで `c` / `x` / `v` / `l` / `a` は無視される**のに、その間の\n画面はスピナー 1 行だけで、無視した理由がどこにも出ていなかった。\n\n実端末（pty）で実 API を相手に再現した結果:\n\n- `enter` の 4 秒後に押した `c` → 何も起きない\n- 同じ手順で 25 秒後に押した `c` → コメント欄が開く\n\n断ったときに理由を 1 行出すようにした（`diff` が既に持っている `declined` と同じ流儀）。\n\n```\n⣾  読み込み中...\n本文がまだ届いていません。少し待ってからもう一度\n```\n\n設計書 §3.4 は原因を「端末から届くキーイベントが `\"c\"` にならない」と推測し、\n`--debug-keys` を足して切り分ける、としていた。実際は違ったので §3.4.1 に結論を\n追記し、`--debug-keys` は入れていない。\n\n## `--repo` を渡したら Repos タブから始まるようにした\n\nこれまでは `--repo kukv/octoscope` を渡しても Work タブで始まっていた。spec §4 の\n「起動直後は Work タブ」どおりの動作だったが、フラグを渡すのは「このリポジトリを\n見に来た」という意思表示なので、**spec を先に直してから** Repos 開始に変えた。\n\nカレントディレクトリの git remote から後で解決した場合は**タブを移さない**。\nその答えは盤面が出てから数秒後に届くので、見ている画面を奪うことになる。\n\nREADME（en / ja）の `--repo` の説明も追随させた。\n\n## 別の item 宛ての応答で画面が入れ替わるのを防いだ\n\n`detail.Model` は item ごとに作り直されるので、**利用者が別の item を開いたあとに前の\nitem の応答が届く**と、それが今の画面に効いてしまう。`itemMsg` にはこのガードが元から\nあったが、7 つのメッセージに無かった。全部に `ref` を持たせて捨てるようにした。\n\n| メッセージ | ガードが無いと |\n|---|---|\n| `pickerCandidatesMsg` | 頼んでいないピッカーが、別リポジトリの候補で開く |\n| `pickerAppliedMsg` / `pickErrorMsg` | 押していない `l` の結果やエラーが出る |\n| `commentPostedMsg` / `stateChangedMsg` | 別の item を取り直して本文が入れ替わる |\n| `commentErrorMsg` / `stateErrorMsg` | 開いていない item の失敗が画面に出る |\n\nこれで `detail` の非同期メッセージは全部ガードつきになった（`diff` は元から全部ついて\nいる）。当初の指摘は `pickErrorMsg` 1 つだったが、同じ形の穴が 7 つあった。\n\n## 読みにくかったコードとテストを直した\n\n- **`mode` / `phase` に `String()`** を足した（detail / diff）。テストの失敗が\n  `mode = 3` ではなく `mode = pick` と出る\n- **`diff.submitCancelled` だけ `errText` を消していなかった**ので detail に揃えた。\n  「modeView は描かないから残してよい」という言い訳コメントは消えた\n- **空振りしていたテストを直した。** Repos のシナリオ 2 本は、Repos タブが無くても\n  Work の `enter` が同じ詳細画面を開くので通ってしまっていた。タブの前提を確認する\n  ガードを足し、詳細画面の判定も `#12`（Repos 一覧も番号を描く）から詳細画面だけが\n  描く `state: open` に替えた\n- 初期タブを変えたことで `app` のテストが新たに 3 種類の空振りを起こしたので、\n  そちらも直した（シナリオ 3 本が Repos 経由になる、`\"2\"` が no-op になる、\n  幅テストが Repos タブを `\"work\"` という名前で記録する）\n\n## 確認\n\n- `make check` 814 テスト緑、lint 0 件。**新しいテストは検証対象を壊して落ちることを\n  確認済み**\n- **実端末で見た。** python の `pty.fork()` + `TIOCSWINSZ` で端末を作り、実 API 相手に\n  120 桁 ja の Work 盤・詳細画面・上の decline 行・`--repo` での Repos 開始を目視\n- **見ていないもの**: 80 桁の桁ずれ（ANSI を剥がすと erase-line で判定できない。\n  golden が担保）、diff 画面、Web UI 側での Pending の確認、レビューの提出と破棄。\n  実在の PR に `ctrl+s` は送っていない\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+        "author": {
+          "login": "kukv"
+        },
+        "labels": {
+          "nodes": []
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "comments": {
+          "nodes": [
+            {
+              "author": {
+                "login": "github-actions"
+              },
+              "body": "## Code Metrics Report\n| Coverage | Test Execution Time |\n|---------:|--------------------:|\n| 88.5%    | 38s                 |\n\n\n### Code coverage of files in pull request scope (90.3%, patch 92.1%)\n\n|                                                                        Files                                                                         | Coverage | Patch Coverage |\n|------------------------------------------------------------------------------------------------------------------------------------------------------|---------:|---------------:|\n| [internal/tui/app/app.go](https://github.com/kukv/octoscope/blob/39e2a0911d64757e86fa1be7f67f58a3aede46cd/internal%2Ftui%2Fapp%2Fapp.go)             | 95.6%    | 100.0%         |\n| [internal/tui/detail/detail.go](https://github.com/kukv/octoscope/blob/39e2a0911d64757e86fa1be7f67f58a3aede46cd/internal%2Ftui%2Fdetail%2Fdetail.go) | 92.5%    | 93.0%          |\n| [internal/tui/detail/render.go](https://github.com/kukv/octoscope/blob/39e2a0911d64757e86fa1be7f67f58a3aede46cd/internal%2Ftui%2Fdetail%2Frender.go) | 95.6%    | 100.0%         |\n| [internal/tui/diff/diff.go](https://github.com/kukv/octoscope/blob/39e2a0911d64757e86fa1be7f67f58a3aede46cd/internal%2Ftui%2Fdiff%2Fdiff.go)         | 80.2%    | 81.8%          |\n\n---\nReported by [octocov](https://github.com/k1LoW/octocov)\n<!-- octocov -->",
+              "createdAt": "2026-09-07T05:42:51Z"
+            },
+            {
+              "author": {
+                "login": "github-actions"
+              },
+              "body": "## Code Metrics Report\n| Coverage | Test Execution Time |\n|---------:|--------------------:|\n| 88.5%    | 38s                 |\n\n\n### Code coverage of files in pull request scope (90.4%, patch 94.1%)\n\n|                                                                        Files                                                                         | Coverage | Patch Coverage |\n|------------------------------------------------------------------------------------------------------------------------------------------------------|---------:|---------------:|\n| [internal/tui/app/app.go](https://github.com/kukv/octoscope/blob/e1f8a99da39fe5a49c19e276a97fb272a528ed63/internal%2Ftui%2Fapp%2Fapp.go)             | 95.6%    | 100.0%         |\n| [internal/tui/detail/detail.go](https://github.com/kukv/octoscope/blob/e1f8a99da39fe5a49c19e276a97fb272a528ed63/internal%2Ftui%2Fdetail%2Fdetail.go) | 92.7%    | 95.3%          |\n| [internal/tui/detail/render.go](https://github.com/kukv/octoscope/blob/e1f8a99da39fe5a49c19e276a97fb272a528ed63/internal%2Ftui%2Fdetail%2Frender.go) | 95.6%    | 100.0%         |\n| [internal/tui/diff/diff.go](https://github.com/kukv/octoscope/blob/e1f8a99da39fe5a49c19e276a97fb272a528ed63/internal%2Ftui%2Fdiff%2Fdiff.go)         | 80.2%    | 81.8%          |\n\n---\nReported by [octocov](https://github.com/k1LoW/octocov)\n<!-- octocov -->",
+              "createdAt": "2026-09-07T05:45:42Z"
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "nodes": [
+                      {
+                        "__typename": "CheckRun",
+                        "name": "lint",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "sca",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "test",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
