@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kukv/octoscope/internal/config"
 	"github.com/kukv/octoscope/internal/gh"
 )
 
@@ -67,6 +68,18 @@ type repoStore interface {
 	SaveRepositories(repos []string) error
 }
 
+// queryStore is where the Search tab's saved queries survive a restart.
+type queryStore interface {
+	SaveQueries(queries []config.SavedQuery) error
+}
+
+// settingsStore is the settings file: it satisfies repoStore and queryStore
+// both, which is what New's caller (cmd/octoscope's config.Store) writes.
+type settingsStore interface {
+	repoStore
+	queryStore
+}
+
 type reviewFetcher interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
@@ -124,6 +137,7 @@ type Usecase struct {
 	crossRepo  crossRepoLister
 	repos      repoFinder
 	repoStore  repoStore
+	queryStore queryStore
 	reviewInfo reviewFetcher
 	reviews    reviewer
 	web        opener
@@ -132,8 +146,8 @@ type Usecase struct {
 }
 
 // New wires a Usecase to one backend and the settings file its repository
-// list is written to.
-func New(src source, store repoStore) *Usecase {
+// list and saved queries are written to.
+func New(src source, store settingsStore) *Usecase {
 	return &Usecase{
 		items:      src,
 		comments:   src,
@@ -144,6 +158,7 @@ func New(src source, store repoStore) *Usecase {
 		crossRepo:  src,
 		repos:      src,
 		repoStore:  store,
+		queryStore: store,
 		reviewInfo: src,
 		reviews:    src,
 		web:        src,

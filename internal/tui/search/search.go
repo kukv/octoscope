@@ -2,13 +2,17 @@ package search
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // searcher runs one GitHub search. The query is built here and means
@@ -35,6 +39,7 @@ type Source interface {
 	searcher
 	webOpener
 	candidateSource
+	queryStore
 }
 
 // OpenDetailMsg asks the parent to show the detail view for one item.
@@ -84,14 +89,17 @@ const (
 	paneResults
 )
 
-// mode says which overlay is up: none, a typed filter's field, or the raw
-// query editor. It does not stack with pane (.claude/rules/tui.md).
+// mode says which overlay is up: none, a typed filter's field, the raw
+// query editor, the field that names a query before it is saved, or the
+// saved-query picker. It does not stack with pane (.claude/rules/tui.md).
 type mode int
 
 const (
 	modeBrowse mode = iota
 	modeField
 	modeRaw
+	modeName
+	modePicker
 )
 
 type Model struct {
@@ -121,6 +129,11 @@ type Model struct {
 	// notice is what GitHub said about a query it would not run. The tab
 	// keeps its filters and its last results; the user edits and tries again.
 	notice string
+
+	// saved is the Search tab's saved queries, in the order they were saved.
+	saved []usecase.SavedQuery
+	// pick is the picker's own cursor, drawn as its selected row.
+	pick int
 
 	// labelCandidates and authorCandidates are what the named repository
 	// offers for the chips under the filter pane, kept with the repo they
@@ -287,6 +300,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case webErrMsg:
 		m.notice = msg.err.Error()
 		return m, nil
+	case saveErrMsg:
+		m.notice = i18n.T("search.save_failed") + ": " + msg.err.Error()
+		return m, nil
 	case labelCandidatesMsg:
 		if msg.repo != m.filters.Value(FilterRepo) {
 			return m, nil
@@ -313,11 +329,62 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleFieldKey(msg)
 	case modeRaw:
 		return m.handleRawKey(msg)
+	case modeName:
+		return m.handleNameKey(msg)
+	case modePicker:
+		return m.handlePickerKey(msg)
+	}
+	// ctrl+o is not a per-pane action: either pane opens the same list, so
+	// it is handled here rather than inside handleFilterKey or
+	// handleResultKey.
+	if msg.String() == "ctrl+o" {
+		return m.openPicker(), nil
 	}
 	if m.pane == paneFilters {
 		return m.handleFilterKey(msg)
 	}
 	return m.handleResultKey(msg)
+}
+
+// openPicker opens the saved-queries list on its first row.
+func (m Model) openPicker() Model {
+	m.mode = modePicker
+	m.pick = 0
+	return m
+}
+
+func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = modeBrowse
+		return m, nil
+	case "j", "down":
+		if m.pick < len(m.saved)-1 {
+			m.pick++
+		}
+		return m, nil
+	case "k", "up":
+		if m.pick > 0 {
+			m.pick--
+		}
+		return m, nil
+	case "enter":
+		if m.pick < 0 || m.pick >= len(m.saved) {
+			return m, nil
+		}
+		m.raw = m.saved[m.pick].Query
+		m.mode = modeBrowse
+		return m.startSearch()
+	case "x":
+		qs, removed := removeSaved(m.saved, m.pick)
+		if !removed {
+			return m, nil
+		}
+		m.saved = qs
+		m.pick = min(m.pick, len(qs)-1)
+		return m, saveQueries(m.src, qs)
+	}
+	return m, nil
 }
 
 // handleFilterKey is browse mode with the filter pane focused.
@@ -354,6 +421,8 @@ func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "e":
 		return m.openRaw(), nil
+	case "s":
+		return m.openName(), nil
 	case "r":
 		return m.startSearch()
 	}
@@ -399,6 +468,8 @@ func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, openWeb(m.src, m.items[m.sel].URL)
 	case "e":
 		return m.openRaw(), nil
+	case "s":
+		return m.openName(), nil
 	case "r":
 		return m.startSearch()
 	}
@@ -421,7 +492,7 @@ func (m Model) openField() Model {
 	m.mode = modeField
 	m.input = textinput.New()
 	m.input.SetValue(m.filters.Value(m.cursor))
-	m.input.SetWidth(max(filterPaneWidth-filterNameWidth-promptCols, 1))
+	m.input.SetWidth(max(filterPaneWidth-filterNameWidth-promptCols-cursorCol, 1))
 	m.input.Focus()
 	return m
 }
@@ -433,7 +504,22 @@ func (m Model) openRaw() Model {
 	m.input = textinput.New()
 	m.input.SetValue(m.query())
 	if m.width > 0 {
-		m.input.SetWidth(max(m.width-len("q ")-promptCols, 1))
+		m.input.SetWidth(max(m.width-len("q ")-promptCols-cursorCol, 1))
+	}
+	m.input.Focus()
+	return m
+}
+
+// openName opens the field that names a query before it is saved: saved
+// queries hold a name, and a bare query string is not one a user can pick
+// from later.
+func (m Model) openName() Model {
+	m.mode = modeName
+	m.input = textinput.New()
+	if m.width > 0 {
+		// -1 for the space that separates search.save_prompt from the field
+		// in queryRow.
+		m.input.SetWidth(max(m.width-ansi.StringWidth(i18n.T("search.save_prompt"))-1-promptCols-cursorCol, 1))
 	}
 	m.input.Focus()
 	return m
@@ -464,6 +550,25 @@ func (m Model) handleRawKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.raw = m.input.Value()
 		m.mode = modeBrowse
 		return m.startSearch()
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleNameKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = modeBrowse
+		return m, nil
+	case "enter":
+		name := strings.TrimSpace(m.input.Value())
+		m.mode = modeBrowse
+		if name == "" {
+			return m, nil
+		}
+		m.saved = upsert(m.saved, usecase.SavedQuery{Name: name, Query: m.query()})
+		return m, saveQueries(m.src, m.saved)
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)

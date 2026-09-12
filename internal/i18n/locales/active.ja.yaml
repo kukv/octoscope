@@ -98,6 +98,12 @@ search:
     other: "—"
   candidates:
     other: "候補"
+  save_prompt:
+    other: "クエリの名前"
+  save_failed:
+    other: "クエリを保存できませんでした"
+  no_saved_queries:
+    other: "保存されたクエリはまだありません"
 
 dialog:
   add_repo_title:
@@ -272,6 +278,10 @@ footer:
       other: "l:結果へ"
     raw:
       other: "e:生クエリ"
+    save:
+      other: "s:保存"
+    open_saved:
+      other: "ctrl+o:保存済み"
     open:
       other: "enter:詳細"
     move:
@@ -290,6 +300,8 @@ footer:
       other: "esc:取消"
     apply:
       other: "enter:確定"
+    remove:
+      other: "x:削除"
   close:
     other: "x:クローズ"
   reopen:

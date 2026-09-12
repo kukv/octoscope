@@ -102,6 +102,12 @@ search:
     other: "—"
   candidates:
     other: "Candidates"
+  save_prompt:
+    other: "Name this query"
+  save_failed:
+    other: "Could not save the query"
+  no_saved_queries:
+    other: "No saved queries yet"
 
 dialog:
   add_repo_title:
@@ -282,6 +288,10 @@ footer:
       other: "l: results"
     raw:
       other: "e: raw query"
+    save:
+      other: "s: save"
+    open_saved:
+      other: "ctrl+o: saved"
     open:
       other: "enter: detail"
     move:
@@ -300,6 +310,8 @@ footer:
       other: "esc: cancel"
     apply:
       other: "enter: apply"
+    remove:
+      other: "x: remove"
   close:
     other: "x:close"
   reopen:

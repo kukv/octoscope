@@ -13,11 +13,6 @@ const (
 	// starColumn holds a suggestion's star count, right-aligned.
 	starColumn = 10
 
-	// borderCols and padCols are what theme.Popup costs around its contents:
-	// one column of border and one of padding on each side.
-	borderCols = 2
-	padCols    = 2
-
 	// promptCols is the "> " textinput draws in front of what is typed.
 	promptCols = 2
 )
@@ -69,16 +64,15 @@ func stars(n int) string {
 }
 
 // boxWidth keeps the popup readable at eighty columns without letting it run
-// the full width of a wide terminal.
+// the full width of a wide terminal. The judgment is shared with
+// internal/tui/search's saved-queries popup, so it lives in layout; only
+// the type is not shared.
 func (m Model) boxWidth() int {
-	if m.width <= 0 {
-		return 40
-	}
-	return max(min(m.width-4, 60), 20)
+	return layout.PopupWidth(m.width)
 }
 
 // contentWidth is what a line inside the box may occupy. A line longer than
 // this makes lipgloss wrap it, which splits a suggestion across two rows.
 func (m Model) contentWidth() int {
-	return max(m.boxWidth()-borderCols-padCols, 1)
+	return layout.PopupContentWidth(m.boxWidth())
 }

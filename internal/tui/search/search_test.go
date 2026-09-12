@@ -9,6 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/i18n"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 type fakeSource struct {
@@ -38,6 +40,32 @@ func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]gh.Label, err
 func (f *fakeSource) ListAssignees(_ context.Context, repo string) ([]string, error) {
 	f.authorRepo = repo
 	return f.users, nil
+}
+
+func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+
+// fakeStore is a fakeSource whose SaveQueries records what was saved and can
+// be made to fail, for the tests that check what actually reaches the
+// store rather than only what the model does.
+type fakeStore struct {
+	fakeSource
+	saved []usecase.SavedQuery
+	err   error
+}
+
+func (f *fakeStore) SaveQueries(qs []usecase.SavedQuery) error {
+	f.saved = qs
+	return f.err
+}
+
+// newTestModel builds a model on store the way New(src) does elsewhere in
+// this file, run past its first search so it starts from the same steady
+// state a real run would.
+func newTestModel(t *testing.T, store *fakeStore) Model {
+	t.Helper()
+
+	m := New(store)
+	return resolve(t, m, m.Init())
 }
 
 // resolve runs a command the model handed back and feeds its message in, the
@@ -73,6 +101,8 @@ func press(m Model, key string) (Model, tea.Cmd) {
 		return m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	case "backspace":
 		return m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	case "ctrl+o":
+		return m.Update(tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl})
 	default:
 		return m.Update(tea.KeyPressMsg{Code: []rune(key)[0], Text: key})
 	}
@@ -299,17 +329,124 @@ func TestEnterOnAResultOpensIt(t *testing.T) {
 	}
 }
 
-// s belongs to saving a query, which this slice does not have yet. Binding
-// it to anything else now would have to be taken back.
-func TestSDoesNothingYet(t *testing.T) {
+// s names the query before it is saved: saved_queries holds a name and a
+// query, and a list of bare query strings is not one a user can pick from.
+func TestSavingAsksForANameFirst(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 120, []gh.WorkItem{{Ref: gh.ItemRef{Repo: "kukv/octoscope", Number: 1}}})
-	m, _ = press(m, "l")
-	before := m.View()
-	m, cmd := press(m, "s")
-	if cmd != nil || m.View() != before {
-		t.Error("s did something; it is reserved for saving a query")
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "s")
+	if !m.Capturing() {
+		t.Fatal("s did not open a field")
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("s saved before a name was typed: %+v", store.saved)
+	}
+	m = typeInto(m, "mine")
+	m, cmd := press(m, "enter")
+	if cmd == nil {
+		t.Fatal("enter did not start the save")
+	}
+	resolve(t, m, cmd)
+	if len(store.saved) != 1 || store.saved[0].Name != "mine" {
+		t.Fatalf("saved = %+v", store.saved)
+	}
+	if store.saved[0].Query == "" {
+		t.Error("the saved entry carries no query")
+	}
+}
+
+// An empty name would put a blank row in the picker that nothing can
+// identify.
+func TestAnEmptyNameSavesNothing(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "s")
+	m, cmd := press(m, "enter")
+	if cmd != nil {
+		resolve(t, m, cmd)
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("an empty name was saved: %+v", store.saved)
+	}
+}
+
+// esc must leave the tab as it was: a half-typed name is not a query.
+func TestEscapeAbandonsTheName(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "s")
+	m = typeInto(m, "mine")
+	m, _ = press(m, "esc")
+	if m.Capturing() {
+		t.Error("esc left the field open")
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("esc saved anyway: %+v", store.saved)
+	}
+}
+
+// Saving the same name twice replaces it: two rows with one name is a list
+// nobody can choose from.
+func TestSavingTheSameNameReplacesIt(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:draft"}})
+	m, _ = press(m, "s")
+	m = typeInto(m, "mine")
+	m, cmd := press(m, "enter")
+	resolve(t, m, cmd)
+	if len(store.saved) != 1 {
+		t.Fatalf("saved = %+v, want one entry", store.saved)
+	}
+	if store.saved[0].Query != "is:open" {
+		t.Errorf("saved[0].Query = %q, want the new query to have replaced the old one", store.saved[0].Query)
+	}
+}
+
+// A write that fails has to say so: the model keeps the new entry while the
+// settings file does not, and the user is the only one who can tell.
+func TestAFailedSaveIsReported(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{err: errors.New("disk is full")}
+	m := newTestModel(t, store)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = press(m, "s")
+	m = typeInto(m, "mine")
+	m, cmd := press(m, "enter")
+	m = resolve(t, m, cmd)
+	if !strings.Contains(m.View(), i18n.T("search.save_failed")) {
+		t.Errorf("the failure is not on screen:\n%s", m.View())
+	}
+}
+
+// A failed removal is reported the same way, and it must be visible while
+// the popup is still open: esc is the only way out of it, so a notice that
+// only shows up after esc arrives too late for the user to connect it to
+// the x they just pressed.
+func TestTheNoticeShowsWhileThePickerIsOpen(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{err: errors.New("disk is full")}
+	m := newTestModel(t, store)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "x")
+	m = resolve(t, m, cmd)
+	if m.mode != modePicker {
+		t.Fatal("setup: x closed the popup")
+	}
+	if !strings.Contains(m.View(), i18n.T("search.save_failed")) {
+		t.Errorf("the failure is not on screen while the popup is open:\n%s", m.View())
 	}
 }
 
@@ -482,6 +619,163 @@ func TestTheAuthorsOfTheNamedRepositoryAreOffered(t *testing.T) {
 
 	if !strings.Contains(m.View(), "octocat") {
 		t.Errorf("the repository's authors are not offered:\n%s", m.View())
+	}
+}
+
+// ctrl+o opens the list of saved queries, and enter runs the one it lands on.
+func TestCtrlOOpensTheSavedQueriesAndEnterRunsOne(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "mine", Query: "is:open author:@me"},
+		{Name: "reviews", Query: "is:open review-requested:@me"},
+	})
+	m, _ = press(m, "ctrl+o")
+	if !strings.Contains(m.View(), "reviews") {
+		t.Fatal("the popup does not list the saved queries")
+	}
+	m, _ = press(m, "j")
+	m, cmd := press(m, "enter")
+	if cmd == nil {
+		t.Fatal("enter did not run the query")
+	}
+	if !strings.Contains(m.View(), "review-requested:@me") {
+		t.Error("the raw query row does not show what was picked")
+	}
+}
+
+// x removes the row and writes the rest back, the way the Repos sidebar's x
+// does. Without it the only way to drop a query is to edit config.yaml.
+func TestXRemovesASavedQueryAndSavesTheRest(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "mine", Query: "is:open author:@me"},
+		{Name: "reviews", Query: "is:open review-requested:@me"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "x")
+	if cmd == nil {
+		t.Fatal("x did not write the list back")
+	}
+	resolve(t, m, cmd)
+	if len(store.saved) != 1 || store.saved[0].Name != "reviews" {
+		t.Fatalf("saved = %+v, want only reviews", store.saved)
+	}
+	if strings.Contains(m.View(), "mine") {
+		t.Error("the removed row is still drawn")
+	}
+}
+
+// Removing the last row leaves the cursor on something that exists.
+func TestRemovingTheLastRowKeepsTheCursorInRange(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "a", Query: "is:open"},
+		{Name: "b", Query: "is:pr"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, _ = press(m, "j")
+	m, cmd := press(m, "x")
+	resolve(t, m, cmd)
+	m, _ = press(m, "enter")
+	// A picker whose cursor was left one past the end guards enter and does
+	// nothing (handlePickerKey's "m.pick >= len(m.saved)" check), so a
+	// leftover popup here is the tell that the cursor was not pulled back.
+	if m.mode == modePicker {
+		t.Fatal("enter did nothing: the cursor was left out of range")
+	}
+	if !strings.Contains(m.View(), "is:open") {
+		t.Error("enter after the removal did not land on the row that is left")
+	}
+}
+
+// x on an empty list must not panic or write an empty file for nothing.
+func TestXOnAnEmptyListDoesNothing(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "x")
+	if cmd != nil {
+		resolve(t, m, cmd)
+	}
+	if len(store.saved) != 0 {
+		t.Error("x wrote to the settings file with nothing to remove")
+	}
+}
+
+// The root acts on q and 3 before a tab sees them. Typing over an open popup
+// would quit octoscope or jump tabs.
+func TestThePopupHoldsTheKeys(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m, _ = press(m, "ctrl+o")
+	if !m.Capturing() {
+		t.Error("the popup does not capture keys")
+	}
+}
+
+// Reopening the picker starts back on its first row: leaving the cursor
+// where a previous visit left it would pick the wrong entry on a bare enter.
+func TestReopeningThePickerResetsTheCursor(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "a", Query: "is:open"},
+		{Name: "b", Query: "is:closed"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, _ = press(m, "j")
+	m, _ = press(m, "esc")
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "enter")
+	m = resolve(t, m, cmd)
+	if !strings.Contains(m.View(), "is:open") {
+		t.Errorf("the cursor was left on the previous visit's row:\n%s", m.View())
+	}
+}
+
+// Nothing saved yet is a state the popup has to say something about, not an
+// empty box.
+func TestThePopupSaysWhenNothingIsSaved(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m, _ = press(m, "ctrl+o")
+	if !strings.Contains(m.View(), i18n.T("search.no_saved_queries")) {
+		t.Error("the popup does not say the list is empty")
+	}
+}
+
+// esc closes it and changes nothing.
+func TestEscapeClosesThePopup(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open author:@me"}})
+	before := m.View()
+	m, _ = press(m, "ctrl+o")
+	if !strings.Contains(m.View(), "mine") {
+		t.Fatal("setup: the popup did not open, so esc closing it proves nothing")
+	}
+	m, _ = press(m, "esc")
+	if m.Capturing() {
+		t.Error("esc left the popup open")
+	}
+	if m.View() != before {
+		t.Error("esc changed the tab")
 	}
 }
 

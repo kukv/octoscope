@@ -111,6 +111,8 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 	return nil
 }
 
+func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
 	if ref.Kind == gh.ItemIssue {
 		return usecase.Item{Kind: gh.ItemIssue}, nil
@@ -188,13 +190,13 @@ func newTestModel(opts Options) Model {
 
 // started is loadedApp with the search tab's own item, so it can be reached
 // through app's own key routing without a t.Helper() at every call site.
-func started(t *testing.T, width int) Model {
+func started(t *testing.T) Model {
 	t.Helper()
 	src := &fakeSource{searchItems: []gh.WorkItem{{
 		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
 		Title: "a result",
 	}}}
-	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return resolve(t, next.(Model), cmd)
 }
 
@@ -212,6 +214,10 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	case "ctrl+s":
 		return tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+	case "ctrl+o":
+		return tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
+	case "backspace":
+		return tea.KeyPressMsg{Code: tea.KeyBackspace}
 	default:
 		return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
 	}
@@ -328,7 +334,7 @@ func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
 func TestThreeShowsTheSearchTab(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 	if !strings.Contains(m.View().Content, i18n.T("search.filters")) {
 		t.Errorf("3 did not reach the Search tab:\n%s", m.View().Content)
@@ -340,7 +346,7 @@ func TestThreeShowsTheSearchTab(t *testing.T) {
 func TestTypingTheTabKeysIntoTheSearchFieldTypesThem(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 	m = press(m, "e")
 	for _, key := range []string{"q", "1", "2", "3"} {
@@ -354,7 +360,7 @@ func TestTypingTheTabKeysIntoTheSearchFieldTypesThem(t *testing.T) {
 func TestASearchResultOpensTheDetailView(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 	m = press(m, "l")
 	m, cmd := pressCmd(m, "enter")
@@ -1320,7 +1326,7 @@ func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 // repository is found from the working directory rather than named on the
 // command line -- but that move waits for the lookup to answer.
 func TestDefaultReposWaitsForTheRepositoryToBeFound(t *testing.T) {
-	m := New(&fakeSource{}, Options{DefaultRepos: true})
+	m := New(&fakeSource{}, Options{DefaultTab: "repos"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = next.(Model)
 
@@ -1349,7 +1355,7 @@ func TestAFoundRepositoryDoesNotMoveTheUserByItself(t *testing.T) {
 // The setting must not pull the user back after they have moved: it chooses
 // where the run starts, not where it stays.
 func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
-	m := New(&fakeSource{}, Options{DefaultRepos: true})
+	m := New(&fakeSource{}, Options{DefaultTab: "repos"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	next, _ = next.(Model).Update(repoResolvedMsg{name: "kukv/octoscope"})
 	onWork := press(next.(Model), "1")
@@ -1357,5 +1363,123 @@ func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
 	after, _ := onWork.Update(repoResolvedMsg{name: "kukv/octoscope"})
 	if got := after.(Model).tab; got != tabWork {
 		t.Errorf("tab = %v, want tabWork", got)
+	}
+}
+
+// default_tab: search has no dependency on the current repository, unlike
+// repos, so it must not wait for the lookup: the Search tab is there before
+// any message reaches Update.
+func TestDefaultSearchStartsThereImmediately(t *testing.T) {
+	m := New(&fakeSource{}, Options{DefaultTab: "search"})
+
+	if m.tab != tabSearch {
+		t.Errorf("tab = %v, want tabSearch", m.tab)
+	}
+}
+
+// --repo names a repository for this run; default_tab is a standing
+// preference. The flag wins regardless of what default_tab says.
+func TestRepoFlagOutranksDefaultSearch(t *testing.T) {
+	m := New(&fakeSource{}, Options{DefaultTab: "search", Repo: "kukv/octoscope"})
+
+	if m.tab != tabRepos {
+		t.Errorf("tab = %v, want tabRepos", m.tab)
+	}
+}
+
+// typeRaw types s into whichever field is open, one key at a time, the way a
+// terminal delivers it.
+func typeRaw(m Model, s string) Model {
+	for _, r := range s {
+		m = press(m, string(r))
+	}
+	return m
+}
+
+// clearRaw backspaces out whatever is already in the open field: the raw
+// editor and the name field both start filled with the current query, so
+// typing on top of that would append rather than replace it.
+func clearRaw(m Model, s string) Model {
+	for range []rune(s) {
+		m = press(m, "backspace")
+	}
+	return m
+}
+
+// setRawQuery goes through e, clear, type, enter, the way a user replaces
+// the raw query. It leaves the model back in browse mode with the search
+// started.
+func setRawQuery(t *testing.T, m Model, current, query string) Model {
+	t.Helper()
+	m = press(m, "e")
+	m = clearRaw(m, current)
+	m = typeRaw(m, query)
+	m, cmd := pressCmd(m, "enter")
+	return resolve(t, m, cmd)
+}
+
+// The whole path a user takes, through the root model that owns the tabs:
+// nothing here reaches into a sub-model's fields.
+func TestSavingAQueryAndCallingItBack(t *testing.T) {
+	t.Parallel()
+
+	m := started(t)
+	m = press(m, "3")
+
+	// is:open is the default filters query the raw editor and the name field
+	// both start filled with.
+	m = setRawQuery(t, m, "is:open", "author:kukv")
+
+	m = press(m, "s")
+	m = typeRaw(m, "mine")
+	m, cmd := pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+
+	// Change the raw query away from what was saved, so calling the saved
+	// query back is what brings "author:kukv" back, not it never leaving.
+	m = setRawQuery(t, m, "author:kukv", "is:closed")
+
+	m = press(m, "ctrl+o")
+
+	// The root routes q, 1 and 3 to the tabs before a tab sees them; while
+	// the picker is open they must reach it instead, or q would quit
+	// octoscope and 1 would jump to the Work tab out from under the popup.
+	m, cmd = pressCmd(m, "q")
+	if isQuit(cmd) {
+		t.Fatal("q quit octoscope instead of reaching the open picker")
+	}
+	m = press(m, "1")
+	if m.tab != tabSearch {
+		t.Fatalf("1 left the Search tab while the picker was open: tab = %v", m.tab)
+	}
+
+	m, cmd = pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+
+	if got := content(m); !strings.Contains(got, "author:kukv") {
+		t.Errorf("the raw query row does not show the saved query back:\n%s", got)
+	}
+	if got := content(m); strings.Contains(got, "is:closed") {
+		t.Errorf("the raw query row still shows the query that was replaced:\n%s", got)
+	}
+}
+
+// The settings file's saved queries have to reach the Search tab's picker.
+// Nothing else in these tests sets Options.SavedQueries, so without this the
+// wiring in New can be cut and every test stays green.
+func TestTheSettingsFileSavedQueriesReachThePicker(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{}
+	next, cmd := New(src, Options{
+		SavedQueries: []usecase.SavedQuery{{Name: "from-the-file", Query: "is:open author:@me"}},
+	}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+
+	m = press(m, "3")
+	m = press(m, "ctrl+o")
+
+	if got := content(m); !strings.Contains(got, "from-the-file") {
+		t.Errorf("the picker does not list what the settings file held:\n%s", got)
 	}
 }

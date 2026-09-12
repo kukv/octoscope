@@ -112,7 +112,38 @@ func TestGolden(t *testing.T) {
 				candidates, _ = candidates.Update(windowSize(w))
 				candidates.fetchedAt = goldenFetchedAt
 				golden.Assert(t, fmt.Sprintf("search_candidates_%s_%d", lang.name, w), candidates.View())
+
+				picker := saveQuery(t, loaded, "urgent", "is:open label:urgent")
+				picker = saveQuery(t, picker, "自分のPR", "author:kukv")
+				picker, _ = press(picker, "ctrl+o")
+				golden.Assert(t, fmt.Sprintf("search_picker_%s_%d", lang.name, w), picker.View())
+
+				naming := loaded
+				naming, _ = press(naming, "s")
+				naming = typeInto(naming, "自分")
+				golden.Assert(t, fmt.Sprintf("search_naming_%s_%d", lang.name, w), naming.View())
 			})
 		}
 	}
+}
+
+// saveQuery goes through the same keys a user does to save one: e to open
+// the raw editor (which starts filled with the current query, so it is
+// cleared first rather than typed into on top of), the query, s to name it,
+// enter to commit each. It leaves the model in browse mode with the query
+// saved, ready for the next one or for ctrl+o to open the picker.
+func saveQuery(t *testing.T, m Model, name, query string) Model {
+	t.Helper()
+	m, _ = press(m, "e") // openRaw never returns a command
+	for range []rune(m.input.Value()) {
+		m, _ = press(m, "backspace")
+	}
+	m = typeInto(m, query)
+	m, cmd := press(m, "enter")
+	m = resolve(t, m, cmd)
+	m, _ = press(m, "s")
+	m = typeInto(m, name)
+	m, cmd = press(m, "enter")
+	m = resolve(t, m, cmd)
+	return m
 }

@@ -1,6 +1,7 @@
 package search
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // sized is a model with results in it, at the width the test cares about.
@@ -132,12 +134,55 @@ func TestTheRawEditorFitsTheTerminal(t *testing.T) {
 	for _, w := range []int{80, 120, 160} {
 		m := sized(t, w, nil)
 		m, _ = press(m, "e")
+		if row, _, _ := strings.Cut(m.View(), "\n"); strings.Contains(row, "…") {
+			t.Errorf("width %d: the raw editor's row is truncated before anything was typed:\n%s", w, row)
+		}
 		for _, r := range strings.Repeat("x", 200) {
 			m, _ = press(m, string(r))
 		}
 		row, _, _ := strings.Cut(m.View(), "\n")
 		if got := ansi.StringWidth(row); got > w {
 			t.Errorf("width %d: the raw editor's row is %d columns:\n%s", w, got, row)
+		}
+	}
+}
+
+// The name prompt's row is the prompt text, a separating space, and the
+// input field. The width given to the input field must leave room for that
+// space, or the field claims a column past the edge and the row is clipped
+// with a truncation mark even though nothing typed was too long to show.
+func TestTheSaveNamePromptFitsTheTerminal(t *testing.T) {
+	t.Parallel()
+
+	for _, w := range []int{80, 120, 160} {
+		m := sized(t, w, nil)
+		m, _ = press(m, "s")
+		row, _, _ := strings.Cut(m.View(), "\n")
+		if got := ansi.StringWidth(row); got > w {
+			t.Errorf("width %d: the name prompt row is %d columns:\n%s", w, got, row)
+		}
+		if strings.Contains(row, "…") {
+			t.Errorf("width %d: the name prompt row is truncated with nothing typed:\n%s", w, row)
+		}
+	}
+}
+
+// The filter row is the filter's name in a fixed column and the field after
+// it, clipped to the pane. The width given to the field must leave room for
+// the cursor cell textinput draws past it, or the row is clipped with a
+// truncation mark even though nothing typed was too long to show.
+func TestATypedFilterIsNotTruncatedBeforeAnythingIsTyped(t *testing.T) {
+	t.Parallel()
+
+	for _, w := range []int{120, 160} {
+		m := sized(t, w, nil)
+		m, _ = press(m, "j") // type -> state
+		m, _ = press(m, "j") // state -> org
+		m, _ = press(m, "enter")
+		for i, line := range strings.Split(m.View(), "\n") {
+			if strings.Contains(line, "…") {
+				t.Errorf("width %d: line %d is truncated with nothing typed:\n%s", w, i, line)
+			}
 		}
 	}
 }
@@ -160,5 +205,44 @@ func TestATypedFilterFitsThePane(t *testing.T) {
 				t.Errorf("width %d: line %d is %d columns:\n%s", w, i, got, m.View())
 			}
 		}
+	}
+}
+
+// The popup draws one row per saved query. Nothing caps them, so a list
+// grown over months pushes the box's top edge and the key bar off the
+// screen -- the whole popup becomes unusable.
+func TestThePickerFitsTheHeight(t *testing.T) {
+	t.Parallel()
+
+	m := sized(t, 120, nil)
+	qs := make([]usecase.SavedQuery, 60)
+	for i := range qs {
+		qs[i] = usecase.SavedQuery{Name: fmt.Sprintf("q%d", i), Query: "is:open"}
+	}
+	m = m.SetSavedQueries(qs)
+	m, _ = press(m, "ctrl+o")
+	if got := len(strings.Split(m.View(), "\n")); got > 40 {
+		t.Errorf("the picker drew %d lines into a 40-row terminal", got)
+	}
+}
+
+// The window that TestThePickerFitsTheHeight cuts to must still follow the
+// cursor, or scrolling past the top of a long list would hide the entry the
+// user is on.
+func TestThePickerWindowFollowsTheCursor(t *testing.T) {
+	t.Parallel()
+
+	m := sized(t, 120, nil)
+	qs := make([]usecase.SavedQuery, 60)
+	for i := range qs {
+		qs[i] = usecase.SavedQuery{Name: fmt.Sprintf("q%d", i), Query: "is:open"}
+	}
+	m = m.SetSavedQueries(qs)
+	m, _ = press(m, "ctrl+o")
+	for range 59 {
+		m, _ = press(m, "j")
+	}
+	if !strings.Contains(m.View(), "q59") {
+		t.Errorf("the selected row scrolled out of view:\n%s", m.View())
 	}
 }

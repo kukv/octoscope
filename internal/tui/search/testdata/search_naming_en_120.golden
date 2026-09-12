@@ -1,4 +1,4 @@
-q [38;2;139;148;158mis:open[m                                                                                                      2 results
+Name this query [37m> [m自分[7;37m [m                                                                                                 
 
 [1;38;2;139;148;158mFilters[m                       [38;2;38;45;57m│[m[1;38;2;139;148;158mResults[m 2
 [48;2;29;39;53m[38;2;139;148;158mtype[m      all[m                 [38;2;38;45;57m│[m[48;2;29;39;53m[38;2;63;185;80m✓[m octoscope       [38;2;139;148;158m#42[m   レンダリングのパイプラインをまるごと置き換える refactor…   [38;2;139;148;158m3h ago[m[m
@@ -10,4 +10,4 @@ q [38;2;139;148;158mis:open[m                                                 
 [38;2;139;148;158mreview[m    —                   [38;2;38;45;57m│[m
 [38;2;139;148;158msort[m      —                   [38;2;38;45;57m│[m
 
-[38;2;139;148;158mj/k: field  space: change  enter: type  l: results  e: raw query  s: save  r: search again  q: quit  ctrl+o: saved[m
+[38;2;139;148;158mesc: cancel  enter: apply[m

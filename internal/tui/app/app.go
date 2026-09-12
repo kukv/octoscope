@@ -21,6 +21,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/search"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // repoNamer names the repository of the working directory. It is the root's
@@ -55,11 +56,16 @@ type Options struct {
 	// cannot read internal/config, so the list travels here.
 	Repositories []string
 
-	// DefaultRepos says the settings file asks for the Repos tab at
-	// start-up. It cannot be honoured until the current repository is known,
-	// so it is remembered here and spent when the lookup answers. It is
-	// weaker than --repo, which is a statement about this run.
-	DefaultRepos bool
+	// SavedQueries is the settings file's saved queries, handed to the
+	// Search tab the same way Repositories is handed to the Repos tab.
+	SavedQueries []usecase.SavedQuery
+
+	// DefaultTab is the settings file's opening tab ("repos", "search", or
+	// "" for none). "repos" cannot be honoured until the current repository
+	// is known, so it is remembered and spent when the lookup answers.
+	// "search" has no such dependency and takes effect immediately. Either
+	// is weaker than --repo, which is a statement about this run.
+	DefaultTab string
 
 	// ConfigError is why the settings file could not be read, if it could
 	// not. Empty means it was read, or was not there at all -- which is not
@@ -184,18 +190,19 @@ func New(src Source, opts Options) Model {
 			Repositories: opts.Repositories,
 			Current:      opts.Repo,
 		}),
-		search: search.New(src),
+		search: search.New(src).SetSavedQueries(opts.SavedQueries),
 	}
 	// Naming a repository on the command line is a statement about what the
-	// user came to look at, so that is the tab they land on. A repository
-	// found later, from the working directory, does not move them by itself
-	// -- unless the settings file asked for the Repos tab, in which case
-	// wantRepos spends that request when the lookup answers: see
-	// repoResolved.
-	if opts.Repo != "" {
+	// user came to look at, so that is the tab they land on -- ahead of
+	// default_tab either way, since it is a statement about this run and
+	// default_tab is a standing preference.
+	m.wantRepos = opts.DefaultTab == "repos"
+	switch {
+	case opts.Repo != "":
 		m.tab = tabRepos
+	case opts.DefaultTab == "search":
+		m.tab = tabSearch
 	}
-	m.wantRepos = opts.DefaultRepos
 	return m
 }
 

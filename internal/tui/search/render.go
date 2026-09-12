@@ -34,6 +34,12 @@ const (
 	// (internal/tui/dialog uses the same figure for the same reason).
 	promptCols = 2
 
+	// cursorCol is the extra column textinput reserves after the typed text
+	// for its cursor cell, on top of promptCols -- it is there even on an
+	// empty value, so a field sized to promptCols alone still overflows by
+	// one column once its own SetWidth is added to a row built around it.
+	cursorCol = 1
+
 	// queryRowHeight is the query line and the blank line under it;
 	// footerHeight is the blank line and the key bar.
 	queryRowHeight = 2
@@ -47,12 +53,20 @@ const (
 func (m Model) View() string {
 	if m.width <= 0 {
 		// The root routes keys to this tab before the first size arrives, so
-		// the raw editor must show what was typed even without one to lay
-		// the rest of the screen out against.
-		if m.mode == modeRaw {
-			return m.queryRow()
+		// whatever a key has just changed -- a typed query, a picked saved
+		// one -- must show without a width to lay the rest of the screen out
+		// against.
+		if m.mode == modePicker {
+			return m.pickerView()
 		}
-		return ""
+		return m.queryRow()
+	}
+	if m.mode == modePicker {
+		lines := []string{m.pickerView()}
+		if m.notice != "" {
+			lines = append(lines, theme.Error().Render(layout.Notice(m.notice, m.width)))
+		}
+		return strings.Join(append(lines, m.keyBar()), "\n")
 	}
 	lines := []string{m.queryRow(), ""}
 	if m.paneCols() > 0 {
@@ -88,16 +102,26 @@ func (m Model) resultWidth() int {
 // itself instead, with no count: what it will find is not known until enter
 // runs it.
 func (m Model) queryRow() string {
-	if m.mode == modeRaw {
+	switch m.mode {
+	case modeRaw:
 		line := "q " + m.input.View()
+		if m.width <= 0 {
+			return line
+		}
+		return layout.Clip(line, m.width)
+	case modeName:
+		line := i18n.T("search.save_prompt") + " " + m.input.View()
 		if m.width <= 0 {
 			return line
 		}
 		return layout.Clip(line, m.width)
 	}
 	query := m.query()
-	count := m.countText()
 	left := "q " + theme.Dim().Render(query)
+	if m.width <= 0 {
+		return left
+	}
+	count := m.countText()
 	room := max(m.width-ansi.StringWidth(count), 0)
 	return layout.Pad(left, room) + count
 }
@@ -136,6 +160,9 @@ func (m Model) keyBar() string {
 // bar names only the way out and the way to confirm. esc leads because
 // FitKeyBar never drops the first hint: it is the only way out.
 func (m Model) footerHints() []string {
+	if m.mode == modePicker {
+		return []string{i18n.T("footer.search.cancel"), i18n.T("footer.search.apply"), i18n.T("footer.search.remove")}
+	}
 	if m.Capturing() {
 		return []string{i18n.T("footer.search.cancel"), i18n.T("footer.search.apply")}
 	}
@@ -148,8 +175,10 @@ func (m Model) footerHints() []string {
 			i18n.T("footer.search.diff"),
 			i18n.T("footer.search.web"),
 			i18n.T("footer.search.raw"),
+			i18n.T("footer.search.save"),
 			i18n.T("footer.search.refresh"),
-			i18n.T("footer.search.quit"))
+			i18n.T("footer.search.quit"),
+			i18n.T("footer.search.open_saved"))
 	}
 	hints := []string{
 		i18n.T("footer.search.field"),
@@ -161,8 +190,10 @@ func (m Model) footerHints() []string {
 	}
 	return append(hints,
 		i18n.T("footer.search.raw"),
+		i18n.T("footer.search.save"),
 		i18n.T("footer.search.refresh"),
-		i18n.T("footer.search.quit"))
+		i18n.T("footer.search.quit"),
+		i18n.T("footer.search.open_saved"))
 }
 
 // filterPane draws the eight filters, one per row: its name in a fixed

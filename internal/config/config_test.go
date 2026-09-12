@@ -60,7 +60,7 @@ func TestLoadReportsBrokenYAMLAndStillReturnsDefaults(t *testing.T) {
 func TestLoadIgnoresKeysItDoesNotKnow(t *testing.T) {
 	t.Parallel()
 
-	path := write(t, "language: ja\nsaved_queries:\n  - is:open\n")
+	path := write(t, "language: ja\nfuture_field: is:open\n")
 
 	got, err := config.Load(path)
 	if err != nil {
@@ -71,31 +71,36 @@ func TestLoadIgnoresKeysItDoesNotKnow(t *testing.T) {
 	}
 }
 
-// default_tab is as tolerant of case and surrounding whitespace as icons and
-// language are; a user typing "Repos" must not silently land on Work.
-func TestWantsReposIgnoresCaseAndSurroundingWhitespace(t *testing.T) {
+// The settings file names a tab, not a boolean: a boolean cannot say
+// "search", and every tab added later would need another one.
+func TestDefaultTabNamesTheTab(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name       string
-		defaultTab string
-		want       bool
-	}{
-		{"empty", "", false},
-		{"exact", "repos", true},
-		{"mixed case", "Repos", true},
-		{"surrounding whitespace", " repos ", true},
-		{"unrelated value", "work", false},
+	cases := map[string]string{
+		"repos":    "repos",
+		"  SEARCH": "search",
+		"work":     "",
+		"":         "",
+		"nonsense": "",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
 			t.Parallel()
 
-			got := config.Config{DefaultTab: tt.defaultTab}.WantsRepos()
-			if got != tt.want {
-				t.Errorf("Config{DefaultTab: %q}.WantsRepos() = %v, want %v", tt.defaultTab, got, tt.want)
+			if got := (config.Config{DefaultTab: in}).DefaultTabName(); got != want {
+				t.Errorf("DefaultTabName(%q) = %q, want %q", in, got, want)
 			}
 		})
+	}
+}
+
+// A name the settings file does not know must not stop octoscope from
+// starting: a typo in a setting is not a reason to lose GitHub.
+func TestAnUnknownTabStartsOnTheDefault(t *testing.T) {
+	t.Parallel()
+
+	if got := (config.Config{DefaultTab: "detail"}).DefaultTabName(); got != "" {
+		t.Errorf("DefaultTabName = %q, want the empty default", got)
 	}
 }
 
@@ -250,5 +255,44 @@ func TestSaveRepositoriesWithNoPathFails(t *testing.T) {
 
 	if err := config.NewStore("").SaveRepositories([]string{"kukv/koto"}); err == nil {
 		t.Error("saving to an empty path reported success")
+	}
+}
+
+// Saving queries must leave every other setting where it was: the list and
+// the language are not this call's business.
+func TestSavingQueriesKeepsTheRestOfTheSettings(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("language: ja\nrepositories:\n  - kukv/octoscope\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	s := config.NewStore(path)
+	if err := s.SaveQueries([]config.SavedQuery{{Name: "mine", Query: "is:open author:@me"}}); err != nil {
+		t.Fatalf("SaveQueries: %v", err)
+	}
+	got, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.Language != "ja" || len(got.Repositories) != 1 {
+		t.Errorf("SaveQueries flattened the rest: %+v", got)
+	}
+	if len(got.SavedQueries) != 1 || got.SavedQueries[0].Query != "is:open author:@me" {
+		t.Errorf("SavedQueries = %+v", got.SavedQueries)
+	}
+}
+
+// A settings file that cannot be parsed is not written at all: a query is
+// not worth flattening the rest of someone's settings for.
+func TestSavingQueriesRefusesAFileItCannotRead(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("language: [unclosed\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := config.NewStore(path).SaveQueries(nil); err == nil {
+		t.Fatal("SaveQueries succeeded on a file it could not parse")
 	}
 }
