@@ -39,7 +39,9 @@ func (f *fakeRun) run(_ context.Context, dir string, args ...string) ([]byte, er
 
 func newTestClient(out string, err error) (*Client, *fakeRun) {
 	f := &fakeRun{out: []byte(out), err: err}
-	return &Client{dir: "/repo", run: f.run}, f
+	c := New("/repo", "")
+	c.run = f.run
+	return c, f
 }
 
 func readTestdata(t *testing.T, name string) string {

@@ -3,11 +3,41 @@ package gql
 import (
 	"context"
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
 )
+
+// fake records what was sent and answers with what it was given. The body is
+// returned even when err is set: a partially resolvable query answers with
+// both at once.
+type fake struct {
+	docs []string
+	vars [][]Var
+	body []byte
+	err  error
+}
+
+func (f *fake) client() *Client {
+	return &Client{Do: func(_ context.Context, doc string, vars []Var) ([]byte, error) {
+		f.docs = append(f.docs, doc)
+		f.vars = append(f.vars, vars)
+		return f.body, f.err
+	}}
+}
+
+// fileClient answers every call with a recorded response.
+func fileClient(t *testing.T, path string) *Client {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	return &Client{Do: func(context.Context, string, []Var) ([]byte, error) { return raw, nil }}
+}
 
 // A 502 means no answer came back, not that nothing arrived: the request is
 // well-formed, so asking again is the right response.

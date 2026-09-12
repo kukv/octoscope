@@ -415,7 +415,8 @@ func TestPRReviewContextWalksEveryPageOfThreads(t *testing.T) {
 		`"nodes":[{"path":"b.go","originalLine":2,"diffSide":"RIGHT"}]}}}}}`
 
 	f := &fakeSeq{outs: []string{page1, page2}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+	c := New("/repo", "kukv/octoscope")
+	c.run = f.run
 
 	rc, err := c.PRReviewContext(t.Context(), "", 55)
 	if err != nil {
@@ -458,7 +459,8 @@ func TestPRReviewContextWalksEveryPageOfAThreadsComments(t *testing.T) {
 		`"nodes":[{"body":"fifty-first","author":{"login":"kukv"}}]}}}}`
 
 	f := &fakeSeq{outs: []string{threads, rest}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+	c := New("/repo", "kukv/octoscope")
+	c.run = f.run
 
 	rc, err := c.PRReviewContext(t.Context(), "", 55)
 	if err != nil {
@@ -498,7 +500,8 @@ func TestAThreadThatFitsInOnePageCostsNoExtraRequest(t *testing.T) {
 		`"nodes":[{"body":"only","author":{"login":"kukv"}}]}}]}}}}}`
 
 	f := &fakeSeq{outs: []string{threads}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+	c := New("/repo", "kukv/octoscope")
+	c.run = f.run
 
 	if _, err := c.PRReviewContext(t.Context(), "", 55); err != nil {
 		t.Fatalf("PRReviewContext: %v", err)
@@ -522,7 +525,8 @@ func TestAThreadWithThreePagesOfCommentsIsFollowedToTheEnd(t *testing.T) {
 		`"nodes":[{"body":"three","author":{"login":"kukv"}}]}}}}`
 
 	f := &fakeSeq{outs: []string{threads, page2, page3}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+	c := New("/repo", "kukv/octoscope")
+	c.run = f.run
 
 	rc, err := c.PRReviewContext(t.Context(), "", 55)
 	if err != nil {

@@ -11,7 +11,8 @@ import (
 func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
 	t.Parallel()
 
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: fileRun(t, "testdata/merge_context.json")}
+	c := New("/repo", "kukv/octoscope")
+	c.run = fileRun(t, "testdata/merge_context.json")
 	got, err := c.PRMergeContext(t.Context(), "", 61)
 	if err != nil {
 		t.Fatalf("PRMergeContext: %v", err)
@@ -66,7 +67,8 @@ func TestPRMergeContextTranslatesTheEnums(t *testing.T) {
 				`"mergeStateStatus":"` + tt.state + `","reviewDecision":"APPROVED",` +
 				`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
 			f := &fakeSeq{outs: []string{body}}
-			c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+			c := New("/repo", "kukv/octoscope")
+			c.run = f.run
 
 			got, err := c.PRMergeContext(t.Context(), "", 61)
 			if err != nil {
@@ -100,7 +102,8 @@ func TestPRMergeContextSeesAutoMergeAlreadyOn(t *testing.T) {
 		`"mergeStateStatus":"UNSTABLE","reviewDecision":"","viewerCanEnableAutoMerge":true,` +
 		`"autoMergeRequest":{"enabledAt":"2026-09-08T01:00:00Z"}}}}}`
 	f := &fakeSeq{outs: []string{body}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+	c := New("/repo", "kukv/octoscope")
+	c.run = f.run
 
 	got, err := c.PRMergeContext(t.Context(), "", 61)
 	if err != nil {
@@ -127,7 +130,8 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 			t.Parallel()
 
 			f := &fakeSeq{outs: []string{`{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}`}}
-			c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
+			c := New("/repo", "kukv/octoscope")
+			c.run = f.run
 			if err := c.MergePR("PR_1", tt.method); err != nil {
 				t.Fatalf("MergePR: %v", err)
 			}
@@ -145,7 +149,8 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 	t.Parallel()
 
 	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: on.run}
+	c := New("/repo", "kukv/octoscope")
+	c.run = on.run
 	if err := c.EnableAutoMerge("PR_1", gh.MergeRebase); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
@@ -154,7 +159,8 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 	}
 
 	off := &fakeSeq{outs: []string{`{"data":{"disablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
-	c = &Client{dir: "/repo", repo: "kukv/octoscope", run: off.run}
+	c = New("/repo", "kukv/octoscope")
+	c.run = off.run
 	if err := c.DisableAutoMerge("PR_1"); err != nil {
 		t.Fatalf("DisableAutoMerge: %v", err)
 	}

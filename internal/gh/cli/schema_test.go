@@ -40,7 +40,6 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 	t.Parallel()
 
 	docs := map[string]string{
-		"work.graphql":            workQuery,
 		"review.graphql":          reviewContextQuery,
 		"start_review.graphql":    startReviewMutation,
 		"add_thread.graphql":      addThreadMutation,
@@ -48,7 +47,6 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 		"review_at_once.graphql":  reviewAtOnceMutation,
 		"discard_review.graphql":  discardReviewMutation,
 		"thread_comments.graphql": threadCommentsQuery,
-		"checks.graphql":          checksQuery,
 		"merge.graphql":           mergeContextQuery,
 
 		"merge_pr.graphql":           mergePRMutation,
