@@ -24,32 +24,40 @@ func commentNodeJSON(login string) string {
 // view that takes one page drops the newest comments of a long thread and
 // presents the rest as the whole conversation. gh pages the thread to the
 // end, and so must this.
+//
+// The thread is three pages on purpose. Two pages cannot tell a walk that
+// keeps going from one that fetches a single extra page and stops: both
+// answer a two-page thread correctly, and the second is the same silent
+// truncation one keyword further out.
 func TestGetPRWalksEveryPageOfTheConversation(t *testing.T) {
 	t.Parallel()
 
 	page1 := `{"data":{"repository":{"pullRequest":{"number":59,"comments":{"pageInfo":` +
 		`{"hasNextPage":true,"endCursor":"CUR1"},"nodes":[` + commentNodeJSON("oldest") + `]}}}}}`
-	page2 := commentsOnly("pullRequest", `{"hasNextPage":false,"endCursor":"CUR2"}`, commentNodeJSON("newest"))
+	page2 := commentsOnly("pullRequest", `{"hasNextPage":true,"endCursor":"CUR2"}`, commentNodeJSON("middle"))
+	page3 := commentsOnly("pullRequest", `{"hasNextPage":false,"endCursor":"CUR3"}`, commentNodeJSON("newest"))
 
-	f := &fakeSeq{outs: []string{page1, page2}}
+	f := &fakeSeq{outs: []string{page1, page2, page3}}
 	c := &Client{Do: f.do}
 
 	pr, err := c.GetPR(context.Background(), "kukv/octoscope", 59)
 	if err != nil {
 		t.Fatalf("GetPR: %v", err)
 	}
-	if len(f.calls) != 2 {
-		t.Fatalf("calls = %d, want 2 (the first page says there is another)", len(f.calls))
+	if len(f.calls) != 3 {
+		t.Fatalf("calls = %d, want 3: the walk stops only when a page says there is no next one", len(f.calls))
 	}
-	// Without the cursor the second request asks for page one again and the
-	// loop never ends.
-	if !slices.Contains(f.calls[1], S("after", "CUR1")) {
-		t.Errorf("second call = %v, want it to carry after=CUR1", f.calls[1])
+	// Each request carries the cursor the page before it ended on. Without
+	// that, every later request asks for page one again.
+	for i, want := range []string{"CUR1", "CUR2"} {
+		if !slices.Contains(f.calls[i+1], S("after", want)) {
+			t.Errorf("call %d = %v, want it to carry after=%s", i+1, f.calls[i+1], want)
+		}
 	}
-	// The later page is appended, not substituted, and the thread keeps the
+	// The later pages are appended, not substituted, and the thread keeps the
 	// order GitHub answered it in.
-	if got := logins(pr.Comments); !slices.Equal(got, []string{"oldest", "newest"}) {
-		t.Errorf("conversation = %v, want [oldest newest]", got)
+	if got := logins(pr.Comments); !slices.Equal(got, []string{"oldest", "middle", "newest"}) {
+		t.Errorf("conversation = %v, want [oldest middle newest]", got)
 	}
 }
 
