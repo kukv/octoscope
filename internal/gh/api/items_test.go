@@ -81,6 +81,9 @@ func TestReopeningAnIssuePatchesTheIssuesEndpointBackToOpen(t *testing.T) {
 	}
 
 	req := (*got)[0]
+	if req.Method != http.MethodPatch {
+		t.Errorf("method = %s, want PATCH", req.Method)
+	}
 	if req.URL.Path != "/repos/cli/cli/issues/50" {
 		t.Errorf("path = %q", req.URL.Path)
 	}
@@ -163,6 +166,36 @@ func TestRemovingAssigneesCarriesThemInTheBody(t *testing.T) {
 		t.Errorf("method = %s, want DELETE", req.Method)
 	}
 	if req.URL.Path != "/repos/cli/cli/issues/50/assignees" {
+		t.Errorf("path = %q", req.URL.Path)
+	}
+	var sent struct {
+		Assignees []string `json:"assignees"`
+	}
+	body, _ := io.ReadAll(req.Body)
+	_ = json.Unmarshal(body, &sent)
+	if len(sent.Assignees) != 1 || sent.Assignees[0] != "octocat" {
+		t.Errorf("assignees = %v", sent.Assignees)
+	}
+}
+
+// Adding assignees shares editLabels' shape closely enough to copy its body
+// key by mistake: this checks the request actually says "assignees", not
+// "labels", and lands on /assignees, not /labels.
+func TestAddingAssigneesNamesThemUnderTheAssigneesKeyNotTheLabelsOne(t *testing.T) {
+	t.Parallel()
+
+	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{}`)
+	})
+	if err := c.EditPRAssignees("cli/cli", 61, []string{"octocat"}, nil); err != nil {
+		t.Fatalf("EditPRAssignees: %v", err)
+	}
+
+	req := (*got)[0]
+	if req.Method != http.MethodPost {
+		t.Errorf("method = %s, want POST", req.Method)
+	}
+	if req.URL.Path != "/repos/cli/cli/issues/61/assignees" {
 		t.Errorf("path = %q", req.URL.Path)
 	}
 	var sent struct {
