@@ -44,6 +44,8 @@ jobs:
         uses: falcosecurity/falco-actions/start@558a3ceeee9403e1c875ffbeb704c34c93e24752 # main(タグ未発行のため commit を固定)
         with:
           mode: analyze
+          # sysdig 0.41.4 (renovate は digest 単体を追従できないため手動更新)
+          sysdig-version: sha256:740a122ba3ab923467c09a25725cdc5b530d93345f00cc1ced1b4a32bd9c52a9
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -91,5 +93,8 @@ jobs:
     steps:
       - name: Analyze
         uses: falcosecurity/falco-actions/analyze@558a3ceeee9403e1c875ffbeb704c34c93e24752 # main(タグ未発行のため commit を固定)
+        with:
+          # falco 0.39.2 (renovate は digest 単体を追従できないため手動更新)
+          falco-version: sha256:ba05dfb209cc1c2e912ce116d230b5f59c4542e7286f05b663c499066d5d6a42
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

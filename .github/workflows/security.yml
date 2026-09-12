@@ -71,7 +71,12 @@ jobs:
   # 切り離すため別ジョブにしている
   secrets-comment:
     needs: [secrets]
-    if: always() && needs.secrets.result == 'failure' && github.event_name == 'pull_request'
+    # fork PR は GITHUB_TOKEN が read-only に降格されコメントできないため、
+    # 同一リポの PR のみ対象にする(検知自体は secrets ジョブの失敗で担保される)
+    if: >-
+      always() && needs.secrets.result == 'failure'
+      && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
