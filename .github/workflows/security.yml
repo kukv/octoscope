@@ -1,7 +1,7 @@
 name: security
 
 # 全リポ共通のセキュリティ検査(言語非依存)。
-# - hidden-unicode: 不可視 Unicode / Trojan Source の検知
+# - hidden-unicode: Trojan Source(双方向制御文字)の検知
 # - secrets:        gitleaks による全履歴のシークレット検知(検知したら PR にメンション付きでコメント)
 # - sca:            依存ライブラリの既知脆弱性検知
 # - workflow-audit: zizmor によるワークフロー自体の静的解析
@@ -29,29 +29,23 @@ jobs:
     permissions:
       contents: read
     env:
-      # renovate: datasource=npm depName=anti-trojan-source
-      ANTI_TROJAN_SOURCE_VERSION: 1.13.0
+      # renovate: datasource=pypi depName=texthooks
+      TEXTHOOKS_VERSION: 0.7.1
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: scan source files
+      # Trojan Source は双方向制御文字でソースの見た目と実挙動をずらす攻撃。
+      # git 管理下のテキストファイル全部(バイナリは -I で除外)を対象にする。
+      # AI エージェントへの指示ファイル(CLAUDE.md など)もここに含まれる。
+      - name: forbid bidi controls
         run: |
-          npx --yes "anti-trojan-source@${ANTI_TROJAN_SOURCE_VERSION}" --verbose \
-            --files='**/*.{go,java,kt,kts,rs,ts,tsx,js,jsx,mjs,cjs,py,sh,bash,zsh,sql,tf,hcl,toml,yml,yaml,json,md}'
-          npx --yes "anti-trojan-source@${ANTI_TROJAN_SOURCE_VERSION}" --verbose \
-            --files='.github/**/*.{yml,yaml,md,json}'
-
-      # AI エージェントへの指示ファイルは、不可視文字による指示の書き換えが
-      # レビューで見えないため個別に走査する
-      - name: scan AI rules files
-        run: |
-          npx --yes "anti-trojan-source@${ANTI_TROJAN_SOURCE_VERSION}" --verbose \
-            --files='**/{CLAUDE.md,AGENTS.md,.cursorrules,.clinerules,.windsurfrules,*.mdc,copilot-instructions.md}'
-          npx --yes "anti-trojan-source@${ANTI_TROJAN_SOURCE_VERSION}" --verbose \
-            --files='.claude/**/*.md'
+          files="$(git grep -lI --cached '')"
+          if [ -n "$files" ]; then
+            echo "$files" | xargs -d '\n' pipx run --spec "texthooks==${TEXTHOOKS_VERSION}" forbid-bidi-controls
+          fi
 
   secrets:
     if: github.event_name != 'schedule'
