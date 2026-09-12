@@ -57,8 +57,15 @@ lint/2_Run actions_checkout@3d3c42e…txt ← ステップ名の "/" は "_" に
 test/5_Test.txt
 ```
 
-- `--log` は平坦な `0_lint.txt` を読む。だからステップが分からず `UNKNOWN STEP` になる
-- `--log-failed` は `lint/<n>_<step>.txt` を読む。だからステップ名が入る
+- `--log` は平坦な `0_lint.txt` を読んでいる**と思われる**。だからステップが分からず
+  `UNKNOWN STEP` になる
+- `--log-failed` は `lint/<n>_<step>.txt` を読んでいる**と思われる**。だからステップ名が入る
+
+**この 2 行だけは実測ではなく推定である。** 根拠は録ってある fixture の形（`job_log.txt` の
+1 行目が `Current runner version` で始まり、ステップ名が全部 `UNKNOWN STEP`。
+`job_log_failed.txt` には実際のステップ名が入っている）と、上の zip の構造が
+その 2 つにちょうど対応すること。**4-4 の最初のタスクで `gh` の
+`pkg/cmd/run/view/view.go` を読んで確かめる。** 確かめる前に実装方針を固めない。
 
 ### `GET /repos/{o}/{r}/actions/jobs/{job_id}/logs`（1 ジョブの平坦なログ）
 

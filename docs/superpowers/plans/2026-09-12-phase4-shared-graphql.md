@@ -37,6 +37,9 @@ GraphQL 系メソッドを利用側（`internal/usecase` の `source`）に出�
   効くので既存ルールで覆われる。Task 5 で実際に確認する）
 - カバレッジ基準は 80%（`.octocov.yml`）。移設でカバレッジが落ちないよう、テストも一緒に動かす
 - 各タスクの終わりに `make check` が緑であること
+- **各タスクの `git commit` 例には共著者行を省いてある。** 実際のコミットには
+  末尾に 1 行足す（空行を 1 つ挟んでから）:
+  `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`
 
 ## このスライスに入れないもの
 
@@ -116,6 +119,9 @@ api が `{owner}` という名前のリポジトリを探しに行く。
 ### 7. スライス 4 は 5 本の PR に割る
 
 このスライスは 1 本目。残りは着手前にそれぞれ計画を書く。
+**承認が取れたら、設計 §10 に「4 は 5 本に割った」の 1 行を足す**
+（§10 が「2 は 3 本に割った」と書いている前例と同じ形）。前提 6 の §6 の訂正と
+同じ PR で出す。
 
 | PR | 内容 |
 |---|---|
@@ -124,6 +130,88 @@ api が `{owner}` という名前のリポジトリを探しに行く。
 | 4-3 | REST 系（`go-github`）: label list / assignees / コメント / close・reopen / ラベルと担当者の編集 / `pulls/{n}/files` / `search/repositories` / `user/repos`・`orgs/{o}/repos` / `user/orgs` |
 | 4-4 | Actions: `RerunWorkflow` と `JobLog`（`run view --log` の代替） |
 | 4-5 | 引き継ぎ文書と、`gh` を PATH から外した手動確認の手順（完了条件 10） |
+
+---
+
+## テストの移し方（Task 2〜5 に共通する、一番はまる所）
+
+**`git mv` して `package` を書き換えるだけでは 1 つもコンパイルが通らない。**
+移す対象のテストは全部 `c.run = func(_ context.Context, _ string, args ...string)` を
+差し替えて `args`（`gh` の引数の文字列スライス）をアサートしている。`gql` に `run` は無く、
+`args` も無い。移す前に次の 2 つを決めてある。
+
+### 1. `gql` 側のフェイクは `doc` と `vars` を録る
+
+Task 2 で `internal/gh/gql/gql_test.go` に 1 つだけ置き、Task 3〜5 はこれを使い回す。
+
+```go
+// fake records what was sent and answers with what it was given. The body is
+// returned even when err is set: a partially resolvable query answers with
+// both at once.
+type fake struct {
+	docs []string
+	vars [][]Var
+	body []byte
+	err  error
+}
+
+func (f *fake) client() *Client {
+	return &Client{Do: func(_ context.Context, doc string, vars []Var) ([]byte, error) {
+		f.docs = append(f.docs, doc)
+		f.vars = append(f.vars, vars)
+		return f.body, f.err
+	}}
+}
+
+// fileClient answers every call with a recorded response.
+func fileClient(t *testing.T, path string) *Client {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	return &Client{Do: func(context.Context, string, []Var) ([]byte, error) { return raw, nil }}
+}
+```
+
+ページングを見るテストは、応答を 1 つずつ返すフェイク（呼ばれた回数で切り替える形）を
+そのテストの中に書く。既存の `checks_test.go` / `review_test.go` にある形をそのまま持ってくる。
+
+### 2. 引数のアサーションは変数のアサーションになる
+
+```go
+// before (cli):  if !slices.Contains(args, "reviewId=R_1") {
+// after  (gql):  if !slices.Contains(f.vars[0], S("reviewId", "R_1")) {
+// before (cli):  if !slices.Contains(args, "number=42") {
+// after  (gql):  if !slices.Contains(f.vars[0], N("number", 42)) {
+```
+
+`Var` は比較可能な構造体なので `slices.Contains` がそのまま使える。
+
+**「`gh` が今までと同じ綴りで起動する」の保証は `cli` 側に 1 か所だけ残す** —
+Task 1 の `TestNumbersAndPlaceholdersAreTheOnlyTypedArguments`（`Var` → 引数の対応表）と、
+Task 2 の `TestTheSearchStringDoesNotTravelAsQuery`（`New` から `run` まで通しで 1 本）。
+**同じ保証を全メソッドで繰り返さない。** 繰り返すと、`ghArgs` を直すたびに
+数十のテストを書き換えることになり、そのどれもが同じことしか言っていない。
+
+### 3. `&Client{...}` で組んでいるテストは `New` を通す
+
+`internal/gh/cli/*_test.go` には `&Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}` が
+**20 か所以上ある**（`cli_test.go:41`、`checks_test.go` に 8、`merge_test.go` に 6、
+`review_test.go` に 4 ほか）。`Client` が `*gql.Client` を embed した後、この形は
+embed が `nil` のまま残るので、GraphQL 系のメソッドを呼んだ瞬間に nil で落ちる。
+
+`cli` に残るテストは全部この形に直す。
+
+```go
+c := New("/repo", "kukv/octoscope")
+c.run = f.run
+```
+
+`New` が作る transport のクロージャは `c.run` を**呼び出し時に**読むので、
+`New` の後に差し替えても効く（Task 1 のコメントがその理由を書いている）。
+`cli_test.go:41` のヘルパーを直せば大半はそこで済む。
 
 ---
 
@@ -351,15 +439,36 @@ func (c *Client) Write(ctx context.Context, doc string, vars ...Var) ([]byte, er
 	return c.Do(ctx, doc, vars)
 }
 
+// SplitRepoVars names the repository by splitting "owner/name". It is what
+// a transport that cannot fill in a repository of its own gets: GraphQL's
+// repository() takes the two halves separately, unlike `gh pr`, which takes
+// the whole thing after --repo.
+func SplitRepoVars(repo string) ([]Var, error) {
+	owner, name, ok := gh.SplitRepo(repo)
+	if !ok {
+		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
+	}
+	return []Var{S("owner", owner), S("name", name)}, nil
+}
+
 // repoVars is what a caller uses to name the repository of a call.
 func (c *Client) repoVars(repo string) ([]Var, error) {
-	vars, err := c.RepoVars(repo)
+	split := c.RepoVars
+	if split == nil {
+		split = SplitRepoVars
+	}
+	vars, err := split(repo)
 	if err != nil {
 		return nil, fmt.Errorf("name repository: %w", err)
 	}
 	return vars, nil
 }
 ```
+
+`RepoVars` が `nil` のときに `SplitRepoVars` に落ちるのは、**`gql` のテストが
+`Client{Do: ...}` だけを組めるようにするため**である。これが無いと、リポジトリを
+名指しするメソッド（`PRChecks` / `PRReviewContext` / `PRMergeContext`）のテストが
+全部 nil で落ちる。
 
 `gh.Classify` が既にあるかを確かめる（`internal/gh/gh.go`）。無ければテスト側を
 `fmt.Errorf("HTTP 502: %w", gh.ErrTransient)` に読み替える。
@@ -460,11 +569,16 @@ git commit -m "refactor: give the GraphQL documents a transport to travel throug
   - `func RollupContexts(nodes []CheckContext) gh.Checks`
 - Consumes: Task 1 の `Client` / `Read` / `Var`
 
+- [ ] **Step 0: `gql` のフェイクを置く**
+
+上の「テストの移し方」1 の `fake` / `fileClient` を `internal/gh/gql/gql_test.go` に足す。
+Task 3〜5 はこれを使う。
+
 - [ ] **Step 1: 移設先のデコードテストを書いて落とす**
 
 `internal/gh/cli/graphql_test.go` のうち、**録った JSON を食わせて `gh.WorkItem` を
 確かめている部分**を `internal/gh/gql/search_test.go` に写す。`c.run` の差し替えは
-`Client{Do: ...}` の差し替えに読み替える。
+`Client{Do: ...}` の差し替えに読み替える（「テストの移し方」2）。
 
 ```go
 package gql
@@ -573,8 +687,18 @@ func repoVars(repo string) ([]gql.Var, error) {
 }
 ```
 
-`internal/gh/cli/item.go` の `rollup(...)` を `gql.RollupContexts(...)` に、
-`[]checkNode` を `[]gql.CheckContext` に直す。
+`internal/gh/cli/item.go` の 2 か所を直す（確認済み）。33 行目の
+`StatusCheckRollup []checkNode` を `[]gql.CheckContext` に、54 行目の
+`rollup(p.StatusCheckRollup)` を `gql.RollupContexts(p.StatusCheckRollup)` に。
+
+- [ ] **Step 3b: `cli` のテストを `New` 経由に直す**
+
+「テストの移し方」3 のとおり、`&Client{...}` で組んでいる箇所を全部
+`New(...)` + `c.run = ...` に直す。**ここを飛ばすと Task 3 以降が nil で落ちる。**
+
+```bash
+grep -rn '&Client{' internal/gh/cli/*_test.go   # 残っていないこと
+```
 
 - [ ] **Step 4: `cli` 側には引数のアサーションだけ残す**
 
@@ -925,8 +1049,9 @@ git commit -m "refactor: keep the schema check next to the documents it validate
 - 設計 §6 の表が実態と合わない 2 点（この計画の前提 6）。書き換えは利用者の承認事項
 - `gh.PR` / `gh.Issue` を埋める `.graphql` 文書はまだ無い（4-2）
 - `cli` に残ったサブコマンド依存の一覧（4-3 / 4-4 が引き取るもの）
-- `gql.Client` の `RepoVars` が `nil` のときの挙動（今は panic）。
-  4-2 で `api` を組むときに必ず入れる側なので、守りを足していない
+- `gql.Client.RepoVars` が `nil` のときは `SplitRepoVars` に落ちる。
+  つまり「リポジトリ名を渡さずに済ませる」のは `cli` だけの特権であり、
+  4-2 の `api` は必ず自分で owner/name を解決してから渡す
 
 - [ ] **Step 2: コミットする**
 
