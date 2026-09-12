@@ -1,8 +1,8 @@
-package cli
+package gql
 
 import (
+	"context"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -11,9 +11,8 @@ import (
 func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
 	t.Parallel()
 
-	c := New("/repo", "kukv/octoscope")
-	c.run = fileRun(t, "testdata/merge_context.json")
-	got, err := c.PRMergeContext(t.Context(), "", 61)
+	c := fileClient(t, "testdata/merge_context.json")
+	got, err := c.PRMergeContext(context.Background(), "kukv/octoscope", 61)
 	if err != nil {
 		t.Fatalf("PRMergeContext: %v", err)
 	}
@@ -67,10 +66,9 @@ func TestPRMergeContextTranslatesTheEnums(t *testing.T) {
 				`"mergeStateStatus":"` + tt.state + `","reviewDecision":"APPROVED",` +
 				`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
 			f := &fakeSeq{outs: []string{body}}
-			c := New("/repo", "kukv/octoscope")
-			c.run = f.run
+			c := &Client{Do: f.do}
 
-			got, err := c.PRMergeContext(t.Context(), "", 61)
+			got, err := c.PRMergeContext(context.Background(), "kukv/octoscope", 61)
 			if err != nil {
 				t.Fatalf("PRMergeContext: %v", err)
 			}
@@ -102,10 +100,9 @@ func TestPRMergeContextSeesAutoMergeAlreadyOn(t *testing.T) {
 		`"mergeStateStatus":"UNSTABLE","reviewDecision":"","viewerCanEnableAutoMerge":true,` +
 		`"autoMergeRequest":{"enabledAt":"2026-09-08T01:00:00Z"}}}}}`
 	f := &fakeSeq{outs: []string{body}}
-	c := New("/repo", "kukv/octoscope")
-	c.run = f.run
+	c := &Client{Do: f.do}
 
-	got, err := c.PRMergeContext(t.Context(), "", 61)
+	got, err := c.PRMergeContext(context.Background(), "kukv/octoscope", 61)
 	if err != nil {
 		t.Fatalf("PRMergeContext: %v", err)
 	}
@@ -119,26 +116,25 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 
 	tests := []struct {
 		method gh.MergeMethod
-		want   string
+		want   Var
 	}{
-		{gh.MergeSquash, "mergeMethod=SQUASH"},
-		{gh.MergeCommit, "mergeMethod=MERGE"},
-		{gh.MergeRebase, "mergeMethod=REBASE"},
+		{gh.MergeSquash, S("mergeMethod", "SQUASH")},
+		{gh.MergeCommit, S("mergeMethod", "MERGE")},
+		{gh.MergeRebase, S("mergeMethod", "REBASE")},
 	}
 	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
+		t.Run(tt.want.Str, func(t *testing.T) {
 			t.Parallel()
 
 			f := &fakeSeq{outs: []string{`{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}`}}
-			c := New("/repo", "kukv/octoscope")
-			c.run = f.run
+			c := &Client{Do: f.do}
 			if err := c.MergePR("PR_1", tt.method); err != nil {
 				t.Fatalf("MergePR: %v", err)
 			}
 			if !slices.Contains(f.calls[0], tt.want) {
-				t.Errorf("call = %v, want it to carry %s", f.calls[0], tt.want)
+				t.Errorf("call = %v, want it to carry %v", f.calls[0], tt.want)
 			}
-			if !slices.Contains(f.calls[0], "pullRequestId=PR_1") {
+			if !slices.Contains(f.calls[0], S("pullRequestId", "PR_1")) {
 				t.Errorf("call = %v, want it to carry pullRequestId=PR_1", f.calls[0])
 			}
 		})
@@ -149,26 +145,22 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 	t.Parallel()
 
 	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
-	c := New("/repo", "kukv/octoscope")
-	c.run = on.run
+	c := &Client{Do: on.do}
 	if err := c.EnableAutoMerge("PR_1", gh.MergeRebase); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
-	if !slices.Contains(on.calls[0], "mergeMethod=REBASE") {
+	if !slices.Contains(on.calls[0], S("mergeMethod", "REBASE")) {
 		t.Errorf("call = %v, want it to carry mergeMethod=REBASE", on.calls[0])
 	}
 
 	off := &fakeSeq{outs: []string{`{"data":{"disablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
-	c = New("/repo", "kukv/octoscope")
-	c.run = off.run
+	c = &Client{Do: off.do}
 	if err := c.DisableAutoMerge("PR_1"); err != nil {
 		t.Fatalf("DisableAutoMerge: %v", err)
 	}
 	// Turning it off takes the pull request and nothing else: the method
 	// belongs to the request being cancelled, not to the cancellation.
-	for _, arg := range off.calls[0] {
-		if strings.HasPrefix(arg, "mergeMethod=") {
-			t.Errorf("call = %v, want no mergeMethod", off.calls[0])
-		}
+	if slices.ContainsFunc(off.calls[0], func(v Var) bool { return v.Name == "mergeMethod" }) {
+		t.Errorf("call = %v, want no mergeMethod", off.calls[0])
 	}
 }

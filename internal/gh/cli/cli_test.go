@@ -731,6 +731,47 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 	})
 }
 
+func TestRepoVarsNamesTheOwnerAndName(t *testing.T) {
+	t.Parallel()
+
+	got, err := repoVars("kukv/koto")
+	if err != nil {
+		t.Fatalf("repoVars: %v", err)
+	}
+	want := []gql.Var{gql.S("owner", "kukv"), gql.S("name", "koto")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("repoVars = %+v, want %+v", got, want)
+	}
+}
+
+// TestRepoVarsFillsPlaceholdersWhenEmpty is the ordinary case: no --repo, so
+// there is no "owner/name" to split and gh has to fill the placeholders from
+// the checkout's remote.
+func TestRepoVarsFillsPlaceholdersWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	got, err := repoVars("")
+	if err != nil {
+		t.Fatalf("repoVars: %v", err)
+	}
+	want := []gql.Var{gql.Placeholder("owner", "{owner}"), gql.Placeholder("name", "{repo}")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("repoVars = %+v, want %+v", got, want)
+	}
+}
+
+// TestRepoVarsRejectsARepoWithNoSlash guards against silently querying the
+// wrong repository: a --repo value with no "/" cannot be split into owner
+// and name, so the call must fail rather than send an empty owner or name to
+// GitHub.
+func TestRepoVarsRejectsARepoWithNoSlash(t *testing.T) {
+	t.Parallel()
+
+	if _, err := repoVars("not-a-repo"); err == nil {
+		t.Fatal("repoVars did not fail for a repo with no slash")
+	}
+}
+
 // GraphQL rejects "3" where it wants 3, and gh substitutes {owner}/{repo}
 // only in -F values. Everything the user typed stays in -f, where gh passes
 // it through untouched.

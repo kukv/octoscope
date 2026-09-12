@@ -7,11 +7,7 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
 )
-
-// pageInfo is gone with the documents; review.go follows in the next step.
-type pageInfo = gql.PageInfo
 
 // JobLog reads one job's log. With failedOnly it asks for the failed steps
 // alone: that is what someone opening a red check came to read, and a whole

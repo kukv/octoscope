@@ -251,6 +251,7 @@ func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
 	docs := map[string]string{
 		"work.graphql":   workQuery,
 		"checks.graphql": checksQuery,
+		"review.graphql": reviewContextQuery,
 	}
 	re := regexp.MustCompile(`first:\s*(\d+)`)
 	for name, doc := range docs {

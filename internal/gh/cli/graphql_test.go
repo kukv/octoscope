@@ -3,9 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
-	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -223,28 +221,5 @@ func TestListWorkSectionPropagatesRunError(t *testing.T) {
 	}
 	if len(items) != 0 {
 		t.Errorf("the column holds %d items, want 0", len(items))
-	}
-}
-
-// review.graphql is the last document left in cli that pages a connection;
-// work.graphql and checks.graphql moved with their documents and are
-// covered by the equivalent test in internal/gh/gql.
-func TestNoConnectionAsksForMoreThanGitHubAllows(t *testing.T) {
-	t.Parallel()
-
-	docs := map[string]string{
-		"review.graphql": reviewContextQuery,
-	}
-	re := regexp.MustCompile(`first:\s*(\d+)`)
-	for name, doc := range docs {
-		for _, m := range re.FindAllStringSubmatch(doc, -1) {
-			n, err := strconv.Atoi(m[1])
-			if err != nil {
-				t.Fatalf("%s: %v", name, err)
-			}
-			if n > 100 {
-				t.Errorf("%s: %s exceeds GitHub's cap of 100", name, m[0])
-			}
-		}
 	}
 }
