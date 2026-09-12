@@ -113,6 +113,34 @@ func TestTheListDocumentsAskForAHundred(t *testing.T) {
 	}
 }
 
+// reviewDecision, statusCheckRollup, additions and deletions are exactly what
+// REST cannot answer about a pull request; that gap is the reason this
+// document exists instead of a REST call. A fixture-based test cannot catch
+// one of these being dropped from the document (the fixture already has the
+// data on disk, independent of what the document currently asks for), so
+// this reads the embedded document text directly. The document's own header
+// comment also names these fields in prose, so comment lines are stripped
+// first -- otherwise the assertion would pass even with the selection gone.
+func TestRepoPRsDocumentSelectsTheFieldsRESTCannotAnswer(t *testing.T) {
+	t.Parallel()
+
+	var selections strings.Builder
+	for _, line := range strings.Split(repoPRsQuery, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		selections.WriteString(line)
+		selections.WriteByte('\n')
+	}
+	doc := selections.String()
+
+	for _, field := range []string{"reviewDecision", "statusCheckRollup", "additions", "deletions"} {
+		if !strings.Contains(doc, field) {
+			t.Errorf("repo_prs.graphql does not select %s", field)
+		}
+	}
+}
+
 func TestListIssuesReadsTheRecordedAnswer(t *testing.T) {
 	t.Parallel()
 
