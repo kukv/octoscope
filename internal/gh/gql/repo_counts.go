@@ -1,4 +1,4 @@
-package cli
+package gql
 
 import (
 	"context"
@@ -51,7 +51,7 @@ type repoCountsResponse struct {
 // instead of failing the rest.
 func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
 	counts := make([]gh.RepoCount, len(repos))
-	args := []string{}
+	var vars []Var
 	indices := []int{}
 	for i, repo := range repos {
 		counts[i].Repo = repo
@@ -61,16 +61,14 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount
 			continue
 		}
 		n := len(indices)
-		args = append(args, "-f", fmt.Sprintf("o%d=%s", n, owner), "-f", fmt.Sprintf("n%d=%s", n, name))
+		vars = append(vars, S(fmt.Sprintf("o%d", n), owner), S(fmt.Sprintf("n%d", n), name))
 		indices = append(indices, i)
 	}
 	if len(indices) == 0 {
 		return counts, nil
 	}
 
-	query := buildRepoCountsQuery(len(indices))
-	callArgs := append([]string{"api", "graphql", "-f", "query=" + query}, args...)
-	out, runErr := c.read(ctx, c.dir, callArgs...)
+	out, runErr := c.Read(ctx, buildRepoCountsQuery(len(indices)), vars...)
 	var resp repoCountsResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
 		if runErr != nil {

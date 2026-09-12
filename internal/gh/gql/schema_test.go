@@ -1,4 +1,4 @@
-package cli
+package gql
 
 import (
 	"encoding/json"
@@ -40,6 +40,19 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 	t.Parallel()
 
 	docs := map[string]string{
+		"work":                        workQuery,
+		"review":                      reviewContextQuery,
+		"start_review":                startReviewMutation,
+		"add_thread":                  addThreadMutation,
+		"submit_review":               submitReviewMutation,
+		"review_at_once":              reviewAtOnceMutation,
+		"discard_review":              discardReviewMutation,
+		"thread_comments":             threadCommentsQuery,
+		"checks":                      checksQuery,
+		"merge":                       mergeContextQuery,
+		"merge_pr":                    mergePRMutation,
+		"enable_auto_merge":           enableAutoMergeMutation,
+		"disable_auto_merge":          disableAutoMergeMutation,
 		"repo_counts (built for two)": buildRepoCountsQuery(2),
 	}
 	schema := loadSchema(t)
