@@ -310,3 +310,27 @@ Actions（4-4）まで揃ってからで、4-2 終了時点では配線がコン
 10 は人手。**`gh` を PATH から外し `GH_TOKEN` だけで全機能が動く**こと（spec §7）。
 TTY と実在のリポジトリが要るのでこの環境では代行できない。受け渡しの手順は
 Phase 2・Phase 3 と同じ形で `docs/superpowers/` に書く。
+
+## 11.1 照合結果（2026-09-13、スライス 4-5）
+
+| 条件 | 結果 | 根拠 |
+|---|---|---|
+| 1 設定ファイル | 満たす | スライス 1。`internal/config` のテスト |
+| 2 言語の決定順 | 満たす | スライス 1。`internal/i18n` の `Resolve` のテスト |
+| 3 Repos タブと追加・削除の永続化 | 満たす | スライス 2-2 / 2-3 |
+| 4 カレントのリポジトリが先頭 | 満たす | スライス 2-1 |
+| 5 件数バッジが 1 リクエスト | 満たす | スライス 2-1。消えたリポジトリ 1 件の部分解決も |
+| 6 Search タブと保存クエリ | 満たす | スライス 3-2 / 3-3 |
+| 7 `internal/tui` が両バックエンドを import しない | **満たす（実行して確認）** | `go list -deps ./internal/tui/... \| grep -E 'internal/gh/(cli\|api)$'` が空 |
+| 8 `.graphql` 1 組を両バックエンドが使う | **満たす（実行して確認）** | `internal/gh/gql` に 21 文書。`cli` と `api` の両方が `internal/gh/gql` を import する。`internal/gh/gql/schema_test.go` がその 1 組を検証 |
+| 9 golden が en / ja × 80 / 120 / 160 | 満たす | 314 ファイル中 308 がこの命名。残る 6 は別軸の意図的なもの（`*_icons_ascii` / `*_icons_nerd` のグリフ集合、`work_tall_24` の高さ） |
+
+**10 の現状。** 当初「人手」としていたが、**取得系は 4-5 で機械的に確認できた。**
+`gh` を PATH から外し `GH_TOKEN` だけで `api` の取得メソッド 16 本を実データに
+対して走らせ、全部成功した（`kukv/octoscope` と、open PR のある `cli/cli`）。
+`api` バックエンドで起動し 25 秒間落ちないことも `pty` を割り当てて確認した。
+
+**残るのは画面・キー操作・書き込み系である。** 画面は `script` 経由では
+alt screen の描画が捕まらず（`cli` バックエンドでも同じなので capture 側の制約）、
+書き込み系と `RerunWorkflow` は実際の GitHub を変更するため実行しなかった。
+手順は `docs/superpowers/2026-09-13-phase4-handover.md`。
