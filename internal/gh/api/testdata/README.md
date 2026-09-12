@@ -12,6 +12,7 @@ GitHub の REST API から実際に録った応答。手書きしない。
 | `search_repos.json` | `gh api 'search/repositories?q=octoscope&per_page=5'` | 2026-09-13 | 公開検索結果（`--jq` で絞らない。伏せるものが無い） |
 | `user_repos.json` | `gh api 'user/repos?affiliation=owner&sort=pushed&direction=desc&per_page=100' --jq '[.[] \| select(.private==false) \| {full_name, private}] \| .[0:5]'` | 2026-09-13 | `kukv` 自身の公開リポジトリ 5 件（private なリポジトリ名が残っていたため公開のみに絞り直した） |
 | `user_orgs.json` | `gh api user/orgs --jq '[.[] \| {login}]'` | 2026-09-13 | `kukv` の所属 Org（1 件） |
+| `job.json` | `gh api repos/kukv/octoscope/actions/jobs/103558786732` | 2026-09-13 | `kukv/octoscope` のジョブ `103558786732`（`hidden-unicode`、run `34695737662`、失敗済み。step の番号が 1,2,3,4,8,9 と飛ぶのは実際の応答のまま） |
 
 `assignees.json` は `jq` で `login` と `id` に絞ってある。生の応答には
 プロフィール URL とアバター URL が並び、録りものに残す理由が無い。
