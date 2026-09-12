@@ -603,6 +603,73 @@ func TestCtrlOOpensTheSavedQueriesAndEnterRunsOne(t *testing.T) {
 	}
 }
 
+// x removes the row and writes the rest back, the way the Repos sidebar's x
+// does. Without it the only way to drop a query is to edit config.yaml.
+func TestXRemovesASavedQueryAndSavesTheRest(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "mine", Query: "is:open author:@me"},
+		{Name: "reviews", Query: "is:open review-requested:@me"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "x")
+	if cmd == nil {
+		t.Fatal("x did not write the list back")
+	}
+	resolve(t, m, cmd)
+	if len(store.saved) != 1 || store.saved[0].Name != "reviews" {
+		t.Fatalf("saved = %+v, want only reviews", store.saved)
+	}
+	if strings.Contains(m.View(), "mine") {
+		t.Error("the removed row is still drawn")
+	}
+}
+
+// Removing the last row leaves the cursor on something that exists.
+func TestRemovingTheLastRowKeepsTheCursorInRange(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "a", Query: "is:open"},
+		{Name: "b", Query: "is:pr"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, _ = press(m, "j")
+	m, cmd := press(m, "x")
+	resolve(t, m, cmd)
+	m, _ = press(m, "enter")
+	// A picker whose cursor was left one past the end guards enter and does
+	// nothing (handlePickerKey's "m.pick >= len(m.saved)" check), so a
+	// leftover popup here is the tell that the cursor was not pulled back.
+	if m.mode == modePicker {
+		t.Fatal("enter did nothing: the cursor was left out of range")
+	}
+	if !strings.Contains(m.View(), "is:open") {
+		t.Error("enter after the removal did not land on the row that is left")
+	}
+}
+
+// x on an empty list must not panic or write an empty file for nothing.
+func TestXOnAnEmptyListDoesNothing(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, &fakeStore{})
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "x")
+	if cmd != nil {
+		resolve(t, m, cmd)
+	}
+	if len(store.saved) != 0 {
+		t.Error("x wrote to the settings file with nothing to remove")
+	}
+}
+
 // The root acts on q and 3 before a tab sees them. Typing over an open popup
 // would quit octoscope or jump tabs.
 func TestThePopupHoldsTheKeys(t *testing.T) {

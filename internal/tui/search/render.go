@@ -150,6 +150,9 @@ func (m Model) keyBar() string {
 // bar names only the way out and the way to confirm. esc leads because
 // FitKeyBar never drops the first hint: it is the only way out.
 func (m Model) footerHints() []string {
+	if m.mode == modePicker {
+		return []string{i18n.T("footer.search.cancel"), i18n.T("footer.search.apply"), i18n.T("footer.search.remove")}
+	}
 	if m.Capturing() {
 		return []string{i18n.T("footer.search.cancel"), i18n.T("footer.search.apply")}
 	}
@@ -163,6 +166,7 @@ func (m Model) footerHints() []string {
 			i18n.T("footer.search.web"),
 			i18n.T("footer.search.raw"),
 			i18n.T("footer.search.save"),
+			i18n.T("footer.search.open_saved"),
 			i18n.T("footer.search.refresh"),
 			i18n.T("footer.search.quit"))
 	}
@@ -177,6 +181,7 @@ func (m Model) footerHints() []string {
 	return append(hints,
 		i18n.T("footer.search.raw"),
 		i18n.T("footer.search.save"),
+		i18n.T("footer.search.open_saved"),
 		i18n.T("footer.search.refresh"),
 		i18n.T("footer.search.quit"))
 }

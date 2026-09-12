@@ -1,6 +1,8 @@
 package search
 
 import (
+	"slices"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/usecase"
@@ -34,6 +36,15 @@ func upsert(qs []usecase.SavedQuery, q usecase.SavedQuery) []usecase.SavedQuery 
 		}
 	}
 	return append(qs, q)
+}
+
+// removeSaved drops the entry at i and reports whether it was dropped, the
+// way internal/tui/repo/rows.go's removeRow does for the sidebar's own x.
+func removeSaved(qs []usecase.SavedQuery, i int) ([]usecase.SavedQuery, bool) {
+	if i < 0 || i >= len(qs) {
+		return qs, false
+	}
+	return append(slices.Clone(qs[:i]), qs[i+1:]...), true
 }
 
 // saveQueries writes the saved queries as they now stand to the settings

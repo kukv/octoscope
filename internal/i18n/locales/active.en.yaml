@@ -290,6 +290,8 @@ footer:
       other: "e: raw query"
     save:
       other: "s: save"
+    open_saved:
+      other: "ctrl+o: saved"
     open:
       other: "enter: detail"
     move:
@@ -308,6 +310,8 @@ footer:
       other: "esc: cancel"
     apply:
       other: "enter: apply"
+    remove:
+      other: "x: remove"
   close:
     other: "x:close"
   reopen:

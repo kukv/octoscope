@@ -374,6 +374,14 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.raw = m.saved[m.pick].Query
 		m.mode = modeBrowse
 		return m.startSearch()
+	case "x":
+		qs, removed := removeSaved(m.saved, m.pick)
+		if !removed {
+			return m, nil
+		}
+		m.saved = qs
+		m.pick = min(m.pick, len(qs)-1)
+		return m, saveQueries(m.src, qs)
 	}
 	return m, nil
 }
