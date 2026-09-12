@@ -5,13 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/jeandeaual/go-locale"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/config"
-	"github.com/kukv/octoscope/internal/gh/cli"
+	"github.com/kukv/octoscope/internal/gh/api"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"
 	"github.com/kukv/octoscope/internal/tui/icon"
@@ -59,10 +60,23 @@ func main() {
 	// Whether the current directory has a repository is settled by the UI,
 	// not here: answering it costs a gh subprocess, and waiting for one before
 	// the first frame left the terminal blank for as long as it took.
-	client := cli.New(dir, *repoFlag)
+	ghClient, apiClient, err := chooseBackend(dir, *repoFlag, exec.LookPath, api.Token)
+	if err != nil {
+		// Printed before the program starts: once it is in the alt screen,
+		// nothing written here survives the screen being cleared.
+		fmt.Fprintln(os.Stderr, i18n.T("error.no_backend"))
+		os.Exit(1)
+	}
+
 	// The store is built even when config.Path failed: it reports that
 	// failure when something is saved, rather than saving nothing in silence.
-	uc := usecase.New(client, config.NewStore(path))
+	store := config.NewStore(path)
+	var uc *usecase.Usecase
+	if ghClient != nil {
+		uc = usecase.New(ghClient, store)
+	} else {
+		uc = usecase.New(apiClient, store)
+	}
 	p := tea.NewProgram(app.New(uc, app.Options{
 		Repo:         *repoFlag,
 		Repositories: cfg.Repositories,

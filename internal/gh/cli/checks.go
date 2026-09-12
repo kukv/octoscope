@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
 )
@@ -30,9 +29,7 @@ func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnl
 }
 
 // parseJobLog reads the format gh prints: three tab-separated fields, the
-// job's name, the step's name, and the message, whose first word is an
-// RFC3339 timestamp on every line the runner stamped. The message of the
-// very first line starts with a byte order mark.
+// job's name, the step's name, and the line the runner wrote.
 func parseJobLog(out string) []gh.LogLine {
 	var lines []gh.LogLine
 	for _, raw := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
@@ -44,16 +41,7 @@ func parseJobLog(out string) []gh.LogLine {
 			lines = append(lines, gh.LogLine{Text: fields[len(fields)-1]})
 			continue
 		}
-		// The mark sits at the start of the message, not of the line: the
-		// job and the step name come before it.
-		message := strings.TrimPrefix(fields[2], "\ufeff")
-		line := gh.LogLine{Step: fields[1], Text: message}
-		if stamp, rest, ok := strings.Cut(message, " "); ok {
-			if at, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
-				line.Time, line.Text = at, rest
-			}
-		}
-		lines = append(lines, line)
+		lines = append(lines, gh.NewLogLine(fields[1], fields[2]))
 	}
 	return lines
 }

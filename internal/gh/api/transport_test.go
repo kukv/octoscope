@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/gh/gql"
@@ -163,5 +164,60 @@ func TestAnOrdinaryFailureKeepsWhatGitHubSaid(t *testing.T) {
 	}
 	if gh.IsFatal(err) {
 		t.Error("a rate limit is not something the user has to fix before anything works")
+	}
+}
+
+// A server that accepts the connection and then never answers would otherwise
+// hold the screen forever: there is no deadline on the context the TUI passes,
+// and gh is not here to be killed.
+func TestAServerThatNeverAnswersDoesNotHangForever(t *testing.T) {
+	orig := responseTimeout
+	responseTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { responseTimeout = orig })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		time.Sleep(2 * time.Second)
+	}))
+	t.Cleanup(srv.Close)
+
+	c := New("", "kukv/octoscope", "secret-token")
+	c.baseURL = srv.URL
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.read(context.Background(), "repos/kukv/octoscope/labels", "")
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("read: want an error when the server never answers")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("read did not give up")
+	}
+}
+
+// The body of a large answer is not on the clock the headers are. A run's log
+// archive is megabytes: cutting it off part way would show half a log as if
+// the job had printed half a log.
+func TestASlowBodyIsNotCutOff(t *testing.T) {
+	orig := responseTimeout
+	responseTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { responseTimeout = orig })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		time.Sleep(150 * time.Millisecond)
+		_, _ = io.WriteString(w, `[]`)
+	}))
+	t.Cleanup(srv.Close)
+
+	c := New("", "kukv/octoscope", "secret-token")
+	c.baseURL = srv.URL
+
+	if _, err := c.read(context.Background(), "repos/kukv/octoscope/labels", ""); err != nil {
+		t.Fatalf("read: %v, want the slow body to arrive", err)
 	}
 }
