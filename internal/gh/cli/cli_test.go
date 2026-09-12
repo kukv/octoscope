@@ -612,3 +612,26 @@ func TestNumbersAndPlaceholdersAreTheOnlyTypedArguments(t *testing.T) {
 		t.Errorf("args =\n%q\nwant\n%q", got, want)
 	}
 }
+
+// --repo reaches the backends unvalidated, and the same string is handed to
+// whichever one is running. gql.SplitRepoVars is what the api backend parses
+// it with, and it is the strict one on purpose: the repository may also come
+// from a hand-edited settings file. A raw strings.Cut here accepted "a/b/c",
+// a half-empty name and a padded one, and asked GitHub for a repository
+// nobody named.
+func TestBothBackendsRefuseTheSameRepoStrings(t *testing.T) {
+	t.Parallel()
+
+	for _, repo := range []string{"a/b/c", "kukv/", "/octoscope", " kukv/octoscope ", "octoscope"} {
+		t.Run(repo, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := gql.SplitRepoVars(repo); err == nil {
+				t.Fatalf("the api backend accepts %q, so this case proves nothing", repo)
+			}
+			if got, err := repoVars(repo); err == nil {
+				t.Errorf("the cli backend turned %q into %+v; the api backend refuses it", repo, got)
+			}
+		})
+	}
+}

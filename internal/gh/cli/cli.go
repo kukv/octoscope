@@ -55,15 +55,16 @@ func New(dir, repo string) *Client {
 // "owner/name" after --repo. When no repository was named -- the ordinary
 // case of running octoscope inside a checkout -- there is nothing to split,
 // and gh fills the placeholders from the working directory's remote.
+//
+// A named repository is split by gql.SplitRepoVars, the same parse the api
+// backend uses: the string reaches both of them straight off --repo or a
+// hand-edited settings file, and one backend accepting what the other
+// refuses would send GitHub a repository nobody meant.
 func repoVars(repo string) ([]gql.Var, error) {
 	if repo == "" {
 		return []gql.Var{gql.Placeholder("owner", "{owner}"), gql.Placeholder("name", "{repo}")}, nil
 	}
-	owner, name, ok := strings.Cut(repo, "/")
-	if !ok {
-		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
-	}
-	return []gql.Var{gql.S("owner", owner), gql.S("name", name)}, nil
+	return gql.SplitRepoVars(repo)
 }
 
 // effectiveRepo picks the per-call repository if given, else the client's.
