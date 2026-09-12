@@ -145,29 +145,33 @@ label / author の候補チップは既存の `ListLabels` / `ListAssignees` を
 | 面 | 手段 |
 |---|---|
 | GraphQL（クエリと mutation の全部） | `.graphql` 文書とデコードを共通の場所に置き、**transport だけ差し替える**。`gh api graphql` を実行する / `https://api.github.com/graphql` に POST する（§2 で実測） |
-| `gh` のサブコマンドのうち、REST では埋まらない面 | **新しい `.graphql` 文書を `gql` に足す**。`pr list` / `issue list` / `pr view` / `issue view` / `repo view` |
-| `gh` のサブコマンドのうち、REST で置ける面 | `go-github` の REST で `api` 側に実装する。`label list` / `api repos/.../assignees` / コメント・close/reopen・ラベルと担当者の編集 / `pr diff` のフォールバック先 `pulls/{n}/files` / `search repos` / `repo list` / `api user/orgs` |
-| Actions | `run rerun` / `run view --log`（zip の取得と整形。下を見る） |
+| `gh` のサブコマンドに依存している面 | `go-github` の REST で `api` 側に実装する。`label list` / assignees の候補 / コメント・close/reopen・ラベルと担当者の編集 / `pr diff`（files API）/ `search repos` / `repo list` / `user/orgs` / `run rerun` / `run view --log` |
 | `OpenWeb` | 既存の `internal/browser`。`gh` に依存しない |
 
 依存に増えるのは `go-github` だけで、`githubv4` は増えない。
 
-**この表は 2026-09-12 に実測（`docs/superpowers/2026-09-12-phase4-api-measurements.md`）で
-2 か所を訂正した。**
+**上の表を 2026-09-12 に 2 点直した**（実測は
+`docs/superpowers/2026-09-12-phase4-api-measurements.md`）。
 
-1. **`pr list` / `issue list` / `repo view` を REST で置けない。** `/pulls` の一覧には
-   `additions` / `deletions` / `reviewDecision` / `statusCheckRollup` / `comments` が無く、
-   単体の `/pulls/{n}` にも `reviewDecision` と `statusCheckRollup` が無い。`gh.PR` は
-   その全部を持つので、REST で組むと PR 1 件ごとに追加のリクエストが要り、それでも
-   review decision は埋まらない。`gh pr list --json` 自体が内部で GraphQL を叩いており、
-   GraphQL 文書にするのは「`gh` と同じことをする」だけである。これで完了条件 8 も
-   これらの経路について自動的に満たされる
-2. **表に載っていなかったサブコマンド依存が 5 つある。** `pr diff`（失敗時に
-   `pulls/{n}/files` へフォールバック）、`search repos`、`repo list`、`api user/orgs`、
-   `api repos/.../assignees`。設計を書いた 2026-09-08 以降に足されたものを含む
+- **`pr list` / `issue list` / `repo view` を REST 側から外した。** REST では
+  `gh.PR` を埋められない。`repos/{o}/{r}/pulls` の一覧に `additions` /
+  `deletions` / `reviewDecision` / `statusCheckRollup` / `comments` が無く、
+  単体の `pulls/{n}` にも `reviewDecision` と `statusCheckRollup` は無い（実測）。
+  PR 1 件ごとに追加のリクエストを足しても review decision は埋まらない。
+  **これらは新しい `.graphql` 文書として GraphQL 側に足す。** `gh pr list --json`
+  自身が内部で GraphQL を叩いているので、`gh` と同じことをするだけである
+- **表に無かったサブコマンド依存を 5 つ足した。** `pr diff`（失敗時に files API へ
+  フォールバック）/ `search repos` / `repo list` / `user/orgs` / assignees の候補。
+  この設計を書いた 2026-09-08 以降に足されたものを含む
 
-**パリティの正本はこの表ではなく `internal/usecase/usecase.go:113` の `source`
-interface である。** 4-2 以降はそちらを数える。
+**パリティの正本はこの表ではなく `internal/usecase/usecase.go` の `source`
+interface である。** 表は「どちらの手段で実装するか」を示すもので、数え上げの
+基準にはしない。この食い違いは、表が実装より先に書かれ、その後に実装が育った
+ことで生まれた。
+
+**境界**: `github.com` のみを相手にする。`gh` が見る `GH_HOST` /
+`GH_ENTERPRISE_TOKEN` は `api` バックエンドでは見ない。GitHub Enterprise は
+Phase 4 の範囲外である。
 
 **認証**: `GH_TOKEN` → `GITHUB_TOKEN`。起動時に `exec.LookPath("gh")` を試み、
 見つかれば `cli`、見つからなければトークンで `api` を組む。どちらも無ければ、
@@ -233,16 +237,18 @@ api を最後に置く理由は spec §7 のとおりで、先に並走させる
 2-3 追加ダイアログ・削除・初回投入の導線。**設定ファイルの書き込み（`Save`）は
 2-3 に置く。** 書き込む呼び出し元がそこで初めて生まれるためである。
 
-**4 は 5 本に割った**（2026-09-12、§6 の訂正を計画に落とす段で数えたところ 1 本に
-収まらなかった）。
+**3 は 3 本に割った。** 3-1 土台（`SearchItems`、桁の道具の共通化）、
+3-2 Search タブ本体、3-3 保存クエリ（`s` 保存・`Ctrl+O` 呼び出し・`saved_queries`・
+`default_tab: search`）。
 
-| PR | 内容 |
-|---|---|
-| 4-1 | `internal/gh/gql` の新設。`.graphql` 文書とデコードの移設、transport の切り出し。振る舞いは不変 |
-| 4-2 | `internal/gh/api`: トークン検出・HTTP transport・カレントリポジトリの解決・GraphQL 系の全メソッド。`pr list` / `issue list` / `repo view` の新 `.graphql` 文書（§6 の訂正 1）。`main.go` のバックエンド選択と認証エラー画面 |
-| 4-3 | REST 系（`go-github`）: §6 の表の「REST で置ける面」全部 |
-| 4-4 | Actions: `RerunWorkflow` と `JobLog`（`run view --log` の代替） |
-| 4-5 | 引き継ぎ文書と、`gh` を PATH から外した手動確認の手順（完了条件 10） |
+**4 は 5 本に割った**（2026-09-12、計画に落とす段で数えたところ 1 本に収まらなかった）。
+4-1 共通 GraphQL 層（`.graphql` 文書とデコードを `internal/gh/gql` に出し、transport を
+切り出す。振る舞いは不変）、4-2 `internal/gh/api` 本体（トークン検出・HTTP transport・
+カレントリポジトリの解決・GraphQL 系の全メソッド・`pr list` / `issue list` / `repo view` の
+新文書・`main.go` のバックエンド選択と認証エラー画面）、4-3 REST 系（`go-github`）、
+4-4 Actions（`RerunWorkflow` と `JobLog`）、4-5 引き継ぎと手動確認の手順。
+**4-1 を先頭に置くのは、文書が 1 組のまま両バックエンドから使われる形（完了条件 8）を
+先に作らないと、4-2 以降が二重実装になるためである。**
 
 各 PR は `make check` が緑であること。
 
