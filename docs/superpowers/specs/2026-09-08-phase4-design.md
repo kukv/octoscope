@@ -145,10 +145,21 @@ label / author の候補チップは既存の `ListLabels` / `ListAssignees` を
 | 面 | 手段 |
 |---|---|
 | GraphQL（クエリと mutation の全部） | `.graphql` 文書とデコードを共通の場所に置き、**transport だけ差し替える**。`gh api graphql` を実行する / `https://api.github.com/graphql` に POST する（§2 で実測） |
-| `gh` のサブコマンドに依存している面 | `go-github` の REST で `api` 側に実装する。`label list` / assignees の候補 / コメント・close/reopen・ラベルと担当者の編集 / `pr diff`（files API）/ `search repos` / `repo list` / `user/orgs` / `run rerun` / `run view --log` |
+| `gh` のサブコマンドに依存している面 | REST で `api` 側に実装する。`label list` / assignees の候補 / コメント・close/reopen・ラベルと担当者の編集 / `pr diff`（files API）/ `search repos` / `repo list` / `user/orgs` / `run rerun` / `run view --log` |
 | `OpenWeb` | 既存の `internal/browser`。`gh` に依存しない |
 
-依存に増えるのは `go-github` だけで、`githubv4` は増えない。
+依存は増えない。`go-github` も `githubv4` も足さない。
+
+**上の行を 2026-09-13 に訂正した**（実測・理由は
+`docs/superpowers/2026-09-13-phase4-rest-backend-followups.md`）。スライス 4-3
+（REST 系）に着手した時点で `go-github` を足さないことを決めた。理由は 3 つ:
+transport の `classify` が既に REST の `{"message": ...}` を読んで
+`gh.ErrTransient` / `gh.ErrUnauthenticated` に振り分けており
+`*github.ErrorResponse` からの二度目の同じマッピングになること、テストの継ぎ目が
+`Client.baseURL` の 1 つから `+ github.Client.BaseURL` の 2 つに増えること、
+`go-github` が持っていて自前に無いページングと型付きボディのうち実際に要るのは
+`pulls/{n}/files` の Link ヘッダ解析（15 行程度）だけであること。自前の REST
+transport は `internal/gh/api/rest.go` にある。
 
 **上の表を 2026-09-12 に 2 点直した**（実測は
 `docs/superpowers/2026-09-12-phase4-api-measurements.md`）。

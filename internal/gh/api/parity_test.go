@@ -33,3 +33,46 @@ var (
 	_ graphQLSource = (*api.Client)(nil)
 	_ graphQLSource = (*cli.Client)(nil)
 )
+
+// restSource is the part of the usecase layer's source interface that REST
+// answers. Both backends satisfy it with the same domain types: a method only
+// one of them has would leave the other's screens empty.
+//
+// Actions (RerunWorkflow, JobLog) are the last group and arrive in the next
+// slice; this file goes away then, when usecase.New(api.New(...)) compiles
+// and the compiler itself becomes the parity check.
+type restWriter interface {
+	AddPRComment(repo string, number int, body string) error
+	AddIssueComment(repo string, number int, body string) error
+	ClosePR(repo string, number int) error
+	ReopenPR(repo string, number int) error
+	CloseIssue(repo string, number int) error
+	ReopenIssue(repo string, number int) error
+}
+
+type restEditor interface {
+	EditPRLabels(repo string, number int, add, remove []string) error
+	EditIssueLabels(repo string, number int, add, remove []string) error
+	EditPRAssignees(repo string, number int, add, remove []string) error
+	EditIssueAssignees(repo string, number int, add, remove []string) error
+}
+
+type restReader interface {
+	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
+	ListAssignees(ctx context.Context, repo string) ([]string, error)
+	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
+	SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error)
+	ListOwnRepos(ctx context.Context, owner string, limit int) ([]gh.RepoCandidate, error)
+	ListOrgs(ctx context.Context) ([]string, error)
+}
+
+type restSource interface {
+	restWriter
+	restEditor
+	restReader
+}
+
+var (
+	_ restSource = (*api.Client)(nil)
+	_ restSource = (*cli.Client)(nil)
+)
