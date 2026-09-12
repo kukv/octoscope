@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+	"errors"
 	"os"
 	"regexp"
 	"strings"
@@ -300,6 +301,33 @@ func TestGetPRSendsTheNumberAsANumber(t *testing.T) {
 		}
 	}
 	t.Errorf("no number variable in %+v", *got)
+}
+
+func TestRepoNameReadsTheCanonicalName(t *testing.T) {
+	t.Parallel()
+
+	c, _ := fixedTransport(t, "testdata/repo_name.json")
+	name, err := c.RepoName(context.Background(), "kukv/octoscope")
+	if err != nil {
+		t.Fatalf("RepoName: %v", err)
+	}
+	if name != "kukv/octoscope" {
+		t.Errorf("name = %q, want kukv/octoscope", name)
+	}
+}
+
+// A repository nobody can see comes back as a null node beside an errors
+// array. "" with no error would read as "this directory has no repository",
+// which is a different thing from "GitHub refused".
+func TestRepoNameReportsAFailureRatherThanAnEmptyName(t *testing.T) {
+	t.Parallel()
+
+	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
+		return []byte(`{"data":{"repository":null}}`), errors.New("Could not resolve to a Repository")
+	}}
+	if _, err := c.RepoName(context.Background(), "kukv/nope"); err == nil {
+		t.Fatal("want the transport's error back")
+	}
 }
 
 func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {

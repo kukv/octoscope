@@ -255,3 +255,14 @@ D=internal/gh/gql/testdata
 gh api graphql -F query=@internal/gh/gql/issue.graphql \
   -f owner=kukv -f name=octoscope -F number=50 | jq . > $D/issue.json
 ```
+
+## `repo_name.json`
+
+`repo_name.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope`。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/repo_name.graphql \
+  -f owner=kukv -f name=octoscope | jq . > $D/repo_name.json
+```

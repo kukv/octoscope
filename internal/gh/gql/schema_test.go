@@ -58,6 +58,7 @@ var checkedDocs = map[string]string{
 	"repo_issues.graphql":        repoIssuesQuery,
 	"pr.graphql":                 prQuery,
 	"issue.graphql":              issueQuery,
+	"repo_name.graphql":          repoNameQuery,
 }
 
 func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {

@@ -22,6 +22,9 @@ var prQuery string
 //go:embed issue.graphql
 var issueQuery string
 
+//go:embed repo_name.graphql
+var repoNameQuery string
+
 // prNode is one pull request as the documents in this package select it.
 // The list document leaves Body, Comments and Assignees unselected and they
 // decode as zero values; the single-item document fills them.
@@ -272,4 +275,27 @@ func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issu
 		return gh.Issue{}, fmt.Errorf("parse issue: %w", err)
 	}
 	return resp.Data.Repository.Issue.toIssue(), nil
+}
+
+// RepoName returns the repository's canonical "owner/name".
+func (c *Client) RepoName(ctx context.Context, repo string) (string, error) {
+	vars, err := c.repoVars(repo)
+	if err != nil {
+		return "", err
+	}
+	out, err := c.Read(ctx, repoNameQuery, vars...)
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		Data struct {
+			Repository struct {
+				NameWithOwner string `json:"nameWithOwner"`
+			} `json:"repository"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return "", fmt.Errorf("parse repository name: %w", err)
+	}
+	return resp.Data.Repository.NameWithOwner, nil
 }
