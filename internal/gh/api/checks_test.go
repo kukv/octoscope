@@ -511,3 +511,91 @@ func TestARecordedJobIsDecodedTheWayGitHubSpellsIt(t *testing.T) {
 		t.Fatalf("failed lines = %+v, want the one step the recorded job failed on", failedLines)
 	}
 }
+
+// A step's output can carry an escape sequence -- a test runner's own colour
+// codes, say. Handing it to the screen raw would let the log repaint the
+// user's terminal, where the cli backend already shows it in caret notation.
+func TestAnEscapeInAStepsOutputCannotReachTheScreen(t *testing.T) {
+	t.Parallel()
+
+	c, _ := serveJobLog(t, twoStepJob, zipOf(t, map[string]string{
+		"build/1_Set up job.txt": "starting\n",
+		"build/2_Run tests.txt":  "\x1b[31mFAIL\x1b[0m\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	if len(lines) != 2 || lines[1].Text != "^[[31mFAIL^[[0m" {
+		t.Fatalf("lines = %+v, want the escape shown as caret notation", lines)
+	}
+}
+
+// A step name from GitHub's job JSON can carry a control character just as its
+// log text can. gh's cli backend gets its step name through gh's own
+// sanitizer, so leaving this one raw would show it differently depending on
+// which backend answered.
+func TestAnEscapeInAStepNameCannotReachTheScreen(t *testing.T) {
+	t.Parallel()
+
+	j := `{"id": 61, "run_id": 7, "name": "build", "status": "completed",
+		"conclusion": "failure", "steps": [{"name": "\u001b[31mRun tests", "number": 1, "conclusion": "failure"}]}`
+	c, _ := serveJobLog(t, j, zipOf(t, map[string]string{
+		"build/1_\x1b[31mRun tests.txt": "FAIL\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	if len(lines) != 1 || lines[0].Step != "^[[31mRun tests" {
+		t.Fatalf("lines = %+v, want the step name shown as caret notation", lines)
+	}
+}
+
+// The archive's line endings are CRLF, the way a Windows runner's job would
+// write them. gh's own scanner drops the trailing \r, so an api backend that
+// kept it would show a line the cli backend does not.
+func TestACarriageReturnDoesNotSurviveTheLine(t *testing.T) {
+	t.Parallel()
+
+	c, _ := serveJobLog(t, twoStepJob, zipOf(t, map[string]string{
+		"build/1_Set up job.txt": "starting\r\n",
+		"build/2_Run tests.txt":  "FAIL\r\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	for _, line := range lines {
+		if strings.Contains(line.Text, "\r") {
+			t.Errorf("line %q carries a carriage return", line.Text)
+		}
+	}
+}
+
+// A reusable workflow's job is named "caller / callee", and the archive names
+// its whole-job file after logFileName, with the slash stripped. Matching the
+// raw job name here would miss the entry and send a third request to the
+// job's own log endpoint for the same output.
+func TestAWholeJobEntryForACompositeNameIsFoundWithoutAThirdRequest(t *testing.T) {
+	t.Parallel()
+
+	j := `{"id": 61, "run_id": 7, "name": "build / test", "status": "completed", "conclusion": "failure"}`
+	c, got := serveJobLog(t, j, zipOf(t, map[string]string{
+		"0_build  test.txt": "starting\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	if len(lines) != 1 || lines[0].Text != "starting" {
+		t.Fatalf("lines = %+v", lines)
+	}
+	if len(*got) != 2 {
+		t.Errorf("requests = %d, want 2: the whole-job entry must be found without asking the job's own log", len(*got))
+	}
+}

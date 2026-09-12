@@ -51,3 +51,20 @@ func TestNeitherGhNorATokenIsAnAuthenticationFailure(t *testing.T) {
 		t.Errorf("err = %v, want gh.ErrUnauthenticated", err)
 	}
 }
+
+// token's own error is the reason chooseBackend concluded there is no
+// authentication at all, and it is lost the moment token grows a failure mode
+// other than gh.ErrUnauthenticated itself. Discarding it here would leave that
+// future failure with nothing to tell errors.Is or the user apart from the
+// sentinel's own text.
+func TestTheUnderlyingTokenErrorSurvives(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("keyring is locked")
+	_, _, err := chooseBackend("/work", "kukv/octoscope",
+		func(string) (string, error) { return "", exec.ErrNotFound },
+		func() (string, error) { return "", cause })
+	if !errors.Is(err, cause) {
+		t.Errorf("err = %v, want it to wrap %v", err, cause)
+	}
+}

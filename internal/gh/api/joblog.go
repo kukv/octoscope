@@ -118,7 +118,11 @@ func stepLines(zr *zip.Reader, j job, failedOnly bool) (lines []gh.LogLine, ok b
 		if failedOnly && !failed(s.Conclusion) {
 			continue
 		}
-		entry, entryErr := readEntry(f, s.Name)
+		// s.Name is GitHub's step name, unsanitized; gh's cli backend gets its
+		// step name through gh's own asciisanitizer, so this call keeps the
+		// two backends showing the same thing for a step name that carries a
+		// control character, the way sanitizeControls already does for Text.
+		entry, entryErr := readEntry(f, sanitizeControls(s.Name))
 		if entryErr != nil {
 			return nil, false, entryErr
 		}
