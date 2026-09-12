@@ -1,0 +1,21 @@
+# The rest of an issue's conversation. issue.graphql takes the first page;
+# this re-requests the comments connection alone rather than the whole item.
+query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      comments(first: 100, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          author {
+            login
+          }
+          body
+          createdAt
+        }
+      }
+    }
+  }
+}

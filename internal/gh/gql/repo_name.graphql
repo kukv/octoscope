@@ -1,0 +1,9 @@
+# The repository's canonical "owner/name". The Repos tab asks for it to find
+# out whether the working directory has a repository at all, and to follow a
+# rename: GitHub answers with the current name, not the one that was asked
+# for.
+query ($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    nameWithOwner
+  }
+}

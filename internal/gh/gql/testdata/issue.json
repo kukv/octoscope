@@ -1,0 +1,51 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "number": 54,
+        "title": "Workタブのカードのタイトルを3段表記にしたい",
+        "state": "CLOSED",
+        "url": "https://github.com/kukv/octoscope/issues/54",
+        "updatedAt": "2026-09-06T12:10:10Z",
+        "body": "タイトルを3段にして情報を増やす\n1行ごとの文字数はそのまま。3段にすることで情報量を上げる\n<img width=\"793\" height=\"76\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/94aa9c48-f622-4913-9a02-0dff27e14c62\" />",
+        "author": {
+          "login": "kukv"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "Priority: Medium",
+              "color": "ffd700"
+            },
+            {
+              "name": "Kind: Enhancement",
+              "color": "89058a"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "kukv"
+            }
+          ]
+        },
+        "comments": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHPAAAAAUtZYdU="
+          },
+          "nodes": [
+            {
+              "author": {
+                "login": "kukv"
+              },
+              "body": "色々改善点が出てきたので、それらをまとめたドキュメントを作る",
+              "createdAt": "2026-09-06T12:10:07Z"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

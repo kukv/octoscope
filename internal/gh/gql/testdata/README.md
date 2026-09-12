@@ -91,12 +91,19 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection","IssueComment","IssueCommentConnection","User","UserConnection"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/gql/testdata/schema.json
 ```
 
 `PullRequestConnection` と `IssueConnection` は 2026-09-08 に `repo_counts.graphql`
 （`repository.pullRequests` / `repository.issues` の `totalCount`）のために追加した。
+
+`IssueComment`、`IssueCommentConnection`、`User`、`UserConnection` は 2026-09-12 に
+`pr.graphql` / `issue.graphql`（`comments` と `assignees`）のために追加した。
+
+同じ 2026-09-12 の録り直しで `Mutation.updateEnterpriseProofOfPresenceRequiredSetting`
+が消えた。このプロジェクトが選ばない enterprise 専用の mutation で、GitHub 側の
+スキーマ変更による自然な削除。録り直すたびにこの種の削除は起こり得る。
 
 ## `review_context.json`
 
@@ -196,4 +203,80 @@ OPEN 1 件 / CLOSED 4 件 / MERGED 45 件）。
 ```bash
 gh api graphql -F query=@internal/gh/gql/work.graphql \
   -f search='repo:kukv/octoscope' | jq . > internal/gh/gql/testdata/search_items.json
+```
+
+## `repo_prs.json`
+
+`repo_prs.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope`。録った時点で開いている PR が #81 の 1 件あり、review decision
+（`REVIEW_REQUIRED`）・check roll-up・additions/deletions のすべてが埋まって
+いたため、それをそのまま残している。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/repo_prs.graphql \
+  -f owner=kukv -f name=octoscope | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
+```
+
+## `repo_issues.json`
+
+`repo_issues.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope`。開いている Issue が #50 と #14（renovate の Dependency
+Dashboard）の 2 件で、両方をそのまま残している。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
+  -f owner=kukv -f name=octoscope | jq '.data.repository.issues.nodes |= .[0:5]' > $D/repo_issues.json
+```
+
+## `pr.json`
+
+`pr.graphql` に対する実レスポンス。録った日: 2026-09-13、対象:
+`kukv/octoscope#59`。ラベル 1 件・assignee 1 人・コメント 3 件
+（`octocov` の Code Metrics Report 2 件と短い手書き 1 件）が入っている。
+
+**#61 から録り直した理由**: #61 は labels と assignees が両方とも空で、
+`prNode` の `labels` / `assignees` の json タグを壊してもどのテストも落ちなかった。
+詳細画面はこの 2 つをそのまま描くので、空のまま描かれても誰も気づかない状態だった。
+
+2026-09-13 に `comments` の `pageInfo` を選ぶようになったのに合わせて録り直した。
+`kukv/octoscope#59` のコメントは 3 件で 1 ページに収まるため、この録りものが
+確かめるのはフィールドの読み取りだけである。**`pr_comments.graphql` による
+ページングの仕組みは録りものではなく `comments_test.go` 内のインライン JSON で
+確かめる**（`pr_checks.json` と同じ方針）。2 ページ以上ある会話を録るには
+コメントが 100 件を超える実在の PR が要り、それはこのリポジトリには無い。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/pr.graphql \
+  -f owner=kukv -f name=octoscope -F number=59 | jq . > $D/pr.json
+```
+
+## `issue.json`
+
+`issue.graphql` に対する実レスポンス。録った日: 2026-09-13、対象:
+`kukv/octoscope#54`。ラベル 2 件・assignee 1 人・コメント 1 件が入っている。
+
+**#50 から録り直した理由**: #50 は labels も assignees もコメントも空で、
+`issueNode` のそれらの json タグや `toComments` の呼び出しを壊しても
+どのテストも落ちなかった。Issue の会話は詳細画面の中身そのものである。
+
+2026-09-13 に `comments` の `pageInfo` を選ぶようになったのに合わせて録り直した。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/issue.graphql \
+  -f owner=kukv -f name=octoscope -F number=54 | jq . > $D/issue.json
+```
+
+## `repo_name.json`
+
+`repo_name.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope`。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/repo_name.graphql \
+  -f owner=kukv -f name=octoscope | jq . > $D/repo_name.json
 ```

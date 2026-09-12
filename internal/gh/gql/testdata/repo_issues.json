@@ -1,0 +1,36 @@
+{
+  "data": {
+    "repository": {
+      "issues": {
+        "nodes": [
+          {
+            "number": 50,
+            "title": "Moving from a Herdr plugin to a standalone CLI (octoscope)",
+            "state": "OPEN",
+            "url": "https://github.com/kukv/octoscope/issues/50",
+            "updatedAt": "2026-09-05T18:19:11Z",
+            "author": {
+              "login": "kukv"
+            },
+            "labels": {
+              "nodes": []
+            }
+          },
+          {
+            "number": 14,
+            "title": "Dependency Dashboard",
+            "state": "OPEN",
+            "url": "https://github.com/kukv/octoscope/issues/14",
+            "updatedAt": "2026-09-11T23:09:33Z",
+            "author": {
+              "login": "renovate"
+            },
+            "labels": {
+              "nodes": []
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+# One pull request, with everything the detail view shows. The single-item
+# REST endpoint has additions and deletions but still neither reviewDecision
+# nor statusCheckRollup, and it carries no comments at all.
+query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      number
+      title
+      state
+      url
+      isDraft
+      updatedAt
+      reviewDecision
+      headRefName
+      baseRefName
+      additions
+      deletions
+      body
+      author {
+        login
+      }
+      labels(first: 100) {
+        nodes { ...LabelFields }
+      }
+      assignees(first: 100) {
+        nodes { login }
+      }
+      # 100 is GitHub's cap for one connection, and it answers with the
+      # oldest hundred. pr_comments.graphql walks the pages after this one,
+      # so the detail view shows the whole conversation in order.
+      comments(first: 100) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          author { login }
+          body
+          createdAt
+        }
+      }
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              contexts(first: 100) {
+                nodes { ...CheckContext }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+fragment LabelFields on Label {
+  name
+  color
+}
+
+fragment CheckContext on StatusCheckRollupContext {
+  __typename
+  ... on CheckRun {
+    name
+    status
+    conclusion
+  }
+  ... on StatusContext {
+    context
+    state
+  }
+}

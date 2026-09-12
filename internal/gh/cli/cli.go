@@ -16,17 +16,8 @@ import (
 	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
-const (
-	prListFields = "number,title,author,state,isDraft,updatedAt,reviewDecision,url," +
-		"labels,headRefName,baseRefName,additions,deletions,statusCheckRollup"
-	prViewFields    = prListFields + ",body,comments,labels,assignees"
-	issueListFields = "number,title,author,state,updatedAt,labels,url"
-	issueViewFields = issueListFields + ",body,comments,assignees"
-)
-
-// listLimit is how many items the gh list subcommands are asked for. Every
-// one of them -- pr list, issue list, label list -- fetches 30 by default and
-// says nothing about the rest, so a repository with more open pull requests
+// listLimit is how many items gh label list is asked for. It fetches 30 by
+// default and says nothing about the rest, so a repository with more labels
 // than that would lose them without a word. gh names no upper bound; it pages
 // until it has as many as it was asked for.
 const listLimit = "100"
@@ -64,15 +55,16 @@ func New(dir, repo string) *Client {
 // "owner/name" after --repo. When no repository was named -- the ordinary
 // case of running octoscope inside a checkout -- there is nothing to split,
 // and gh fills the placeholders from the working directory's remote.
+//
+// A named repository is split by gql.SplitRepoVars, the same parse the api
+// backend uses: the string reaches both of them straight off --repo or a
+// hand-edited settings file, and one backend accepting what the other
+// refuses would send GitHub a repository nobody meant.
 func repoVars(repo string) ([]gql.Var, error) {
 	if repo == "" {
 		return []gql.Var{gql.Placeholder("owner", "{owner}"), gql.Placeholder("name", "{repo}")}, nil
 	}
-	owner, name, ok := strings.Cut(repo, "/")
-	if !ok {
-		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
-	}
-	return []gql.Var{gql.S("owner", owner), gql.S("name", name)}, nil
+	return gql.SplitRepoVars(repo)
 }
 
 // effectiveRepo picks the per-call repository if given, else the client's.
@@ -140,75 +132,10 @@ func appendRepo(args []string, repo string) []string {
 	return args
 }
 
-func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
-	args := appendRepo([]string{"pr", "list", "--json", prListFields, "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.read(ctx, c.dir, args...)
-	if err != nil {
-		return nil, err
-	}
-	var prs []prJSON
-	if err := json.Unmarshal(out, &prs); err != nil {
-		return nil, fmt.Errorf("parse pr list: %w", err)
-	}
-	return toPRs(prs), nil
-}
-
-func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
-	args := appendRepo([]string{"issue", "list", "--json", issueListFields, "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.read(ctx, c.dir, args...)
-	if err != nil {
-		return nil, err
-	}
-	var issues []issueJSON
-	if err := json.Unmarshal(out, &issues); err != nil {
-		return nil, fmt.Errorf("parse issue list: %w", err)
-	}
-	return toIssues(issues), nil
-}
-
-func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, error) {
-	args := appendRepo([]string{"pr", "view", strconv.Itoa(number), "--json", prViewFields}, c.effectiveRepo(repo))
-	out, err := c.read(ctx, c.dir, args...)
-	if err != nil {
-		return gh.PR{}, err
-	}
-	var pr prJSON
-	if err := json.Unmarshal(out, &pr); err != nil {
-		return gh.PR{}, fmt.Errorf("parse pr view: %w", err)
-	}
-	return pr.toDomain(), nil
-}
-
-func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error) {
-	args := appendRepo([]string{"issue", "view", strconv.Itoa(number), "--json", issueViewFields}, c.effectiveRepo(repo))
-	out, err := c.read(ctx, c.dir, args...)
-	if err != nil {
-		return gh.Issue{}, err
-	}
-	var issue issueJSON
-	if err := json.Unmarshal(out, &issue); err != nil {
-		return gh.Issue{}, fmt.Errorf("parse issue view: %w", err)
-	}
-	return issue.toDomain(), nil
-}
-
+// RepoName returns the repository the client works against, as GitHub spells
+// it. An empty repo means the working directory's, which gh fills in.
 func (c *Client) RepoName(ctx context.Context) (string, error) {
-	args := []string{"repo", "view"}
-	if c.repo != "" {
-		args = append(args, c.repo)
-	}
-	args = append(args, "--json", "nameWithOwner")
-	out, err := c.read(ctx, c.dir, args...)
-	if err != nil {
-		return "", err
-	}
-	var v struct {
-		NameWithOwner string `json:"nameWithOwner"`
-	}
-	if err := json.Unmarshal(out, &v); err != nil {
-		return "", fmt.Errorf("parse repo view: %w", err)
-	}
-	return v.NameWithOwner, nil
+	return c.Client.RepoName(ctx, c.repo)
 }
 
 // OpenWeb shows the item in a browser. It does not go through gh: `gh ... --web`

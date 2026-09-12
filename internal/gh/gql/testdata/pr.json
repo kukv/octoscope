@@ -1,0 +1,99 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 59,
+        "title": "fix: 無音の打ち切りを潰し、internal/usecase を入れる（Phase 2 立て直し Part 1）",
+        "state": "MERGED",
+        "url": "https://github.com/kukv/octoscope/pull/59",
+        "isDraft": false,
+        "updatedAt": "2026-09-07T01:04:20Z",
+        "reviewDecision": "REVIEW_REQUIRED",
+        "headRefName": "worktree-eventual-singing-gem",
+        "baseRefName": "main",
+        "additions": 6322,
+        "deletions": 486,
+        "body": "Phase 2 立て直し Part 1（設計書の作業順 2 / 5 / 3 / 4）。実装計画は\n`docs/superpowers/plans/2026-09-07-phase2-remediation-part1.md`。\n\n## 何を直したか\n\n**無音の打ち切り（作業順 2）**\n\n- `reviewThreads` を Go 側のループでページングする。GitHub は connection を 100 で\n  打ち切り、`gh api --paginate` は最上位より下の GraphQL カーソルを追えないので、\n  101 本目以降のスレッドはエラーも出さずに消えていた\n- `labels(first: 10)` を 100 に上げた。据え置く connection（スレッド内の\n  `comments`、Work の `search`、REST の `per_page`）には、なぜ据え置くのかを\n  コメントで残した\n- `gh.Work` の配列長を section の enum から引くようにし、`diff.go` の裸の定数に\n  名前を付けた\n\n**実物の testdata（作業順 5）**\n\n- `internal/gh/cli` のパーステストが、手書き JSON ではなく `gh` の実出力の\n  録りものを読む。手書きだと「GitHub が実際には返さない形」でも通ってしまう\n- `work.json` は `@me` 検索なので全リポジトリをなめる。**公開リポジトリのノードだけ**に\n  絞り、エイリアスごとに 5 件で打ち切り、公開 PR の本文経由で私有リポジトリ名と\n  インフラ構成に触れていた 2 件を落とした。録り方は `testdata/README.md` にある\n\n**`internal/usecase`（作業順 4）**\n\n- PR / Issue の種別振り分け（`GetItem` / `AddComment` / `SetState` / `EditLabels` /\n  `EditAssignees`）と、レビューの呼び出し順序（`PostLineComment` / `SubmitReview`）が\n  ビューから下りた。ビューは「何をしたいか」を言い、それが何回の API 呼び出しに\n  なるかは知らない\n- `detail` が宣言する interface は 6 / 2 / 1 メソッド（規約の上限は宣言あたり 6）\n- `cmd/octoscope` は `cli.New → usecase.New → app.New` の 3 行\n\n**規約（作業順 3 の後始末）**\n\n- 規約を実装より先に入れたときの暫定注記（`TRANSIENT(Part1 ...)`）を削除した。\n  Part 2 に持ち越す 2 件は意図的に残してある\n\n## 検証\n\n- `make check`: 781 テスト / lint 0 件\n- `make release-check`: goreleaser 設定 OK、Windows / macOS / Linux のクロスコンパイル成功\n- **golden は 1 バイトも動いていない**（表示を変える変更を含まないため）\n- 新しいテストはすべて、守っている行を壊して赤くなることを確認してから入れた\n\n## 確認をお願いしたいこと\n\n**実機での動作確認は未実施です。**`.claude/rules/tui.md` の「テストが通っただけで\n完了にしない」の分が残っています。以下を `--lang en` / `--lang ja`、80 桁と 160 桁で:\n\n- Work: `j` / `k` / `enter` → 詳細\n- 詳細: `o` / `c` / `x` → `y` / `l` / `a` / `v` / `d`\n- diff: `j` / `k` / `c` → `ctrl+s` / `v` / `X`\n- Repos: `tab` → `j` → `enter` → 詳細 → `o`\n\n## Part 2 に持ち越すもの\n\n- `detail` / `diff` の bool を enum に畳む、`Update` の case 分割、コード中の\n  `spec N` / `Task N` 参照 26 箇所の削除、画面をまたぐシナリオテスト\n- 既知の未解決 2 件: 詳細画面の `c` が開かないことがある（再現せず）、\n  `--repo` を渡しても Work タブが出る\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+        "author": {
+          "login": "kukv"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "Kind: Refactoring",
+              "color": "fa8072"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "kukv"
+            }
+          ]
+        },
+        "comments": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHPAAAAAUudLN8="
+          },
+          "nodes": [
+            {
+              "author": {
+                "login": "github-actions"
+              },
+              "body": "## Code Metrics Report\n| Coverage | Test Execution Time |\n|---------:|--------------------:|\n| 88.2%    | 39s                 |\n\n\n### Code coverage of files in pull request scope (84.5%, patch 75.3%)\n\n|                                                                        Files                                                                         | Coverage | Patch Coverage |\n|------------------------------------------------------------------------------------------------------------------------------------------------------|---------:|---------------:|\n| [cmd/octoscope/main.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/cmd%2Foctoscope%2Fmain.go)                   | 0.0%     | 0.0%           |\n| [internal/gh/cli/cli.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Fgh%2Fcli%2Fcli.go)               | 70.6%    | -              |\n| [internal/gh/cli/diff.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Fgh%2Fcli%2Fdiff.go)             | 97.0%    | 100.0%         |\n| [internal/gh/cli/review.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Fgh%2Fcli%2Freview.go)         | 94.8%    | 88.2%          |\n| [internal/gh/gh.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Fgh%2Fgh.go)                           | 100.0%   | 100.0%         |\n| [internal/tui/detail/detail.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Ftui%2Fdetail%2Fdetail.go) | 91.1%    | 100.0%         |\n| [internal/tui/detail/render.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Ftui%2Fdetail%2Frender.go) | 95.6%    | 100.0%         |\n| [internal/tui/diff/comment.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Ftui%2Fdiff%2Fcomment.go)   | 94.8%    | 100.0%         |\n| [internal/tui/diff/diff.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Ftui%2Fdiff%2Fdiff.go)         | 79.3%    | -              |\n| [internal/tui/review/review.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Ftui%2Freview%2Freview.go) | 84.7%    | 100.0%         |\n| [internal/usecase/review.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Fusecase%2Freview.go)         | 81.2%    | 70.0%          |\n| [internal/usecase/usecase.go](https://github.com/kukv/octoscope/blob/917551b6b5af273cda7cf88883e47bab9a661a3e/internal%2Fusecase%2Fusecase.go)       | 64.7%    | 54.6%          |\n\n---\nReported by [octocov](https://github.com/k1LoW/octocov)\n<!-- octocov -->",
+              "createdAt": "2026-09-07T00:09:37Z"
+            },
+            {
+              "author": {
+                "login": "github-actions"
+              },
+              "body": "## Code Metrics Report\n| Coverage | Test Execution Time |\n|---------:|--------------------:|\n| 88.2%    | 37s                 |\n\n\n### Code coverage of files in pull request scope (84.5%, patch 75.3%)\n\n|                                                                        Files                                                                         | Coverage | Patch Coverage |\n|------------------------------------------------------------------------------------------------------------------------------------------------------|---------:|---------------:|\n| [cmd/octoscope/main.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/cmd%2Foctoscope%2Fmain.go)                   | 0.0%     | 0.0%           |\n| [internal/gh/cli/cli.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Fgh%2Fcli%2Fcli.go)               | 70.6%    | -              |\n| [internal/gh/cli/diff.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Fgh%2Fcli%2Fdiff.go)             | 97.0%    | 100.0%         |\n| [internal/gh/cli/review.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Fgh%2Fcli%2Freview.go)         | 94.8%    | 88.2%          |\n| [internal/gh/gh.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Fgh%2Fgh.go)                           | 100.0%   | 100.0%         |\n| [internal/tui/detail/detail.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Ftui%2Fdetail%2Fdetail.go) | 91.1%    | 100.0%         |\n| [internal/tui/detail/render.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Ftui%2Fdetail%2Frender.go) | 95.6%    | 100.0%         |\n| [internal/tui/diff/comment.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Ftui%2Fdiff%2Fcomment.go)   | 94.8%    | 100.0%         |\n| [internal/tui/diff/diff.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Ftui%2Fdiff%2Fdiff.go)         | 79.3%    | -              |\n| [internal/tui/review/review.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Ftui%2Freview%2Freview.go) | 84.7%    | 100.0%         |\n| [internal/usecase/review.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Fusecase%2Freview.go)         | 81.2%    | 70.0%          |\n| [internal/usecase/usecase.go](https://github.com/kukv/octoscope/blob/d281e36ecbde4f39841eaa69c220c8ef93bdfe0d/internal%2Fusecase%2Fusecase.go)       | 64.7%    | 54.6%          |\n\n---\nReported by [octocov](https://github.com/k1LoW/octocov)\n<!-- octocov -->",
+              "createdAt": "2026-09-07T00:54:32Z"
+            },
+            {
+              "author": {
+                "login": "kukv"
+              },
+              "body": "テストコメント",
+              "createdAt": "2026-09-07T01:00:01Z"
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "nodes": [
+                      {
+                        "__typename": "CheckRun",
+                        "name": "lint",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "sca",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "test",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

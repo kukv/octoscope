@@ -6,37 +6,17 @@ GitHub の返し方が変わったときに気づけることがこの testdata 
 
 録る対象は自分の公開リポジトリ（`kukv/octoscope`）に限る。秘密情報を入れない。
 
-## レスポンスの録りもの
+## `pr_files.json`
 
-`pr_list.json` / `issue_list.json` / `pr_view.json` / `issue_view.json` /
-`pr_files.json` は、`gh` の実出力をそのまま録ったもの。
-録った日: 2026-09-07、対象: `kukv/octoscope`（PR #55、Issue #50）。
+`gh` の実出力をそのまま録ったもの。録った日: 2026-09-07、対象: `kukv/octoscope`（PR #55）。
 
 パースのテストは手書きの JSON ではなくこれを読む。手書きだと「GitHub が実際には
 そう返さない形」でも通ってしまい、返し方が変わったときに気づけない。
 
 ```bash
 D=internal/gh/cli/testdata
-gh pr list --repo kukv/octoscope --state all --json \
-  'number,title,author,state,isDraft,updatedAt,reviewDecision,url,labels,headRefName,baseRefName,additions,deletions,statusCheckRollup' \
-  --limit 100 | jq . > $D/pr_list.json
-
-gh issue list --repo kukv/octoscope --state all --json \
-  'number,title,author,state,updatedAt,labels,url' --limit 100 | jq . > $D/issue_list.json
-
-gh pr view 55 --repo kukv/octoscope --json \
-  'number,title,author,state,isDraft,updatedAt,reviewDecision,url,labels,headRefName,baseRefName,additions,deletions,statusCheckRollup,body,comments,assignees' \
-  | jq . > $D/pr_view.json
-
-gh issue view 50 --repo kukv/octoscope --json \
-  'number,title,author,state,updatedAt,labels,url,body,comments,assignees' | jq . > $D/issue_view.json
-
 gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D/pr_files.json
 ```
-
-`pr_list.json` は `--state all` で録っている（`ListPRs` 自身は open だけを取る）。
-open / closed / merged の 3 状態が 1 ファイルに入るほうが、`ParseItemState` の
-変換をまとめて確かめられるため。
 
 ## `job_log.txt` / `job_log_failed.txt`
 
