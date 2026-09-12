@@ -214,6 +214,10 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	case "ctrl+s":
 		return tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+	case "ctrl+o":
+		return tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
+	case "backspace":
+		return tea.KeyPressMsg{Code: tea.KeyBackspace}
 	default:
 		return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
 	}
@@ -1380,5 +1384,82 @@ func TestRepoFlagOutranksDefaultSearch(t *testing.T) {
 
 	if m.tab != tabRepos {
 		t.Errorf("tab = %v, want tabRepos", m.tab)
+	}
+}
+
+// typeRaw types s into whichever field is open, one key at a time, the way a
+// terminal delivers it.
+func typeRaw(m Model, s string) Model {
+	for _, r := range s {
+		m = press(m, string(r))
+	}
+	return m
+}
+
+// clearRaw backspaces out whatever is already in the open field: the raw
+// editor and the name field both start filled with the current query, so
+// typing on top of that would append rather than replace it.
+func clearRaw(m Model, s string) Model {
+	for range []rune(s) {
+		m = press(m, "backspace")
+	}
+	return m
+}
+
+// setRawQuery goes through e, clear, type, enter, the way a user replaces
+// the raw query. It leaves the model back in browse mode with the search
+// started.
+func setRawQuery(t *testing.T, m Model, current, query string) Model {
+	t.Helper()
+	m = press(m, "e")
+	m = clearRaw(m, current)
+	m = typeRaw(m, query)
+	m, cmd := pressCmd(m, "enter")
+	return resolve(t, m, cmd)
+}
+
+// The whole path a user takes, through the root model that owns the tabs:
+// nothing here reaches into a sub-model's fields.
+func TestSavingAQueryAndCallingItBack(t *testing.T) {
+	t.Parallel()
+
+	m := started(t, 120)
+	m = press(m, "3")
+
+	// is:open is the default filters query the raw editor and the name field
+	// both start filled with.
+	m = setRawQuery(t, m, "is:open", "author:kukv")
+
+	m = press(m, "s")
+	m = typeRaw(m, "mine")
+	m, cmd := pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+
+	// Change the raw query away from what was saved, so calling the saved
+	// query back is what brings "author:kukv" back, not it never leaving.
+	m = setRawQuery(t, m, "author:kukv", "is:closed")
+
+	m = press(m, "ctrl+o")
+
+	// The root routes q, 1 and 3 to the tabs before a tab sees them; while
+	// the picker is open they must reach it instead, or q would quit
+	// octoscope and 1 would jump to the Work tab out from under the popup.
+	m, cmd = pressCmd(m, "q")
+	if isQuit(cmd) {
+		t.Fatal("q quit octoscope instead of reaching the open picker")
+	}
+	m = press(m, "1")
+	if m.tab != tabSearch {
+		t.Fatalf("1 left the Search tab while the picker was open: tab = %v", m.tab)
+	}
+
+	m, cmd = pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+
+	if got := content(m); !strings.Contains(got, "author:kukv") {
+		t.Errorf("the raw query row does not show the saved query back:\n%s", got)
+	}
+	if got := content(m); strings.Contains(got, "is:closed") {
+		t.Errorf("the raw query row still shows the query that was replaced:\n%s", got)
 	}
 }
