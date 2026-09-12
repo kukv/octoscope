@@ -3,8 +3,11 @@ package api
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
+	"time"
 
+	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
@@ -104,8 +107,9 @@ func TestTheRemoteFillsInTheRepositoryWhenNoneWasNamed(t *testing.T) {
 	if gotDir != "/somewhere" {
 		t.Errorf("dir = %q, want /somewhere", gotDir)
 	}
-	if len(gotArgs) == 0 || gotArgs[0] != "remote" {
-		t.Errorf("args = %v, want a git remote lookup", gotArgs)
+	// "-v" or any other flag would return something this code cannot parse.
+	if want := []string{"remote", "get-url", "origin"}; !reflect.DeepEqual(gotArgs, want) {
+		t.Errorf("args = %v, want %v", gotArgs, want)
 	}
 }
 
@@ -118,8 +122,12 @@ func TestADirectoryThatIsNoRepositoryIsAnOrdinaryFailure(t *testing.T) {
 	c.runGit = func(context.Context, string, ...string) ([]byte, error) {
 		return nil, errors.New("fatal: not a git repository")
 	}
-	if _, err := c.repoVars(""); err == nil {
+	_, err := c.repoVars("")
+	if err == nil {
 		t.Fatal("want an error")
+	}
+	if gh.IsFatal(err) {
+		t.Fatal("a directory with no repository must not cost the user their screen")
 	}
 }
 
@@ -141,6 +149,58 @@ func TestTheRemoteIsReadOnlyOnce(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Errorf("git ran %d times, want 1", calls)
+	}
+}
+
+// A lookup git actually answered -- even with an error, such as no origin
+// remote configured -- is permanent: asking again would not change it.
+func TestAnOrdinaryGitFailureIsCachedNotRetried(t *testing.T) {
+	t.Parallel()
+
+	c := New("", "", "token")
+	calls := 0
+	c.runGit = func(context.Context, string, ...string) ([]byte, error) {
+		calls++
+		return nil, errors.New("fatal: no such remote 'origin'")
+	}
+	for range 2 {
+		if _, err := c.repoVars(""); err == nil {
+			t.Fatal("want an error")
+		}
+	}
+	if calls != 1 {
+		t.Errorf("git ran %d times, want 1", calls)
+	}
+}
+
+// A lookup killed by this package's own deadline is a different thing from
+// "there is no origin remote": the next attempt may well succeed, so it must
+// not be remembered for the client's lifetime the way a settled answer is.
+//
+// This test shortens remoteTimeout rather than waiting on the real one, and
+// has the fake wait on ctx.Done() rather than sleeping a fixed duration, so
+// it is exact about what "killed by the deadline" means without being slow
+// or flaky. It cannot run in parallel with other tests: it mutates the
+// package-level remoteTimeout.
+func TestARemoteReadKilledByTheDeadlineIsRetried(t *testing.T) {
+	orig := remoteTimeout
+	remoteTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { remoteTimeout = orig })
+
+	c := New("", "", "token")
+	calls := 0
+	c.runGit = func(ctx context.Context, _ string, _ ...string) ([]byte, error) {
+		calls++
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	for range 2 {
+		if _, err := c.repoVars(""); err == nil {
+			t.Fatal("want an error")
+		}
+	}
+	if calls != 2 {
+		t.Errorf("git ran %d times, want 2: a killed lookup must be retried", calls)
 	}
 }
 

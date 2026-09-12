@@ -38,8 +38,12 @@ type Client struct {
 	endpoint string
 	client   *http.Client
 
-	runGit     gitFunc
-	once       sync.Once
+	runGit gitFunc
+	mu     sync.Mutex
+	// done is set only once git has actually answered: a lookup killed by
+	// its own deadline is worth retrying, not remembering for the client's
+	// lifetime.
+	done       bool
 	current    string
 	currentErr error
 }

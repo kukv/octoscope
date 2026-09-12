@@ -16,7 +16,10 @@ import (
 // remoteTimeout bounds the one local subprocess this package runs. gh's own
 // lookup is allowed twenty seconds because it reaches the API; reading a
 // remote out of a git config does not.
-const remoteTimeout = 5 * time.Second
+//
+// A var, not a const: tests shorten it to exercise the deadline without
+// waiting on it.
+var remoteTimeout = 5 * time.Second
 
 // repoVars names the repository of a call. An explicit repository -- the
 // --repo flag, or the sidebar asking for one of its rows -- wins; otherwise
@@ -34,22 +37,34 @@ func (c *Client) repoVars(repo string) ([]gql.Var, error) {
 	return gql.SplitRepoVars(repo)
 }
 
-// currentRepo reads the working directory's origin remote, once. The sidebar
-// asks for several repositories at a time and every refresh would otherwise
-// pay for a subprocess per row.
+// currentRepo reads the working directory's origin remote. The sidebar asks
+// for several repositories at a time and every refresh would otherwise pay
+// for a subprocess per row, so a settled answer is cached; a lookup this
+// package's own deadline killed is not, since the next attempt may well
+// succeed.
 //
 // gql.Client.RepoVars takes no context, so the deadline is this package's own.
 func (c *Client) currentRepo() (string, error) {
-	c.once.Do(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), remoteTimeout)
-		defer cancel()
-		out, err := c.git()(ctx, c.dir, "remote", "get-url", "origin")
-		if err != nil {
-			c.currentErr = fmt.Errorf("read the origin remote: %w", err)
-			return
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.done {
+		return c.current, c.currentErr
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), remoteTimeout)
+	defer cancel()
+	out, err := c.git()(ctx, c.dir, "remote", "get-url", "origin")
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("read the origin remote: %w", err)
 		}
-		c.current, c.currentErr = parseRemote(string(out))
-	})
+		c.done = true
+		c.currentErr = fmt.Errorf("read the origin remote: %w", err)
+		return c.current, c.currentErr
+	}
+	c.done = true
+	c.current, c.currentErr = parseRemote(string(out))
 	return c.current, c.currentErr
 }
 
@@ -68,7 +83,6 @@ func parseRemote(url string) (string, error) {
 	case strings.HasPrefix(s, "git@"+host+":"):
 		s = strings.TrimPrefix(s, "git@"+host+":")
 	default:
-		// Strip the scheme and any user@ in front of the host.
 		if _, rest, ok := strings.Cut(s, "://"); ok {
 			s = rest
 		}
