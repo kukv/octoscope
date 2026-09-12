@@ -2261,9 +2261,22 @@ Run: `go test ./internal/gh/api/ -v` → PASS
 
 - [ ] **Step 6: `api.Client` が GraphQL 系を全部持っていることを確認する**
 
-**コンパイルで確かめる。** `internal/gh/api/api_test.go` に足す:
+**コンパイルで確かめる。** `internal/gh/api/parity_test.go` を新しく作り、
+**`package api_test`（外部テストパッケージ）**で書く。`cli.Client` を import
+するので `package api` には置けない — `api` が `cli` を import すると、
+バックエンドどうしが依存し合う。
 
 ```go
+package api_test
+
+import (
+	"context"
+
+	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/gh/api"
+	"github.com/kukv/octoscope/internal/gh/cli"
+)
+
 // graphQLSource is every GraphQL-backed operation the usecase layer's source
 // interface asks for. The rest of that interface -- the REST calls and the
 // Actions calls -- arrives in later slices; this is the part this backend is
@@ -2286,14 +2299,10 @@ type graphQLSource interface {
 // Both backends answer the same operations with the same domain types. A
 // method that only one of them has would leave the other's screens empty.
 var (
-	_ graphQLSource = (*Client)(nil)
+	_ graphQLSource = (*api.Client)(nil)
 	_ graphQLSource = (*cli.Client)(nil)
 )
 ```
-
-**`cli.Client` を import するので、このファイルは `package api_test`（外部テスト
-パッケージ）に分ける** — `api` が `cli` を import すると、バックエンドどうしが
-依存し合う。`internal/gh/api/parity_test.go` として `package api_test` で置く。
 
 この時点で `cli.Client` は `RepoName(ctx)` を持ち（既存）、`api.Client` も持つ。
 `ListWorkSection` などは両方 `*gql.Client` の埋め込みから生えている。
