@@ -633,9 +633,13 @@ func TestEscapeClosesThePopup(t *testing.T) {
 	t.Parallel()
 
 	m := newTestModel(t, &fakeStore{})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
 	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open author:@me"}})
 	before := m.View()
 	m, _ = press(m, "ctrl+o")
+	if !strings.Contains(m.View(), "mine") {
+		t.Fatal("setup: the popup did not open, so esc closing it proves nothing")
+	}
 	m, _ = press(m, "esc")
 	if m.Capturing() {
 		t.Error("esc left the popup open")
