@@ -287,6 +287,14 @@ linters:
         linters:
           - unparam
         text: "send"
+      # unparam flags read's accept parameter while every caller so far
+      # passes "". The caller that names a real media type -- PRDiff, asking
+      # for a diff instead of JSON -- lands in the next commit of this slice.
+      # Remove this entry once that caller exists.
+      - path: internal/gh/api/rest\.go
+        linters:
+          - unparam
+        text: "read"
 
 issues:
   max-issues-per-linter: 0
