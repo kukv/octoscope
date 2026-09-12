@@ -18,7 +18,7 @@ error:
   config_unreadable:
     other: "設定ファイルを読み込めませんでした。既定値で動作します"
   unauthenticated:
-    other: "GitHub にサインインしていません。次を実行してください: gh auth login"
+    other: "GitHub にサインインしていません。gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
   no_backend:
     other: "GitHub に接続する手段がありません。gh CLI を入れて gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
 
