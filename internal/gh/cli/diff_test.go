@@ -10,9 +10,13 @@ import (
 	"github.com/kukv/octoscope/internal/gh"
 )
 
+// readSample reads the one recording of sample.diff, kept in internal/gh
+// since that is where the parsing tests that assert on its content now live.
+// The tests here only need gh pr diff to return something a real diff could
+// be, not any particular content of it.
 func readSample(t *testing.T) []byte {
 	t.Helper()
-	b, err := os.ReadFile("testdata/sample.diff")
+	b, err := os.ReadFile("../testdata/sample.diff")
 	if err != nil {
 		t.Fatal(err)
 	}
