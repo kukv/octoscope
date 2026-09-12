@@ -134,12 +134,12 @@ func TestGolden(t *testing.T) {
 // saved, ready for the next one or for ctrl+o to open the picker.
 func saveQuery(t *testing.T, m Model, name, query string) Model {
 	t.Helper()
-	m, cmd := press(m, "e")
+	m, _ = press(m, "e") // openRaw never returns a command
 	for range []rune(m.input.Value()) {
 		m, _ = press(m, "backspace")
 	}
 	m = typeInto(m, query)
-	m, cmd = press(m, "enter")
+	m, cmd := press(m, "enter")
 	m = resolve(t, m, cmd)
 	m, _ = press(m, "s")
 	m = typeInto(m, name)

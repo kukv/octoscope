@@ -190,13 +190,13 @@ func newTestModel(opts Options) Model {
 
 // started is loadedApp with the search tab's own item, so it can be reached
 // through app's own key routing without a t.Helper() at every call site.
-func started(t *testing.T, width int) Model {
+func started(t *testing.T) Model {
 	t.Helper()
 	src := &fakeSource{searchItems: []gh.WorkItem{{
 		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
 		Title: "a result",
 	}}}
-	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return resolve(t, next.(Model), cmd)
 }
 
@@ -334,7 +334,7 @@ func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
 func TestThreeShowsTheSearchTab(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 	if !strings.Contains(m.View().Content, i18n.T("search.filters")) {
 		t.Errorf("3 did not reach the Search tab:\n%s", m.View().Content)
@@ -346,7 +346,7 @@ func TestThreeShowsTheSearchTab(t *testing.T) {
 func TestTypingTheTabKeysIntoTheSearchFieldTypesThem(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 	m = press(m, "e")
 	for _, key := range []string{"q", "1", "2", "3"} {
@@ -360,7 +360,7 @@ func TestTypingTheTabKeysIntoTheSearchFieldTypesThem(t *testing.T) {
 func TestASearchResultOpensTheDetailView(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 	m = press(m, "l")
 	m, cmd := pressCmd(m, "enter")
@@ -1423,7 +1423,7 @@ func setRawQuery(t *testing.T, m Model, current, query string) Model {
 func TestSavingAQueryAndCallingItBack(t *testing.T) {
 	t.Parallel()
 
-	m := started(t, 120)
+	m := started(t)
 	m = press(m, "3")
 
 	// is:open is the default filters query the raw editor and the name field
