@@ -30,8 +30,12 @@ func TestPRDiffBuildsTheCommand(t *testing.T) {
 		got = args
 		return readSample(t), nil
 	}
-	if _, err := c.PRDiff(context.Background(), "", 128); err != nil {
+	files, err := c.PRDiff(context.Background(), "", 128)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("no files parsed from the sample diff")
 	}
 	want := []string{"pr", "diff", "128", "--color", "never", "--repo", "kukv/koto"}
 	if len(got) != len(want) {

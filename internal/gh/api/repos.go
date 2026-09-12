@@ -22,7 +22,8 @@ func (r repoJSON) toDomain() gh.RepoCandidate {
 }
 
 // page is what REST will actually answer with. Asking for more than a page is
-// a 422, so a caller's larger limit is cut down rather than sent.
+// a 422, so a caller's larger limit is cut down rather than sent -- silently,
+// unlike cli, which lets gh page past 100 on the caller's behalf.
 func page(limit int) int {
 	if limit > pageSize || limit <= 0 {
 		return pageSize

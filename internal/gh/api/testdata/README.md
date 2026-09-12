@@ -15,3 +15,6 @@ GitHub の REST API から実際に録った応答。手書きしない。
 
 `assignees.json` は `jq` で `login` と `id` に絞ってある。生の応答には
 プロフィール URL とアバター URL が並び、録りものに残す理由が無い。
+
+`user_orgs.json` の `bright-room` は新たな開示ではない。`renovate.json` など、
+このリポジトリに既にコミット済みの所属 Org 名である。

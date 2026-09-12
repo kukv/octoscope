@@ -64,10 +64,6 @@ gh repo list --limit 100 --json nameWithOwner,isPrivate \
   > internal/gh/cli/testdata/own_repos.json
 ```
 
-`ListOrgs` の録画は置いていない。所属 Org 名そのものが伏せる対象であり、
-`--jq '[.[].login]'` が返すのは文字列の配列だけなので、テストはその形の
-リテラルを `c.run` から返せば足りる。
-
 `sample.diff` は `internal/gh/testdata` にある（README も同じ場所）。パース
 そのものを見るテストが `internal/gh` に移ったので、録りものはそちらにしか
 置かない。
