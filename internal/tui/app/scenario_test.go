@@ -40,6 +40,10 @@ func (f *scenarioSource) SearchRepos(context.Context, string, int) ([]gh.RepoCan
 	return f.found, nil
 }
 
+func (f *scenarioSource) SearchItems(context.Context, string) ([]gh.WorkItem, error) {
+	return nil, nil
+}
+
 func (f *scenarioSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
 	return f.seed, nil
 }

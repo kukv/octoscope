@@ -37,6 +37,8 @@ tab:
     other: "Work"
   repos:
     other: "Repos"
+  search:
+    other: "Search"
   repo_lookup_timeout:
     other: "現在のリポジトリを特定できませんでした"
   config_unreadable:
@@ -61,6 +63,41 @@ repos:
     other: "＋ リポジトリを追加"
   seed_hint:
     other: "g で自分のリポジトリから選べます"
+
+search:
+  filters:
+    other: "フィルタ"
+  results:
+    other: "結果"
+  no_results:
+    other: "一致するものがありません"
+  result_count:
+    other: "{{.Count}} 件"
+  result_count_capped:
+    other: "{{.Count}}+ 件"
+  # フィルタ名は GitHub の検索構文そのものなので翻訳しない
+  # (.claude/rules/tui.md)。
+  filter:
+    type:
+      other: "type"
+    state:
+      other: "state"
+    org:
+      other: "org"
+    repo:
+      other: "repo"
+    author:
+      other: "author"
+    label:
+      other: "label"
+    review:
+      other: "review"
+    sort:
+      other: "sort"
+  unset:
+    other: "—"
+  candidates:
+    other: "候補"
 
 dialog:
   add_repo_title:
@@ -224,6 +261,35 @@ footer:
       other: "o:Web"
     quit:
       other: "q:終了"
+  search:
+    field:
+      other: "j/k:項目"
+    cycle:
+      other: "space:切替"
+    edit_field:
+      other: "enter:入力"
+    results:
+      other: "l:結果へ"
+    raw:
+      other: "e:生クエリ"
+    open:
+      other: "enter:詳細"
+    move:
+      other: "j/k:移動"
+    back:
+      other: "h:フィルタへ"
+    refresh:
+      other: "r:再検索"
+    diff:
+      other: "d:diff"
+    web:
+      other: "o:Web"
+    quit:
+      other: "q:終了"
+    cancel:
+      other: "esc:取消"
+    apply:
+      other: "enter:確定"
   close:
     other: "x:クローズ"
   reopen:

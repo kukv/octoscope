@@ -48,10 +48,13 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	var cmd tea.Cmd
-	if m.tab == tabWork {
+	switch m.tab {
+	case tabWork:
 		m.work, cmd = m.work.Update(shifted)
-	} else {
+	case tabRepos:
 		m.repo, cmd = m.repo.Update(shifted)
+	case tabSearch:
+		m.search, cmd = m.search.Update(shifted)
 	}
 	return m, cmd
 }

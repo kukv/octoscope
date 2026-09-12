@@ -37,6 +37,8 @@ tab:
     other: "Work"
   repos:
     other: "Repos"
+  search:
+    other: "Search"
   repo_lookup_timeout:
     other: "could not tell which repository this is"
   config_unreadable:
@@ -61,6 +63,45 @@ repos:
     other: "+ Add a repository"
   seed_hint:
     other: "Press g to pick from the repositories you already have"
+
+search:
+  filters:
+    other: "Filters"
+  results:
+    other: "Results"
+  no_results:
+    other: "Nothing matched this search"
+  # The result count, under the cap a search asks for. Above the cap,
+  # result_count_capped is shown instead: a full page may have been cut
+  # short, so its count is not a real quantity to pluralize on.
+  result_count:
+    one: "{{.Count}} result"
+    other: "{{.Count}} results"
+  result_count_capped:
+    other: "{{.Count}}+ results"
+  # A filter's name is GitHub's own search qualifier and is not translated
+  # (.claude/rules/tui.md).
+  filter:
+    type:
+      other: "type"
+    state:
+      other: "state"
+    org:
+      other: "org"
+    repo:
+      other: "repo"
+    author:
+      other: "author"
+    label:
+      other: "label"
+    review:
+      other: "review"
+    sort:
+      other: "sort"
+  unset:
+    other: "—"
+  candidates:
+    other: "Candidates"
 
 dialog:
   add_repo_title:
@@ -230,6 +271,35 @@ footer:
       other: "o:web"
     quit:
       other: "q:quit"
+  search:
+    field:
+      other: "j/k: field"
+    cycle:
+      other: "space: change"
+    edit_field:
+      other: "enter: type"
+    results:
+      other: "l: results"
+    raw:
+      other: "e: raw query"
+    open:
+      other: "enter: detail"
+    move:
+      other: "j/k: move"
+    back:
+      other: "h: filters"
+    refresh:
+      other: "r: search again"
+    diff:
+      other: "d: diff"
+    web:
+      other: "o: open"
+    quit:
+      other: "q: quit"
+    cancel:
+      other: "esc: cancel"
+    apply:
+      other: "enter: apply"
   close:
     other: "x:close"
   reopen:

@@ -54,6 +54,14 @@ type fakeSource struct {
 	found       []gh.RepoCandidate
 	seed        []gh.RepoCandidate
 	saved       []string
+
+	searchItems []gh.WorkItem
+	searchCalls int
+}
+
+func (f *fakeSource) SearchItems(context.Context, string) ([]gh.WorkItem, error) {
+	f.searchCalls++
+	return f.searchItems, nil
 }
 
 func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
@@ -176,6 +184,18 @@ func newTestModelWith(src Source, opts Options) Model {
 
 func newTestModel(opts Options) Model {
 	return newTestModelWith(&fakeSource{}, opts)
+}
+
+// started is loadedApp with the search tab's own item, so it can be reached
+// through app's own key routing without a t.Helper() at every call site.
+func started(t *testing.T, width int) Model {
+	t.Helper()
+	src := &fakeSource{searchItems: []gh.WorkItem{{
+		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
+		Title: "a result",
+	}}}
+	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	return resolve(t, next.(Model), cmd)
 }
 
 func key(s string) tea.KeyPressMsg {
@@ -302,6 +322,45 @@ func TestAResolvedRepositoryDoesNotMoveTheUser(t *testing.T) {
 	next, _ := m.Update(repoResolvedMsg{name: "kukv/demo"})
 	if got := next.(Model); got.tab != tabWork {
 		t.Errorf("tab = %d after the repository was resolved, want tabWork", got.tab)
+	}
+}
+
+func TestThreeShowsTheSearchTab(t *testing.T) {
+	t.Parallel()
+
+	m := started(t, 120)
+	m = press(m, "3")
+	if !strings.Contains(m.View().Content, i18n.T("search.filters")) {
+		t.Errorf("3 did not reach the Search tab:\n%s", m.View().Content)
+	}
+}
+
+// The root acts on q, 1, 2 and 3 before the tabs see them. A query with one
+// of those in it must still reach the field.
+func TestTypingTheTabKeysIntoTheSearchFieldTypesThem(t *testing.T) {
+	t.Parallel()
+
+	m := started(t, 120)
+	m = press(m, "3")
+	m = press(m, "e")
+	for _, key := range []string{"q", "1", "2", "3"} {
+		m = press(m, key)
+	}
+	if !strings.Contains(m.View().Content, "q123") {
+		t.Errorf("the tab keys did not reach the field:\n%s", m.View().Content)
+	}
+}
+
+func TestASearchResultOpensTheDetailView(t *testing.T) {
+	t.Parallel()
+
+	m := started(t, 120)
+	m = press(m, "3")
+	m = press(m, "l")
+	m, cmd := pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+	if len(m.stack) == 0 {
+		t.Error("enter on a result opened nothing")
 	}
 }
 
@@ -596,6 +655,38 @@ func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 	if f.prCalls == 0 {
 		t.Error("the Repos list was not refreshed after a merge")
+	}
+}
+
+// TestAMergeRefreshesSearchToo guards against Search being treated
+// differently from Work and Repos: reached through the root's own key
+// routing (3, then l, then enter), a pull request merged from Search's
+// detail view must re-run Search's own query too, not only the board and
+// the Repos list.
+func TestAMergeRefreshesSearchToo(t *testing.T) {
+	f := &fakeSource{searchItems: []gh.WorkItem{{
+		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
+		Title: "a result",
+	}}}
+	next, cmd := New(f, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+	m = press(m, "3")
+	m = press(m, "l")
+	m, cmd = pressCmd(m, "enter")
+	m = resolve(t, m, cmd)
+	if len(m.stack) == 0 {
+		t.Fatal("setup: opening the search result did not open a detail view")
+	}
+	before := f.searchCalls
+
+	_, cmd = m.Update(merge.MergedMsg{})
+	if cmd == nil {
+		t.Fatal("merge.MergedMsg produced no command")
+	}
+	resolve(t, m, cmd)
+
+	if f.searchCalls <= before {
+		t.Error("Search was not refreshed after a merge")
 	}
 }
 

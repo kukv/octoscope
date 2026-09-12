@@ -18,6 +18,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/merge"
 	"github.com/kukv/octoscope/internal/tui/repo"
 	"github.com/kukv/octoscope/internal/tui/review"
+	"github.com/kukv/octoscope/internal/tui/search"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
 )
@@ -36,6 +37,7 @@ type Source interface {
 	detail.Source
 	diff.Source
 	checks.Source
+	search.Source
 	repoNamer
 }
 
@@ -110,6 +112,7 @@ type tabID int
 const (
 	tabWork tabID = iota
 	tabRepos
+	tabSearch
 )
 
 // overlay is a view drawn over the tabs. They stack: d from the detail view
@@ -139,6 +142,7 @@ type Model struct {
 	detail detail.Model
 	diff   diff.Model
 	checks checks.Model
+	search search.Model
 
 	// started guards the first fetch, which waits for the first size rather
 	// than happening in Init: work.Refresh hands back a model carrying the
@@ -180,6 +184,7 @@ func New(src Source, opts Options) Model {
 			Repositories: opts.Repositories,
 			Current:      opts.Repo,
 		}),
+		search: search.New(src),
 	}
 	// Naming a repository on the command line is a statement about what the
 	// user came to look at, so that is the tab they land on. A repository
@@ -219,9 +224,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
+	case search.OpenDetailMsg:
+		return m.openDetail(msg.Ref)
 	case work.OpenDiffMsg:
 		return m.openDiff(msg.Ref)
 	case repo.OpenDiffMsg:
+		return m.openDiff(msg.Ref)
+	case search.OpenDiffMsg:
 		return m.openDiff(msg.Ref)
 	case detail.OpenDiffMsg:
 		return m.openDiffOverDetail(msg.Ref)
@@ -243,6 +252,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case work.FatalMsg:
 		return m.fail(msg.Err)
 	case repo.FatalMsg:
+		return m.fail(msg.Err)
+	case search.FatalMsg:
 		return m.fail(msg.Err)
 	case detail.ErrorMsg:
 		return m.detailFailed(msg)
@@ -308,11 +319,11 @@ func (m Model) checksFailed(msg checks.ErrorMsg) (tea.Model, tea.Cmd) {
 }
 
 // refreshLists carries a review submission or a merge to the views that are
-// open and refetches the board and the Repos list, which have nothing of
-// their own to notice from. A review submission is refetched by the detail
-// and diff views; of a merge only the detail view takes notice, closing when
-// the pull request was merged and letting the popup refetch when it only
-// joined or left the auto-merge queue.
+// open and refetches the board, the Repos list and Search, none of which
+// have anything of their own to notice from. A review submission is
+// refetched by the detail and diff views; of a merge only the detail view
+// takes notice, closing when the pull request was merged and letting the
+// popup refetch when it only joined or left the auto-merge queue.
 func (m Model) refreshLists(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.broadcast(msg)
 	m = next.(Model)
@@ -320,7 +331,9 @@ func (m Model) refreshLists(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.work, workCmd = m.work.Refresh()
 	var repoCmd tea.Cmd
 	m.repo, repoCmd = m.repo.Refresh()
-	return m, tea.Batch(cmd, workCmd, repoCmd)
+	var searchCmd tea.Cmd
+	m.search, searchCmd = m.search.Refresh()
+	return m, tea.Batch(cmd, workCmd, repoCmd, searchCmd)
 }
 
 // has reports whether o is anywhere on the stack, not only on top: the
@@ -364,6 +377,9 @@ func (m Model) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	m.repo, cmd = m.repo.Update(msg)
+	cmds = append(cmds, cmd)
+
+	m.search, cmd = m.search.Update(msg)
 	cmds = append(cmds, cmd)
 
 	if m.has(overlayDetail) {
@@ -417,7 +433,7 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.started = true
 		var fetch tea.Cmd
 		m.work, fetch = m.work.Refresh()
-		cmds = append(cmds, fetch, m.repo.Init())
+		cmds = append(cmds, fetch, m.repo.Init(), m.search.Init())
 		if m.opts.Repo == "" {
 			cmds = append(cmds, resolveRepo(m.src))
 		}
@@ -572,9 +588,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	// A tab with a field open takes every key, the same way an overlay does.
-	// Without this, typing a repository name with a q in it would quit.
-	if m.tab == tabRepos && m.repo.Capturing() {
-		m.repo, cmd = m.repo.Update(msg)
+	// Without this, typing a repository name or a search query with a q in
+	// it would quit, or a digit in it would jump tabs.
+	if m.capturing() {
+		switch m.tab {
+		case tabRepos:
+			m.repo, cmd = m.repo.Update(msg)
+		case tabSearch:
+			m.search, cmd = m.search.Update(msg)
+		}
 		return m, cmd
 	}
 
@@ -587,14 +609,32 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "2":
 		m.tab = tabRepos
 		return m, nil
+	case "3":
+		m.tab = tabSearch
+		return m, nil
 	}
 
-	if m.tab == tabWork {
+	switch m.tab {
+	case tabWork:
 		m.work, cmd = m.work.Update(msg)
-	} else {
+	case tabRepos:
 		m.repo, cmd = m.repo.Update(msg)
+	case tabSearch:
+		m.search, cmd = m.search.Update(msg)
 	}
 	return m, cmd
+}
+
+// capturing says the active tab has a field open that must see every key,
+// the same way an overlay does.
+func (m Model) capturing() bool {
+	switch m.tab {
+	case tabRepos:
+		return m.repo.Capturing()
+	case tabSearch:
+		return m.search.Capturing()
+	}
+	return false
 }
 
 // quit stops the Work board's fetch before leaving, so a cancelled gh

@@ -34,8 +34,11 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) activeTab() string {
-	if m.tab == tabRepos {
+	switch m.tab {
+	case tabRepos:
 		return m.repo.View()
+	case tabSearch:
+		return m.search.View()
 	}
 	return m.work.View()
 }
@@ -44,7 +47,7 @@ func (m Model) activeTab() string {
 // the mouse hit-test read this, so they cannot disagree about where a label
 // sits.
 func (m Model) tabLabels() []string {
-	return []string{"1 " + i18n.T("tab.work"), "2 " + i18n.T("tab.repos")}
+	return []string{"1 " + i18n.T("tab.work"), "2 " + i18n.T("tab.repos"), "3 " + i18n.T("tab.search")}
 }
 
 // tabRow labels each tab with the key that reaches it, and reports on the
