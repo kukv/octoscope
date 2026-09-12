@@ -33,6 +33,10 @@
           ]
         },
         "comments": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpHPAAAAAUudLN8="
+          },
           "nodes": [
             {
               "author": {

@@ -58,6 +58,8 @@ var checkedDocs = map[string]string{
 	"repo_issues.graphql":        repoIssuesQuery,
 	"pr.graphql":                 prQuery,
 	"issue.graphql":              issueQuery,
+	"pr_comments.graphql":        prCommentsQuery,
+	"issue_comments.graphql":     issueCommentsQuery,
 	"repo_name.graphql":          repoNameQuery,
 }
 

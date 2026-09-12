@@ -18,6 +18,10 @@ query ($owner: String!, $name: String!, $number: Int!) {
         nodes { login }
       }
       comments(first: 100) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           author { login }
           body

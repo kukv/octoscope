@@ -240,6 +240,13 @@ gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
 `prNode` の `labels` / `assignees` の json タグを壊してもどのテストも落ちなかった。
 詳細画面はこの 2 つをそのまま描くので、空のまま描かれても誰も気づかない状態だった。
 
+2026-09-13 に `comments` の `pageInfo` を選ぶようになったのに合わせて録り直した。
+`kukv/octoscope#59` のコメントは 3 件で 1 ページに収まるため、この録りものが
+確かめるのはフィールドの読み取りだけである。**`pr_comments.graphql` による
+ページングの仕組みは録りものではなく `comments_test.go` 内のインライン JSON で
+確かめる**（`pr_checks.json` と同じ方針）。2 ページ以上ある会話を録るには
+コメントが 100 件を超える実在の PR が要り、それはこのリポジトリには無い。
+
 ```bash
 D=internal/gh/gql/testdata
 gh api graphql -F query=@internal/gh/gql/pr.graphql \
@@ -254,6 +261,8 @@ gh api graphql -F query=@internal/gh/gql/pr.graphql \
 **#50 から録り直した理由**: #50 は labels も assignees もコメントも空で、
 `issueNode` のそれらの json タグや `toComments` の呼び出しを壊しても
 どのテストも落ちなかった。Issue の会話は詳細画面の中身そのものである。
+
+2026-09-13 に `comments` の `pageInfo` を選ぶようになったのに合わせて録り直した。
 
 ```bash
 D=internal/gh/gql/testdata

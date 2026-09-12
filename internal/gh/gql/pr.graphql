@@ -25,9 +25,14 @@ query ($owner: String!, $name: String!, $number: Int!) {
       assignees(first: 100) {
         nodes { login }
       }
-      # The detail view shows the conversation in order and does not page it;
-      # 100 is GitHub's cap for one connection.
+      # 100 is GitHub's cap for one connection, and it answers with the
+      # oldest hundred. pr_comments.graphql walks the pages after this one,
+      # so the detail view shows the whole conversation in order.
       comments(first: 100) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           author { login }
           body

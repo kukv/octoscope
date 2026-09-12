@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -21,6 +22,12 @@ var prQuery string
 
 //go:embed issue.graphql
 var issueQuery string
+
+//go:embed pr_comments.graphql
+var prCommentsQuery string
+
+//go:embed issue_comments.graphql
+var issueCommentsQuery string
 
 //go:embed repo_name.graphql
 var repoNameQuery string
@@ -50,10 +57,8 @@ type prNode struct {
 	Assignees struct {
 		Nodes []gh.Author `json:"nodes"`
 	} `json:"assignees"`
-	Comments struct {
-		Nodes []commentNode `json:"nodes"`
-	} `json:"comments"`
-	Commits struct {
+	Comments commentPage `json:"comments"`
+	Commits  struct {
 		Nodes []struct {
 			Commit struct {
 				StatusCheckRollup *struct {
@@ -64,6 +69,14 @@ type prNode struct {
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"commits"`
+}
+
+// commentPage is one page of a conversation. GitHub caps a connection at
+// 100 nodes and answers with the oldest of them, so a thread longer than
+// that is only whole once the pages after the first have been walked.
+type commentPage struct {
+	PageInfo PageInfo      `json:"pageInfo"`
+	Nodes    []commentNode `json:"nodes"`
 }
 
 // commentNode is one comment. GraphQL nests the author under an object,
@@ -141,9 +154,7 @@ type issueNode struct {
 	Assignees struct {
 		Nodes []gh.Author `json:"nodes"`
 	} `json:"assignees"`
-	Comments struct {
-		Nodes []commentNode `json:"nodes"`
-	} `json:"comments"`
+	Comments commentPage `json:"comments"`
 }
 
 func (n issueNode) toIssue() gh.Issue {
@@ -175,6 +186,64 @@ type issueResponse struct {
 			Issue issueNode `json:"issue"`
 		} `json:"repository"`
 	} `json:"data"`
+}
+
+type prCommentsResponse struct {
+	Data struct {
+		Repository struct {
+			PullRequest struct {
+				Comments commentPage `json:"comments"`
+			} `json:"pullRequest"`
+		} `json:"repository"`
+	} `json:"data"`
+}
+
+type issueCommentsResponse struct {
+	Data struct {
+		Repository struct {
+			Issue struct {
+				Comments commentPage `json:"comments"`
+			} `json:"issue"`
+		} `json:"repository"`
+	} `json:"data"`
+}
+
+func decodePRComments(body []byte) (commentPage, error) {
+	var resp prCommentsResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return commentPage{}, fmt.Errorf("parse pull request comments: %w", err)
+	}
+	return resp.Data.Repository.PullRequest.Comments, nil
+}
+
+func decodeIssueComments(body []byte) (commentPage, error) {
+	var resp issueCommentsResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return commentPage{}, fmt.Errorf("parse issue comments: %w", err)
+	}
+	return resp.Data.Repository.Issue.Comments, nil
+}
+
+// restOfConversation appends the pages of comments that come after the one
+// the single-item document already carries. doc asks for nothing but the
+// comments connection, so a long thread does not re-fetch the whole item.
+func (c *Client) restOfConversation(ctx context.Context, doc string, repoVars []Var, number int, first commentPage,
+	decode func([]byte) (commentPage, error),
+) ([]commentNode, error) {
+	nodes := first.Nodes
+	page := first
+	for page.PageInfo.HasNextPage && page.PageInfo.EndCursor != "" {
+		vars := append(slices.Clone(repoVars), N("number", number), S("after", page.PageInfo.EndCursor))
+		out, err := c.Read(ctx, doc, vars...)
+		if err != nil {
+			return nil, err
+		}
+		if page, err = decode(out); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, page.Nodes...)
+	}
+	return nodes, nil
 }
 
 type prListResponse struct {
@@ -257,7 +326,12 @@ func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, err
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return gh.PR{}, fmt.Errorf("parse pull request: %w", err)
 	}
-	return resp.Data.Repository.PullRequest.toPR(), nil
+	node := resp.Data.Repository.PullRequest
+	node.Comments.Nodes, err = c.restOfConversation(ctx, prCommentsQuery, vars, number, node.Comments, decodePRComments)
+	if err != nil {
+		return gh.PR{}, err
+	}
+	return node.toPR(), nil
 }
 
 // GetIssue returns one issue with its body and conversation.
@@ -274,7 +348,12 @@ func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issu
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return gh.Issue{}, fmt.Errorf("parse issue: %w", err)
 	}
-	return resp.Data.Repository.Issue.toIssue(), nil
+	node := resp.Data.Repository.Issue
+	node.Comments.Nodes, err = c.restOfConversation(ctx, issueCommentsQuery, vars, number, node.Comments, decodeIssueComments)
+	if err != nil {
+		return gh.Issue{}, err
+	}
+	return node.toIssue(), nil
 }
 
 // RepoName returns the repository's canonical "owner/name".
