@@ -19,6 +19,8 @@ error:
     other: "設定ファイルを読み込めませんでした。既定値で動作します"
   unauthenticated:
     other: "GitHub にサインインしていません。次を実行してください: gh auth login"
+  no_backend:
+    other: "GitHub に接続する手段がありません。gh CLI を入れて gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
 
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).
