@@ -144,6 +144,91 @@ func TestRepoPathPrefersTheExplicitRepositoryOverTheClients(t *testing.T) {
 	}
 }
 
+// send attaches this client's own token to whatever URL it is given, so a
+// next link pointing somewhere else must not be followed.
+func TestWalkPagesStopsAtANextLinkPointingAtAnotherHost(t *testing.T) {
+	t.Parallel()
+
+	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Link", `<https://evil.example/x?page=2>; rel="next"`)
+		_, _ = io.WriteString(w, `[1]`)
+	})
+	var pages int
+	err := c.walkPages(context.Background(), "x", func([]byte) error {
+		pages++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walkPages: %v", err)
+	}
+	if pages != 1 {
+		t.Errorf("pages = %d, want 1 (the off-host next link must not be followed)", pages)
+	}
+	if len(*got) != 1 {
+		t.Errorf("requests = %d, want 1", len(*got))
+	}
+}
+
+// A next link pointing back at the same page would loop forever without a
+// page cap.
+func TestWalkPagesStopsAtMaxPagesWhenNextKeepsPointingAtItself(t *testing.T) {
+	t.Parallel()
+
+	c, got := serveREST(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Link", `<http://`+r.Host+r.URL.Path+`>; rel="next"`)
+		_, _ = io.WriteString(w, `[1]`)
+	})
+	var pages int
+	err := c.walkPages(context.Background(), "x", func([]byte) error {
+		pages++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walkPages: %v", err)
+	}
+	if pages != maxPages {
+		t.Errorf("pages = %d, want %d", pages, maxPages)
+	}
+	if len(*got) != maxPages {
+		t.Errorf("requests = %d, want %d", len(*got), maxPages)
+	}
+}
+
+// A transient failure on a later page must be retried the same way the first
+// page is: prFiles and ListLabels build on walkPages precisely so paging
+// callers get this for free.
+func TestWalkPagesRetriesATransientFailureOnALaterPage(t *testing.T) {
+	t.Parallel()
+
+	calls := 0
+	c, _ := serveREST(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		switch calls {
+		case 1:
+			w.Header().Set("Link", `<http://`+r.Host+`/x?page=2>; rel="next"`)
+			_, _ = io.WriteString(w, `[1]`)
+		case 2:
+			w.WriteHeader(http.StatusBadGateway)
+		default:
+			_, _ = io.WriteString(w, `[1]`)
+		}
+	})
+	var pages int
+	err := c.walkPages(context.Background(), "x", func([]byte) error {
+		pages++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walkPages: %v", err)
+	}
+	if pages != 2 {
+		t.Errorf("pages = %d, want 2", pages)
+	}
+	if calls != 3 {
+		t.Errorf("calls = %d, want 3 (page 1, page 2's 502, page 2's retry)", calls)
+	}
+}
+
 // A repository with no owner/name separator would build a path GitHub reads as
 // a different endpoint entirely, so it is refused before the request is sent.
 func TestRepoPathRefusesAThingThatIsNotOwnerSlashName(t *testing.T) {

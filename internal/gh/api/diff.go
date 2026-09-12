@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/kukv/octoscope/internal/gh"
 )
@@ -42,19 +41,18 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.File
 // endpoint's default page is 30 files, and the pull request this fallback
 // exists for had 418.
 func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
-	url := c.restURL(fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d", repo, number, pageSize))
+	path := fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d", repo, number, pageSize)
 	var files []gh.FileDiff
-	for url != "" {
-		out, header, err := c.send(ctx, http.MethodGet, url, nil, "")
-		if err != nil {
-			return nil, err
-		}
+	err := c.walkPages(ctx, path, func(out []byte) error {
 		page, err := gh.ParseFilesAPI(out)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		files = append(files, page...)
-		url = nextLink(header)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return files, nil
 }

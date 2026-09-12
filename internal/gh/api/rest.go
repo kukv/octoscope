@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -69,15 +70,23 @@ func (c *Client) send(ctx context.Context, method, url string, body any, accept 
 	return out, resp.Header, statusError(resp.StatusCode, out)
 }
 
-// read fetches one path, asking again once when GitHub's front end did not
-// answer. Only reads take this path: a 502 says no answer came back, not that
-// nothing arrived, so a repeated write could apply twice.
-func (c *Client) read(ctx context.Context, path, accept string) ([]byte, error) {
-	out, _, err := c.send(ctx, http.MethodGet, c.restURL(path), nil, accept)
+// readURL fetches one absolute URL, asking again once when GitHub's front end
+// did not answer. Only reads take this path: a 502 says no answer came back,
+// not that nothing arrived, so a repeated write could apply twice.
+//
+// It takes the URL rather than a path so a paging caller can retry a later
+// page too: read alone only ever asked for the first one.
+func (c *Client) readURL(ctx context.Context, url, accept string) ([]byte, http.Header, error) {
+	out, header, err := c.send(ctx, http.MethodGet, url, nil, accept)
 	if err == nil || ctx.Err() != nil || !errors.Is(err, gh.ErrTransient) {
-		return out, err
+		return out, header, err
 	}
-	out, _, err = c.send(ctx, http.MethodGet, c.restURL(path), nil, accept)
+	return c.send(ctx, http.MethodGet, url, nil, accept)
+}
+
+// read fetches one path. See readURL for the retry.
+func (c *Client) read(ctx context.Context, path, accept string) ([]byte, error) {
+	out, _, err := c.readURL(ctx, c.restURL(path), accept)
 	return out, err
 }
 
@@ -104,6 +113,54 @@ func (c *Client) repoPath(repo string) (string, error) {
 		return "", fmt.Errorf("repo %q has no owner/name separator", repo)
 	}
 	return repo, nil
+}
+
+// maxPages caps a paged read at 50 pages, i.e. 5000 entries at pageSize --
+// comfortably past anything this backend ever needs to page through. It also
+// bounds how long a next link that points back at itself can loop for: send
+// always attaches this client's own token to whatever URL it is given, so a
+// next link is not trusted to eventually run out on its own.
+const maxPages = 50
+
+// walkPages fetches path and then whatever the response's Link header names
+// as the next page, feeding each page's raw body to each, until there is no
+// next page, maxPages is reached, or the next link fails validNext.
+//
+// Both callers page a JSON list, so this always reads with the default
+// Accept rather than taking one -- a paged diff media type request has never
+// come up.
+func (c *Client) walkPages(ctx context.Context, path string, each func([]byte) error) error {
+	next := c.restURL(path)
+	for i := 0; next != "" && i < maxPages; i++ {
+		out, header, err := c.readURL(ctx, next, "")
+		if err != nil {
+			return err
+		}
+		if err := each(out); err != nil {
+			return err
+		}
+		next = validNext(nextLink(header), c.base())
+	}
+	return nil
+}
+
+// validNext rejects a next link whose scheme or host does not match base,
+// treating it as if there were no next page rather than as an error: a next
+// link is echoed straight into an Authorization header by send, so it is not
+// followed on trust alone.
+func validNext(next, base string) string {
+	if next == "" {
+		return ""
+	}
+	b, err := url.Parse(base)
+	if err != nil {
+		return ""
+	}
+	n, err := url.Parse(next)
+	if err != nil || n.Scheme != b.Scheme || n.Host != b.Host {
+		return ""
+	}
+	return next
 }
 
 // nextLink is the URL of the page after this one, or empty on the last page.
