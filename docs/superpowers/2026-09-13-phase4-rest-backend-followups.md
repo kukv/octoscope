@@ -8,14 +8,23 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
 
 - **Actions**（`RerunWorkflow` / `JobLog`）は 4-4。`gh` の
   `pkg/cmd/run/view/view.go` を読んでから実装方針を決めること。
+  **→ 4-4 で片付いた。** 詳細は
+  `docs/superpowers/2026-09-13-phase4-actions-followups.md`。
 - **`main.go` のバックエンド選択と認証エラー画面** も 4-4。設計 §10 が
   当初からここを 4-4 の行に置いている。
+  **→ 4-4 で片付いた（`chooseBackend`、`cmd/octoscope/backend.go`）。**
+  詳細は `docs/superpowers/2026-09-13-phase4-actions-followups.md`。
 - **取得のタイムアウト。** `internal/gh/api` は `http.DefaultClient` を使っており
   タイムアウトが無い（4-2 の積み残しで既出）。**REST もこの Client を使うので、
   タイムアウトが無い対象が GraphQL だけでなく REST 系にも広がった。** 4-4 で
   クライアント側のタイムアウトを足すか、呼び出しごとに context のデッドラインを
   持たせるかを決める。**`prFiles` と `ListLabels` は 1 リクエストを最大 50 ページ
   （`walkPages`）に広げたので、タイムアウト不在の露出はこの見直しで増えている。**
+  **→ 4-4 で片付いた。** `internal/gh/api/api.go` の `responseTimeout`
+  （16 秒）が `DialContext` / `TLSHandshakeTimeout` / `ResponseHeaderTimeout` に
+  掛かる形で入った。ただし `cli` バックエンド側のタイムアウトは依然無いままで、
+  これは新しい繰り越しとして
+  `docs/superpowers/2026-09-13-phase4-actions-followups.md` に記録した。
 - **ラベル/担当者の編集で、追加が成功したあと削除が失敗すると、追加だけが
   適用された状態が残る**（`internal/gh/api/items.go`）。呼び出し側はどちらが
   通ったか知る手段が無い。UI 側の再読み込みと一緒に決める。
@@ -35,6 +44,9 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
 - **`internal/gh/api/parity_test.go` は 4-4 で削除する。**
   `usecase.New(api.New(...))` がコンパイルできた時点で、コンパイラ自身が
   本物のパリティチェックになるため（4-2 の積み残しの 5 番で決定済み）。
+  **→ 4-4 で片付いた。** 削除し、`api.Client.JobLog` を外すとビルドが
+  「メソッドが無い」と名指しで落ちることを確かめて、コンパイラがパリティ
+  チェックの代わりになることを検証した。
 
 ## このスライスで決めたこと（記録する価値があるもの）
 

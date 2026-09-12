@@ -193,6 +193,31 @@ Phase 4 の範囲外である。
 （Phase 3 設計 §2）、api 側はこの整形を自分で書くことになる。計画ではここを
 独立したタスクに切る。
 
+**上の 1 段落を 2026-09-13 に詳しくした**（4-4 着手前に `gh` の trunk を読んで
+確かめた。推測ではない）。
+
+| 確かめたこと | 結果（出典） |
+|---|---|
+| `gh run view --job <id> --log` が叩く順序 | `GET actions/jobs/{id}` →（未完了なら断る）→ `GET actions/runs/{run_id}/logs` の zip → zip 内のファイルをジョブ・ステップに対応づけ → 1 行ずつ `ジョブ名 \t ステップ名 \t 本文` で出す（`pkg/cmd/run/view/view.go:307-343`） |
+| zip の構造 | `<ジョブ名>/<ステップ番号>_<ステップ名>.txt` と、top-level の `<序数>_<ジョブ名>.txt`。古い Actions サービス由来で `-<負の数>_<ジョブ名>.txt` のこともある（`pkg/cmd/run/view/logs.go` の `getZipLogMap` の doc） |
+| zip にジョブ全体のログも無いとき | `GET actions/jobs/{id}/logs` の平文へ落ちる（`apiLogFetcher`） |
+| zip 内のジョブ名のサニタイズ | サーバ側が加工している。`gh` は `/` と `:` を除去し、UTF-16 のコードユニットで 90 に切り詰め、前後の空白を落とす（`getJobNameForLogFilename` / `truncateAsUTF16`）。api 側は `internal/gh/api/joblog.go` の `logFileName`（同じ 3 操作、`jobNameLimit = 90`） |
+| ステップ名が引けないとき `gh` が出す文字列 | `UNKNOWN STEP`（`displayLogSegments`）。api 側は `internal/gh/api/joblog.go` の `unknownStep` |
+| `gh` が本文に掛けている加工 | `asciisanitizer`。C0/C1 制御文字を caret 表記（`\x1b` → `^[`）に置換する。`\t` `\n` `\v` `\r` は素通し（`cli/go-gh` の `pkg/asciisanitizer/sanitizer.go`）。api 側は `internal/gh/api/joblog.go` の `sanitizeControls` / `caret` で同じ変換をする |
+
+**2026-09-13 の実データ計測で分かったこと。** `kukv/octoscope` の 2 つの run
+（`29934018532`・`34695737662`、いずれも当日ダウンロード）の zip アーカイブは
+どちらも top-level の `<序数>_<ジョブ名>.txt`（ジョブ全体のログ）と
+`<ジョブ名>/system.txt` しか持たず、上表 2 行目の
+`<ジョブ名>/<ステップ番号>_<ステップ名>.txt` は 1 つも含んでいなかった。
+**GitHub は現在、run ログの zip にステップ別エントリを入れていない可能性が
+ある。** `gh` 自身のローカルキャッシュ（`~/.cache/gh/run-log-29934018532-*.zip`、
+2026-07-22 付）にはステップ別エントリが残っており、以前はこの形をしていたと
+見える。裏づけは `docs/superpowers/2026-09-13-phase4-actions-followups.md`。
+この変化を踏まえると、上表の zip 構造とステップ対応づけは「`gh` が実装して
+いる手順」としては今も正しいが、「現在の GitHub が返すアーカイブの形」としては
+古い可能性がある。
+
 ## 7. 境界
 
 Phase 2・Phase 3 と同じ。`internal/tui` は `internal/gh/cli` も `internal/gh/api` も
