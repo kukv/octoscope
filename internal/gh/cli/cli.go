@@ -13,6 +13,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
 const (
@@ -290,4 +291,22 @@ func (c *Client) EditPRAssignees(repo string, number int, add, remove []string) 
 
 func (c *Client) EditIssueAssignees(repo string, number int, add, remove []string) error {
 	return c.editItems("issue", repo, number, add, remove, "--add-assignee", "--remove-assignee")
+}
+
+// ghArgs spells one document and its variables the way gh api graphql takes
+// them. -F is for values gh has to parse rather than pass through: numbers,
+// and the {owner}/{repo} placeholders it fills from the working directory.
+func ghArgs(doc string, vars []gql.Var) []string {
+	args := []string{"api", "graphql", "-f", "query=" + doc}
+	for _, v := range vars {
+		switch v.Kind {
+		case gql.VarInt:
+			args = append(args, "-F", v.Name+"="+strconv.Itoa(v.Int))
+		case gql.VarPlaceholder:
+			args = append(args, "-F", v.Name+"="+v.Str)
+		default:
+			args = append(args, "-f", v.Name+"="+v.Str)
+		}
+	}
+	return args
 }

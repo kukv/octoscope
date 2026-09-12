@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
 const prListJSON = `[{"number":12,"title":"feat: add pane view","author":{"is_bot":false,"login":"kukv"},"state":"OPEN","isDraft":false,"updatedAt":"2026-07-11T10:00:00Z","reviewDecision":"APPROVED","url":"https://github.com/kukv/demo/pull/12"}]`
@@ -726,4 +727,26 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			t.Errorf("StartReview ran gh %d times, want 1: a write must never be retried", calls)
 		}
 	})
+}
+
+// GraphQL rejects "3" where it wants 3, and gh substitutes {owner}/{repo}
+// only in -F values. Everything the user typed stays in -f, where gh passes
+// it through untouched.
+func TestNumbersAndPlaceholdersAreTheOnlyTypedArguments(t *testing.T) {
+	t.Parallel()
+
+	got := ghArgs("query {}", []gql.Var{
+		gql.Placeholder("owner", "{owner}"),
+		gql.N("number", 3),
+		gql.S("body", "-F not a flag"),
+	})
+	want := []string{
+		"api", "graphql", "-f", "query=query {}",
+		"-F", "owner={owner}",
+		"-F", "number=3",
+		"-f", "body=-F not a flag",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("args =\n%q\nwant\n%q", got, want)
+	}
 }
