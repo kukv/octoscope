@@ -149,6 +149,25 @@ GitHub が per-step エントリ入りのアーカイブを返さない以上、
   返している**（`internal/gh/api/joblog.go`）。**直さなかった理由:** 実害が無く
   （呼び出し元は理由に関わらず同じ扱いをする）、このスライスのスコープ
   （`gh` と同じ zip 方式を実装する）を超える。
+- **run のログアーカイブを丸ごとメモリに載せており、大きさの上限が無い**
+  （`internal/gh/api/joblog.go` の `jobLogLines` と `internal/gh/api/rest.go` の
+  `send`）。`io.ReadAll` で zip 全体を 1 本の `[]byte` にし、そこから各エントリを
+  さらに全展開するので、圧縮アーカイブ・展開後のエントリ・`[]gh.LogLine` が
+  同時に常駐する。`walkPages` の `maxPages` に相当する歯止めはこの経路に無い。
+  `gh` は zip をキャッシュ**ファイル**に書くのでメモリには載らない。
+  **直さなかった理由: 機構は確実だが規模が未計測である。** 手元に大きい
+  matrix run が無く、「何 MB になるのか」を言える数字を持っていない。
+  根拠の無い数字で上限を決めるのは避ける（`.claude/rules/` の測って正当化する
+  原則）。加えて `zip.NewReader` は `io.ReaderAt` を要求するため、素朴な
+  ストリーミングへの差し替えはできない — `gh` の答えは一時ファイルであり、
+  それを採ると「キャッシュを持たない」という上の判断とまとめて考え直すことに
+  なる。**次に着手するなら、まず実在の大きい run のアーカイブサイズを測る。**
+- **コンパイラによるパリティ検査は、`main.go` が 2 つの具体型を
+  `usecase.New` に渡していることに依存している**（`cmd/octoscope/main.go`）。
+  `parity_test.go` を消せたのは、`*cli.Client` と `*api.Client` の**両方**が
+  `usecase.New` に渡る分岐がそこにあるからである。**`chooseBackend` を
+  interface 1 つを返す形に畳むと、どちらか片方のパリティ検査が黙って消える。**
+  直す対象ではなく、壊さないために書き残す。
 - **ラベルの順序 / `parseRemote` の明示ポート / ラベル・担当者編集の部分適用 /
   `nextLink` の `,`** は 4-3 から引き続き繰り越し。詳細は
   `docs/superpowers/2026-09-13-phase4-rest-backend-followups.md` を参照。
