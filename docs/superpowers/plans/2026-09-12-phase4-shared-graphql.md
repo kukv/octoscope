@@ -982,7 +982,7 @@ git mv internal/gh/cli/testdata/repo_counts_partial.json internal/gh/gql/testdat
 
 ```bash
 ls internal/gh/cli/*.graphql          # 何も無いこと
-grep -rn 'api", "graphql"' internal/gh/cli/   # 何も無いこと
+grep -rn 'api", "graphql"' internal/gh/cli/   # ghArgs とそのテストの 2 件だけ
 ```
 
 残っていたら、それは移し忘れである。
@@ -1047,7 +1047,9 @@ git commit -m "docs: record what the shared GraphQL layer left behind"
 
 ## 完了条件（このスライス）
 
-1. `internal/gh/cli` に `.graphql` ファイルが 1 つも無く、`"api", "graphql"` の文字列も無い
+1. `internal/gh/cli` に `.graphql` ファイルが 1 つも無く、`"api", "graphql"` の文字列は
+   `ghArgs` とそのテストにしか無い（`gh api graphql` を起動するのが `cli` の役目なので、
+   この 2 件は残るのが正しい）
 2. `internal/gh/gql/schema_test.go` が全 14 文書を録画したスキーマに突き合わせている
    — 完結した文書 13 ファイルと、`repo_counts.graphql`（断片）から組んだ
    `buildRepoCountsQuery(2)`。`.graphql` ファイルは全部で 14 個
