@@ -14,7 +14,14 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
   タイムアウトが無い（4-2 の積み残しで既出）。**REST もこの Client を使うので、
   タイムアウトが無い対象が GraphQL だけでなく REST 系にも広がった。** 4-4 で
   クライアント側のタイムアウトを足すか、呼び出しごとに context のデッドラインを
-  持たせるかを決める。
+  持たせるかを決める。**`prFiles` と `ListLabels` は 1 リクエストを最大 50 ページ
+  （`walkPages`）に広げたので、タイムアウト不在の露出はこの見直しで増えている。**
+- **ラベル/担当者の編集で、追加が成功したあと削除が失敗すると、追加だけが
+  適用された状態が残る**（`internal/gh/api/items.go`）。呼び出し側はどちらが
+  通ったか知る手段が無い。UI 側の再読み込みと一緒に決める。
+- **`nextLink`（`internal/gh/api/rest.go`）は `Link` ヘッダを `,` で分割しているので、
+  next URL 自体に `,` が入ると壊れる。** `pulls/{n}/files` のページング URL には
+  入らないので現状到達しない。
 - **`parseRemote` が明示ポート付きの `ssh://` URL を拒む**
   （`ssh://git@github.com:22/owner/repo.git`。4-2 の積み残しの 4 番）。
   このスライスでは触っていない。次に `parseRemote` を触るときに一緒に直す。
@@ -52,6 +59,14 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
 `cli/cli`（83 件のラベルを持つ、突き合わせに使うには十分な数）に対して
 2026-09-13 に実測し、`gh label list` の順序と完全一致することを確認した
 （下の「実測」参照）。
+
+**100 件を超えるリポジトリでは、当初は `gh` と食い違っていた。** REST は
+名前昇順で返すため、1 ページ（`per_page=100`）だけ読んで並べ替えると、
+返るのは「アルファベット順の先頭 100 件」であって「最古の 100 件」ではない。
+順序ではなく**集合そのもの**が `gh label list --limit 100`（GraphQL の
+`CREATED_AT ASC` 先頭 100 件）と食い違う。全体レビューで指摘され、その場で
+直した: 全ページ辿ってから `id` 昇順に並べ、先頭 100 件に切るようにした
+（`ListLabels` が使うページングは `prFiles` と共通の `walkPages` に載せた）。
 
 ### `gh pr diff` の正体
 
@@ -139,24 +154,7 @@ PR diff のファイル数は 8 件で、計画段階の見込み（「5 ファ�
 **直さなかった理由:** 実害が無い（二重デコードのコストだけで、結果は変わらない）。
 このスライスのスコープ（REST 系の実装）を超える。
 
-### 2. テスト名の typo `TheWere` → `TheyWere`
-
-`internal/gh/api/lists_test.go` の
-`TestLabelsComeBackInTheOrderTheWereCreatedNotAlphabetically`。
-
-**直さなかった理由:** テストの主張には影響しない。次にこのテストに触るときに
-直す。
-
-### 3. `slices.SortFunc` の比較を `cmp.Compare` で 1 行にできる
-
-`internal/gh/api/lists.go` の `ListLabels` の並べ替えは
-`slices.SortFunc(found, func(a, b labelJSON) int { ... })` を数行で書いている。
-`cmp.Compare(a.ID, b.ID)` に置き換えれば 1 行にできる。
-
-**直さなかった理由:** 挙動は同じで、読みやすさの好みの範囲。このスライスの
-スコープ（振る舞いを変えない）から見ても触る理由が無い。
-
-### 4. fixture に選んだ PR が 8 ファイルで、計画の「5 ファイル程度」より多い
+### 2. fixture に選んだ PR が 8 ファイルで、計画の「5 ファイル程度」より多い
 
 Task 4 が `PRDiff` の fixture に選んだ `kukv/octoscope#66` は 8 ファイルの
 変更を含み、計画段階の見込み（5 ファイル程度）より多い。
@@ -165,7 +163,7 @@ Task 4 が `PRDiff` の fixture に選んだ `kukv/octoscope#66` は 8 ファイ
 （`ParseFilesAPI` は件数に依存しない形状のテストのため）。録り直す実益が
 無いと判断した。
 
-### 5. `page(limit)` の 0 / 負数の境界が無テスト
+### 3. `page(limit)` の 0 / 負数の境界が無テスト
 
 `internal/gh/api/repos.go` の `page(limit)` は `limit <= 0` のときに
 `pageSize` を返す分岐を持つが、これを直接確かめるテストが無い。
