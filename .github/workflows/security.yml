@@ -42,10 +42,7 @@ jobs:
       # AI エージェントへの指示ファイル(CLAUDE.md など)もここに含まれる。
       - name: forbid bidi controls
         run: |
-          files="$(git grep -lI --cached '')"
-          if [ -n "$files" ]; then
-            echo "$files" | xargs -d '\n' pipx run --spec "texthooks==${TEXTHOOKS_VERSION}" forbid-bidi-controls
-          fi
+          git grep -lIz --cached '' | xargs -0 --no-run-if-empty pipx run --spec "texthooks==${TEXTHOOKS_VERSION}" forbid-bidi-controls
 
   secrets:
     if: github.event_name != 'schedule'
