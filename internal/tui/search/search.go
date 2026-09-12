@@ -503,7 +503,7 @@ func (m Model) openRaw() Model {
 	m.input = textinput.New()
 	m.input.SetValue(m.query())
 	if m.width > 0 {
-		m.input.SetWidth(max(m.width-len("q ")-promptCols, 1))
+		m.input.SetWidth(max(m.width-len("q ")-promptCols-cursorCol, 1))
 	}
 	m.input.Focus()
 	return m
@@ -516,7 +516,9 @@ func (m Model) openName() Model {
 	m.mode = modeName
 	m.input = textinput.New()
 	if m.width > 0 {
-		m.input.SetWidth(max(m.width-ansi.StringWidth(i18n.T("search.save_prompt"))-promptCols, 1))
+		// -1 for the space that separates search.save_prompt from the field
+		// in queryRow.
+		m.input.SetWidth(max(m.width-ansi.StringWidth(i18n.T("search.save_prompt"))-1-promptCols-cursorCol, 1))
 	}
 	m.input.Focus()
 	return m

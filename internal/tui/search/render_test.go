@@ -132,12 +132,35 @@ func TestTheRawEditorFitsTheTerminal(t *testing.T) {
 	for _, w := range []int{80, 120, 160} {
 		m := sized(t, w, nil)
 		m, _ = press(m, "e")
+		if row, _, _ := strings.Cut(m.View(), "\n"); strings.Contains(row, "…") {
+			t.Errorf("width %d: the raw editor's row is truncated before anything was typed:\n%s", w, row)
+		}
 		for _, r := range strings.Repeat("x", 200) {
 			m, _ = press(m, string(r))
 		}
 		row, _, _ := strings.Cut(m.View(), "\n")
 		if got := ansi.StringWidth(row); got > w {
 			t.Errorf("width %d: the raw editor's row is %d columns:\n%s", w, got, row)
+		}
+	}
+}
+
+// The name prompt's row is the prompt text, a separating space, and the
+// input field. The width given to the input field must leave room for that
+// space, or the field claims a column past the edge and the row is clipped
+// with a truncation mark even though nothing typed was too long to show.
+func TestTheSaveNamePromptFitsTheTerminal(t *testing.T) {
+	t.Parallel()
+
+	for _, w := range []int{80, 120, 160} {
+		m := sized(t, w, nil)
+		m, _ = press(m, "s")
+		row, _, _ := strings.Cut(m.View(), "\n")
+		if got := ansi.StringWidth(row); got > w {
+			t.Errorf("width %d: the name prompt row is %d columns:\n%s", w, got, row)
+		}
+		if strings.Contains(row, "…") {
+			t.Errorf("width %d: the name prompt row is truncated with nothing typed:\n%s", w, row)
 		}
 	}
 }

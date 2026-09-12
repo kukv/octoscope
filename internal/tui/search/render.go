@@ -34,6 +34,12 @@ const (
 	// (internal/tui/dialog uses the same figure for the same reason).
 	promptCols = 2
 
+	// cursorCol is the extra column textinput reserves after the typed text
+	// for its cursor cell, on top of promptCols -- it is there even on an
+	// empty value, so a field sized to promptCols alone still overflows by
+	// one column once its own SetWidth is added to a row built around it.
+	cursorCol = 1
+
 	// queryRowHeight is the query line and the blank line under it;
 	// footerHeight is the blank line and the key bar.
 	queryRowHeight = 2
