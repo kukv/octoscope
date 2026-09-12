@@ -18,7 +18,7 @@ error:
   config_unreadable:
     other: "settings file could not be read; running with defaults"
   unauthenticated:
-    other: "Not signed in to GitHub. Run: gh auth login"
+    other: "Not signed in to GitHub. Run gh auth login, or set GH_TOKEN to a personal access token."
   no_backend:
     other: "No way to reach GitHub. Either install the gh CLI and run gh auth login, or set GH_TOKEN to a personal access token."
 
