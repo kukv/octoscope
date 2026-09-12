@@ -48,6 +48,13 @@ func TestListPRsReadsTheRecordedAnswer(t *testing.T) {
 	if first.Author.Login == "" {
 		t.Error("author not filled")
 	}
+	for _, pr := range prs {
+		// The board sorts on this one, and a zero time sorts every row to
+		// the same place without any error to notice.
+		if pr.UpdatedAt.IsZero() {
+			t.Errorf("pr #%d has no updatedAt", pr.Number)
+		}
+	}
 }
 
 // The Repos tab shows the review decision and the check roll-up, and those
@@ -277,6 +284,10 @@ func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	}
 	if pr.Comments[0].CreatedAt.IsZero() {
 		t.Error("comment has no timestamp")
+	}
+	// The detail view names the branches the pull request merges between.
+	if pr.Head == "" || pr.Base == "" {
+		t.Errorf("head/base = %q/%q, want both", pr.Head, pr.Base)
 	}
 }
 
