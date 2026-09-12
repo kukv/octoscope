@@ -232,28 +232,33 @@ gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
 
 ## `pr.json`
 
-`pr.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
-`kukv/octoscope#61`。`pr_checks.json` / `merge_context.json` と同じ PR で、
-マージ済みだが body・comments・check roll-up はすべて返る。2 件のコメント
-（`octocov` の Code Metrics Report）が入っており、`TestGetPRFillsTheBodyAndTheConversation`
-が確かめる会話の中身に使う。
+`pr.graphql` に対する実レスポンス。録った日: 2026-09-13、対象:
+`kukv/octoscope#59`。ラベル 1 件・assignee 1 人・コメント 3 件
+（`octocov` の Code Metrics Report 2 件と短い手書き 1 件）が入っている。
+
+**#61 から録り直した理由**: #61 は labels と assignees が両方とも空で、
+`prNode` の `labels` / `assignees` の json タグを壊してもどのテストも落ちなかった。
+詳細画面はこの 2 つをそのまま描くので、空のまま描かれても誰も気づかない状態だった。
 
 ```bash
 D=internal/gh/gql/testdata
 gh api graphql -F query=@internal/gh/gql/pr.graphql \
-  -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr.json
+  -f owner=kukv -f name=octoscope -F number=59 | jq . > $D/pr.json
 ```
 
 ## `issue.json`
 
-`issue.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
-`kukv/octoscope#50`。`search_items.json` と同じ Issue で、body が入っている
-（コメントは 0 件）。
+`issue.graphql` に対する実レスポンス。録った日: 2026-09-13、対象:
+`kukv/octoscope#54`。ラベル 2 件・assignee 1 人・コメント 1 件が入っている。
+
+**#50 から録り直した理由**: #50 は labels も assignees もコメントも空で、
+`issueNode` のそれらの json タグや `toComments` の呼び出しを壊しても
+どのテストも落ちなかった。Issue の会話は詳細画面の中身そのものである。
 
 ```bash
 D=internal/gh/gql/testdata
 gh api graphql -F query=@internal/gh/gql/issue.graphql \
-  -f owner=kukv -f name=octoscope -F number=50 | jq . > $D/issue.json
+  -f owner=kukv -f name=octoscope -F number=54 | jq . > $D/issue.json
 ```
 
 ## `repo_name.json`

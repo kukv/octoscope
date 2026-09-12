@@ -266,7 +266,7 @@ func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	t.Parallel()
 
 	c, _ := fixedTransport(t, "testdata/pr.json")
-	pr, err := c.GetPR(context.Background(), "kukv/octoscope", 61)
+	pr, err := c.GetPR(context.Background(), "kukv/octoscope", 59)
 	if err != nil {
 		t.Fatalf("GetPR: %v", err)
 	}
@@ -289,6 +289,19 @@ func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	if pr.Head == "" || pr.Base == "" {
 		t.Errorf("head/base = %q/%q, want both", pr.Head, pr.Base)
 	}
+	// GraphQL nests both of these under a "nodes" array, so a tag that names
+	// the connection instead of its nodes decodes into an empty list and the
+	// detail view shows an item with no labels and nobody assigned.
+	if len(pr.Assignees) == 0 {
+		t.Error("no assignees decoded")
+	} else if pr.Assignees[0].Login == "" {
+		t.Errorf("assignee not filled: %+v", pr.Assignees[0])
+	}
+	if len(pr.Labels) == 0 {
+		t.Error("no labels decoded")
+	} else if pr.Labels[0].Name == "" || pr.Labels[0].Color == "" {
+		t.Errorf("label not filled: %+v", pr.Labels[0])
+	}
 }
 
 // The number is a GraphQL Int. A transport that spells it as a string gets
@@ -297,7 +310,7 @@ func TestGetPRSendsTheNumberAsANumber(t *testing.T) {
 	t.Parallel()
 
 	c, got := fixedTransport(t, "testdata/pr.json")
-	if _, err := c.GetPR(context.Background(), "kukv/octoscope", 61); err != nil {
+	if _, err := c.GetPR(context.Background(), "kukv/octoscope", 59); err != nil {
 		t.Fatalf("GetPR: %v", err)
 	}
 	for _, v := range *got {
@@ -305,8 +318,8 @@ func TestGetPRSendsTheNumberAsANumber(t *testing.T) {
 			if v.Kind != VarInt {
 				t.Errorf("number is %v, want VarInt", v.Kind)
 			}
-			if v.Int != 61 {
-				t.Errorf("number = %d, want 61", v.Int)
+			if v.Int != 59 {
+				t.Errorf("number = %d, want 59", v.Int)
 			}
 			return
 		}
@@ -358,7 +371,7 @@ func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {
 	t.Parallel()
 
 	c, _ := fixedTransport(t, "testdata/issue.json")
-	issue, err := c.GetIssue(context.Background(), "kukv/octoscope", 50)
+	issue, err := c.GetIssue(context.Background(), "kukv/octoscope", 54)
 	if err != nil {
 		t.Fatalf("GetIssue: %v", err)
 	}
@@ -368,12 +381,31 @@ func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {
 	if issue.Body == "" {
 		t.Error("body not filled")
 	}
+	if len(issue.Comments) == 0 {
+		t.Fatal("no comments decoded")
+	}
+	if issue.Comments[0].Author.Login == "" || issue.Comments[0].Body == "" {
+		t.Errorf("comment not filled: %+v", issue.Comments[0])
+	}
+	if issue.Comments[0].CreatedAt.IsZero() {
+		t.Error("comment has no timestamp")
+	}
+	if len(issue.Assignees) == 0 {
+		t.Error("no assignees decoded")
+	} else if issue.Assignees[0].Login == "" {
+		t.Errorf("assignee not filled: %+v", issue.Assignees[0])
+	}
+	if len(issue.Labels) == 0 {
+		t.Error("no labels decoded")
+	} else if issue.Labels[0].Name == "" || issue.Labels[0].Color == "" {
+		t.Errorf("label not filled: %+v", issue.Labels[0])
+	}
 }
 
 // The detail view's picker shows who an item is assigned to, and these two
-// documents are where that answer comes from. Both recorded fixtures have an
-// empty assignees list, so no decode-based test can notice the selection
-// going away; this reads the document text instead, comments stripped.
+// documents are where that answer comes from. The decode tests above read a
+// recorded answer, which carries its assignees no matter what the document
+// currently asks for; this reads the document text instead.
 func TestSingleItemDocumentsSelectTheAssignees(t *testing.T) {
 	t.Parallel()
 
