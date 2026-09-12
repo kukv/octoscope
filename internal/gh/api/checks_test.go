@@ -296,9 +296,9 @@ func TestTheLegacyWholeJobEntryIsFoundToo(t *testing.T) {
 	}
 }
 
-// A run whose archive has expired, or a job whose entry the name matching
-// could not find, still has its own log endpoint. Answering with nothing would
-// look like a job that printed nothing.
+// An archive that was read but names neither this job's steps nor its whole
+// log still leaves the job's own log endpoint to ask. Answering with nothing
+// would look like a job that printed nothing.
 func TestAnArchiveWithoutTheJobFallsBackToTheJobsOwnLog(t *testing.T) {
 	t.Parallel()
 
@@ -344,6 +344,117 @@ func TestAJobNamedAfterACompositeActionFindsItsEntries(t *testing.T) {
 	}
 	if len(lines) != 1 || lines[0].Step != "Run tests" {
 		t.Fatalf("lines = %+v", lines)
+	}
+}
+
+// An archive that cannot be fetched, or cannot be read as a zip, is an error
+// and stops there. Falling back to the job's own log endpoint would turn a
+// broken archive into a screenful of UNKNOWN STEP lines, where the cli backend
+// stops with gh's error -- so what this checks is that the second endpoint was
+// never asked.
+func TestAnUnreadableArchiveIsAnErrorRatherThanAFallback(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name  string
+		serve func(w http.ResponseWriter)
+	}{
+		{"archive is gone", func(w http.ResponseWriter) {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message": "Not Found"}`)
+		}},
+		{"archive is not a zip", func(w http.ResponseWriter) {
+			_, _ = io.WriteString(w, "this is not an archive")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			c, got := serveREST(t, func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasSuffix(r.URL.Path, "/actions/runs/7/logs") {
+					tc.serve(w)
+					return
+				}
+				_, _ = io.WriteString(w, twoStepJob)
+			})
+
+			if _, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false); err == nil {
+				t.Fatal("JobLog: want an error for an archive that could not be read")
+			}
+			for _, req := range *got {
+				if strings.HasSuffix(req.URL.Path, "/actions/jobs/61/logs") {
+					t.Errorf("the job's own log was fetched: a broken archive must not fall back")
+				}
+			}
+		})
+	}
+}
+
+// A blank line inside a step's output is part of the output. gh prints an
+// empty third field for it, which the cli backend keeps as a line with no
+// text, so dropping it here would put a shorter log on the screen depending on
+// which backend is running. The entry's own trailing newline is not a line.
+func TestABlankLineInTheLogIsKeptTheWayGhKeepsIt(t *testing.T) {
+	t.Parallel()
+
+	c, _ := serveJobLog(t, twoStepJob, zipOf(t, map[string]string{
+		"build/1_Set up job.txt": "starting\n\ndone\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	var texts []string
+	for _, line := range lines {
+		texts = append(texts, line.Text)
+	}
+	if len(texts) != 3 || texts[0] != "starting" || texts[1] != "" || texts[2] != "done" {
+		t.Fatalf("texts = %q, want the blank line kept and no line after the last newline", texts)
+	}
+}
+
+// A step that printed nothing has an empty entry, and an empty entry is no
+// lines. Splitting it the way a non-empty one is split would put one blank
+// line on the screen for every silent step.
+func TestAStepThatPrintedNothingContributesNoLines(t *testing.T) {
+	t.Parallel()
+
+	c, _ := serveJobLog(t, twoStepJob, zipOf(t, map[string]string{
+		"build/1_Set up job.txt": "",
+		"build/2_Run tests.txt":  "FAIL\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	if len(lines) != 1 || lines[0].Step != "Run tests" {
+		t.Fatalf("lines = %+v, want only the step that printed something", lines)
+	}
+}
+
+// GitHub lists a job's steps in the order it happens to hold them, and a log
+// read out of order is unreadable. Leaving the order to the answer would make
+// this depend on something nobody here controls.
+func TestStepsOutOfOrderInTheAnswerStillComeOutInOrder(t *testing.T) {
+	t.Parallel()
+
+	j := `{"id": 61, "run_id": 7, "name": "build", "status": "completed",
+		"conclusion": "failure", "steps": [
+			{"name": "Run tests", "number": 2, "conclusion": "failure"},
+			{"name": "Set up job", "number": 1, "conclusion": "success"}]}`
+	c, _ := serveJobLog(t, j, zipOf(t, map[string]string{
+		"build/1_Set up job.txt": "starting\n",
+		"build/2_Run tests.txt":  "FAIL\n",
+	}))
+
+	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	if len(lines) != 2 || lines[0].Step != "Set up job" || lines[1].Step != "Run tests" {
+		t.Fatalf("lines = %+v, want the steps in the order they ran", lines)
 	}
 }
 

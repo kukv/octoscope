@@ -150,13 +150,18 @@ func readEntry(f *zip.File, step string) ([]gh.LogLine, error) {
 	return logLines(string(body), step), nil
 }
 
-// logLines splits one entry into the lines the screen shows.
+// logLines splits one entry into the lines the screen shows. A blank line in
+// the middle of a log is kept: gh prints one for it too, and dropping it here
+// would put a shorter log on the screen than the cli backend shows.
+//
+// An entry with nothing in it is no lines at all, which is why the empty body
+// is answered before the split: splitting "" yields one empty line.
 func logLines(body, step string) []gh.LogLine {
+	if body == "" {
+		return nil
+	}
 	var lines []gh.LogLine
 	for _, raw := range strings.Split(strings.TrimSuffix(body, "\n"), "\n") {
-		if raw == "" {
-			continue
-		}
 		lines = append(lines, gh.NewLogLine(step, sanitizeControls(strings.TrimSuffix(raw, "\r"))))
 	}
 	return lines

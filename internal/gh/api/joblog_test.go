@@ -16,6 +16,17 @@ func TestASlashInAJobNameIsNotInItsZipEntry(t *testing.T) {
 	}
 }
 
+// The server trims the name before it names the directory. A job whose name
+// was written with a space around it -- or one left behind by a stripped
+// slash -- would otherwise be looked for under a name no entry carries.
+func TestSpaceAroundAJobNameIsNotInItsZipEntry(t *testing.T) {
+	t.Parallel()
+
+	if got := logFileName(" build "); got != "build" {
+		t.Errorf("logFileName = %q, want %q", got, "build")
+	}
+}
+
 // A colon goes the same way: Windows cannot have one in a path.
 func TestAColonInAJobNameIsNotInItsZipEntry(t *testing.T) {
 	t.Parallel()
@@ -64,10 +75,10 @@ func TestAnEscapeInTheLogCannotReachTheScreen(t *testing.T) {
 	}
 }
 
-// The single-byte form of the same escape is a different rune with the same
-// effect on a terminal. Mapping it by the arithmetic the C0 range uses would
-// hand the raw byte straight back.
-func TestTheSingleByteEscapeIsNeutralisedToo(t *testing.T) {
+// U+009B is the C1 control that means what the two-character escape means, and
+// a terminal acts on it the same way. Mapping it by the arithmetic the C0
+// range uses would hand it straight back.
+func TestTheC1FormOfTheEscapeIsNeutralisedToo(t *testing.T) {
 	t.Parallel()
 
 	if got := sanitizeControls("\u009b[31mFAIL"); got != "^[[31mFAIL" {
