@@ -150,17 +150,6 @@ label / author の候補チップは既存の `ListLabels` / `ListAssignees` を
 
 依存は増えない。`go-github` も `githubv4` も足さない。
 
-**上の行を 2026-09-13 に訂正した**（実測・理由は
-`docs/superpowers/2026-09-13-phase4-rest-backend-followups.md`）。スライス 4-3
-（REST 系）に着手した時点で `go-github` を足さないことを決めた。理由は 3 つ:
-transport の `classify` が既に REST の `{"message": ...}` を読んで
-`gh.ErrTransient` / `gh.ErrUnauthenticated` に振り分けており
-`*github.ErrorResponse` からの二度目の同じマッピングになること、テストの継ぎ目が
-`Client.baseURL` の 1 つから `+ github.Client.BaseURL` の 2 つに増えること、
-`go-github` が持っていて自前に無いページングと型付きボディのうち実際に要るのは
-`pulls/{n}/files` の Link ヘッダ解析（15 行程度）だけであること。自前の REST
-transport は `internal/gh/api/rest.go` にある。
-
 **上の表を 2026-09-12 に 2 点直した**（実測は
 `docs/superpowers/2026-09-12-phase4-api-measurements.md`）。
 
@@ -174,6 +163,17 @@ transport は `internal/gh/api/rest.go` にある。
 - **表に無かったサブコマンド依存を 5 つ足した。** `pr diff`（失敗時に files API へ
   フォールバック）/ `search repos` / `repo list` / `user/orgs` / assignees の候補。
   この設計を書いた 2026-09-08 以降に足されたものを含む
+
+**上の行を 2026-09-13 に訂正した**（実測・理由は
+`docs/superpowers/2026-09-13-phase4-rest-backend-followups.md`）。スライス 4-3
+（REST 系）に着手した時点で `go-github` を足さないことを決めた。理由は 3 つ:
+transport の `classify` が既に REST の `{"message": ...}` を読んで
+`gh.ErrTransient` / `gh.ErrUnauthenticated` に振り分けており
+`*github.ErrorResponse` からの二度目の同じマッピングになること、テストの継ぎ目が
+`Client.baseURL` の 1 つから `+ github.Client.BaseURL` の 2 つに増えること、
+`go-github` が持っていて自前に無いページングと型付きボディのうち実際に要るのは
+`pulls/{n}/files` の Link ヘッダ解析（15 行程度）だけであること。自前の REST
+transport は `internal/gh/api/rest.go` にある。
 
 **パリティの正本はこの表ではなく `internal/usecase/usecase.go` の `source`
 interface である。** 表は「どちらの手段で実装するか」を示すもので、数え上げの

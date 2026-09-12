@@ -94,6 +94,14 @@ Task 1（`rest.go`）と Task 3（`lists.go`）で `unparam` の除外を一時�
 `diffMediaType` 引数の読み手が生まれたため、2 件とも削除した。これは積み残しでは
 なく、「一時的な除外を約束どおり消した」という記録。
 
+## `internal/gh/cli` から移ったもの
+
+- **`ParseDiff` と `ParseFilesAPI`**（旧 `parseDiff` / bare patch のパース）を
+  `internal/gh/diff_parse.go` に移した。`cli.Client.PRDiff` と
+  `api.Client.PRDiff` の両方がこれを呼ぶ。
+- **`sample.diff`** は `internal/gh/testdata/` に 1 部だけ残し、`cli` 側は
+  `../testdata/sample.diff` を読む（上の「録りものは 1 部だけ持つ」参照）。
+
 ## 実測
 
 `gh` のサブコマンドと REST が同じ結果を返すことを、実際のリポジトリに対して
@@ -119,14 +127,6 @@ assignees 候補には `gh` に直接のサブコマンドが無い（`gh pr edi
 
 PR diff のファイル数は 8 件で、計画段階の見込み（「5 ファイル程度」）より多い
 （下の「見つかったが直さなかったこと」参照）。
-
-## `internal/gh/cli` から移ったもの
-
-- **`ParseDiff` と `ParseFilesAPI`**（旧 `parseDiff` / bare patch のパース）を
-  `internal/gh/diff_parse.go` に移した。`cli.Client.PRDiff` と
-  `api.Client.PRDiff` の両方がこれを呼ぶ。
-- **`sample.diff`** は `internal/gh/testdata/` に 1 部だけ残し、`cli` 側は
-  `../testdata/sample.diff` を読む（上の「録りものは 1 部だけ持つ」参照）。
 
 ## 見つかったが直さなかったこと（理由つき）
 
