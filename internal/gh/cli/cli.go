@@ -13,6 +13,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
 const (
@@ -38,6 +39,7 @@ type runFunc func(ctx context.Context, dir string, args ...string) ([]byte, erro
 
 // Client runs gh commands in a fixed directory, against a fixed repository.
 type Client struct {
+	*gql.Client
 	dir  string
 	repo string
 	run  runFunc
@@ -46,7 +48,31 @@ type Client struct {
 // New returns a client for the repository named by repo ("owner/name").
 // An empty repo falls back to the repository of the git remote in dir.
 func New(dir, repo string) *Client {
-	return &Client{dir: dir, repo: repo, run: runGh}
+	c := &Client{dir: dir, repo: repo, run: runGh}
+	c.Client = &gql.Client{
+		// The closure reads c.run at call time: tests replace it after New.
+		Do: func(ctx context.Context, doc string, vars []gql.Var) ([]byte, error) {
+			return c.run(ctx, c.dir, ghArgs(doc, vars)...)
+		},
+		RepoVars: func(repo string) ([]gql.Var, error) { return repoVars(c.effectiveRepo(repo)) },
+	}
+	return c
+}
+
+// repoVars names the repository for a GraphQL call. GraphQL's repository()
+// takes owner and name separately, unlike `gh pr` which takes the whole
+// "owner/name" after --repo. When no repository was named -- the ordinary
+// case of running octoscope inside a checkout -- there is nothing to split,
+// and gh fills the placeholders from the working directory's remote.
+func repoVars(repo string) ([]gql.Var, error) {
+	if repo == "" {
+		return []gql.Var{gql.Placeholder("owner", "{owner}"), gql.Placeholder("name", "{repo}")}, nil
+	}
+	owner, name, ok := strings.Cut(repo, "/")
+	if !ok {
+		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
+	}
+	return []gql.Var{gql.S("owner", owner), gql.S("name", name)}, nil
 }
 
 // effectiveRepo picks the per-call repository if given, else the client's.
@@ -290,4 +316,22 @@ func (c *Client) EditPRAssignees(repo string, number int, add, remove []string) 
 
 func (c *Client) EditIssueAssignees(repo string, number int, add, remove []string) error {
 	return c.editItems("issue", repo, number, add, remove, "--add-assignee", "--remove-assignee")
+}
+
+// ghArgs spells one document and its variables the way gh api graphql takes
+// them. -F is for values gh has to parse rather than pass through: numbers,
+// and the {owner}/{repo} placeholders it fills from the working directory.
+func ghArgs(doc string, vars []gql.Var) []string {
+	args := []string{"api", "graphql", "-f", "query=" + doc}
+	for _, v := range vars {
+		switch v.Kind {
+		case gql.VarInt:
+			args = append(args, "-F", v.Name+"="+strconv.Itoa(v.Int))
+		case gql.VarPlaceholder:
+			args = append(args, "-F", v.Name+"="+v.Str)
+		default:
+			args = append(args, "-f", v.Name+"="+v.Str)
+		}
+	}
+	return args
 }

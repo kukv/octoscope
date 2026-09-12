@@ -1,12 +1,11 @@
-package cli
+package gql
 
 import (
 	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -32,28 +31,6 @@ var discardReviewMutation string
 
 //go:embed thread_comments.graphql
 var threadCommentsQuery string
-
-// repoArgs names the repository for a GraphQL call.
-//
-// GraphQL's repository() takes owner and name separately, unlike `gh pr`
-// which takes the whole "owner/name" after --repo. When no repository was
-// named -- the ordinary case of running octoscope inside a checkout -- there
-// is nothing to split, and `gh api` fills the placeholders {owner} and {repo}
-// from the working directory's remote.
-//
-// Those placeholders are only substituted in -F values, which is why this is
-// the one place a value that is not a number goes through -F. Everything the
-// user typed still goes through -f (see AddReviewThread).
-func repoArgs(repo string) ([]string, error) {
-	if repo == "" {
-		return []string{"-F", "owner={owner}", "-F", "name={repo}"}, nil
-	}
-	owner, name, ok := strings.Cut(repo, "/")
-	if !ok {
-		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
-	}
-	return []string{"-f", "owner=" + owner, "-f", "name=" + name}, nil
-}
 
 type reviewContextResponse struct {
 	Data struct {
@@ -95,7 +72,7 @@ type threadNode struct {
 	OriginalLine int    `json:"originalLine"`
 	DiffSide     string `json:"diffSide"`
 	Comments     struct {
-		PageInfo pageInfo            `json:"pageInfo"`
+		PageInfo PageInfo            `json:"pageInfo"`
 		Nodes    []threadCommentNode `json:"nodes"`
 	} `json:"comments"`
 }
@@ -117,7 +94,7 @@ type threadCommentNode struct {
 // and follows a thread's own comments only when that thread says it has
 // more.
 func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
-	repoFields, err := repoArgs(c.effectiveRepo(repo))
+	repoFields, err := c.repoVars(repo)
 	if err != nil {
 		return gh.ReviewContext{}, err
 	}
@@ -126,12 +103,11 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 	var nodes []threadNode
 	cursor := ""
 	for {
-		args := append([]string{"api", "graphql", "-f", "query=" + reviewContextQuery}, repoFields...)
-		args = append(args, "-F", "number="+strconv.Itoa(number))
+		vars := append(slices.Clone(repoFields), N("number", number))
 		if cursor != "" {
-			args = append(args, "-f", "after="+cursor)
+			vars = append(vars, S("after", cursor))
 		}
-		out, err := c.read(ctx, c.dir, args...)
+		out, err := c.Read(ctx, reviewContextQuery, vars...)
 		if err != nil {
 			return gh.ReviewContext{}, err
 		}
@@ -178,7 +154,7 @@ type threadCommentsResponse struct {
 	Data struct {
 		Node struct {
 			Comments struct {
-				PageInfo pageInfo            `json:"pageInfo"`
+				PageInfo PageInfo            `json:"pageInfo"`
 				Nodes    []threadCommentNode `json:"nodes"`
 			} `json:"comments"`
 		} `json:"node"`
@@ -191,11 +167,7 @@ func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]
 	var rest []gh.ThreadComment
 	cursor := after
 	for {
-		args := []string{
-			"api", "graphql", "-f", "query=" + threadCommentsQuery,
-			"-f", "threadId=" + threadID, "-f", "after=" + cursor,
-		}
-		out, err := c.read(ctx, c.dir, args...)
+		out, err := c.Read(ctx, threadCommentsQuery, S("threadId", threadID), S("after", cursor))
 		if err != nil {
 			return nil, err
 		}
@@ -253,10 +225,7 @@ func (c threadCommentNode) toDomain() gh.ThreadComment {
 // node id. A pending review is visible only to its author, so this is the id
 // the rest of the session adds comments to.
 func (c *Client) StartReview(pullRequestID string) (string, error) {
-	out, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+startReviewMutation,
-		"-f", "pullRequestId="+pullRequestID,
-	)
+	out, err := c.Write(context.Background(), startReviewMutation, S("pullRequestId", pullRequestID))
 	if err != nil {
 		return "", err
 	}
@@ -298,24 +267,22 @@ func apiEvent(e gh.ReviewEvent) string {
 
 // AddReviewThread attaches one line comment to an unsubmitted review.
 func (c *Client) AddReviewThread(reviewID string, comment gh.PendingComment) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+addThreadMutation,
-		"-f", "reviewId="+reviewID,
-		"-f", "path="+comment.Path,
-		"-F", "line="+strconv.Itoa(comment.Line),
-		"-f", "side="+apiSide(comment.Side),
-		"-f", "body="+comment.Body,
+	_, err := c.Write(context.Background(), addThreadMutation,
+		S("reviewId", reviewID),
+		S("path", comment.Path),
+		N("line", comment.Line),
+		S("side", apiSide(comment.Side)),
+		S("body", comment.Body),
 	)
 	return err
 }
 
 // SubmitReview sends the unsubmitted review, with every comment on it.
 func (c *Client) SubmitReview(reviewID string, event gh.ReviewEvent, body string) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+submitReviewMutation,
-		"-f", "reviewId="+reviewID,
-		"-f", "event="+apiEvent(event),
-		"-f", "body="+body,
+	_, err := c.Write(context.Background(), submitReviewMutation,
+		S("reviewId", reviewID),
+		S("event", apiEvent(event)),
+		S("body", body),
 	)
 	return err
 }
@@ -325,20 +292,16 @@ func (c *Client) SubmitReview(reviewID string, event gh.ReviewEvent, body string
 // call. Approving a diff you had nothing to say about is the commonest review
 // there is, and it should not have to leave a pending review behind first.
 func (c *Client) SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+reviewAtOnceMutation,
-		"-f", "pullRequestId="+pullRequestID,
-		"-f", "event="+apiEvent(event),
-		"-f", "body="+body,
+	_, err := c.Write(context.Background(), reviewAtOnceMutation,
+		S("pullRequestId", pullRequestID),
+		S("event", apiEvent(event)),
+		S("body", body),
 	)
 	return err
 }
 
 // DiscardReview throws the unsubmitted review away, comments and all.
 func (c *Client) DiscardReview(reviewID string) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+discardReviewMutation,
-		"-f", "reviewId="+reviewID,
-	)
+	_, err := c.Write(context.Background(), discardReviewMutation, S("reviewId", reviewID))
 	return err
 }

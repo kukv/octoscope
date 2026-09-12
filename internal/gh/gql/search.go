@@ -1,4 +1,4 @@
-package cli
+package gql
 
 import (
 	"context"
@@ -58,7 +58,7 @@ type searchNode struct {
 			Commit struct {
 				StatusCheckRollup *struct {
 					Contexts struct {
-						Nodes []checkNode `json:"nodes"`
+						Nodes []CheckContext `json:"nodes"`
 					} `json:"contexts"`
 				} `json:"statusCheckRollup"`
 			} `json:"commit"`
@@ -66,7 +66,11 @@ type searchNode struct {
 	} `json:"commits"`
 }
 
-type checkNode struct {
+// CheckContext is one entry of a commit's status check rollup. gh pr list
+// --json statusCheckRollup returns the same shape in a flat array, which is
+// why the roll-up below is a free function rather than a method on the
+// commit around it.
+type CheckContext struct {
 	Typename   string `json:"__typename"`
 	Name       string `json:"name"`
 	Context    string `json:"context"`
@@ -77,7 +81,7 @@ type checkNode struct {
 
 // name is what the check calls itself. The two shapes spell the field
 // differently, so the choice cannot be made by the JSON tags alone.
-func (n checkNode) name() string {
+func (n CheckContext) name() string {
 	if n.Typename == "StatusContext" {
 		return n.Context
 	}
@@ -108,8 +112,7 @@ func (c *Client) SearchItems(ctx context.Context, query string) ([]gh.WorkItem, 
 // one result set, and half of one would be read as "that is all there is".
 // The error carries what GitHub said, which is what a user has to act on.
 func (c *Client) searchItems(ctx context.Context, search string) ([]gh.WorkItem, error) {
-	out, err := c.read(ctx, c.dir, "api", "graphql",
-		"-f", "query="+workQuery, "-f", "search="+search)
+	out, err := c.Read(ctx, workQuery, S("search", search))
 	if err != nil {
 		return nil, err
 	}
@@ -156,20 +159,19 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 
 // checks reads the roll-up out of the commit the search returned.
 func (n searchNode) checks() gh.Checks {
-	var nodes []checkNode
+	var nodes []CheckContext
 	for _, commit := range n.Commits.Nodes {
 		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
 			nodes = append(nodes, rollup.Contexts.Nodes...)
 		}
 	}
-	return rollup(nodes)
+	return RollupContexts(nodes)
 }
 
-// rollup counts every check-run context once: each context increments Total
-// and exactly one of Passed, Failed, or Running, so Passed+Failed+Running
-// always equals Total. It is a free function because `gh pr list` returns the
-// same contexts in a flat array, without the commit around them.
-func rollup(nodes []checkNode) gh.Checks {
+// RollupContexts counts every check-run context once: each context
+// increments Total and exactly one of Passed, Failed, or Running, so
+// Passed+Failed+Running always equals Total.
+func RollupContexts(nodes []CheckContext) gh.Checks {
 	var c gh.Checks
 	for _, node := range nodes {
 		c.Total++
@@ -204,7 +206,7 @@ func rollup(nodes []checkNode) gh.Checks {
 // checkOutcome reads one context of the rollup. CheckRun reports status and
 // conclusion; the older StatusContext reports a single state, so the two
 // shapes have to be read differently.
-func checkOutcome(n checkNode) gh.CheckState {
+func checkOutcome(n CheckContext) gh.CheckState {
 	if n.Typename == "StatusContext" {
 		switch n.State {
 		case "SUCCESS":

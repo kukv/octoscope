@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
 const prListJSON = `[{"number":12,"title":"feat: add pane view","author":{"is_bot":false,"login":"kukv"},"state":"OPEN","isDraft":false,"updatedAt":"2026-07-11T10:00:00Z","reviewDecision":"APPROVED","url":"https://github.com/kukv/demo/pull/12"}]`
@@ -38,7 +39,9 @@ func (f *fakeRun) run(_ context.Context, dir string, args ...string) ([]byte, er
 
 func newTestClient(out string, err error) (*Client, *fakeRun) {
 	f := &fakeRun{out: []byte(out), err: err}
-	return &Client{dir: "/repo", run: f.run}, f
+	c := New("/repo", "")
+	c.run = f.run
+	return c, f
 }
 
 func readTestdata(t *testing.T, name string) string {
@@ -726,4 +729,67 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			t.Errorf("StartReview ran gh %d times, want 1: a write must never be retried", calls)
 		}
 	})
+}
+
+func TestRepoVarsNamesTheOwnerAndName(t *testing.T) {
+	t.Parallel()
+
+	got, err := repoVars("kukv/koto")
+	if err != nil {
+		t.Fatalf("repoVars: %v", err)
+	}
+	want := []gql.Var{gql.S("owner", "kukv"), gql.S("name", "koto")}
+	if !slices.Equal(got, want) {
+		t.Errorf("repoVars = %+v, want %+v", got, want)
+	}
+}
+
+// TestRepoVarsFillsPlaceholdersWhenEmpty is the ordinary case: no --repo, so
+// there is no "owner/name" to split and gh has to fill the placeholders from
+// the checkout's remote.
+func TestRepoVarsFillsPlaceholdersWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	got, err := repoVars("")
+	if err != nil {
+		t.Fatalf("repoVars: %v", err)
+	}
+	want := []gql.Var{gql.Placeholder("owner", "{owner}"), gql.Placeholder("name", "{repo}")}
+	if !slices.Equal(got, want) {
+		t.Errorf("repoVars = %+v, want %+v", got, want)
+	}
+}
+
+// TestRepoVarsRejectsARepoWithNoSlash guards against silently querying the
+// wrong repository: a --repo value with no "/" cannot be split into owner
+// and name, so the call must fail rather than send an empty owner or name to
+// GitHub.
+func TestRepoVarsRejectsARepoWithNoSlash(t *testing.T) {
+	t.Parallel()
+
+	if _, err := repoVars("not-a-repo"); err == nil {
+		t.Fatal("repoVars did not fail for a repo with no slash")
+	}
+}
+
+// GraphQL rejects "3" where it wants 3, and gh substitutes {owner}/{repo}
+// only in -F values. Everything the user typed stays in -f, where gh passes
+// it through untouched.
+func TestNumbersAndPlaceholdersAreTheOnlyTypedArguments(t *testing.T) {
+	t.Parallel()
+
+	got := ghArgs("query {}", []gql.Var{
+		gql.Placeholder("owner", "{owner}"),
+		gql.N("number", 3),
+		gql.S("body", "-F not a flag"),
+	})
+	want := []string{
+		"api", "graphql", "-f", "query=query {}",
+		"-F", "owner={owner}",
+		"-F", "number=3",
+		"-f", "body=-F not a flag",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("args =\n%q\nwant\n%q", got, want)
+	}
 }

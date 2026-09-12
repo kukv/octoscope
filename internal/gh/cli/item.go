@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/gh/gql"
 )
 
 // prJSON and issueJSON are the shapes `gh pr view` and `gh issue view` return.
@@ -30,7 +31,7 @@ type prJSON struct {
 	Deletions      int          `json:"deletions"`
 	// gh pr list returns the roll-up as a flat array of contexts, without the
 	// commit the GraphQL search nests it under.
-	StatusCheckRollup []checkNode `json:"statusCheckRollup"`
+	StatusCheckRollup []gql.CheckContext `json:"statusCheckRollup"`
 }
 
 func (p prJSON) toDomain() gh.PR {
@@ -51,7 +52,7 @@ func (p prJSON) toDomain() gh.PR {
 		Base:      p.BaseRefName,
 		Additions: p.Additions,
 		Deletions: p.Deletions,
-		Checks:    rollup(p.StatusCheckRollup),
+		Checks:    gql.RollupContexts(p.StatusCheckRollup),
 	}
 }
 

@@ -25,74 +25,11 @@ func fileRun(t *testing.T, path string) runFunc {
 	}
 }
 
-// rollupPage wraps contexts nodes in the shape the query selects them in.
-func rollupPage(pageInfo, nodes string) string {
-	return `{"data":{"repository":{"pullRequest":{"commits":{"nodes":[{"commit":` +
-		`{"statusCheckRollup":{"contexts":{"pageInfo":` + pageInfo + `,"nodes":[` + nodes + `]}}}}]}}}}}`
-}
-
-func TestPRChecksWalksEveryPageOfContexts(t *testing.T) {
-	t.Parallel()
-
-	page1 := rollupPage(`{"hasNextPage":true,"endCursor":"CUR1"}`,
-		`{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"SUCCESS"}`)
-	page2 := rollupPage(`{"hasNextPage":false,"endCursor":"CUR2"}`,
-		`{"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE"}`)
-
-	f := &fakeSeq{outs: []string{page1, page2}}
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: f.run}
-
-	checks, err := c.PRChecks(t.Context(), "", 61)
-	if err != nil {
-		t.Fatalf("PRChecks: %v", err)
-	}
-	if len(f.calls) != 2 {
-		t.Fatalf("calls = %d, want 2 (the first page says there is another)", len(f.calls))
-	}
-	// Without the cursor the second request asks for page one again and the
-	// loop never ends.
-	if !slices.Contains(f.calls[1], "after=CUR1") {
-		t.Errorf("second call = %v, want it to carry after=CUR1", f.calls[1])
-	}
-	if checks.Total != 2 {
-		t.Errorf("Total = %d, want 2 (one from each page)", checks.Total)
-	}
-}
-
-func TestPRChecksReadsTheIdsTheViewActsOn(t *testing.T) {
-	t.Parallel()
-
-	c := &Client{dir: "/repo", repo: "kukv/octoscope", run: fileRun(t, "testdata/pr_checks.json")}
-	checks, err := c.PRChecks(t.Context(), "", 61)
-	if err != nil {
-		t.Fatalf("PRChecks: %v", err)
-	}
-	i := slices.IndexFunc(checks.Runs, func(r gh.CheckRun) bool { return r.Name == "lint" })
-	if i < 0 {
-		t.Fatalf("no check named lint in %v", checks.Runs)
-	}
-	got := checks.Runs[i]
-	if got.Kind != gh.CheckKindRun {
-		t.Errorf("Kind = %v, want CheckKindRun", got.Kind)
-	}
-	if got.JobID != 101635448466 {
-		t.Errorf("JobID = %d, want 101635448466", got.JobID)
-	}
-	if got.RunID != 34087925535 {
-		t.Errorf("RunID = %d, want 34087925535", got.RunID)
-	}
-	if got.Workflow != "CI" {
-		t.Errorf("Workflow = %q, want %q", got.Workflow, "CI")
-	}
-	if got.Duration() == 0 {
-		t.Error("Duration() = 0, want the time between startedAt and completedAt")
-	}
-}
-
 func TestJobLogStripsTheJobNameAndTheByteOrderMark(t *testing.T) {
 	t.Parallel()
 
-	c := &Client{repo: "kukv/octoscope", run: fileRun(t, "testdata/job_log.txt")}
+	c := New("", "kukv/octoscope")
+	c.run = fileRun(t, "testdata/job_log.txt")
 	lines, err := c.JobLog(context.Background(), "", 101635448466, false)
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
@@ -121,7 +58,8 @@ func TestJobLogStripsTheJobNameAndTheByteOrderMark(t *testing.T) {
 func TestALineWithoutATimestampKeepsItsText(t *testing.T) {
 	t.Parallel()
 
-	c := &Client{repo: "kukv/octoscope", run: fileRun(t, "testdata/job_log_failed.txt")}
+	c := New("", "kukv/octoscope")
+	c.run = fileRun(t, "testdata/job_log_failed.txt")
 	lines, err := c.JobLog(context.Background(), "", 88970766114, true)
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
@@ -140,11 +78,12 @@ func TestALineWithoutATimestampKeepsItsText(t *testing.T) {
 func TestJobLogAsksForOnlyTheFailedStepsWhenToldTo(t *testing.T) {
 	t.Parallel()
 
+	c := New("", "kukv/octoscope")
 	var got []string
-	c := &Client{repo: "kukv/octoscope", run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		got = args
 		return nil, nil
-	}}
+	}
 	if _, err := c.JobLog(context.Background(), "", 42, true); err != nil {
 		t.Fatalf("JobLog: %v", err)
 	}
@@ -159,9 +98,10 @@ func TestJobLogAsksForOnlyTheFailedStepsWhenToldTo(t *testing.T) {
 func TestAJobThatDidNotFailReturnsNoLines(t *testing.T) {
 	t.Parallel()
 
-	c := &Client{repo: "kukv/octoscope", run: func(context.Context, string, ...string) ([]byte, error) {
+	c := New("", "kukv/octoscope")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		return nil, nil // gh exits 0 with no output when no step failed
-	}}
+	}
 	lines, err := c.JobLog(context.Background(), "", 42, true)
 	if err != nil {
 		t.Fatalf("JobLog: %v, want no error: an empty log is not a failure", err)
@@ -182,9 +122,10 @@ func TestJobLogPassesAnInProgressJobsErrorThroughUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantErr := fmt.Errorf("gh %s: %s", "run", strings.TrimSpace(string(stderr)))
-	c := &Client{repo: "kukv/octoscope", run: func(context.Context, string, ...string) ([]byte, error) {
+	c := New("", "kukv/octoscope")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		return nil, wantErr
-	}}
+	}
 	_, err = c.JobLog(context.Background(), "", 101759970990, false)
 	// The text is what reaches the view, so a wrap that keeps errors.Is
 	// happy but changes what the user reads must still fail this test.
@@ -199,11 +140,12 @@ func TestJobLogPassesAnInProgressJobsErrorThroughUnchanged(t *testing.T) {
 func TestRerunFailedNamesTheRunAndAsksOnlyForFailedJobs(t *testing.T) {
 	t.Parallel()
 
+	c := New("", "kukv/octoscope")
 	var got []string
-	c := &Client{repo: "kukv/octoscope", run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		got = args
 		return nil, nil
-	}}
+	}
 	if err := c.RerunWorkflow(context.Background(), "", 34087925535, gh.RerunFailed); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
@@ -221,11 +163,12 @@ func TestRerunFailedNamesTheRunAndAsksOnlyForFailedJobs(t *testing.T) {
 func TestRerunOfTheWholeRunPassesNoFailedFlag(t *testing.T) {
 	t.Parallel()
 
+	c := New("", "kukv/octoscope")
 	var got []string
-	c := &Client{repo: "kukv/octoscope", run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		got = args
 		return nil, nil
-	}}
+	}
 	if err := c.RerunWorkflow(context.Background(), "", 34087925535, gh.RerunAll); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}

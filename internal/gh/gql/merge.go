@@ -1,11 +1,11 @@
-package cli
+package gql
 
 import (
 	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"strconv"
+	"slices"
 
 	"github.com/kukv/octoscope/internal/gh"
 )
@@ -39,13 +39,12 @@ type mergeContextResponse struct {
 // PRMergeContext fetches what the merge popup draws: what the repository
 // allows and what state this pull request is in.
 func (c *Client) PRMergeContext(ctx context.Context, repo string, number int) (gh.MergeContext, error) {
-	repoFields, err := repoArgs(c.effectiveRepo(repo))
+	repoFields, err := c.repoVars(repo)
 	if err != nil {
 		return gh.MergeContext{}, err
 	}
-	args := append([]string{"api", "graphql", "-f", "query=" + mergeContextQuery}, repoFields...)
-	args = append(args, "-F", "number="+strconv.Itoa(number))
-	out, err := c.read(ctx, c.dir, args...)
+	vars := append(slices.Clone(repoFields), N("number", number))
+	out, err := c.Read(ctx, mergeContextQuery, vars...)
 	if err != nil {
 		return gh.MergeContext{}, err
 	}
@@ -143,10 +142,9 @@ func apiMergeMethod(m gh.MergeMethod) string {
 
 // MergePR merges the pull request now.
 func (c *Client) MergePR(pullRequestID string, method gh.MergeMethod) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+mergePRMutation,
-		"-f", "pullRequestId="+pullRequestID,
-		"-f", "mergeMethod="+apiMergeMethod(method),
+	_, err := c.Write(context.Background(), mergePRMutation,
+		S("pullRequestId", pullRequestID),
+		S("mergeMethod", apiMergeMethod(method)),
 	)
 	return err
 }
@@ -154,19 +152,15 @@ func (c *Client) MergePR(pullRequestID string, method gh.MergeMethod) error {
 // EnableAutoMerge asks GitHub to merge the pull request once what it is
 // waiting on is in.
 func (c *Client) EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+enableAutoMergeMutation,
-		"-f", "pullRequestId="+pullRequestID,
-		"-f", "mergeMethod="+apiMergeMethod(method),
+	_, err := c.Write(context.Background(), enableAutoMergeMutation,
+		S("pullRequestId", pullRequestID),
+		S("mergeMethod", apiMergeMethod(method)),
 	)
 	return err
 }
 
 // DisableAutoMerge cancels a queued auto-merge.
 func (c *Client) DisableAutoMerge(pullRequestID string) error {
-	_, err := c.run(context.Background(), c.dir, "api", "graphql",
-		"-f", "query="+disableAutoMergeMutation,
-		"-f", "pullRequestId="+pullRequestID,
-	)
+	_, err := c.Write(context.Background(), disableAutoMergeMutation, S("pullRequestId", pullRequestID))
 	return err
 }
