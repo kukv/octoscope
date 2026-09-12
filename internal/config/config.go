@@ -24,13 +24,29 @@ type Config struct {
 	// Repositories is the list the Repos tab shows, in the order it shows
 	// them.
 	Repositories []string `yaml:"repositories,omitempty"`
+
+	// SavedQueries is the Search tab's saved queries, in the order the user
+	// saved them.
+	SavedQueries []SavedQuery `yaml:"saved_queries,omitempty"`
 }
 
-// WantsRepos reports whether default_tab asks to start on the Repos tab.
-// It is as tolerant of case and surrounding whitespace as icon.Resolve and
-// i18n.Resolve are of their own values.
-func (c Config) WantsRepos() bool {
-	return strings.EqualFold(strings.TrimSpace(c.DefaultTab), "repos")
+// SavedQuery is one entry of saved_queries: what the user called it, and
+// the GitHub search it stands for.
+type SavedQuery struct {
+	Name  string `yaml:"name"`
+	Query string `yaml:"query"`
+}
+
+// DefaultTabName is the tab default_tab asks to start on, normalised. A name
+// no tab answers to reads as unset: a typo in a setting is not a reason to
+// refuse to start.
+func (c Config) DefaultTabName() string {
+	switch name := strings.ToLower(strings.TrimSpace(c.DefaultTab)); name {
+	case "repos", "search":
+		return name
+	default:
+		return ""
+	}
 }
 
 // Path is where the settings file lives: octoscope/config.yaml under the
@@ -84,6 +100,21 @@ func (s *Store) SaveRepositories(repos []string) error {
 		return err
 	}
 	c.Repositories = repos
+	return s.save(c)
+}
+
+// SaveQueries replaces the saved queries and leaves every other setting as
+// it was. A file that cannot be parsed is not written at all: a query is
+// not worth flattening the rest of someone's settings for.
+func (s *Store) SaveQueries(queries []SavedQuery) error {
+	if s.path == "" {
+		return errors.New("no settings file to write: the config directory could not be located")
+	}
+	c, err := Load(s.path)
+	if err != nil {
+		return err
+	}
+	c.SavedQueries = queries
 	return s.save(c)
 }
 

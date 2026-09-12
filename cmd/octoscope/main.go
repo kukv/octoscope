@@ -66,7 +66,7 @@ func main() {
 	p := tea.NewProgram(app.New(uc, app.Options{
 		Repo:         *repoFlag,
 		Repositories: cfg.Repositories,
-		DefaultRepos: cfg.WantsRepos(),
+		DefaultTab:   cfg.DefaultTabName(),
 		ConfigError:  configErr,
 	}))
 	_, runErr := p.Run()

@@ -1320,7 +1320,7 @@ func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 // repository is found from the working directory rather than named on the
 // command line -- but that move waits for the lookup to answer.
 func TestDefaultReposWaitsForTheRepositoryToBeFound(t *testing.T) {
-	m := New(&fakeSource{}, Options{DefaultRepos: true})
+	m := New(&fakeSource{}, Options{DefaultTab: "repos"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = next.(Model)
 
@@ -1349,7 +1349,7 @@ func TestAFoundRepositoryDoesNotMoveTheUserByItself(t *testing.T) {
 // The setting must not pull the user back after they have moved: it chooses
 // where the run starts, not where it stays.
 func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
-	m := New(&fakeSource{}, Options{DefaultRepos: true})
+	m := New(&fakeSource{}, Options{DefaultTab: "repos"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	next, _ = next.(Model).Update(repoResolvedMsg{name: "kukv/octoscope"})
 	onWork := press(next.(Model), "1")
@@ -1357,5 +1357,26 @@ func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
 	after, _ := onWork.Update(repoResolvedMsg{name: "kukv/octoscope"})
 	if got := after.(Model).tab; got != tabWork {
 		t.Errorf("tab = %v, want tabWork", got)
+	}
+}
+
+// default_tab: search has no dependency on the current repository, unlike
+// repos, so it must not wait for the lookup: the Search tab is there before
+// any message reaches Update.
+func TestDefaultSearchStartsThereImmediately(t *testing.T) {
+	m := New(&fakeSource{}, Options{DefaultTab: "search"})
+
+	if m.tab != tabSearch {
+		t.Errorf("tab = %v, want tabSearch", m.tab)
+	}
+}
+
+// --repo names a repository for this run; default_tab is a standing
+// preference. The flag wins regardless of what default_tab says.
+func TestRepoFlagOutranksDefaultSearch(t *testing.T) {
+	m := New(&fakeSource{}, Options{DefaultTab: "search", Repo: "kukv/octoscope"})
+
+	if m.tab != tabRepos {
+		t.Errorf("tab = %v, want tabRepos", m.tab)
 	}
 }
