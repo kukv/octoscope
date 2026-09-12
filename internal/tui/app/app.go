@@ -21,6 +21,7 @@ import (
 	"github.com/kukv/octoscope/internal/tui/search"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // repoNamer names the repository of the working directory. It is the root's
@@ -54,6 +55,10 @@ type Options struct {
 	// whether or not the working directory is a repository. internal/tui
 	// cannot read internal/config, so the list travels here.
 	Repositories []string
+
+	// SavedQueries is the settings file's saved queries, handed to the
+	// Search tab the same way Repositories is handed to the Repos tab.
+	SavedQueries []usecase.SavedQuery
 
 	// DefaultTab is the settings file's opening tab ("repos", "search", or
 	// "" for none). "repos" cannot be honoured until the current repository
@@ -185,7 +190,7 @@ func New(src Source, opts Options) Model {
 			Repositories: opts.Repositories,
 			Current:      opts.Repo,
 		}),
-		search: search.New(src),
+		search: search.New(src).SetSavedQueries(opts.SavedQueries),
 	}
 	// Naming a repository on the command line is a statement about what the
 	// user came to look at, so that is the tab they land on -- ahead of

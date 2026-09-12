@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/usecase"
 )
 
 type fakeSource struct {
@@ -38,6 +39,32 @@ func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]gh.Label, err
 func (f *fakeSource) ListAssignees(_ context.Context, repo string) ([]string, error) {
 	f.authorRepo = repo
 	return f.users, nil
+}
+
+func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+
+// fakeStore is a fakeSource whose SaveQueries records what was saved and can
+// be made to fail, for the tests that check what actually reaches the
+// store rather than only what the model does.
+type fakeStore struct {
+	fakeSource
+	saved []usecase.SavedQuery
+	err   error
+}
+
+func (f *fakeStore) SaveQueries(qs []usecase.SavedQuery) error {
+	f.saved = qs
+	return f.err
+}
+
+// newTestModel builds a model on store the way New(src) does elsewhere in
+// this file, run past its first search so it starts from the same steady
+// state a real run would.
+func newTestModel(t *testing.T, store *fakeStore) Model {
+	t.Helper()
+
+	m := New(store)
+	return resolve(t, m, m.Init())
 }
 
 // resolve runs a command the model handed back and feeds its message in, the
@@ -73,6 +100,8 @@ func press(m Model, key string) (Model, tea.Cmd) {
 		return m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	case "backspace":
 		return m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	case "ctrl+o":
+		return m.Update(tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl})
 	default:
 		return m.Update(tea.KeyPressMsg{Code: []rune(key)[0], Text: key})
 	}
@@ -299,17 +328,82 @@ func TestEnterOnAResultOpensIt(t *testing.T) {
 	}
 }
 
-// s belongs to saving a query, which this slice does not have yet. Binding
-// it to anything else now would have to be taken back.
-func TestSDoesNothingYet(t *testing.T) {
+// s names the query before it is saved: saved_queries holds a name and a
+// query, and a list of bare query strings is not one a user can pick from.
+func TestSavingAsksForANameFirst(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 120, []gh.WorkItem{{Ref: gh.ItemRef{Repo: "kukv/octoscope", Number: 1}}})
-	m, _ = press(m, "l")
-	before := m.View()
-	m, cmd := press(m, "s")
-	if cmd != nil || m.View() != before {
-		t.Error("s did something; it is reserved for saving a query")
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "s")
+	if !m.Capturing() {
+		t.Fatal("s did not open a field")
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("s saved before a name was typed: %+v", store.saved)
+	}
+	m = typeInto(m, "mine")
+	m, cmd := press(m, "enter")
+	if cmd == nil {
+		t.Fatal("enter did not start the save")
+	}
+	resolve(t, m, cmd)
+	if len(store.saved) != 1 || store.saved[0].Name != "mine" {
+		t.Fatalf("saved = %+v", store.saved)
+	}
+	if store.saved[0].Query == "" {
+		t.Error("the saved entry carries no query")
+	}
+}
+
+// An empty name would put a blank row in the picker that nothing can
+// identify.
+func TestAnEmptyNameSavesNothing(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "s")
+	m, cmd := press(m, "enter")
+	if cmd != nil {
+		resolve(t, m, cmd)
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("an empty name was saved: %+v", store.saved)
+	}
+}
+
+// esc must leave the tab as it was: a half-typed name is not a query.
+func TestEscapeAbandonsTheName(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m, _ = press(m, "s")
+	m = typeInto(m, "mine")
+	m, _ = press(m, "esc")
+	if m.Capturing() {
+		t.Error("esc left the field open")
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("esc saved anyway: %+v", store.saved)
+	}
+}
+
+// Saving the same name twice replaces it: two rows with one name is a list
+// nobody can choose from.
+func TestSavingTheSameNameReplacesIt(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m, _ = press(m, "s")
+	m = typeInto(m, "mine")
+	m, cmd := press(m, "enter")
+	resolve(t, m, cmd)
+	if len(store.saved) != 1 {
+		t.Fatalf("saved = %+v, want one entry", store.saved)
 	}
 }
 

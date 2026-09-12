@@ -53,6 +53,8 @@ func (f *scenarioSource) SaveRepositories(repos []string) error {
 	return nil
 }
 
+func (f *scenarioSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+
 func (f *scenarioSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
 	if s != gh.SectionReviewRequested {
 		return nil, nil

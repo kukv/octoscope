@@ -111,6 +111,8 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 	return nil
 }
 
+func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+
 func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
 	if ref.Kind == gh.ItemIssue {
 		return usecase.Item{Kind: gh.ItemIssue}, nil

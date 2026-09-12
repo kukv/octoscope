@@ -47,9 +47,9 @@ const (
 func (m Model) View() string {
 	if m.width <= 0 {
 		// The root routes keys to this tab before the first size arrives, so
-		// the raw editor must show what was typed even without one to lay
-		// the rest of the screen out against.
-		if m.mode == modeRaw {
+		// the raw editor and the name field must show what was typed even
+		// without one to lay the rest of the screen out against.
+		if m.mode == modeRaw || m.mode == modeName {
 			return m.queryRow()
 		}
 		return ""
@@ -88,8 +88,15 @@ func (m Model) resultWidth() int {
 // itself instead, with no count: what it will find is not known until enter
 // runs it.
 func (m Model) queryRow() string {
-	if m.mode == modeRaw {
+	switch m.mode {
+	case modeRaw:
 		line := "q " + m.input.View()
+		if m.width <= 0 {
+			return line
+		}
+		return layout.Clip(line, m.width)
+	case modeName:
+		line := i18n.T("search.save_prompt") + " " + m.input.View()
 		if m.width <= 0 {
 			return line
 		}
@@ -148,6 +155,7 @@ func (m Model) footerHints() []string {
 			i18n.T("footer.search.diff"),
 			i18n.T("footer.search.web"),
 			i18n.T("footer.search.raw"),
+			i18n.T("footer.search.save"),
 			i18n.T("footer.search.refresh"),
 			i18n.T("footer.search.quit"))
 	}
@@ -161,6 +169,7 @@ func (m Model) footerHints() []string {
 	}
 	return append(hints,
 		i18n.T("footer.search.raw"),
+		i18n.T("footer.search.save"),
 		i18n.T("footer.search.refresh"),
 		i18n.T("footer.search.quit"))
 }
