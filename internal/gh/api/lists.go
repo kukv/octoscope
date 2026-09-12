@@ -14,17 +14,19 @@ import (
 // reads too. Asking for more is a 422.
 const pageSize = 100
 
-// labelJSON is one entry of the labels endpoint. The id is what puts the list
-// back in the order gh shows: gh asks GraphQL for CREATED_AT ascending, while
-// REST answers by name, and a label's id rises with its creation.
+// labelJSON is one entry of the labels endpoint. The id approximates the
+// order gh shows: gh asks GraphQL for CREATED_AT ascending, while REST
+// answers by name and does not carry created_at at all, so id -- which
+// usually, but not always, rises with creation -- is the closest REST alone
+// can get.
 type labelJSON struct {
 	Name  string `json:"name"`
 	Color string `json:"color"`
 	ID    int64  `json:"id"`
 }
 
-// ListLabels names the repository's labels, oldest first. Nothing between
-// here and the picker reorders them.
+// ListLabels names the repository's labels, oldest first by id. Nothing
+// between here and the picker reorders them.
 //
 // REST answers by name, not creation order, so a repository with more than
 // one page of labels would otherwise hand back the alphabetical head of the

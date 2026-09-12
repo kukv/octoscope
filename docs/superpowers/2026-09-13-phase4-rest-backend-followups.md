@@ -22,6 +22,13 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
 - **`nextLink`（`internal/gh/api/rest.go`）は `Link` ヘッダを `,` で分割しているので、
   next URL 自体に `,` が入ると壊れる。** `pulls/{n}/files` のページング URL には
   入らないので現状到達しない。
+- **ラベルの順序を `gh` と厳密に合わせたいなら、GraphQL の文書を 1 本足して
+  両バックエンドで共有する**という選択肢がある。REST はラベルの `created_at`
+  を返さないため、`id` 昇順は近似にとどまる（`microsoft/vscode` の実測で
+  順序が 1 件ずれることを確認済み。上の「ラベルは `id` 昇順に並べ替えて
+  `gh` に近づける」参照）。このスライスでは採らない: `cli` 側の
+  `gh label list` の呼び方自体も差し替えることになり、REST 系の実装という
+  範囲を超える。
 - **`parseRemote` が明示ポート付きの `ssh://` URL を拒む**
   （`ssh://git@github.com:22/owner/repo.git`。4-2 の積み残しの 4 番）。
   このスライスでは触っていない。次に `parseRemote` を触るときに一緒に直す。
@@ -48,17 +55,21 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
 
 依存は増えなかった。`go-github` も `githubv4` も `go.mod` に無い。
 
-### ラベルは `id` 昇順に並べ替えて `gh` に合わせる
+### ラベルは `id` 昇順に並べ替えて `gh` に近づける
 
 `gh label list` は内部で GraphQL に `orderBy: {field: CREATED_AT, direction: ASC}`
-を渡しており、これは `id` の昇順と一致する（GitHub のラベル ID は作成順に
-振られる連番のため）。REST の `GET /repos/{o}/{r}/labels` はデフォルトで
-名前の昇順で返すため、`internal/gh/api/lists.go` の `ListLabels` は
-`slices.SortFunc` で `id` 昇順に並べ替えてから返す。
+を渡している。REST の `GET /repos/{o}/{r}/labels` はデフォルトで名前の昇順で返し、
+`created_at` そのものは返さないため、`internal/gh/api/lists.go` の `ListLabels` は
+GitHub のラベル ID が作成順に振られる連番であることを頼りに、`id` 昇順を作成順の
+**近似**として使っている。
 
-`cli/cli`（83 件のラベルを持つ、突き合わせに使うには十分な数）に対して
-2026-09-13 に実測し、`gh label list` の順序と完全一致することを確認した
-（下の「実測」参照）。
+**この近似は完全ではない。** `cli/cli`（83 件、1 ページに収まる）では
+2026-09-13 の実測で `gh label list` の順序と完全一致したが、`microsoft/vscode`
+（726 件）で同日実測したところ、集合は一致したものの**順序が 1 件ずれた**
+（下の「実測」参照）。`*question` は `bug` / `help wanted` より後の `id` を
+持ちながら、`gh`（`CREATED_AT ASC`）では先に来る。GitHub のラベル ID が
+常に作成順どおりとは限らないということで、REST がそもそも `created_at` を
+返さない以上、REST だけでこれを完全に修復する手段は無い。
 
 **100 件を超えるリポジトリでは、当初は `gh` と食い違っていた。** REST は
 名前昇順で返すため、1 ページ（`per_page=100`）だけ読んで並べ替えると、
@@ -67,6 +78,14 @@ Task 1〜6、全部完了）で見つかったもの。**このスライスで�
 `CREATED_AT ASC` 先頭 100 件）と食い違う。全体レビューで指摘され、その場で
 直した: 全ページ辿ってから `id` 昇順に並べ、先頭 100 件に切るようにした
 （`ListLabels` が使うページングは `prFiles` と共通の `walkPages` に載せた）。
+`microsoft/vscode` の実測でこの**集合**は完全一致することを確認した。
+**順序の 1 件ずれはこの直しでは埋まらない**が、集合が合っている以上、
+picker から消えるラベルは無い。
+
+厳密に `gh` と同じ順にしたいなら、GraphQL の文書を 1 本足して両バックエンドで
+共有する必要がある（繰り越し参照）。このスライスでは採らなかった: `cli` 側の
+`gh label list` の呼び方自体も差し替えることになり、REST 系の実装というこの
+スライスの範囲を超える。
 
 ### `gh pr diff` の正体
 
@@ -126,14 +145,19 @@ Task 1（`rest.go`）と Task 3（`lists.go`）で `unparam` の除外を一時�
 | 対象 | `gh` | REST | 一致 |
 |---|---|---|---|
 | `cli/cli` のラベル一覧（`id` 昇順、100 件上限） | 83 件 | 83 件 | 完全一致（順序含む、差分なし） |
+| `microsoft/vscode` のラベル一覧（`id` 昇順、100 件上限） | 100 件 | 100 件 | **集合は完全一致。順序は 1 件ずれ**（`*question` が `bug` / `help wanted` より後の `id` を持つが `gh` では先） |
 | `cli/cli` の assignees 候補 | — | 21 件 | （`gh` 側に相当するサブコマンドが無いため件数のみ） |
 | 自分の owner リポジトリ一覧（`--limit 20`） | 20 件 | 20 件 | 完全一致（順序含む、差分なし） |
 | `octoscope` のリポジトリ検索（`--limit 5`） | 5 件 | 5 件 | 完全一致（順序含む、差分なし） |
 | `kukv/octoscope#66` の PR diff のファイル数 | 8 件 | 8 件 | 完全一致 |
 
-**すべて一致した。** ラベルの `id` 昇順の並べ替え、`ListOwnRepos` の
+**ラベルの順序を除いて、すべて一致した。** `ListOwnRepos` の
 `affiliation=owner&sort=pushed&direction=desc`、`search/repositories` の
-デフォルト順（`best match`）のいずれも、`gh` と食い違う点は見つからなかった。
+デフォルト順（`best match`）は `gh` と食い違う点が見つからなかった。ラベルの
+`id` 昇順は、`microsoft/vscode`（726 件のラベルを持つリポジトリ）の実測で
+**集合は一致したが順序が 1 件ずれる**ことが分かっている（上の「ラベルは
+`id` 昇順に並べ替えて `gh` に近づける」参照）。REST がラベルの `created_at`
+を返さない以上、`id` 昇順は近似であって一致の保証ではない。
 
 assignees 候補には `gh` に直接のサブコマンドが無い（`gh pr edit --add-assignee`
 の補完がこの内部で使っているだけ）ため、件数の確認にとどめた。件数自体は
