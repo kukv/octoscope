@@ -36,7 +36,7 @@ func serve(t *testing.T, status int, body string) (*Client, *recorded) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := New("kukv/octoscope", "secret-token")
+	c := New("", "kukv/octoscope", "secret-token")
 	c.endpoint = srv.URL
 	return c, &got
 }

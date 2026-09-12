@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
@@ -29,18 +30,32 @@ func Token() (string, error) {
 // embedded gql.Client, which this type gives a transport.
 type Client struct {
 	*gql.Client
+	dir   string
 	repo  string
 	token string
 	// endpoint and client are the seams the tests use: a local server, and
 	// a client with a shorter patience than the default.
 	endpoint string
 	client   *http.Client
+
+	runGit     gitFunc
+	once       sync.Once
+	current    string
+	currentErr error
 }
 
-// New returns a client for the repository named by repo ("owner/name").
-func New(repo, token string) *Client {
-	c := &Client{repo: repo, token: token}
-	c.Client = &gql.Client{Do: c.post}
+// New returns a client for the repository named by repo ("owner/name"), whose
+// working directory is dir. An empty repo is resolved from dir's git remote,
+// the way gh resolves it from the working directory.
+//
+// The three strings are dir, repo, token, in that order: all of them are
+// strings, so a swapped pair still compiles.
+func New(dir, repo, token string) *Client {
+	c := &Client{dir: dir, repo: repo, token: token}
+	c.Client = &gql.Client{
+		Do:       c.post,
+		RepoVars: c.repoVars,
+	}
 	return c
 }
 

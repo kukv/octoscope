@@ -254,6 +254,13 @@ linters:
         linters:
           - gosec
         text: "G204"
+      # Same shape in internal/gh/api: the one subprocess it runs is "git
+      # remote get-url origin", with arguments that are this package's own
+      # literals, never external input (see the comment at the call site).
+      - path: internal/gh/api/repo\.go
+        linters:
+          - gosec
+        text: "G204"
       # Same shape in internal/browser: which program opens a URL is decided
       # at run time, from a fixed table per platform or from the browser the
       # user named in $BROWSER. The URL is a separate argument and no shell
