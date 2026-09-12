@@ -80,7 +80,16 @@ Linux なら `~/.config`。無くても、または空でも構わない。そ�
 |---|---|
 | `language` | `en` または `ja` |
 | `icons` | `unicode` / `nerd` / `ascii` |
-| `default_tab` | `repos` を指定すると Work の代わりに Repos タブから始まる |
+| `default_tab` | `repos` または `search`。Work の代わりにそのタブから始まる。`--repo` のほうが強い |
+| `saved_queries` | Search タブの保存クエリ。`name` / `query` の組のリスト。`s` で追加し、`ctrl+o` のポップアップで `x` を押すと消える |
+
+```yaml
+saved_queries:
+  - name: mine
+    query: is:open author:@me
+  - name: reviews
+    query: is:open review-requested:@me
+```
 
 [Nerd Font](https://www.nerdfonts.com/) のパッチ済みフォントを入れているなら
 `--icons nerd`、Unicode 記号が描けない環境なら `--icons ascii` を渡す。

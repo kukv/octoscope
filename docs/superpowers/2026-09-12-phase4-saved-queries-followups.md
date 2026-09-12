@@ -116,19 +116,13 @@ Search 側は使わない `Searching()` / `SetError` を抱えることになり
 なおさらずれる）。
 
 **直さなかった理由:** ブリーフが要求しているのは「重ならないこと」だけで、
-一覧としての桁揃えはスコープ外とした。
+一覧としての桁揃えはスコープ外とした。全体レビューで `pickerView`
+自体を高さの窓切りのために書き直す機会があり（下の「全体レビューで見つかり、この波で直したもの」参照）、
+そのついでに直すのが安いという指摘を受けたが、桁揃えは見た目だけの変更で
+ブリーフにも入っていないため、この波でも見送った。次に `pickerView` を
+触るときに揃えること。
 
-### 2. `openField` にも同種の off-by-one がある疑い
-
-コミット `95cf974` で `openName` / `openRaw`（`internal/tui/search/search.go:501,515`）
-の `textinput.SetWidth` に `cursorCol` 分の余白を足したが、フィルタの入力欄を開く
-`openField`（`search.go:490-495`）は対象外のままで、`cursorCol` を引いていない。
-
-**直さなかった理由:** `95cf974` はこのスライスで見つけた別バグ（ポップアップの
-命名欄と生クエリ編集欄の幅）の修正であり、`openField` に同じ問題が実在するかは
-未確認。次にこの行を触る機会に、まず再現するテストを書いて確かめること。
-
-### 3. 前スライスから引き継いだままのもの
+### 2. 前スライスから引き継いだままのもの
 
 - 生クエリの「未設定」と「空文字」を区別しない（前スライスの積み残し 11 番）。
   保存するのは組み上がった文字列（`m.query()` の戻り値）なので、このスライスでは
@@ -139,54 +133,100 @@ Search 側は使わない `Searching()` / `SetError` を抱えることになり
   （積み残し 3 番）。このスライスは検索の実行経路に触れていないため対象外。
 - en のキーバーだけコロンの後に空白がある件（前スライスの積み残し 9 番）。
 
-### 4. 保存クエリの並べ替え・名前の変更が無い
+### 3. 保存クエリの並べ替え・名前の変更が無い
 
 ブリーフにも仕様にも無い操作。消して付け直せば同じ結果になる。
 
 **直さなかった理由:** スコープ外。
 
-### 5. `upsert` が呼び出し側のスライスを破壊的に更新する
-
-`internal/tui/search/saved.go:31` の `upsert` は、同名エントリを置き換えるとき
-`qs[i] = q` で元のスライスをその場で書き換える。起動時に渡した
-`opts.SavedQueries` が参照する配列が書き換わりうる。
-
-**直さなかった理由:** 今は `app.Options` が起動時に 1 度だけ使い捨てで渡される
-ため、書き換えても実害が無い。`Options` を使い回す変更が入るときに合わせて
-コピーを取る形に直すのが筋が良い。
-
-### 6. 保存失敗の通知経路（`saveErrMsg`）にテストが無い
-
-`internal/tui/search/saved.go:20` の `saveErrMsg` と、`search.go:302` のその
-受け口はあるが、`search_test.go` の `fakeStore.err`（同ファイル `fakeStore` 型）
-に非 nil を渡して失敗時の表示行を確かめるテストが無い。
-
-**直さなかった理由:** ブリーフの完了条件に無く、実装中に見つけた副産物。
-`fakeStore` は既にこの用途向けの `err` フィールドを持っているので、次に
-このファイルを触るときに軽く足せる。
-
-### 7. `mode` の doc コメントは古いまま
-
-`internal/tui/search/search.go:92-94` の `mode` の doc コメントは
-「none, a typed filter's field, or the raw query editor」とだけ書いており、
-このスライスで足した `modeName` / `modePicker`（`search.go:100-101`）に触れて
-いない。
-
-**直さなかった理由:** 確認した結果、実際に古いままだった。動作に影響は無く、
-コメント 1 行の更新だけなので、次にこのファイルを触る機会にまとめて直す。
-このスライス単独でコミットを割くほどの変更ではないと判断した。
-
-### 8. Repos の追加ダイアログの積み残し「候補のスクロール」は決着しなかった
+### 4. Repos の追加ダイアログの積み残し「候補のスクロール」は決着しなかった
 
 前スライスの `docs/superpowers/2026-09-12-phase4-search-tab-followups.md` は
 触れていないが、`internal/tui/dialog` 自体の積み残し（Repos の追加ダイアログで
 候補が一覧に収まらないときのスクロール）は、保存クエリのポップアップが解決する
 機会にはならなかった。
 
-**直さなかった理由:** 保存クエリの一覧はブリーフの想定件数が少なく、スクロールを
-必要とする場面が無い。加えて、上の「決めたこと」で書いたとおり `dialog.Model` と
-ポップアップの型を共用しなかったため、`dialog` 側のスクロール未対応はそのまま
-残っている。
+全体レビューで `pickerView`（`internal/tui/search/saved_render.go`）に高さの
+窓切りが入り（下の「全体レビューで見つかり、この波で直したもの」参照）、この窓とカーソル追従の計算式は
+`dialog` 側の同じ穴にもそのまま使える形をしている。ただし今回は
+`internal/tui/search` の中に留め、`internal/tui/layout` には出さなかった。
+
+**直さなかった理由:** ブリーフの範囲が保存クエリのポップアップに閉じており、
+`dialog` 側を直すのは別の作業になる。窓の計算式を `internal/tui/layout` に
+出す一般化は、実際に `dialog` 側を直す番になってから、2 箇所目の使用例を見た
+うえでやるのが安全（1 箇所しか使っていない抽象化は先走りになりやすい）。
+
+### 5. 設定ファイルへの同時書き込みでロストアップデートが起こりうる
+
+`internal/config/config.go` の `SaveQueries` / `SaveRepositories` はどちらも
+`Load`（読む）→ 差し替え → `save`（temp+rename）の read-modify-write で、
+排他が無い。ピッカーで `x` を連続で 2 回押すと、2 つの goroutine が同時に
+これをやる。ファイルが壊れることは無いが（`os.Rename` は atomic）、片方の
+書き込みがもう片方の読み込みより先に走ると、他キーの同時更新が失われたり、
+消したはずのクエリが復活したりしうる。
+
+**直さなかった理由:** このスライスが持ち込んだものではなく、
+`SaveRepositories` から拡張された既存の形。`Store` に `sync.Mutex` を足せば
+read-modify-write の交錯は消えるが、順序の逆転までは消えない
+（負けた goroutine が古い全量を残す）。アーキテクチャの話であり、この波の
+スコープ（保存クエリの全体レビュー指摘への対処）を超えるため、別の機会に
+残す。
+
+### 6. picker の golden 6 枚が 80/120/160 で同一
+
+`layout.PopupWidth` は `max(min(termCols-4, 60), 20)` なので 80 桁以上では
+常に 60 に張り付き、picker のキーバーも 3 ヒントで 80 桁に収まるため、幅 3
+種の golden が完全に同じ内容になっている。実害は無い（表示幅は測り直して
+全部収まっていることを確認済み）。
+
+**直さなかった理由:** golden の内容が同一なこと自体は不具合ではなく、
+「3 幅で録った」ことが幅の網羅を意味しないという認識の記録が目的。
+録り直しても同じ内容になるだけなので、直す対象がない。
+
+## 全体レビュー（2026-09-12）で見つかり、この波で直したもの
+
+このスライスが完結したあとの全体レビュー（`final-review.md`）が Important 6 件・
+Minor の一部を挙げ、そのうち次を直した。上の「見つかったが直さなかったこと」の
+旧 2 番・5 番・6 番・7 番は、この波でそれぞれ解消したのでここへ差し替える。
+
+- **`TestXOnAnEmptyListDoesNothing` の空振り**（`search_test.go`）— モデルと
+  別インスタンスの `fakeStore` を見ていて何があっても通っていた。
+  `newTestModel(t, store)` に直した。
+- **`openField` の off-by-one**（`search.go`）— `cursorCol` を引いておらず、
+  幅 120 で空の `org` フィールドに何も打っていないのに `…` が出ていた
+  （旧 2 番の「疑い」は実在した）。`-cursorCol` を足し、
+  `TestATypedFilterIsNotTruncatedBeforeAnythingIsTyped` で再現・固定した。
+- **ピッカーが端末の高さを溢れる**（`saved_render.go`）— `pickerView` が
+  `m.height` を一切見ず、保存クエリが多いと箱の上辺とキーバーが画面外に
+  押し出されて操作不能になっていた。`pickerRows` / `pickerWindow` で
+  `internal/tui/search/render.go` の `resultRows` / `resultWindow` と同じ
+  形の窓を切り、カーソルが窓に入るよう追従させた
+  （`TestThePickerFitsTheHeight` / `TestThePickerWindowFollowsTheCursor`）。
+- **起動時の配線が未検証**（`app.go`）— `search.New(src).SetSavedQueries(opts.SavedQueries)`
+  の `SetSavedQueries` を丸ごと落としても `go test ./...` が全部緑だった。
+  `app_test.go` に `TestTheSettingsFileSavedQueriesReachThePicker` を足した。
+- **README の設定表**（`README.md` / `README.ja.md`）— `default_tab: search` と
+  `saved_queries` が表に無かった。両方の表と YAML の例を足した。
+- **`upsert` が呼び出し側のスライスを破壊的に更新する**（`saved.go`）— 旧 5 番の
+  「`app.Options` が起動時 1 度きりだから無害」という理由は誤りだった。
+  `handleNameKey` は `m.saved` を書き換えたあと `saveQueries(m.src, m.saved)` を
+  `tea.Cmd` として起動するため、同名で 2 回連続保存すると、書き換え中の
+  スライスを goroutine が読む競合になる。すぐ下の `removeSaved` は
+  `slices.Clone` していて非対称だった。`upsert` も同じく非破壊にし、
+  `TestUpsertDoesNotMutateTheCallersSlice` で固定した。
+- **ピッカーが開いている間 `notice` が描かれない**（`render.go`）— `x` の
+  書き込み失敗が `esc` するまで画面に出なかった。picker の `View()` にも
+  notice の行を足し、`pickerRows` にその分の高さも引かせた
+  （`TestTheNoticeShowsWhileThePickerIsOpen`）。
+- **`saveErrMsg` の通知経路にテストが無い**（旧 6 番）— `TestAFailedSaveIsReported`
+  を足して固定した。
+- **`mode` の doc コメントが古い**（旧 7 番）— `modeName` / `modePicker` を
+  追加した文に直した。
+- **`openPicker` の `m.pick = 0` が未検証** — `TestReopeningThePickerResetsTheCursor`
+  を足して固定した。
+- **`TestSavingTheSameNameReplacesIt` が置換の中身まで見ていない** — 既存
+  エントリを別のクエリにしておき、保存後に新しいクエリへ置き換わっている
+  ことまで確かめる形に強めた。
 
 ## 前スライスの積み残しのうち、このスライスで解消したもの
 

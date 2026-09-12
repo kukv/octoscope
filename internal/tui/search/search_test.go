@@ -398,13 +398,55 @@ func TestSavingTheSameNameReplacesIt(t *testing.T) {
 
 	store := &fakeStore{}
 	m := newTestModel(t, store)
-	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:draft"}})
 	m, _ = press(m, "s")
 	m = typeInto(m, "mine")
 	m, cmd := press(m, "enter")
 	resolve(t, m, cmd)
 	if len(store.saved) != 1 {
 		t.Fatalf("saved = %+v, want one entry", store.saved)
+	}
+	if store.saved[0].Query != "is:open" {
+		t.Errorf("saved[0].Query = %q, want the new query to have replaced the old one", store.saved[0].Query)
+	}
+}
+
+// A write that fails has to say so: the model keeps the new entry while the
+// settings file does not, and the user is the only one who can tell.
+func TestAFailedSaveIsReported(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{err: errors.New("disk is full")}
+	m := newTestModel(t, store)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = press(m, "s")
+	m = typeInto(m, "mine")
+	m, cmd := press(m, "enter")
+	m = resolve(t, m, cmd)
+	if !strings.Contains(m.View(), i18n.T("search.save_failed")) {
+		t.Errorf("the failure is not on screen:\n%s", m.View())
+	}
+}
+
+// A failed removal is reported the same way, and it must be visible while
+// the popup is still open: esc is the only way out of it, so a notice that
+// only shows up after esc arrives too late for the user to connect it to
+// the x they just pressed.
+func TestTheNoticeShowsWhileThePickerIsOpen(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{err: errors.New("disk is full")}
+	m := newTestModel(t, store)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "x")
+	m = resolve(t, m, cmd)
+	if m.mode != modePicker {
+		t.Fatal("setup: x closed the popup")
+	}
+	if !strings.Contains(m.View(), i18n.T("search.save_failed")) {
+		t.Errorf("the failure is not on screen while the popup is open:\n%s", m.View())
 	}
 }
 
@@ -659,7 +701,7 @@ func TestXOnAnEmptyListDoesNothing(t *testing.T) {
 	t.Parallel()
 
 	store := &fakeStore{}
-	m := newTestModel(t, &fakeStore{})
+	m := newTestModel(t, store)
 	m, _ = press(m, "ctrl+o")
 	m, cmd := press(m, "x")
 	if cmd != nil {
@@ -680,6 +722,27 @@ func TestThePopupHoldsTheKeys(t *testing.T) {
 	m, _ = press(m, "ctrl+o")
 	if !m.Capturing() {
 		t.Error("the popup does not capture keys")
+	}
+}
+
+// Reopening the picker starts back on its first row: leaving the cursor
+// where a previous visit left it would pick the wrong entry on a bare enter.
+func TestReopeningThePickerResetsTheCursor(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel(t, &fakeStore{})
+	m = m.SetSavedQueries([]usecase.SavedQuery{
+		{Name: "a", Query: "is:open"},
+		{Name: "b", Query: "is:closed"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, _ = press(m, "j")
+	m, _ = press(m, "esc")
+	m, _ = press(m, "ctrl+o")
+	m, cmd := press(m, "enter")
+	m = resolve(t, m, cmd)
+	if !strings.Contains(m.View(), "is:open") {
+		t.Errorf("the cursor was left on the previous visit's row:\n%s", m.View())
 	}
 }
 

@@ -1463,3 +1463,23 @@ func TestSavingAQueryAndCallingItBack(t *testing.T) {
 		t.Errorf("the raw query row still shows the query that was replaced:\n%s", got)
 	}
 }
+
+// The settings file's saved queries have to reach the Search tab's picker.
+// Nothing else in these tests sets Options.SavedQueries, so without this the
+// wiring in New can be cut and every test stays green.
+func TestTheSettingsFileSavedQueriesReachThePicker(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{}
+	next, cmd := New(src, Options{
+		SavedQueries: []usecase.SavedQuery{{Name: "from-the-file", Query: "is:open author:@me"}},
+	}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+
+	m = press(m, "3")
+	m = press(m, "ctrl+o")
+
+	if got := content(m); !strings.Contains(got, "from-the-file") {
+		t.Errorf("the picker does not list what the settings file held:\n%s", got)
+	}
+}

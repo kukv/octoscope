@@ -82,7 +82,16 @@ file just means every setting is at its default.
 |---|---|
 | `language` | `en` or `ja` |
 | `icons` | `unicode`, `nerd`, or `ascii` |
-| `default_tab` | `repos`, to start on the Repos tab instead of Work |
+| `default_tab` | `repos` or `search`, to start on that tab instead of Work. `--repo` outranks it. |
+| `saved_queries` | The Search tab's saved queries: a list of `name` / `query` pairs. `s` adds one, `x` in the `ctrl+o` popup removes one. |
+
+```yaml
+saved_queries:
+  - name: mine
+    query: is:open author:@me
+  - name: reviews
+    query: is:open review-requested:@me
+```
 
 Pass `--icons nerd` if you have a [Nerd Font](https://www.nerdfonts.com/)
 patched font installed, or `--icons ascii` if the Unicode symbols do not draw.

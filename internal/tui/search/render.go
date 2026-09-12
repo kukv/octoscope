@@ -62,7 +62,11 @@ func (m Model) View() string {
 		return m.queryRow()
 	}
 	if m.mode == modePicker {
-		return m.pickerView() + "\n" + m.keyBar()
+		lines := []string{m.pickerView()}
+		if m.notice != "" {
+			lines = append(lines, theme.Error().Render(layout.Notice(m.notice, m.width)))
+		}
+		return strings.Join(append(lines, m.keyBar()), "\n")
 	}
 	lines := []string{m.queryRow(), ""}
 	if m.paneCols() > 0 {

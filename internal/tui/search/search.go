@@ -89,8 +89,9 @@ const (
 	paneResults
 )
 
-// mode says which overlay is up: none, a typed filter's field, or the raw
-// query editor. It does not stack with pane (.claude/rules/tui.md).
+// mode says which overlay is up: none, a typed filter's field, the raw
+// query editor, the field that names a query before it is saved, or the
+// saved-query picker. It does not stack with pane (.claude/rules/tui.md).
 type mode int
 
 const (
@@ -491,7 +492,7 @@ func (m Model) openField() Model {
 	m.mode = modeField
 	m.input = textinput.New()
 	m.input.SetValue(m.filters.Value(m.cursor))
-	m.input.SetWidth(max(filterPaneWidth-filterNameWidth-promptCols, 1))
+	m.input.SetWidth(max(filterPaneWidth-filterNameWidth-promptCols-cursorCol, 1))
 	m.input.Focus()
 	return m
 }

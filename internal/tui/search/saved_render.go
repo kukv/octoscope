@@ -11,6 +11,14 @@ import (
 	"github.com/kukv/octoscope/internal/usecase"
 )
 
+// pickerBorderRows and pickerFooterRows are what stands between the
+// terminal's height and the rows left for saved queries: theme.Popup's own
+// top and bottom border, and the key bar View draws under the popup.
+const (
+	pickerBorderRows = 2
+	pickerFooterRows = 1
+)
+
 // pickerView draws the saved queries as a popup box, the width theme.Popup
 // and layout.PopupWidth give the add-repository dialog. It holds no input
 // field of its own -- it is picked from, not typed into.
@@ -22,11 +30,38 @@ func (m Model) pickerView() string {
 		return theme.Popup().Width(box).Render(theme.Dim().Render(i18n.T("search.no_saved_queries")))
 	}
 
-	lines := make([]string, len(m.saved))
-	for i, q := range m.saved {
-		lines[i] = m.savedRow(q, i, content)
+	rows := m.pickerRows()
+	first := m.pickerWindow(rows)
+	last := min(first+rows, len(m.saved))
+	lines := make([]string, 0, last-first)
+	for i := first; i < last; i++ {
+		lines = append(lines, m.savedRow(m.saved[i], i, content))
 	}
 	return theme.Popup().Width(box).Render(strings.Join(lines, "\n"))
+}
+
+// pickerRows is how many saved-query rows fit once the border, key bar and
+// (while one is up) the notice line have taken their share. Unset
+// (m.height <= 0), it draws them all, the way the rest of this tab behaves
+// before its first size arrives.
+func (m Model) pickerRows() int {
+	if m.height <= 0 {
+		return len(m.saved)
+	}
+	rows := m.height - pickerBorderRows - pickerFooterRows
+	if m.notice != "" {
+		rows--
+	}
+	return max(rows, 1)
+}
+
+// pickerWindow is the first row drawn, chosen to keep the cursor in view --
+// the same top-anchored scroll resultWindow uses for the result pane.
+func (m Model) pickerWindow(rows int) int {
+	if m.pick < rows {
+		return 0
+	}
+	return m.pick - rows + 1
 }
 
 // savedRow draws one entry: its name, and its query beside it in a dimmer

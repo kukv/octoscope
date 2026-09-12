@@ -31,8 +31,9 @@ func (m Model) SetSavedQueries(qs []usecase.SavedQuery) Model {
 func upsert(qs []usecase.SavedQuery, q usecase.SavedQuery) []usecase.SavedQuery {
 	for i, existing := range qs {
 		if existing.Name == q.Name {
-			qs[i] = q
-			return qs
+			out := slices.Clone(qs)
+			out[i] = q
+			return out
 		}
 	}
 	return append(qs, q)
