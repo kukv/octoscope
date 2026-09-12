@@ -34,7 +34,7 @@ GraphQL 系メソッドを利用側（`internal/usecase` の `source`）に出�
   **エラー文字列で分岐しない**（`gh.ErrTransient` / `gh.ErrUnauthenticated` は `errors.Is`）
 - `internal/gh/gql` は `internal/tui` も `internal/usecase` も import しない。
   **パッケージを増やしたら depguard に足す**（`.golangci.yml`、`gh-layer` は `**/internal/gh/**` で
-  効くので既存ルールで覆われる。Task 5 で実際に確認する）
+  効くので既存ルールで覆われる。Task 4 で実際に確認する）
 - カバレッジ基準は 80%（`.octocov.yml`）。移設でカバレッジが落ちないよう、テストも一緒に動かす
 - 各タスクの終わりに `make check` が緑であること
 - **各タスクの `git commit` 例には共著者行を省いてある。** 実際のコミットには
@@ -133,7 +133,7 @@ api が `{owner}` という名前のリポジトリを探しに行く。
 
 ---
 
-## テストの移し方（Task 2〜5 に共通する、一番はまる所）
+## テストの移し方（Task 2〜4 に共通する、一番はまる所）
 
 **`git mv` して `package` を書き換えるだけでは 1 つもコンパイルが通らない。**
 移す対象のテストは全部 `c.run = func(_ context.Context, _ string, args ...string)` を
@@ -142,7 +142,7 @@ api が `{owner}` という名前のリポジトリを探しに行く。
 
 ### 1. `gql` 側のフェイクは `doc` と `vars` を録る
 
-Task 2 で `internal/gh/gql/gql_test.go` に 1 つだけ置き、Task 3〜5 はこれを使い回す。
+Task 2 で `internal/gh/gql/gql_test.go` に 1 つだけ置き、Task 3・4 はこれを使い回す。
 
 ```go
 // fake records what was sent and answers with what it was given. The body is
@@ -547,32 +547,51 @@ git commit -m "refactor: give the GraphQL documents a transport to travel throug
 
 ---
 
-### Task 2: Work と Search の移設
+### Task 2: Work / Search と checks の移設
 
-一番小さい文書から運ぶ。ここで「embed を動かす」「デコードを動かす」「`cli` は
-1 行の委譲だけになる」という型を作り、以降のタスクはそれを繰り返す。
+**Work・Search と checks は一緒に動かす。** `checkNode` と `rollup` は `graphql.go` で
+定義され、`checks.go`（`checkDetailNode` が embed する）と `item.go`（`gh pr list` の
+roll-up）の両方から使われている。片方だけ動かすと、使い捨ての型エイリアスを `cli` に
+置く羽目になる。**だから 1 タスクにする**（着手前の突き合わせで判明。ledger の Ruling 1）。
+
+ここで「embed を動かす」「デコードを動かす」「`cli` は 1 行の委譲だけになる」という
+型を作り、以降のタスクはそれを繰り返す。
 
 **Files:**
 - Create: `internal/gh/gql/search.go`（`internal/gh/cli/graphql.go` の中身）
 - Create: `internal/gh/gql/search_test.go`（`internal/gh/cli/graphql_test.go` のデコード部）
-- Move: `internal/gh/cli/work.graphql` → `internal/gh/gql/work.graphql`
-- Move: `internal/gh/cli/testdata/work_section.json`、`search_items.json` → `internal/gh/gql/testdata/`
+- Create: `internal/gh/gql/checks.go`（`internal/gh/cli/checks.go` の GraphQL 部）
+- Create: `internal/gh/gql/checks_test.go`（`internal/gh/cli/checks_test.go` の `PRChecks` 部）
+- Move: `internal/gh/cli/work.graphql`、`checks.graphql` → `internal/gh/gql/`
+- Move: `internal/gh/cli/testdata/work_section.json`、`search_items.json`、`pr_checks.json` → `internal/gh/gql/testdata/`
 - Delete: `internal/gh/cli/graphql.go`
+- Modify: `internal/gh/cli/checks.go`（`JobLog` / `parseJobLog` / `RerunWorkflow` だけにする）
 - Modify: `internal/gh/cli/cli.go`（`gql.Client` を embed）、`internal/gh/cli/item.go`（`gql.RollupContexts`）
-- Modify: `internal/gh/cli/graphql_test.go`（引数のアサーションだけ残す）
+- Modify: `internal/gh/cli/graphql_test.go`、`checks_test.go`（残るのは引数とログのアサーション）
 
 **Interfaces:**
 - Produces:
   - `func (c *Client) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)`（`gql.Client` のメソッド）
   - `func (c *Client) SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error)`
+  - `func (c *Client) PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error)`
   - `type CheckContext struct { ... }` — `checkNode` を export した形
   - `func RollupContexts(nodes []CheckContext) gh.Checks`
-- Consumes: Task 1 の `Client` / `Read` / `Var`
+  - `type PageInfo struct { HasNextPage bool; EndCursor string }` — `pageInfo` を export した形
+- Consumes: Task 1 の `Client` / `Read` / `Var` / `repoVars`
+
+**`pageInfo` の扱い（ledger の Ruling 2）:** `pageInfo` は `checks.go` で定義され、
+`review.go` からも使われている。`review.go` が出ていくのは Task 3 なので、
+このタスクでは `cli` に 1 行だけ残す。**Task 3 で消す。**
+
+```go
+// pageInfo is gone with the documents; review.go follows in the next step.
+type pageInfo = gql.PageInfo
+```
 
 - [ ] **Step 0: `gql` のフェイクを置く**
 
 上の「テストの移し方」1 の `fake` / `fileClient` を `internal/gh/gql/gql_test.go` に足す。
-Task 3〜5 はこれを使う。
+Task 3・4 はこれを使う。
 
 - [ ] **Step 1: 移設先のデコードテストを書いて落とす**
 
@@ -694,7 +713,7 @@ func repoVars(repo string) ([]gql.Var, error) {
 - [ ] **Step 3b: `cli` のテストを `New` 経由に直す**
 
 「テストの移し方」3 のとおり、`&Client{...}` で組んでいる箇所を全部
-`New(...)` + `c.run = ...` に直す。**ここを飛ばすと Task 3 以降が nil で落ちる。**
+`New(...)` + `c.run = ...` に直す。**ここを飛ばすと以降のタスクが nil で落ちる。**
 
 ```bash
 grep -rn '&Client{' internal/gh/cli/*_test.go   # 残っていないこと
@@ -732,44 +751,7 @@ func TestTheSearchStringDoesNotTravelAsQuery(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: 全テストが通ることを確認する**
-
-Run: `go test ./internal/gh/...`
-Expected: PASS
-
-- [ ] **Step 6: 空振りしないことを確かめる**
-
-`gql/search.go` の `S("search", search)` を `S("search", "")` に変えて
-`go test ./internal/gh/...` が FAIL することを目で見る。戻す。
-
-- [ ] **Step 7: `make check` を通してコミットする**
-
-```bash
-make check
-git add -A internal/gh
-git commit -m "refactor: move the work and search document into the shared layer"
-```
-
----
-
-### Task 3: checks の GraphQL 部の移設
-
-`checks.go` は 1 ファイルに GraphQL（`PRChecks`）とサブコマンド（`JobLog` / `RerunWorkflow`）が
-同居している唯一のファイルなので、**分けて運ぶ**。
-
-**Files:**
-- Create: `internal/gh/gql/checks.go`
-- Create: `internal/gh/gql/checks_test.go`
-- Move: `internal/gh/cli/checks.graphql` → `internal/gh/gql/checks.graphql`
-- Move: `internal/gh/cli/testdata/pr_checks.json` → `internal/gh/gql/testdata/`
-- Modify: `internal/gh/cli/checks.go`（`JobLog` / `RerunWorkflow` と `parseJobLog` だけにする）
-- Modify: `internal/gh/cli/checks_test.go`（ログ側のテストだけ残す）
-
-**Interfaces:**
-- Produces: `func (c *Client) PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error)`
-- Consumes: Task 2 の `CheckContext` / `RollupContexts` / `PageInfo`
-
-- [ ] **Step 1: 移設先のテストを書いて落とす**
+- [ ] **Step 5: checks の移設先テストを書いて落とす**
 
 `internal/gh/cli/checks_test.go` のうち `pr_checks.json` を食わせている関数を
 `internal/gh/gql/checks_test.go` に写す。**ページングのテストを必ず含める**
@@ -779,7 +761,7 @@ git commit -m "refactor: move the work and search document into the shared layer
 Run: `go test ./internal/gh/gql/`
 Expected: FAIL（`PRChecks` が未定義）
 
-- [ ] **Step 2: ファイルを動かす**
+- [ ] **Step 6: checks のファイルを動かす**
 
 ```bash
 git mv internal/gh/cli/checks.graphql internal/gh/gql/checks.graphql
@@ -811,28 +793,29 @@ git mv internal/gh/cli/testdata/pr_checks.json internal/gh/gql/testdata/
 ```
 
 `c.effectiveRepo(repo)` の呼び出しは消える — `RepoVars` が `cli` 側でそれをやっている。
+`pageInfo` は `gql.PageInfo` になり、`cli` には上の 1 行のエイリアスだけ残す。
 
-- [ ] **Step 3: 全テストが通ることを確認する**
+- [ ] **Step 7: 全テストが通ることを確認する**
 
 Run: `go test ./internal/gh/...`
 Expected: PASS
 
-- [ ] **Step 4: 空振りしないことを確かめる**
+- [ ] **Step 8: 空振りしないことを 2 か所で確かめる**
 
-`PRChecks` のページングの `cursor = contexts.PageInfo.EndCursor` を消して
-`go test ./internal/gh/gql/` が FAIL することを目で見る。戻す。
+`gql/search.go` の `S("search", search)` を `S("search", "")` に変えて FAIL を見る。戻す。
+`PRChecks` のページングの `cursor = contexts.PageInfo.EndCursor` を消して FAIL を見る。戻す。
 
-- [ ] **Step 5: `make check` を通してコミットする**
+- [ ] **Step 9: `make check` を通してコミットする**
 
 ```bash
 make check
 git add -A internal/gh
-git commit -m "refactor: move the checks document into the shared layer"
+git commit -m "refactor: move the work, search and checks documents into the shared layer"
 ```
 
 ---
 
-### Task 4: review と merge の移設
+### Task 3: review と merge の移設
 
 一番大きい 2 つ。文書が 11 個（review 7 + merge 4）あり、mutation を含む。
 **mutation は `Write` を通す**（再試行しない）。
@@ -939,7 +922,7 @@ git commit -m "refactor: move the review and merge documents into the shared lay
 
 ---
 
-### Task 5: repo_counts と schema_test の移設、depguard の確認
+### Task 4: repo_counts と schema_test の移設、depguard の確認
 
 最後に、**全文書を検証している `schema_test.go` を文書と同じ場所に置く**。
 設計の完了条件 8（「`.graphql` 文書が 1 組のまま両バックエンドから使われ、`schema_test.go` が
@@ -1037,7 +1020,7 @@ git commit -m "refactor: keep the schema check next to the documents it validate
 
 ---
 
-### Task 6: 引き継ぎ文書
+### Task 5: 引き継ぎ文書
 
 **Files:**
 - Create: `docs/superpowers/2026-09-12-phase4-shared-graphql-followups.md`
