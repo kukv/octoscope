@@ -1,7 +1,7 @@
 name: security
 
 # 全リポ共通のセキュリティ検査(言語非依存)。
-# - hidden-unicode: 人のレビューで見えない内容の検知(kukv/hidden-content-scan)
+# - hidden-content: 人のレビューで見えない内容の検知(kukv/hidden-content-scan)
 # - secrets:        gitleaks による全履歴のシークレット検知(検知したら PR にメンション付きでコメント)
 # - sca:            依存ライブラリの既知脆弱性検知
 # - workflow-audit: zizmor によるワークフロー自体の静的解析
@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  hidden-unicode:
+  hidden-content:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 5
