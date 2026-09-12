@@ -298,21 +298,6 @@ func TestEditItemsError(t *testing.T) {
 	}
 }
 
-func TestClientUsesDefaultRepo(t *testing.T) {
-	var got []string
-	c := New("/tmp", "kukv/octoscope")
-	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-		got = args
-		return []byte(emptyDataJSON), nil
-	}
-	if _, err := c.ListPRs(t.Context(), ""); err != nil {
-		t.Fatalf("ListPRs: %v", err)
-	}
-	if repoVarsArg(got) != "kukv/octoscope" {
-		t.Errorf("args = %v, want them to name the client's repository", got)
-	}
-}
-
 func TestPerCallRepoOverridesDefault(t *testing.T) {
 	var got []string
 	c := New("/tmp", "kukv/octoscope")

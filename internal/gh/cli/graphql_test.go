@@ -271,9 +271,9 @@ func TestListWorkSectionPropagatesRunError(t *testing.T) {
 	}
 }
 
-// The five listing calls go through the shared documents now, not through
-// gh's own subcommands. A backend that still shells out to `gh pr list`
-// would be selecting a second, unchecked copy of the same fields.
+// These five calls go through the shared documents now, not through gh's own
+// subcommands. A backend that still shells out to `gh pr list` would be
+// selecting a second, unchecked copy of the same fields.
 func TestTheListingCallsSendAGraphQLDocument(t *testing.T) {
 	t.Parallel()
 
@@ -288,10 +288,11 @@ func TestTheListingCallsSendAGraphQLDocument(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			c := New("", "kukv/octoscope")
+			c := New("/repo", "kukv/octoscope")
 			var got []string
-			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-				got = args
+			var dir string
+			c.run = func(_ context.Context, d string, args ...string) ([]byte, error) {
+				dir, got = d, args
 				return []byte(`{"data":{}}`), nil
 			}
 			if err := call(c); err != nil {
@@ -299,6 +300,12 @@ func TestTheListingCallsSendAGraphQLDocument(t *testing.T) {
 			}
 			if len(got) < 2 || got[0] != "api" || got[1] != "graphql" {
 				t.Errorf("%s ran gh %v, want gh api graphql", name, got)
+			}
+			// gh resolves {owner} and {repo} from the directory it runs in,
+			// so a call that forgets the client's own directory answers for
+			// wherever octoscope was started instead.
+			if dir != "/repo" {
+				t.Errorf("%s ran gh in %q, want /repo", name, dir)
 			}
 			// The document has to name the repository the client was built
 			// for; a call that sends no owner asks GitHub about nothing.

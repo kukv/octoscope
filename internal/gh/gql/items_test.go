@@ -205,6 +205,18 @@ func TestListIssuesReadsTheRecordedAnswer(t *testing.T) {
 	if issues[0].Number == 0 || issues[0].Title == "" {
 		t.Errorf("number/title not filled: %+v", issues[0])
 	}
+	// The Work and Repos tabs draw the author, open the URL with o, and sort
+	// on updatedAt. Each of the three is a column that goes blank, or a row
+	// that sorts to the wrong place, with no error to notice.
+	if issues[0].Author.Login == "" {
+		t.Error("author not filled")
+	}
+	if issues[0].URL == "" {
+		t.Error("url not filled; o has nothing to open")
+	}
+	if issues[0].UpdatedAt.IsZero() {
+		t.Error("updatedAt not filled")
+	}
 }
 
 // The repository is named by two variables, not by one "owner/name" string:
