@@ -49,13 +49,17 @@ Search 側は使わない `Searching()` / `SetError` を抱えることになり
 
 ### 境界の型は `internal/usecase` に置いた
 
-`usecase.SavedQuery`（`internal/usecase/usecase.go` に定義、`internal/tui/search`
-と `internal/config` の両方から参照される）が、設定ファイルの `config.SavedQuery`
-と TUI 側の往復に使う型になっている。`internal/tui` は `internal/config` を
-import できず、`internal/usecase` は `internal/tui` を import できない
-（`.claude/rules/architecture.md` の依存の向き、`depguard` で強制）。
-`internal/tui` は `usecase.Item` で既に `internal/usecase` を import しているので、
-**両方から見える場所はそこしかない。**
+`usecase.SavedQuery`（`internal/usecase/search.go:18` に定義）が、設定ファイルの
+`config.SavedQuery` と TUI 側の往復に使う型になっている。`internal/tui` は
+`internal/config` を import できず（`.golangci.yml` の `tui-layer`）、
+`internal/config` は他の internal パッケージを一切 import できない
+（同 `config-layer`、54-62 行目）。`internal/tui` は `usecase.Item` で既に
+`internal/usecase` を import しているので、**`internal/tui` と `internal/config`
+の両方に手が届く場所は `internal/usecase` しかない。** 変換の両方向
+（`config.SavedQuery` → `usecase.SavedQuery` と、その逆）も `internal/usecase`
+が持つ: `Usecase.SaveQueries`（`search.go:24`）と `SavedQueriesFrom`
+（`search.go:34`）。`internal/config` 自身は `usecase.SavedQuery` を一切
+参照しない。
 
 ### `default_tab: search` は待たせない
 
