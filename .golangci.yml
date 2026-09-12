@@ -278,6 +278,15 @@ linters:
         linters:
           - gosec
         text: "G304"
+      # unparam flags send's http.Header result while the only callers in
+      # this package discard it. The paging caller that reads it -- the pull
+      # request files listing, which walks Link headers -- lands in the next
+      # commit of this slice; the seam is built first so the callers can be
+      # written against it. Remove this entry once that caller exists.
+      - path: internal/gh/api/rest\.go
+        linters:
+          - unparam
+        text: "send"
 
 issues:
   max-issues-per-linter: 0

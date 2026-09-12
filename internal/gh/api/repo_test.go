@@ -240,7 +240,7 @@ func TestListPRsInTheWorkingDirectorysRepo(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	c := New("/w", "", "secret-token")
-	c.endpoint = srv.URL
+	c.baseURL = srv.URL
 	c.runGit = func(context.Context, string, ...string) ([]byte, error) {
 		return []byte("git@github.com:kukv/octoscope.git\n"), nil
 	}
