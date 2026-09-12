@@ -1,11 +1,19 @@
 name: security
 
+# 全リポ共通のセキュリティ検査(言語非依存)。
+# - hidden-content: 人のレビューで見えない内容の検知(kukv/hidden-content-scan)
+# - secrets:        gitleaks による全履歴のシークレット検知(検知したら PR にメンション付きでコメント)
+# - sca:            依存ライブラリの既知脆弱性検知
+# - workflow-audit: zizmor によるワークフロー自体の静的解析
+# - actionlint:     ワークフロー構文と埋め込みシェルの検査
+# 各ツールのバージョンは `# renovate:` アノテーションで renovate が追従する。
+
 on:
   pull_request:
   push:
     branches: [main]
   schedule:
-    - cron: "0 0 * * 1" # 週次。脆弱性 DB は後から更新されるため定期実行する
+    - cron: "0 0 * * 1" # 週次。脆弱性 DB は後から更新されるため sca のみ定期実行する
 
 permissions: {}
 
@@ -14,18 +22,146 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # 多エコシステム SCA(lockfile を再帰自動検出。リポ直下の osv-scanner.toml は自動適用)
-  sca:
+  hidden-content:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # 人のレビューで見えない内容(不可視 Unicode・同形異字・AI 指示ファイルの
+      # 隠しマークアップ・.gitattributes による差分隠し)を検知する
+      - uses: kukv/hidden-content-scan@92d4d65a0d79928e6b8bb4cd6ac52172df7f942b # main
+        with:
+          exclude: "**/testdata/**"
+
+  secrets:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
+      GITLEAKS_VERSION: v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+
+    steps:
+      # 全履歴を対象にするため fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: gitleaks
+        run: |
+          docker run --rm \
+            --volume "${PWD}:/repo" \
+            --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0=/repo \
+            "ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}" \
+            git /repo --redact --verbose --exit-code 1
+
+  # 検知時に PR へメンション付きでコメントする。書き込み権限を検査ジョブから
+  # 切り離すため別ジョブにしている
+  secrets-comment:
+    needs: [secrets]
+    if: always() && needs.secrets.result == 'failure' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: comment on pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          OWNER_MENTION: "@kukv"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mentions="$OWNER_MENTION"
+          # bot が作成した PR と、作成者がメンション先と同一の場合は重複させない
+          if [ "$PR_AUTHOR_TYPE" != "Bot" ] && [ "@$PR_AUTHOR" != "$OWNER_MENTION" ]; then
+            mentions="$mentions @$PR_AUTHOR"
+          fi
+
+          {
+            echo "$mentions"
+            echo
+            echo "**gitleaks がシークレットを検知しました。**"
+            echo
+            echo "実行ログ: $RUN_URL"
+            echo
+            echo "- 実際のシークレットだった場合は、まず該当クレデンシャルを失効・ローテーションしてください(履歴からの削除だけでは漏洩は止まりません)"
+            echo "- 誤検知の場合は \`.gitleaksignore\` に fingerprint を追加してください"
+          } > "${RUNNER_TEMP}/gitleaks-comment.md"
+
+          gh pr comment "$PR_NUMBER" --body-file "${RUNNER_TEMP}/gitleaks-comment.md"
+
+  sca:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # lockfile を再帰的に自動検出する。リポ直下の osv-scanner.toml は自動適用される
       - uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
         with:
           scan-args: |-
             --recursive
             --include-git-root
             ./
+
+  workflow-audit:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=pypi depName=zizmor
+      ZIZMOR_VERSION: 1.30.1
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: zizmor
+        run: pipx run "zizmor==${ZIZMOR_VERSION}" --offline .
+
+  actionlint:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=docker depName=rhysd/actionlint
+      ACTIONLINT_VERSION: 1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: actionlint
+        run: |
+          docker run --rm \
+            --volume "${PWD}:/repo" \
+            --workdir /repo \
+            "rhysd/actionlint:${ACTIONLINT_VERSION}" -color
