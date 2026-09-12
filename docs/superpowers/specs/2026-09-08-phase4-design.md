@@ -245,10 +245,15 @@ api を最後に置く理由は spec §7 のとおりで、先に並走させる
 4-1 共通 GraphQL 層（`.graphql` 文書とデコードを `internal/gh/gql` に出し、transport を
 切り出す。振る舞いは不変）、4-2 `internal/gh/api` 本体（トークン検出・HTTP transport・
 カレントリポジトリの解決・GraphQL 系の全メソッド・`pr list` / `issue list` / `repo view` の
-新文書・`main.go` のバックエンド選択と認証エラー画面）、4-3 REST 系（`go-github`）、
-4-4 Actions（`RerunWorkflow` と `JobLog`）、4-5 引き継ぎと手動確認の手順。
+新文書）、4-3 REST 系（`go-github`）、4-4 Actions（`RerunWorkflow` と `JobLog`・
+`main.go` のバックエンド選択と認証エラー画面）、4-5 引き継ぎと手動確認の手順。
 **4-1 を先頭に置くのは、文書が 1 組のまま両バックエンドから使われる形（完了条件 8）を
 先に作らないと、4-2 以降が二重実装になるためである。**
+
+**`main.go` のバックエンド選択と認証エラー画面は 2026-09-12 に 4-2 から 4-4 へ
+訂正した。** `usecase.New(src source, ...)` の `source` interface（4-1 完了時点で
+`internal/usecase/usecase.go:113`）を `api.Client` が満たすのは REST 系（4-3）と
+Actions（4-4）まで揃ってからで、4-2 終了時点では配線がコンパイルできないため。
 
 各 PR は `make check` が緑であること。
 
