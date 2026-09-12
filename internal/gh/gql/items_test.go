@@ -330,6 +330,19 @@ func TestRepoNameReportsAFailureRatherThanAnEmptyName(t *testing.T) {
 	}
 }
 
+// The Repos tab uses this answer to decide whether the working directory has
+// a repository at all, and GitHub returns the current name, which is how a
+// rename reaches the tab. A fixture-based test cannot notice nameWithOwner
+// being dropped from the document: the recorded fixture already has it on
+// disk no matter what the document currently asks for.
+func TestRepoNameDocumentSelectsNameWithOwner(t *testing.T) {
+	t.Parallel()
+
+	if !strings.Contains(stripComments(repoNameQuery), "nameWithOwner") {
+		t.Error("repo_name.graphql does not select nameWithOwner")
+	}
+}
+
 func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {
 	t.Parallel()
 
