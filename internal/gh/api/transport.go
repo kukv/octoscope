@@ -60,7 +60,7 @@ func (c *Client) post(ctx context.Context, doc string, vars []gql.Var) ([]byte, 
 	// GitHub asks every client to name itself; an unnamed one may be refused.
 	req.Header.Set("User-Agent", "octoscope")
 
-	resp, err := c.httpClient().Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("reach GitHub: %w", err)
 	}

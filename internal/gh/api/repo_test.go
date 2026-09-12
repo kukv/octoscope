@@ -2,7 +2,11 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -216,5 +220,44 @@ func assertRepoVars(t *testing.T, vars []gql.Var, owner, name string) {
 	}
 	if got["owner"] != owner || got["name"] != name {
 		t.Errorf("vars = %v, want owner=%s name=%s", got, owner, name)
+	}
+}
+
+// TestListPRsInTheWorkingDirectorysRepo is the ordinary case: no --repo, so
+// the repository comes from the checkout's git remote rather than from a
+// string that can be split. This guards the wiring between Client and
+// gql.Client.RepoVars: without it every call falls back to
+// gql.SplitRepoVars, which cannot answer for an empty repository, and each
+// one fails with `name repository: repo "" has no owner/name separator`.
+func TestListPRsInTheWorkingDirectorysRepo(t *testing.T) {
+	t.Parallel()
+
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		_, _ = io.WriteString(w, `{"data":{"repository":{"pullRequests":{"nodes":[]}}}}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	c := New("/w", "", "secret-token")
+	c.endpoint = srv.URL
+	c.runGit = func(context.Context, string, ...string) ([]byte, error) {
+		return []byte("git@github.com:kukv/octoscope.git\n"), nil
+	}
+	if _, err := c.ListPRs(context.Background(), ""); err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+
+	var sent struct {
+		Variables map[string]any `json:"variables"`
+	}
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("parse request: %v", err)
+	}
+	if sent.Variables["owner"] != "kukv" {
+		t.Errorf("owner = %v, want kukv", sent.Variables["owner"])
+	}
+	if sent.Variables["name"] != "octoscope" {
+		t.Errorf("name = %v, want octoscope", sent.Variables["name"])
 	}
 }

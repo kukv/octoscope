@@ -220,15 +220,16 @@ func TestListIssuesReadsTheRecordedAnswer(t *testing.T) {
 }
 
 // The repository is named by two variables, not by one "owner/name" string:
-// GraphQL's repository() takes the halves separately.
+// GraphQL's repository() takes the halves separately. The two halves of the
+// test repository differ, so a swapped pair does not read as a pass.
 func TestTheListCallsNameTheRepositoryByItsTwoHalves(t *testing.T) {
 	t.Parallel()
 
 	c, got := fixedTransport(t, "testdata/repo_prs.json")
-	if _, err := c.ListPRs(context.Background(), "cli/cli"); err != nil {
+	if _, err := c.ListPRs(context.Background(), "kukv/octoscope"); err != nil {
 		t.Fatalf("ListPRs: %v", err)
 	}
-	want := map[string]string{"owner": "cli", "name": "cli"}
+	want := map[string]string{"owner": "kukv", "name": "octoscope"}
 	for _, v := range *got {
 		if w, ok := want[v.Name]; ok && v.Str == w {
 			delete(want, v.Name)
@@ -297,9 +298,14 @@ func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	if pr.Comments[0].CreatedAt.IsZero() {
 		t.Error("comment has no timestamp")
 	}
-	// The detail view names the branches the pull request merges between.
-	if pr.Head == "" || pr.Base == "" {
-		t.Errorf("head/base = %q/%q, want both", pr.Head, pr.Base)
+	// The detail view names the branches the pull request merges between,
+	// and the size of the diff. Both pairs are two fields of the same type
+	// side by side, so only the recorded values say they were not swapped.
+	if pr.Head != "worktree-eventual-singing-gem" || pr.Base != "main" {
+		t.Errorf("head/base = %q/%q, want worktree-eventual-singing-gem/main", pr.Head, pr.Base)
+	}
+	if pr.Additions != 6322 || pr.Deletions != 486 {
+		t.Errorf("additions/deletions = %d/%d, want 6322/486", pr.Additions, pr.Deletions)
 	}
 	// GraphQL nests both of these under a "nodes" array, so a tag that names
 	// the connection instead of its nodes decodes into an empty list and the

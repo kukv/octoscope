@@ -4,7 +4,6 @@
 package api
 
 import (
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -33,10 +32,9 @@ type Client struct {
 	dir   string
 	repo  string
 	token string
-	// endpoint and client are the seams the tests use: a local server, and
-	// a client with a shorter patience than the default.
+	// endpoint is the seam the tests use: a local server in place of
+	// github.com.
 	endpoint string
-	client   *http.Client
 
 	runGit gitFunc
 	mu     sync.Mutex
@@ -69,14 +67,6 @@ func (c *Client) endpointURL() string {
 		return c.endpoint
 	}
 	return defaultEndpoint
-}
-
-// httpClient is the client to send with. Callers do not set one.
-func (c *Client) httpClient() *http.Client {
-	if c.client != nil {
-		return c.client
-	}
-	return http.DefaultClient
 }
 
 // OpenWeb shows the item in a browser. It is the same call the cli backend
