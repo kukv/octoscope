@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -227,6 +228,11 @@ func TestListPRsRejectsARepositoryWithoutASeparator(t *testing.T) {
 	}
 }
 
+// wordBody matches the field name "body" and nothing else -- PullRequest,
+// Issue and IssueComment all also have a real "bodyHTML" field, and a plain
+// substring match would count one of those as the item's own body.
+var wordBody = regexp.MustCompile(`\bbody\b`)
+
 // A fixture-based test cannot notice body or comments being dropped from the
 // single-item documents: the recorded fixture already has that data on disk
 // no matter what the document currently asks for. This reads the embedded
@@ -239,7 +245,7 @@ func TestSingleItemDocumentsSelectTheBodyAndTheConversation(t *testing.T) {
 	docs := map[string]string{"pr.graphql": prQuery, "issue.graphql": issueQuery}
 	for name, doc := range docs {
 		clean := stripComments(doc)
-		if n := strings.Count(clean, "body"); n < 2 {
+		if n := len(wordBody.FindAllString(clean, -1)); n < 2 {
 			t.Errorf("%s selects body %d times, want at least 2 (the item's own and each comment's)", name, n)
 		}
 		if !strings.Contains(clean, "comments(first: 100)") {

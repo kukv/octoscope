@@ -101,6 +101,10 @@ jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Acto
 `IssueComment`、`IssueCommentConnection`、`User`、`UserConnection` は 2026-09-12 に
 `pr.graphql` / `issue.graphql`（`comments` と `assignees`）のために追加した。
 
+同じ 2026-09-12 の録り直しで `Mutation.updateEnterpriseProofOfPresenceRequiredSetting`
+が消えた。このプロジェクトが選ばない enterprise 専用の mutation で、GitHub 側の
+スキーマ変更による自然な削除。録り直すたびにこの種の削除は起こり得る。
+
 ## `review_context.json`
 
 `review.graphql` に対する実レスポンス。録った日: 2026-09-07、対象: `kukv/octoscope#55`。
