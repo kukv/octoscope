@@ -34,6 +34,8 @@ linters:
               desc: views go through internal/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/gh/gql
               desc: views go through internal/usecase; only cmd/octoscope names a backend
+            - pkg: github.com/kukv/octoscope/internal/gh/api
+              desc: views go through internal/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/config
               desc: settings reach the views through app.Options; cmd/octoscope reads them
         # usecase sits below the UI: it decides which GitHub calls an
