@@ -82,8 +82,9 @@ func (c *Client) editLabels(repo string, number int, add, remove []string) error
 		}
 	}
 	for _, name := range remove {
-		// A label name is a path segment and GitHub's own have spaces in
-		// them ("help wanted"), which would otherwise address another label.
+		// A label name is a path segment and GitHub's own have slashes in
+		// them ("area/cli"), which would otherwise split the path instead of
+		// naming one label.
 		if _, err := c.write(context.Background(), http.MethodDelete,
 			path+"/labels/"+url.PathEscape(name), nil); err != nil {
 			return err

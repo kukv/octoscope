@@ -92,16 +92,19 @@ func TestReopeningAnIssuePatchesTheIssuesEndpointBackToOpen(t *testing.T) {
 	}
 }
 
-// A label's name is a path segment, and GitHub's own labels have spaces in
-// them ("help wanted", "good first issue"). An unescaped name would address a
-// different label, or none.
-func TestRemovingALabelEscapesItsNameIntoThePath(t *testing.T) {
+// A label's name is a path segment, and GitHub's own labels have spaces
+// ("help wanted") and slashes ("area/cli") in them. A space alone would not
+// catch a missing escape: net/http re-escapes it to %20 on the way out
+// regardless of what built the path. A slash is the case that matters -- left
+// unescaped it splits the path into an extra segment instead of naming one
+// label.
+func TestRemovingALabelEscapesASlashInItsNameInsteadOfSplittingThePath(t *testing.T) {
 	t.Parallel()
 
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `[]`)
 	})
-	if err := c.EditIssueLabels("cli/cli", 50, nil, []string{"help wanted"}); err != nil {
+	if err := c.EditIssueLabels("cli/cli", 50, nil, []string{"help wanted", "area/cli"}); err != nil {
 		t.Fatalf("EditIssueLabels: %v", err)
 	}
 
@@ -110,6 +113,11 @@ func TestRemovingALabelEscapesItsNameIntoThePath(t *testing.T) {
 		t.Errorf("method = %s, want DELETE", req.Method)
 	}
 	if req.URL.EscapedPath() != "/repos/cli/cli/issues/50/labels/help%20wanted" {
+		t.Errorf("escaped path = %q", req.URL.EscapedPath())
+	}
+
+	req = (*got)[1]
+	if req.URL.EscapedPath() != "/repos/cli/cli/issues/50/labels/area%2Fcli" {
 		t.Errorf("escaped path = %q", req.URL.EscapedPath())
 	}
 }
