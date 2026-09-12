@@ -206,6 +206,53 @@ func TestListWorkSectionRejectsASectionTheBoardDoesNotHave(t *testing.T) {
 	}
 }
 
+const emptyReviewContextJSON = `{"data":{"repository":{"pullRequest":{"id":"PR_1","reviews":{"nodes":[]},"reviewThreads":{"nodes":[]}}}}}`
+
+// TestPRReviewContextInTheWorkingDirectorysRepo is the ordinary case: no
+// --repo, so there is no "owner/name" to split and gh has to fill the
+// placeholders from the checkout's remote. This guards the wiring between
+// Client and gql.Client.RepoVars: without it, PRReviewContext falls back to
+// gql.SplitRepoVars, which fails on an empty repo instead of asking gh to
+// fill in the placeholders -- breaking review, merge and checks for the
+// ordinary case of running octoscope with no --repo.
+func TestPRReviewContextInTheWorkingDirectorysRepo(t *testing.T) {
+	c := New("/w", "")
+	var got []string
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		got = args
+		return []byte(emptyReviewContextJSON), nil
+	}
+	if _, err := c.PRReviewContext(context.Background(), "", 128); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"owner={owner}", "name={repo}"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("args %v do not carry %q", got, want)
+		}
+	}
+	for _, unwanted := range []string{"owner=", "name="} {
+		if slices.Contains(got, unwanted) {
+			t.Errorf("args %v name an empty repository", got)
+		}
+	}
+}
+
+// TestPRReviewContextRejectsARepoWithNoSlash guards against silently querying
+// the wrong repository: a --repo value with no "/" cannot be split into
+// owner and name, so the call must fail rather than send an empty owner or
+// name to GitHub. The per-call repo is "", so this also guards effectiveRepo
+// falling back to the client's own repo ("not-a-repo") before the split.
+func TestPRReviewContextRejectsARepoWithNoSlash(t *testing.T) {
+	c := New("/w", "not-a-repo")
+	c.run = func(context.Context, string, ...string) ([]byte, error) {
+		t.Fatal("gh was invoked with a repo that cannot be split into owner/name")
+		return nil, nil
+	}
+	if _, err := c.PRReviewContext(context.Background(), "", 128); err == nil {
+		t.Fatal("PRReviewContext did not fail for a repo with no slash")
+	}
+}
+
 func TestListWorkSectionPropagatesRunError(t *testing.T) {
 	t.Parallel()
 

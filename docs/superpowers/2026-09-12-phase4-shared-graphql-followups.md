@@ -37,28 +37,16 @@ Critical/Important 0 件で通っている。
 提案するところまでしかできない。次のスライスに入る前に、この 2 点を
 反映した §6 を承認してもらうこと。
 
-### 2. `cli_test.go` の `repoVars` テスト 2 本が `reflect.DeepEqual` を使っている
+### 2. `gql.Client.repoVars` がエラーに `name repository: ` という文脈を足す（意図して受け入れた差分）
 
-`internal/gh/cli/cli_test.go` の `TestRepoVarsFillsPlaceholdersWhenEmpty`
-（750 行目）と `TestRepoVarsRejectsARepoWithNoSlash` 付近が `[]gql.Var` の
-比較に `reflect.DeepEqual` を使っている。同じファイルの他の `[]Var` 比較
-（449 / 465 / 792 行目）は `slices.Equal` を使っており、こちらがこの
-コードベースの慣用である。
+移設前の `cli.repoArgs` は `repo %q has no owner/name separator` を素で
+返していた。移設後の `gql.Client.repoVars`（`internal/gh/gql/gql.go`）は
+`SplitRepoVars` / `RepoVars` の結果を `fmt.Errorf("name repository: %w", err)`
+で包んでおり、エラー文言が変わっている。
 
-**直さなかった理由:** Task 1 のレビューが見つけた Minor で、動作に影響しない
-表記の不揃い。移設作業（Task 2〜4）の対象ファイルでもなく、このスライスの
-どのタスクにも直す担当が無かった。次にこのテストに触る機会に直す。
-
-### 3. `TestRepoVarsFillsPlaceholdersWhenEmpty` が移設元のコメントの最後の 1 文を落とした
-
-移設前のコメントは「空文字を送ると GitHub に `""` という名前のリポジトリを
-聞くことになる」という 1 文で終わっていたが、Task 3 で `cli_test.go` に
-移した際にこの文が落ちた（現在のコメントは 747〜749 行目で終わる）。
-
-**直さなかった理由:** Task 3 のレビューが見つけた Minor で、テストの主張
-そのものは変わっていない（コメントの説明力が少し落ちただけ）。移設 3 コミット
-分の差分を後から個別に手直しするより、次にこのテストを触るときにまとめて
-直すほうが差分が読みやすい。
+**直さなかった理由:** この文言は `--repo` に不正な値を渡したときだけ見える
+もので、`errors.Is` で分岐している箇所は無い。文脈が増えるぶん元より
+分かりやすくなっており、戻す価値が無いと判断した。
 
 ## `internal/gh/cli` に残ったサブコマンド依存（4-3 / 4-4 が引き取るもの）
 

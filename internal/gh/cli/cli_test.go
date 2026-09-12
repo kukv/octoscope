@@ -739,7 +739,7 @@ func TestRepoVarsNamesTheOwnerAndName(t *testing.T) {
 		t.Fatalf("repoVars: %v", err)
 	}
 	want := []gql.Var{gql.S("owner", "kukv"), gql.S("name", "koto")}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("repoVars = %+v, want %+v", got, want)
 	}
 }
@@ -755,7 +755,7 @@ func TestRepoVarsFillsPlaceholdersWhenEmpty(t *testing.T) {
 		t.Fatalf("repoVars: %v", err)
 	}
 	want := []gql.Var{gql.Placeholder("owner", "{owner}"), gql.Placeholder("name", "{repo}")}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("repoVars = %+v, want %+v", got, want)
 	}
 }

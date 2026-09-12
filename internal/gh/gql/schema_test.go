@@ -36,27 +36,31 @@ func loadSchema(t *testing.T) map[string]schemaType {
 	return s
 }
 
+// checkedDocs names every document this package sends, by the .graphql file
+// it was embedded from. repo_counts.graphql is a fragment, not a complete
+// document, so it is checked as it is actually used: built for two repos.
+var checkedDocs = map[string]string{
+	"work.graphql":               workQuery,
+	"review.graphql":             reviewContextQuery,
+	"start_review.graphql":       startReviewMutation,
+	"add_thread.graphql":         addThreadMutation,
+	"submit_review.graphql":      submitReviewMutation,
+	"review_at_once.graphql":     reviewAtOnceMutation,
+	"discard_review.graphql":     discardReviewMutation,
+	"thread_comments.graphql":    threadCommentsQuery,
+	"checks.graphql":             checksQuery,
+	"merge.graphql":              mergeContextQuery,
+	"merge_pr.graphql":           mergePRMutation,
+	"enable_auto_merge.graphql":  enableAutoMergeMutation,
+	"disable_auto_merge.graphql": disableAutoMergeMutation,
+	"repo_counts.graphql":        buildRepoCountsQuery(2),
+}
+
 func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 	t.Parallel()
 
-	docs := map[string]string{
-		"work":                        workQuery,
-		"review":                      reviewContextQuery,
-		"start_review":                startReviewMutation,
-		"add_thread":                  addThreadMutation,
-		"submit_review":               submitReviewMutation,
-		"review_at_once":              reviewAtOnceMutation,
-		"discard_review":              discardReviewMutation,
-		"thread_comments":             threadCommentsQuery,
-		"checks":                      checksQuery,
-		"merge":                       mergeContextQuery,
-		"merge_pr":                    mergePRMutation,
-		"enable_auto_merge":           enableAutoMergeMutation,
-		"disable_auto_merge":          disableAutoMergeMutation,
-		"repo_counts (built for two)": buildRepoCountsQuery(2),
-	}
 	schema := loadSchema(t)
-	for name, doc := range docs {
+	for name, doc := range checkedDocs {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -64,6 +68,26 @@ func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
 				t.Errorf("%s: %v", name, err)
 			}
 		})
+	}
+}
+
+// TestEveryGraphQLFileIsCheckedAgainstTheSchema guards checkedDocs itself: a
+// .graphql file added without a matching entry there would ship unchecked
+// and the suite above would stay green.
+func TestEveryGraphQLFileIsCheckedAgainstTheSchema(t *testing.T) {
+	t.Parallel()
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".graphql") {
+			continue
+		}
+		if _, ok := checkedDocs[e.Name()]; !ok {
+			t.Errorf("%s is not in checkedDocs, so it is not checked against the schema", e.Name())
+		}
 	}
 }
 

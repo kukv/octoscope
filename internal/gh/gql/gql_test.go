@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
-	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
@@ -125,7 +125,7 @@ func TestRepoVarsFallsBackToSplittingOwnerAndName(t *testing.T) {
 		t.Fatalf("repoVars: %v", err)
 	}
 	want := []Var{S("owner", "kukv"), S("name", "octoscope")}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("repoVars = %+v, want %+v", got, want)
 	}
 }
@@ -144,7 +144,7 @@ func TestRepoVarsUsesTheProvidedSplitter(t *testing.T) {
 		t.Fatalf("repoVars: %v", err)
 	}
 	want := []Var{S("id", "kukv/octoscope")}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("repoVars = %+v, want %+v", got, want)
 	}
 }
