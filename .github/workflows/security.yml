@@ -1,7 +1,7 @@
 name: security
 
 # 全リポ共通のセキュリティ検査(言語非依存)。
-# - hidden-unicode: Trojan Source(双方向制御文字)の検知
+# - hidden-unicode: 人のレビューで見えない内容の検知(kukv/hidden-content-scan)
 # - secrets:        gitleaks による全履歴のシークレット検知(検知したら PR にメンション付きでコメント)
 # - sca:            依存ライブラリの既知脆弱性検知
 # - workflow-audit: zizmor によるワークフロー自体の静的解析
@@ -28,21 +28,17 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-    env:
-      # renovate: datasource=pypi depName=texthooks
-      TEXTHOOKS_VERSION: 0.7.1
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # Trojan Source は双方向制御文字でソースの見た目と実挙動をずらす攻撃。
-      # git 管理下のテキストファイル全部(バイナリは -I で除外)を対象にする。
-      # AI エージェントへの指示ファイル(CLAUDE.md など)もここに含まれる。
-      - name: forbid bidi controls
-        run: |
-          git grep -lIz --cached '' | xargs -0 --no-run-if-empty pipx run --spec "texthooks==${TEXTHOOKS_VERSION}" forbid-bidi-controls
+      # 人のレビューで見えない内容(不可視 Unicode・同形異字・AI 指示ファイルの
+      # 隠しマークアップ・.gitattributes による差分隠し)を検知する
+      - uses: kukv/hidden-content-scan@92d4d65a0d79928e6b8bb4cd6ac52172df7f942b # main
+        with:
+          exclude: "**/testdata/**"
 
   secrets:
     if: github.event_name != 'schedule'
