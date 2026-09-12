@@ -197,3 +197,28 @@ OPEN 1 件 / CLOSED 4 件 / MERGED 45 件）。
 gh api graphql -F query=@internal/gh/gql/work.graphql \
   -f search='repo:kukv/octoscope' | jq . > internal/gh/gql/testdata/search_items.json
 ```
+
+## `repo_prs.json`
+
+`repo_prs.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope`。録った時点で開いている PR が #81 の 1 件あり、review decision
+（`REVIEW_REQUIRED`）・check roll-up・additions/deletions のすべてが埋まって
+いたため、それをそのまま残している。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/repo_prs.graphql \
+  -f owner=kukv -f name=octoscope | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
+```
+
+## `repo_issues.json`
+
+`repo_issues.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`kukv/octoscope`。開いている Issue が #50 と #14（renovate の Dependency
+Dashboard）の 2 件で、両方をそのまま残している。
+
+```bash
+D=internal/gh/gql/testdata
+gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
+  -f owner=kukv -f name=octoscope | jq '.data.repository.issues.nodes |= .[0:5]' > $D/repo_issues.json
+```

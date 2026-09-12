@@ -1,0 +1,77 @@
+# One repository's open pull requests: what the Repos tab lists.
+#
+# REST cannot answer this. The /pulls listing carries neither reviewDecision
+# nor statusCheckRollup nor additions/deletions, and gh pr list --json sends
+# a GraphQL query of its own for the same reason.
+#
+# orderBy is the same one gh pr list asks for. Nothing between here and the
+# screen reorders the list, so a different order here is a different screen.
+#
+# first: 100 is GraphQL's cap for one page, and the same ceiling gh was asked
+# for with --limit 100. A repository with more open pull requests loses the
+# rest, exactly as it did before.
+query ($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(
+      states: OPEN
+      first: 100
+      orderBy: { field: CREATED_AT, direction: DESC }
+    ) {
+      nodes { ...PullRequestListFields }
+    }
+  }
+}
+
+fragment PullRequestListFields on PullRequest {
+  number
+  title
+  state
+  url
+  isDraft
+  updatedAt
+  reviewDecision
+  headRefName
+  baseRefName
+  additions
+  deletions
+  author {
+    login
+  }
+  # 100 is GitHub's cap for a connection, and an item can carry any number
+  # of labels.
+  labels(first: 100) {
+    nodes { ...LabelFields }
+  }
+  commits(last: 1) {
+    nodes {
+      commit {
+        statusCheckRollup {
+          contexts(first: 100) {
+            nodes { ...CheckContext }
+          }
+        }
+      }
+    }
+  }
+}
+
+fragment LabelFields on Label {
+  name
+  color
+}
+
+# CheckRun reports status and conclusion and calls its name "name"; the older
+# StatusContext reports a single state and calls its name "context". Both
+# shapes have to be asked for.
+fragment CheckContext on StatusCheckRollupContext {
+  __typename
+  ... on CheckRun {
+    name
+    status
+    conclusion
+  }
+  ... on StatusContext {
+    context
+    state
+  }
+}

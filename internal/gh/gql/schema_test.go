@@ -54,6 +54,8 @@ var checkedDocs = map[string]string{
 	"enable_auto_merge.graphql":  enableAutoMergeMutation,
 	"disable_auto_merge.graphql": disableAutoMergeMutation,
 	"repo_counts.graphql":        buildRepoCountsQuery(2),
+	"repo_prs.graphql":           repoPRsQuery,
+	"repo_issues.graphql":        repoIssuesQuery,
 }
 
 func TestEveryFieldTheDocumentsSelectExistsInTheSchema(t *testing.T) {
