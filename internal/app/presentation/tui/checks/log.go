@@ -17,13 +17,13 @@ import (
 // one they moved to (d44b7fe, e1f8a99).
 type logMsg struct {
 	ref   domain.ItemRef
-	jobID int64
+	jobID domain.JobHandle
 	lines []domain.LogLine
 }
 
 type logErrMsg struct {
 	ref   domain.ItemRef
-	jobID int64
+	jobID domain.JobHandle
 	err   error
 }
 
@@ -40,7 +40,7 @@ const (
 // logArrived lands a log fetch's answer, dropping it if the user has since
 // left this pull request or moved the cursor to another check.
 func (m Model) logArrived(msg logMsg) Model {
-	if msg.ref != m.ref || msg.jobID != m.selectedJobID() {
+	if msg.ref != m.ref || msg.jobID != m.selectedJob() {
 		return m
 	}
 	m.log = msg.lines
@@ -52,7 +52,7 @@ func (m Model) logArrived(msg logMsg) Model {
 }
 
 func (m Model) logFailed(msg logErrMsg) Model {
-	if msg.ref != m.ref || msg.jobID != m.selectedJobID() {
+	if msg.ref != m.ref || msg.jobID != m.selectedJob() {
 		return m
 	}
 	m.logPhase = phaseIdle
@@ -105,7 +105,7 @@ func (m Model) maxHscroll() int {
 // asked for a job that may no longer be the one under it.
 func (m Model) clearLog() Model {
 	m.log = nil
-	m.logJob = 0
+	m.logJob = ""
 	m.logRow = 0
 	m.hscroll = 0
 	m.logPhase = phaseIdle
@@ -137,13 +137,13 @@ func (m Model) startLog(failedOnly bool) (Model, tea.Cmd) {
 	m.errText = ""
 	m.failedOnly = failedOnly
 	m.logPhase = phaseLoading
-	m.logJob = r.JobID
+	m.logJob = r.Job
 	m.logRow = 0
 	m.hscroll = 0
-	return m, m.fetchLog(r.JobID, failedOnly)
+	return m, m.fetchLog(r.Job, failedOnly)
 }
 
-func (m Model) fetchLog(jobID int64, failedOnly bool) tea.Cmd {
+func (m Model) fetchLog(jobID domain.JobHandle, failedOnly bool) tea.Cmd {
 	src, ref := m.src, m.ref
 	return func() tea.Msg {
 		lines, err := src.JobLog(context.Background(), ref.Repo, jobID, failedOnly)

@@ -165,11 +165,11 @@ func (f *scenarioSource) PRChecks(context.Context, string, int) (domain.Checks, 
 	return f.checks, nil
 }
 
-func (f *scenarioSource) JobLog(context.Context, string, int64, bool) ([]domain.LogLine, error) {
+func (f *scenarioSource) JobLog(context.Context, string, domain.JobHandle, bool) ([]domain.LogLine, error) {
 	return nil, nil
 }
 
-func (f *scenarioSource) RerunWorkflow(context.Context, string, int64, domain.RerunScope) error {
+func (f *scenarioSource) RerunWorkflow(context.Context, string, domain.RunHandle, domain.RerunScope) error {
 	return nil
 }
 

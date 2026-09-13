@@ -94,8 +94,8 @@ type reviewer interface {
 
 type checksFetcher interface {
 	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
+	JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error
 }
 
 type merger interface {
@@ -280,12 +280,12 @@ func (u *Usecase) PRChecks(ctx context.Context, repo string, number int) (domain
 	return u.checks.PRChecks(ctx, repo, number)
 }
 
-func (u *Usecase) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
-	return u.checks.JobLog(ctx, repo, jobID, failedOnly)
+func (u *Usecase) JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error) {
+	return u.checks.JobLog(ctx, repo, job, failedOnly)
 }
 
-func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
-	return u.checks.RerunWorkflow(ctx, repo, runID, scope)
+func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error {
+	return u.checks.RerunWorkflow(ctx, repo, run, scope)
 }
 
 func (u *Usecase) PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error) {

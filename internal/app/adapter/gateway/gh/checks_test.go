@@ -70,8 +70,8 @@ func TestToCheckRunTranslatesACheckRun(t *testing.T) {
 		Kind:        domain.CheckKindRun,
 		Workflow:    "CI",
 		RunNumber:   88,
-		JobID:       101635448466,
-		RunID:       34087925535,
+		Job:         domain.JobHandle("101635448466"),
+		WorkflowRun: domain.RunHandle("34087925535"),
 		URL:         "https://github.com/kukv/octoscope/actions/runs/34087925535/job/101635448466",
 		StartedAt:   startedAt,
 		CompletedAt: completedAt,
@@ -83,7 +83,7 @@ func TestToCheckRunTranslatesACheckRun(t *testing.T) {
 
 // TestToCheckRunTranslatesAStatusContext covers the fields a CheckRun-shaped
 // fixture cannot: Context, State, TargetURL and CreatedAt. Workflow,
-// RunNumber, JobID, RunID and CompletedAt stay zero: a StatusContext has no
+// RunNumber, Job, WorkflowRun and CompletedAt stay zero: a StatusContext has no
 // job, no run and no completion time of its own.
 func TestToCheckRunTranslatesAStatusContext(t *testing.T) {
 	t.Parallel()
@@ -256,13 +256,53 @@ func TestJobLogTranslatesEveryLine(t *testing.T) {
 		return []github.LogLine{{Step: "Run tests", Time: at, Text: "ok"}}, nil
 	}})
 
-	got, err := g.JobLog(context.Background(), "kukv/octoscope", 42, false)
+	got, err := g.JobLog(context.Background(), "kukv/octoscope", "42", false)
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
 	}
 	want := []domain.LogLine{{Step: "Run tests", Time: at, Text: "ok"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("JobLog() = %+v, want %+v", got, want)
+	}
+}
+
+// TestJobLogRejectsAHandleThatIsNotAnActionsID guards the parse: a handle
+// that did not come out of this gateway must not reach the backend as if it
+// were a valid Actions job id.
+func TestJobLogRejectsAHandleThatIsNotAnActionsID(t *testing.T) {
+	t.Parallel()
+
+	g := New(fakeChecksFetcher{})
+	if _, err := g.JobLog(context.Background(), "kukv/octoscope", domain.JobHandle("nope"), false); err == nil {
+		t.Fatal("JobLog accepted a non-numeric handle")
+	}
+}
+
+// TestPRChecksCarriesTheJobAndRunHandlesApart guards against the job and run
+// handles being swapped or merged: they come from different DatabaseID
+// fields of the same node.
+func TestPRChecksCarriesTheJobAndRunHandlesApart(t *testing.T) {
+	t.Parallel()
+
+	n := gql.CheckRun{
+		CheckContext: gql.CheckContext{Typename: "CheckRun", Name: "lint", Status: "COMPLETED", Conclusion: "SUCCESS"},
+		DatabaseID:   11,
+	}
+	n.CheckSuite.WorkflowRun = &gql.WorkflowRun{DatabaseID: 22}
+
+	g := New(fakeChecksFetcher{prChecks: func(context.Context, string, int) ([]gql.CheckRun, error) {
+		return []gql.CheckRun{n}, nil
+	}})
+
+	c, err := g.PRChecks(context.Background(), "kukv/octoscope", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Runs[0].Job != domain.JobHandle("11") {
+		t.Errorf("Job = %q, want %q", c.Runs[0].Job, "11")
+	}
+	if c.Runs[0].WorkflowRun != domain.RunHandle("22") {
+		t.Errorf("WorkflowRun = %q, want %q", c.Runs[0].WorkflowRun, "22")
 	}
 }
 
@@ -297,7 +337,7 @@ func TestRerunWorkflowPassesTheConvertedScope(t *testing.T) {
 		return nil
 	}})
 
-	if err := g.RerunWorkflow(context.Background(), "kukv/octoscope", 34087925535, domain.RerunAll); err != nil {
+	if err := g.RerunWorkflow(context.Background(), "kukv/octoscope", "34087925535", domain.RerunAll); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
 	if got != github.RerunAll {

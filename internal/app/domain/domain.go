@@ -137,10 +137,10 @@ type CheckRun struct {
 	// A StatusContext belongs to none.
 	Workflow  string
 	RunNumber int
-	// JobID addresses the job's log, RunID the run to rerun. Both are zero
-	// for a StatusContext, which has neither.
-	JobID int64
-	RunID int64
+	// Job addresses the job's log, WorkflowRun the run to rerun. Both are
+	// empty for a StatusContext, which has neither.
+	Job         JobHandle
+	WorkflowRun RunHandle
 	// URL is where the check reports itself: detailsUrl for a check run,
 	// targetUrl for a StatusContext.
 	URL         string

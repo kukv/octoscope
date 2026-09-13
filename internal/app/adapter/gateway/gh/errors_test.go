@@ -155,8 +155,8 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		call func() error
 	}{
 		{"PRChecks", func() error { _, err := g.PRChecks(context.Background(), "kukv/octoscope", 1); return err }},
-		{"JobLog", func() error { _, err := g.JobLog(context.Background(), "kukv/octoscope", 1, false); return err }},
-		{"RerunWorkflow", func() error { return g.RerunWorkflow(context.Background(), "kukv/octoscope", 1, domain.RerunAll) }},
+		{"JobLog", func() error { _, err := g.JobLog(context.Background(), "kukv/octoscope", "1", false); return err }},
+		{"RerunWorkflow", func() error { return g.RerunWorkflow(context.Background(), "kukv/octoscope", "1", domain.RerunAll) }},
 		{"GetPR", func() error { _, err := g.GetPR(context.Background(), "kukv/octoscope", 1); return err }},
 		{"GetIssue", func() error { _, err := g.GetIssue(context.Background(), "kukv/octoscope", 1); return err }},
 		{"ListPRs", func() error { _, err := g.ListPRs(context.Background(), "kukv/octoscope"); return err }},

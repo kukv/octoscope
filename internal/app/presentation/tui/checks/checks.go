@@ -18,8 +18,8 @@ import (
 // string targets the workspace repository.
 type Source interface {
 	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
+	JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error
 }
 
 // ClosedMsg tells the parent the user left the checks view.
@@ -67,13 +67,13 @@ type Model struct {
 
 	mode mode
 
-	// rerunPhase, rerunScope, rerunRunID and rerunWorkflow are the rerun
+	// rerunPhase, rerunScope, rerunRun and rerunWorkflow are the rerun
 	// popup's own state: which run it targets (captured at R-press time,
 	// see startRerun), which scope is picked, and whether a send is in
 	// flight.
 	rerunPhase    rerunPhase
 	rerunScope    domain.RerunScope
-	rerunRunID    int64
+	rerunRun      domain.RunHandle
 	rerunWorkflow string
 
 	// log is the lines of the currently open job, failed steps only unless
@@ -81,7 +81,7 @@ type Model struct {
 	// belongs to (or is being fetched for); an answer is kept only while the
 	// cursor is still on the job it was asked for.
 	log        []domain.LogLine
-	logJob     int64
+	logJob     domain.JobHandle
 	logRow     int
 	hscroll    int
 	failedOnly bool
@@ -226,13 +226,13 @@ func (m Model) moveRow(delta int) Model {
 	return m.follow()
 }
 
-// selectedJobID is the job id of the check under the cursor, 0 if the
+// selectedJob is the job handle of the check under the cursor, empty if the
 // cursor is on nothing (the list is empty or has not arrived yet).
-func (m Model) selectedJobID() int64 {
+func (m Model) selectedJob() domain.JobHandle {
 	if m.row < 0 || m.row >= len(m.order) {
-		return 0
+		return ""
 	}
-	return m.order[m.row].JobID
+	return m.order[m.row].Job
 }
 
 // openSelected opens the selected check's own page: detailsUrl for a check
@@ -327,9 +327,9 @@ func arrange(runs []domain.CheckRun) []domain.CheckRun {
 // hasWorkflow reports whether a check has a workflow run behind it to be
 // grouped under. A StatusContext never does, and neither does a check run an
 // App created: GitHub reports those with a null checkSuite.workflowRun,
-// leaving RunID zero and the workflow's name empty.
+// leaving WorkflowRun empty and the workflow's name empty.
 func hasWorkflow(r domain.CheckRun) bool {
-	return r.Kind == domain.CheckKindRun && r.RunID != 0
+	return r.Kind == domain.CheckKindRun && r.WorkflowRun != ""
 }
 
 func rank(s domain.CheckState) int {

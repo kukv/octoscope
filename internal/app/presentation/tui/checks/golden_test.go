@@ -82,18 +82,18 @@ func mixed() domain.Checks {
 	return domain.Checks{
 		Total: 9, Passed: 7, Failed: 1, Running: 1, State: domain.CheckFailure,
 		Runs: []domain.CheckRun{
-			ran(domain.CheckRun{Name: "build", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 1, RunID: 10}, 3*time.Minute+7*time.Second),
-			ran(domain.CheckRun{Name: "lint", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 2, RunID: 10}, 62*time.Second),
-			ran(domain.CheckRun{Name: "test", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 3, RunID: 10}, 2*time.Minute+14*time.Second),
-			ran(domain.CheckRun{Name: "sca", State: domain.CheckFailure, Workflow: "security", RunNumber: 116, JobID: 4, RunID: 20}, 48*time.Second),
-			ran(domain.CheckRun{Name: "audit", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 5, RunID: 20}, 31*time.Second),
-			ran(domain.CheckRun{Name: "secrets", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 6, RunID: 20}, 9*time.Second),
-			ran(domain.CheckRun{Name: "deps", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 7, RunID: 20}, 12*time.Second),
+			ran(domain.CheckRun{Name: "build", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, Job: domain.JobHandle("1"), WorkflowRun: domain.RunHandle("10")}, 3*time.Minute+7*time.Second),
+			ran(domain.CheckRun{Name: "lint", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, Job: domain.JobHandle("2"), WorkflowRun: domain.RunHandle("10")}, 62*time.Second),
+			ran(domain.CheckRun{Name: "test", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, Job: domain.JobHandle("3"), WorkflowRun: domain.RunHandle("10")}, 2*time.Minute+14*time.Second),
+			ran(domain.CheckRun{Name: "sca", State: domain.CheckFailure, Workflow: "security", RunNumber: 116, Job: domain.JobHandle("4"), WorkflowRun: domain.RunHandle("20")}, 48*time.Second),
+			ran(domain.CheckRun{Name: "audit", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, Job: domain.JobHandle("5"), WorkflowRun: domain.RunHandle("20")}, 31*time.Second),
+			ran(domain.CheckRun{Name: "secrets", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, Job: domain.JobHandle("6"), WorkflowRun: domain.RunHandle("20")}, 9*time.Second),
+			ran(domain.CheckRun{Name: "deps", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, Job: domain.JobHandle("7"), WorkflowRun: domain.RunHandle("20")}, 12*time.Second),
 			// An App's own check run: no workflow, no run id, so it joins the
 			// "Other" group and has nothing for R to rerun.
 			{
 				Name: "codecov/patch", State: domain.CheckSuccess, Kind: domain.CheckKindRun,
-				JobID: 8, URL: "https://codecov.example/1",
+				Job: domain.JobHandle("8"), URL: "https://codecov.example/1",
 				StartedAt: start, CompletedAt: start.Add(6 * time.Second),
 			},
 			{Name: "ci/circleci", State: domain.CheckRunning, Kind: domain.CheckKindStatus, URL: "https://circleci.example/1"},
