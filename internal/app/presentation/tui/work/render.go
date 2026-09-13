@@ -21,12 +21,17 @@ const (
 	// side of it.
 	columnGap = 3
 
-	// drawerMinColumns is also cardBoxMinColumns: under a hundred columns a
-	// column is about seventeen wide, and a card's own box would eat two of
-	// them and leave the title with almost nothing. Both the drawer and the
-	// boxes go at the same width, so there is one number to remember.
-	drawerMinColumns  = 100
-	singleColumnBelow = 60
+	// twoColumnsBelow and singleColumnBelow are where the board gives up a
+	// column. A card's head line — the marker, "owner/name" and the number —
+	// wants about twenty columns, and four columns leave a card (W-9)/4-4
+	// wide: eighteen at a hundred, twenty-three at a hundred and twenty.
+	twoColumnsBelow   = 120
+	singleColumnBelow = 80
+
+	// drawerMinColumns is the drawer's own threshold rather than the column
+	// count's: it is two panes side by side, and a hundred columns leaves
+	// them fifty-eight and thirty-nine.
+	drawerMinColumns = 100
 
 	// footerHeight is the blank line and the key bar under the board.
 	footerHeight = 2
@@ -36,9 +41,9 @@ const (
 	// changed height would move the key bar under the user's eyes.
 	drawerHeight = 6
 
-	// gutter is the column the cursor marker lives in on an unboxed card.
-	// Unselected cards keep it blank rather than closing it up, so card text
-	// does not jump sideways as the cursor moves.
+	// gutter indents what is drawn outside a card — the heading, the spinner,
+	// the empty-column note — by as much as a card's own border and padding,
+	// so a column reads as one edge rather than two.
 	gutter = "  "
 )
 
@@ -105,18 +110,15 @@ func (m Model) keyBar() string {
 
 func (m Model) drawerShown() bool { return m.width >= drawerMinColumns }
 
-// boxed reports whether cards are drawn in their own box. See
-// drawerMinColumns for why the two share a threshold.
-func (m Model) boxed() bool { return m.width >= drawerMinColumns }
+// titleLines is fixed rather than fitted to the title. visibleCards,
+// cardWindow and the mouse hit-test all divide by the card height, so a card
+// that shrank with a short title would put them out by however many short
+// titles sat above the pointer.
+const titleLines = 2
 
-// cardHeight is how many lines one card occupies: a box adds its two borders
-// to the title and meta lines inside it.
-func (m Model) cardHeight() int {
-	if m.boxed() {
-		return 4
-	}
-	return 2
-}
+// cardHeight is how many lines one card occupies: the head line, the title,
+// the meta line under it, and the box's two borders.
+func cardHeight() int { return titleLines + 4 }
 
 // boardHeight is what is left for the columns once everything drawn below
 // them has been paid for. The whole screen has to fit: a board that grew with
@@ -132,7 +134,7 @@ func (m Model) boardHeight() int {
 	if m.hasNotice() {
 		h--
 	}
-	return max(h, headingHeight+m.cardHeight())
+	return max(h, headingHeight+cardHeight())
 }
 
 // boardTop is the line the board starts on. Paging between single columns
@@ -239,7 +241,7 @@ func (m Model) heading(s domain.WorkSection, n, w int) string {
 
 // visibleCards is how many whole cards fit under a heading.
 func (m Model) visibleCards(height int) int {
-	return max((height-headingHeight)/m.cardHeight(), 1)
+	return max((height-headingHeight)/cardHeight(), 1)
 }
 
 // cardWindow is the first card a column draws. Only the column the cursor is
@@ -256,61 +258,72 @@ func (m Model) cardWindow(s domain.WorkSection, height int) int {
 	return m.row - visible + 1
 }
 
-// card draws one card: what it is on the first line, where it lives and how
-// it is doing on the second. Wide enough, each card gets a box of its own and
-// the selection is the box's colour; narrow, the box is dropped and the cursor
-// gutter marks the selection instead.
+// card draws one card in a box of its own: where it lives on the first line,
+// its title on the next two, how it is doing on the last. The selection is
+// the box's colour and background.
 func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
-	if !m.boxed() {
-		return []string{
-			fit(m.cardTitle(it, w-len(gutter), selected, gutter), w),
-			fit(gutter+m.cardMeta(it, at, w-len(gutter)), w),
-		}
-	}
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
-	body := m.cardTitle(it, inner, selected, "") + "\n" + m.cardMeta(it, at, inner)
-	return strings.Split(theme.Card(selected).Width(w).Render(body), "\n")
+	body := append([]string{cardHead(it, inner)}, cardTitle(it, inner, selected)...)
+	body = append(body, m.cardMeta(it, at, inner))
+	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
 
-// cardTitle is the state marker, the number and the title. The pieces are
-// styled one at a time rather than as a whole line: a style applied over a
-// coloured marker would end at that marker's own reset.
-func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) string {
-	if selected && marker != "" {
-		marker = theme.Cursor().Render("▸ ")
-	}
-	head := marker + stateMarker(it) + " " + fmt.Sprintf("#%d ", it.Ref.Number)
-	title := clip(it.Title, max(w-ansi.StringWidth(head), 0))
+// cardHead is the first line: what state the item is in, which repository it
+// came from and which number it is there. The repository is clipped before
+// the number is — the number is what identifies the card, and half a number
+// identifies nothing.
+//
+// The pieces are styled one at a time rather than as a whole line: a style
+// applied over a coloured marker would end at that marker's own reset.
+func cardHead(it domain.WorkItem, w int) string {
+	head := stateMarker(it) + " "
+	number := fmt.Sprintf(" #%d", it.Ref.Number)
+	repo := clip(it.Ref.Repo, max(w-ansi.StringWidth(head)-ansi.StringWidth(number), 0))
+	return head + theme.Dim().Render(repo) + number
+}
+
+// cardTitle is the title alone, over titleLines lines.
+func cardTitle(it domain.WorkItem, w int, selected bool) []string {
+	first, second := wrapTitle(it.Title, max(w, 0))
 	if selected {
-		title = theme.Cursor().Render(title)
+		first, second = theme.Cursor().Render(first), theme.Cursor().Render(second)
 	}
-	return head + title
+	return []string{first, second}
 }
 
-// cardMeta is the second line: where the item lives, how its checks are
-// doing, and how long it has sat there. The repository is named without its
-// owner — a column is too narrow for "owner/name", and the drawer gives the
-// full reference.
+// wrapTitle folds a title over two lines of w columns each.
+//
+// The second line is cut from the title itself rather than joined back up out
+// of the lines ansi.Wrap returned. A Japanese title has no spaces to break on
+// and comes back broken by column, and joining those pieces would put spaces
+// in the title that the author never wrote.
+func wrapTitle(title string, w int) (string, string) {
+	head := strings.Split(ansi.Wrap(title, max(w, 1), ""), "\n")[0]
+	return head, clip(strings.TrimSpace(strings.TrimPrefix(title, head)), w)
+}
+
+// cardMeta is the last line: how the item's checks are doing, how long it has
+// sat there, and what it is labelled. Where it lives is on the head line.
 func (m Model) cardMeta(it domain.WorkItem, at time.Time, w int) string {
-	parts := []string{theme.Dim().Render(shortRepo(it.Ref.Repo))}
+	var parts []string
 	if bar := checksBar(it.Checks); bar != "" {
 		parts = append(parts, bar)
 	} else if word := reviewWord(it); word != "" {
 		parts = append(parts, word)
 	}
-	age := theme.Dim().Render(i18n.RelTime(at, it.UpdatedAt))
+	parts = append(parts, theme.Dim().Render(i18n.RelTime(at, it.UpdatedAt)))
 
 	// Labels are offered whatever the rest of the line has not already spent,
 	// so a badge is either drawn whole or left out. Measuring against the
 	// whole width would let the clip below cut one in half, which reads as a
 	// coloured smear rather than a label.
-	spent := ansi.StringWidth(strings.Join(parts, " ")) + 1 + ansi.StringWidth(age) + 1
+	spent := ansi.StringWidth(strings.Join(parts, " ")) + 1
 	if b := badges(it.Labels, w-spent); b != "" {
 		parts = append(parts, strings.TrimSpace(b))
 	}
-	return clip(strings.Join(append(parts, age), " "), w)
+	return clip(strings.Join(parts, " "), w)
 }
 
 // reviewWord is what a pull request with no checks says instead of a bar.
@@ -332,14 +345,6 @@ func reviewWord(it domain.WorkItem) string {
 	}
 }
 
-// shortRepo drops the owner from "owner/name".
-func shortRepo(repo string) string {
-	if _, name, ok := strings.Cut(repo, "/"); ok {
-		return name
-	}
-	return repo
-}
-
 // badges draws the labels that fit in room columns, in the colours GitHub
 // gave them. A label that would be cut in half is left out altogether rather
 // than shown as a coloured fragment.
@@ -359,7 +364,7 @@ func badges(labels []domain.Label, room int) string {
 
 func stateMarker(it domain.WorkItem) string {
 	if it.Ref.Kind == domain.ItemIssue {
-		return theme.Dim().Render(icon.Issue())
+		return theme.Issue().Render(icon.Issue())
 	}
 	return theme.Review(it.Review, it.IsDraft).Render(icon.Review(it.Review, it.IsDraft))
 }
@@ -374,13 +379,27 @@ func checksBar(c domain.Checks) string {
 	return theme.Check(c.State).Render(done) + theme.Dim().Render(rest)
 }
 
-// visibleSections is the width degradation: too narrow for four columns and
-// the board shows the current one alone, with h/l paging between them.
-func (m Model) visibleSections() []domain.WorkSection {
-	if m.width < singleColumnBelow {
-		return []domain.WorkSection{m.section()}
+// columnsFor is the width degradation: how many columns the board puts side
+// by side. The four sections divide by four, two and one, so each tier pages
+// by whole pages; three columns would leave a page with one column in it.
+func (m Model) columnsFor() int {
+	switch {
+	case m.width < singleColumnBelow:
+		return 1
+	case m.width < twoColumnsBelow:
+		return 2
+	default:
+		return m.columns()
 	}
-	return domain.WorkSections()
+}
+
+// visibleSections is the page of columns on screen: the one the cursor's
+// column falls in. h/l move the cursor, and the page follows it.
+func (m Model) visibleSections() []domain.WorkSection {
+	n := m.columnsFor()
+	all := domain.WorkSections()
+	page := m.col / n
+	return all[page*n : min((page+1)*n, len(all))]
 }
 
 func (m Model) columnWidth(n int) int {

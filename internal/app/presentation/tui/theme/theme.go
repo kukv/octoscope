@@ -134,12 +134,21 @@ func Review(s domain.ReviewState, draft bool) lipgloss.Style {
 		return success()
 	case domain.ReviewChangesRequested:
 		return danger()
-	case domain.ReviewRequired:
-		return attention()
 	default:
-		return muted()
+		// ReviewNone and ReviewRequired both mean nobody has reviewed it yet:
+		// GitHub reports no decision for a repository that requires none, and
+		// "required" for one that does. The difference is the repository's
+		// settings, not anything the user can act on differently.
+		return attention()
 	}
 }
+
+// Issue styles the marker for an issue. GitHub draws an open issue green, and
+// every issue the views list is open. It is kept apart from the review and
+// check colours it happens to share a green with: "this is an issue" and
+// "this passed" are different things to say, and one must not follow the
+// other when a palette changes.
+func Issue() lipgloss.Style { return success() }
 
 // Check styles the marker for a rolled-up check state.
 func Check(s domain.CheckState) lipgloss.Style {

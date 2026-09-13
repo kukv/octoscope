@@ -58,6 +58,43 @@ func TestEachReviewStateHasItsOwnColour(t *testing.T) {
 	}
 }
 
+// TestNothingReviewedYetStandsOut covers the two states that both draw the
+// pending marker. GitHub reports no decision at all for a repository with no
+// required review, and "review required" for one that has it; to whoever is
+// looking at the board they are the same thing — nobody has looked yet — and
+// the colour has to say so rather than leaving one of them as quiet as a
+// draft.
+func TestNothingReviewedYetStandsOut(t *testing.T) {
+	dark(t)
+
+	none := theme.Review(domain.ReviewNone, false).Render("x")
+	if none == theme.Dim().Render("x") {
+		t.Error("a pull request nobody has reviewed is as quiet as the text around it")
+	}
+	if want := theme.Review(domain.ReviewRequired, false).Render("x"); none != want {
+		t.Errorf("the two unreviewed states are coloured apart: %q and %q", none, want)
+	}
+	// A draft is waiting on its author, not on a reviewer, and stays quiet.
+	if theme.Review(domain.ReviewNone, true).Render("x") != theme.Dim().Render("x") {
+		t.Error("a draft is coloured as though it were waiting on a reviewer")
+	}
+}
+
+// TestAnIssueIsGreen covers the marker an issue carries. GitHub draws an open
+// issue green, and the board has no other way to say that a card is an issue
+// at all once its marker is as quiet as the text around it.
+func TestAnIssueIsGreen(t *testing.T) {
+	dark(t)
+
+	issue := theme.Issue().Render("x")
+	if issue == theme.Dim().Render("x") {
+		t.Error("an issue is drawn as quietly as the text around it")
+	}
+	if want := theme.Review(domain.ReviewApproved, false).Render("x"); issue != want {
+		t.Errorf("an issue is %q, want the same green as approved, %q", issue, want)
+	}
+}
+
 func TestEachCheckStateHasItsOwnColour(t *testing.T) {
 	dark(t)
 

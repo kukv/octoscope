@@ -206,7 +206,7 @@ func (m Model) row(i int) string {
 		age = i18n.RelTime(m.fetchedAt[tabPRs], pr.UpdatedAt)
 	} else {
 		issue := m.issues[i]
-		state = theme.Dim().Render(icon.Issue())
+		state = theme.Issue().Render(icon.Issue())
 		number, title, labels = "#"+strconv.Itoa(issue.Number), issue.Title, issue.Labels
 		age = i18n.RelTime(m.fetchedAt[tabIssues], issue.UpdatedAt)
 	}

@@ -56,9 +56,12 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 }
 
 // columnAt maps a display column onto a board column, as an index into
-// WorkSections. ok is false in the gap between two columns, past the last
-// one, and — while the board is paged one column at a time — outside the one
-// column on screen.
+// WorkSections. ok is false in the gap between two columns and past the last
+// one drawn.
+//
+// A narrow board draws one page of columns rather than all four, so the
+// position on screen is not the column's own number: the page it belongs to
+// has to be added back.
 func (m Model) columnAt(x int) (int, bool) {
 	sections := m.visibleSections()
 	w := m.columnWidth(len(sections))
@@ -69,10 +72,8 @@ func (m Model) columnAt(x int) (int, bool) {
 	if i >= len(sections) || x%(w+columnGap) >= w {
 		return 0, false
 	}
-	if len(sections) < m.columns() {
-		return m.col, true // only the current column is drawn
-	}
-	return i, true
+	page := m.col / len(sections)
+	return page*len(sections) + i, true
 }
 
 // cardAt maps a point onto the card under it. ok is false over a heading, the
@@ -91,7 +92,7 @@ func (m Model) cardAt(x, y int) (col, row int, ok bool) {
 		return 0, 0, false
 	}
 	section := domain.WorkSections()[col]
-	row = m.cardWindow(section, height) + y/m.cardHeight()
+	row = m.cardWindow(section, height) + y/cardHeight()
 	if row >= len(m.work[section]) {
 		return 0, 0, false
 	}
