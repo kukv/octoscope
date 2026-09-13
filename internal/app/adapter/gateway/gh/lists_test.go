@@ -2,8 +2,10 @@ package gh
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -75,7 +77,11 @@ func TestListLabelsTranslatesEveryLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListLabels: %v", err)
 	}
-	if len(labels) != 2 || labels[0].Name != "bug" || labels[0].Color != "d73a4a" || labels[1].Name != "wip" {
-		t.Errorf("labels = %+v, want bug/d73a4a and wip", labels)
+	want := []domain.Label{
+		{Name: "bug", Color: "d73a4a"},
+		{Name: "wip", Color: "ededed"},
+	}
+	if !reflect.DeepEqual(labels, want) {
+		t.Errorf("ListLabels() = %+v, want %+v", labels, want)
 	}
 }
