@@ -66,6 +66,12 @@ ASCII セットは draft と Issue がどちらも `o` で衝突しているの�
 この計画は「Issue が一目で分かること」を目的にしているので、衝突はその範囲に入る。
 Nerd Font セットは専用のグリフを持っているのでそのまま。
 
+**Issue の記号は緑。** GitHub 自身が open な Issue を緑で描く。色は `theme.Issue()` に
+足す（追記 2026-09-14）。今は 3 つのビューがそれぞれ `theme.Dim().Render(icon.Issue())` と
+書いており、`theme` に役割の名前が無い。緑そのものは `success()` と同じだが、
+「checks が通った」と「Issue が open である」は別の役割なので関数を分ける。
+分けておかないと、片方の色を変えたときにもう片方が黙って道連れになる。
+
 **メタ行の並びは CI バー → 経過時間 → ラベル。** 今はリポジトリ名 → バー → ラベル →
 経過時間だった。リポジトリ名が 1 行目へ移り、経過時間が前に出る。
 
@@ -123,6 +129,22 @@ Nerd Font セットは専用のグリフを持っているのでそのまま。
 **Verify:** Repos タブ・Search タブの一覧も同じ `theme.Review` を引いているので、
 そちらの golden にも同じ色の変化が出る。差分を目で見て、変わっているのが
 未レビューの記号だけであることを確かめる
+
+## Task 2b: Issue の色（追記 2026-09-14）
+
+**Files:** `theme/theme.go`, `theme/theme_test.go`,
+`work/render.go`, `repo/render.go`, `search/render.go`
+
+**Steps:**
+
+- [ ] `theme_test.go` に、`Issue()` が `Dim()` と違うこと、かつ approved と
+      同じ緑であることのテストを書く
+- [ ] `theme.Issue()` を足す
+- [ ] 3 つのビューの `theme.Dim().Render(icon.Issue())` を
+      `theme.Issue().Render(icon.Issue())` に差し替える
+- [ ] `make check`
+
+**Verify:** `grep -rn 'theme.Dim().Render(icon.Issue())' internal/` が 0 件
 
 ## Task 3: カードを 4 行にする
 

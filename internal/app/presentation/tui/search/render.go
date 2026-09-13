@@ -359,7 +359,7 @@ func (m Model) resultWindow(rows int) int {
 func (m Model) resultRow(i int, width int) string {
 	item := m.items[i]
 
-	state := theme.Dim().Render(icon.Issue())
+	state := theme.Issue().Render(icon.Issue())
 	if item.Ref.Kind == domain.ItemPR {
 		state = theme.Review(item.Review, item.IsDraft).Render(icon.Review(item.Review, item.IsDraft))
 	}

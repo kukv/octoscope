@@ -143,6 +143,13 @@ func Review(s domain.ReviewState, draft bool) lipgloss.Style {
 	}
 }
 
+// Issue styles the marker for an issue. GitHub draws an open issue green, and
+// every issue the views list is open. It is kept apart from the review and
+// check colours it happens to share a green with: "this is an issue" and
+// "this passed" are different things to say, and one must not follow the
+// other when a palette changes.
+func Issue() lipgloss.Style { return success() }
+
 // Check styles the marker for a rolled-up check state.
 func Check(s domain.CheckState) lipgloss.Style {
 	switch s {

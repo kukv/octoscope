@@ -80,6 +80,21 @@ func TestNothingReviewedYetStandsOut(t *testing.T) {
 	}
 }
 
+// TestAnIssueIsGreen covers the marker an issue carries. GitHub draws an open
+// issue green, and the board has no other way to say that a card is an issue
+// at all once its marker is as quiet as the text around it.
+func TestAnIssueIsGreen(t *testing.T) {
+	dark(t)
+
+	issue := theme.Issue().Render("x")
+	if issue == theme.Dim().Render("x") {
+		t.Error("an issue is drawn as quietly as the text around it")
+	}
+	if want := theme.Review(domain.ReviewApproved, false).Render("x"); issue != want {
+		t.Errorf("an issue is %q, want the same green as approved, %q", issue, want)
+	}
+}
+
 func TestEachCheckStateHasItsOwnColour(t *testing.T) {
 	dark(t)
 
