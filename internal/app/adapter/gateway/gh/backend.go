@@ -11,6 +11,7 @@ import (
 	"context"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -61,8 +62,8 @@ type crossRepoLister interface {
 // repoFinder is what the add dialog offers: candidates while it is typed
 // into, and the repositories a first run can be seeded from.
 type repoFinder interface {
-	SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error)
-	ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error)
+	SearchRepos(ctx context.Context, query string, limit int) ([]github.Repository, error)
+	ListOwnRepos(ctx context.Context, owner string, limit int) ([]github.Repository, error)
 	ListOrgs(ctx context.Context) ([]string, error)
 }
 
