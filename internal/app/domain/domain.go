@@ -278,6 +278,14 @@ type RepoCandidate struct {
 	Private bool
 }
 
+// SavedQuery is one of the Search tab's saved queries: what the user called
+// it, and the search it stands for. The query is the service's own search
+// syntax, which is why it is a string and not a parsed structure.
+type SavedQuery struct {
+	Name  string
+	Query string
+}
+
 // classified is what gh said, kept apart from the sentinel that names what
 // kind of failure it is. errors.Is finds the sentinel through Unwrap, while
 // Error is gh's own text and nothing else: wrapping with fmt.Errorf would put
