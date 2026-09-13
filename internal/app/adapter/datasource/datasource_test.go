@@ -118,3 +118,97 @@ func TestAStoreWithNoPathReportsItRatherThanSavingNothing(t *testing.T) {
 		t.Error("SaveQueries() with no path returned no error")
 	}
 }
+
+// TestSaveRepositoriesKeepsTheOtherSettings is the whole reason SaveRepositories
+// reads before it writes: the sidebar knows only the repository list, and
+// writing a Config built from that alone would drop everything else in the
+// file.
+func TestSaveRepositoriesKeepsTheOtherSettings(t *testing.T) {
+	path := write(t, "language: ja\nicons: nerd\ndefault_tab: repos\n")
+	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/octoscope"}); err != nil {
+		t.Fatalf("SaveRepositories: %v", err)
+	}
+	got, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.Language != "ja" || got.Icons != "nerd" || got.DefaultTab != "repos" {
+		t.Errorf("save dropped the other settings: %+v", got)
+	}
+	if len(got.Repositories) != 1 || got.Repositories[0] != "kukv/octoscope" {
+		t.Errorf("Repositories = %v, want [kukv/octoscope]", got.Repositories)
+	}
+}
+
+// TestSaveRepositoriesRefusesAFileItCannotParse guards the worst outcome
+// this feature can have: one keypress flattening a settings file whose YAML
+// the user is in the middle of hand-editing.
+func TestSaveRepositoriesRefusesAFileItCannotParse(t *testing.T) {
+	const broken = "language: [ja\n"
+	path := write(t, broken)
+	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/octoscope"}); err == nil {
+		t.Fatal("SaveRepositories overwrote a file it could not parse")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != broken {
+		t.Errorf("file = %q, want it untouched %q", raw, broken)
+	}
+}
+
+// TestSaveQueriesRefusesAFileItCannotParse is SaveRepositories' guard above,
+// for the other write path.
+func TestSaveQueriesRefusesAFileItCannotParse(t *testing.T) {
+	const broken = "language: [ja\n"
+	path := write(t, broken)
+	if err := datasource.NewStore(path).SaveQueries(nil); err == nil {
+		t.Fatal("SaveQueries overwrote a file it could not parse")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != broken {
+		t.Errorf("file = %q, want it untouched %q", raw, broken)
+	}
+}
+
+// TestSaveRepositoriesCreatesTheFileAndItsDirectory covers the first run:
+// nothing under the OS config directory exists yet.
+func TestSaveRepositoriesCreatesTheFileAndItsDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "octoscope", "config.yaml")
+	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/koto"}); err != nil {
+		t.Fatalf("SaveRepositories: %v", err)
+	}
+	got, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(got.Repositories) != 1 || got.Repositories[0] != "kukv/koto" {
+		t.Errorf("Repositories = %v, want [kukv/koto]", got.Repositories)
+	}
+}
+
+// TestSaveRepositoriesLeavesNoTempBehind is what temp+rename is for: a
+// half-written file must never be the one Load reads, and a successful save
+// must not litter the config directory either.
+func TestSaveRepositoriesLeavesNoTempBehind(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/koto"}); err != nil {
+		t.Fatalf("SaveRepositories: %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "config.yaml" {
+		names := make([]string, len(entries))
+		for i, e := range entries {
+			names[i] = e.Name()
+		}
+		t.Errorf("directory holds %v, want only config.yaml", names)
+	}
+}

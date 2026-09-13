@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/usecase"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // upsert must not write into the caller's backing array: handleNameKey hands
@@ -15,8 +15,8 @@ import (
 func TestUpsertDoesNotMutateTheCallersSlice(t *testing.T) {
 	t.Parallel()
 
-	orig := []usecase.SavedQuery{{Name: "mine", Query: "is:open"}}
-	got := upsert(orig, usecase.SavedQuery{Name: "mine", Query: "is:closed"})
+	orig := []domain.SavedQuery{{Name: "mine", Query: "is:open"}}
+	got := upsert(orig, domain.SavedQuery{Name: "mine", Query: "is:closed"})
 
 	if orig[0].Query != "is:open" {
 		t.Errorf("upsert mutated the caller's slice: %+v", orig)

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
@@ -448,41 +447,26 @@ func TestSearchItemsReachesTheGitHubLayer(t *testing.T) {
 }
 
 type fakeQueryStore struct {
-	saved []config.SavedQuery
+	saved []domain.SavedQuery
 	err   error
 }
 
-func (f *fakeQueryStore) SaveQueries(queries []config.SavedQuery) error {
+func (f *fakeQueryStore) SaveQueries(queries []domain.SavedQuery) error {
 	f.saved = queries
 	return f.err
 }
 
-// SaveQueries converts usecase.SavedQuery into config.SavedQuery on the way
-// to the store: internal/app/config is not visible from internal/app/presentation/tui, so the
-// UI's type cannot be the one written to disk.
-func TestSaveQueriesConvertsAndReachesTheStore(t *testing.T) {
+func TestSaveQueriesReachesTheStore(t *testing.T) {
 	t.Parallel()
 
 	store := &fakeQueryStore{}
 	u := &Usecase{queryStore: store}
-	if err := u.SaveQueries([]SavedQuery{{Name: "mine", Query: "is:open author:@me"}}); err != nil {
+	want := []domain.SavedQuery{{Name: "mine", Query: "is:open author:@me"}}
+	if err := u.SaveQueries(want); err != nil {
 		t.Fatalf("SaveQueries: %v", err)
 	}
-	want := []config.SavedQuery{{Name: "mine", Query: "is:open author:@me"}}
 	if !slices.Equal(store.saved, want) {
 		t.Errorf("store holds %+v, want %+v", store.saved, want)
-	}
-}
-
-// cmd/octoscope reads config.SavedQuery from the settings file and must
-// hand root.Options the UI's own type instead.
-func TestSavedQueriesFromConvertsForStartup(t *testing.T) {
-	t.Parallel()
-
-	got := SavedQueriesFrom([]config.SavedQuery{{Name: "mine", Query: "is:open"}})
-	want := []SavedQuery{{Name: "mine", Query: "is:open"}}
-	if !slices.Equal(got, want) {
-		t.Errorf("SavedQueriesFrom = %+v, want %+v", got, want)
 	}
 }
 

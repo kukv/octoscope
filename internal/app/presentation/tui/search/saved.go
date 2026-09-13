@@ -5,12 +5,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/app/usecase"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // queryStore is where the Search tab's saved queries survive a restart.
 type queryStore interface {
-	SaveQueries(queries []usecase.SavedQuery) error
+	SaveQueries(queries []domain.SavedQuery) error
 }
 
 // saveErrMsg carries a failure to write the saved queries to the settings
@@ -21,14 +21,14 @@ type saveErrMsg struct{ err error }
 
 // SetSavedQueries loads the Search tab's saved queries, the way root.New
 // hands the sidebar's list to the Repos tab.
-func (m Model) SetSavedQueries(qs []usecase.SavedQuery) Model {
+func (m Model) SetSavedQueries(qs []domain.SavedQuery) Model {
 	m.saved = qs
 	return m
 }
 
 // upsert replaces the entry of the same name, or appends a new one. Two rows
 // under one name is a list nobody can choose from.
-func upsert(qs []usecase.SavedQuery, q usecase.SavedQuery) []usecase.SavedQuery {
+func upsert(qs []domain.SavedQuery, q domain.SavedQuery) []domain.SavedQuery {
 	for i, existing := range qs {
 		if existing.Name == q.Name {
 			out := slices.Clone(qs)
@@ -41,7 +41,7 @@ func upsert(qs []usecase.SavedQuery, q usecase.SavedQuery) []usecase.SavedQuery 
 
 // removeSaved drops the entry at i and reports whether it was dropped, the
 // way internal/app/presentation/tui/repo/rows.go's removeRow does for the sidebar's own x.
-func removeSaved(qs []usecase.SavedQuery, i int) ([]usecase.SavedQuery, bool) {
+func removeSaved(qs []domain.SavedQuery, i int) ([]domain.SavedQuery, bool) {
 	if i < 0 || i >= len(qs) {
 		return qs, false
 	}
@@ -51,7 +51,7 @@ func removeSaved(qs []usecase.SavedQuery, i int) ([]usecase.SavedQuery, bool) {
 // saveQueries writes the saved queries as they now stand to the settings
 // file. It runs in a tea.Cmd so the write itself, and any failure, do not
 // happen inside handleNameKey (.claude/rules/errors.md).
-func saveQueries(src queryStore, qs []usecase.SavedQuery) tea.Cmd {
+func saveQueries(src queryStore, qs []domain.SavedQuery) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SaveQueries(qs); err != nil {
 			return saveErrMsg{err: err}

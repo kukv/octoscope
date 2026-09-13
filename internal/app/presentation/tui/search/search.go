@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -131,7 +130,7 @@ type Model struct {
 	notice string
 
 	// saved is the Search tab's saved queries, in the order they were saved.
-	saved []usecase.SavedQuery
+	saved []domain.SavedQuery
 	// pick is the picker's own cursor, drawn as its selected row.
 	pick int
 
@@ -567,7 +566,7 @@ func (m Model) handleNameKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if name == "" {
 			return m, nil
 		}
-		m.saved = upsert(m.saved, usecase.SavedQuery{Name: name, Query: m.query()})
+		m.saved = upsert(m.saved, domain.SavedQuery{Name: name, Query: m.query()})
 		return m, saveQueries(m.src, m.saved)
 	}
 	var cmd tea.Cmd

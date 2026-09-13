@@ -27,6 +27,8 @@ type Store struct{ path string }
 func NewStore(path string) *Store { return &Store{path: path} }
 
 // Repositories is the list the Repos tab shows, in the order it shows them.
+// An empty path reads as nothing saved, the same as a first run; only the
+// save side reports it as an error.
 func (s *Store) Repositories() ([]string, error) {
 	c, err := config.Load(s.path)
 	if err != nil {
@@ -36,7 +38,8 @@ func (s *Store) Repositories() ([]string, error) {
 }
 
 // SavedQueries is the Search tab's saved queries, in the order the user
-// saved them.
+// saved them. An empty path reads as nothing saved, the same as a first
+// run; only the save side reports it as an error.
 func (s *Store) SavedQueries() ([]domain.SavedQuery, error) {
 	c, err := config.Load(s.path)
 	if err != nil {
@@ -68,9 +71,9 @@ func (s *Store) SaveQueries(queries []domain.SavedQuery) error {
 	if err != nil {
 		return err
 	}
-	entries := make([]config.SavedQuery, len(queries))
+	entries := make([]config.SavedQueryEntry, len(queries))
 	for i, q := range queries {
-		entries[i] = config.SavedQuery{Name: q.Name, Query: q.Query}
+		entries[i] = config.SavedQueryEntry{Name: q.Name, Query: q.Query}
 	}
 	c.SavedQueries = entries
 	return s.save(c)
