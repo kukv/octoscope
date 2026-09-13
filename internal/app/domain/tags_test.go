@@ -1,10 +1,12 @@
 package domain_test
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -42,40 +44,82 @@ var exported = []any{
 // neutrality stands on. A tag here means some wire format reached in and
 // made the application's shape its own -- which is how Author, Label and
 // Comment ended up being decoded straight into before this was written.
+//
+// The walk recurses into any field whose type is (or contains, through a
+// pointer, slice or array) a struct, including anonymous ones declared
+// inline in a field. A tag on a nested field is just as much a leak as one
+// on a top-level field.
 func TestNoDomainTypeCarriesASerialisationTag(t *testing.T) {
 	t.Parallel()
 	for _, v := range exported {
 		typ := reflect.TypeOf(v)
-		for i := range typ.NumField() {
-			f := typ.Field(i)
-			if f.Tag != "" {
-				t.Errorf("%s.%s carries a struct tag %q", typ.Name(), f.Name, f.Tag)
-			}
+		walkFields(t, typ, typ.Name(), map[reflect.Type]bool{})
+	}
+}
+
+// walkFields reports every struct tag found under typ, prefixing each
+// failure with path so it names where the offending field lives (e.g.
+// "PR.Meta.ID", not just "ID"). seen guards against infinite recursion on a
+// self-referential type.
+func walkFields(t *testing.T, typ reflect.Type, path string, seen map[reflect.Type]bool) {
+	t.Helper()
+	for typ.Kind() == reflect.Pointer || typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array {
+		typ = typ.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return
+	}
+	if seen[typ] {
+		return
+	}
+	seen[typ] = true
+	for i := range typ.NumField() {
+		f := typ.Field(i)
+		fieldPath := path + "." + f.Name
+		if f.Tag != "" {
+			t.Errorf("%s carries a struct tag %q", fieldPath, f.Tag)
 		}
+		walkFields(t, f.Type, fieldPath, seen)
 	}
 }
 
 // TestTheTagListCoversEveryExportedStruct keeps the list above honest: a
 // type added to the package without being added here would go unchecked.
+//
+// It parses each non-test source file with go/parser rather than matching
+// against a regex, so a grouped declaration (type ( Foo struct {...} )) or a
+// generic one (type Foo[T any] struct {...}) is found the same as any other.
 func TestTheTagListCoversEveryExportedStruct(t *testing.T) {
 	t.Parallel()
-	decl := regexp.MustCompile(`(?m)^type ([A-Z]\w*) struct`)
 	seen := map[string]bool{}
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
+	fset := token.NewFileSet()
 	for _, e := range entries {
 		name := e.Name()
 		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		raw, err := os.ReadFile(filepath.Join(".", name))
+		file, err := parser.ParseFile(fset, filepath.Join(".", name), nil, parser.SkipObjectResolution)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, m := range decl.FindAllStringSubmatch(string(raw), -1) {
-			seen[m[1]] = true
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok || !ts.Name.IsExported() {
+					continue
+				}
+				if _, ok := ts.Type.(*ast.StructType); ok {
+					seen[ts.Name.Name] = true
+				}
+			}
 		}
 	}
 	listed := map[string]bool{}

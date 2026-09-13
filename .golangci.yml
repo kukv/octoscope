@@ -38,7 +38,7 @@ linters:
           files:
             - "**/internal/github/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/app
+            - pkg: github.com/kukv/octoscope/internal/app/
               desc: クライアントはアプリケーションを知らない。変換は gateway が行う
         # usecase は画面も翻訳も知らない。
         usecase-layer:
