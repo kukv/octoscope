@@ -24,6 +24,19 @@ type fakeBackend struct {
 	addReviewThread func(reviewID string, c gql.PendingComment) error
 	submitReview    func(reviewID string, event gql.ReviewEvent, body string) error
 	submitNewReview func(pullRequestID string, event gql.ReviewEvent, body string) error
+	prChecks        func(ctx context.Context, repo string, number int) ([]gql.CheckRun, error)
+	jobLog          func(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]github.LogLine, error)
+	rerunWorkflow   func(ctx context.Context, repo string, runID int64, scope github.RerunScope) error
+	listPRs         func(ctx context.Context, repo string) ([]gql.PullRequest, error)
+	listIssues      func(ctx context.Context, repo string) ([]gql.Issue, error)
+	listLabels      func(ctx context.Context, repo string) ([]gql.Label, error)
+	prMergeContext  func(ctx context.Context, repo string, number int) (gql.MergeContext, error)
+	mergePR         func(pullRequestID string, method gql.MergeMethod) error
+	enableAutoMerge func(pullRequestID string, method gql.MergeMethod) error
+	searchRepos     func(ctx context.Context, query string, limit int) ([]github.Repository, error)
+	listOwnRepos    func(ctx context.Context, owner string, limit int) ([]github.Repository, error)
+	searchItems     func(ctx context.Context, query string) ([]gql.SearchItem, error)
+	repoCounts      func(ctx context.Context, repos []string) ([]gql.RepoCount, error)
 }
 
 func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error) {

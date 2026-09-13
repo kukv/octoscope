@@ -98,6 +98,12 @@ type merger interface {
 
 // backend is what a GitHub client answers. It is declared here, on the
 // consumer's side, rather than exported by the client packages.
+//
+// A method Gateway promotes rather than overrides returns the client's own
+// sentinels, unrecognised by domain.IsFatal. That is safe only as long as no
+// promoted method's failure reaches the fatal-error screen -- today those
+// failures are shown inline or discarded instead. If one is ever wired to
+// that screen, give it an override that calls wrap.
 type backend interface {
 	itemFetcher
 	commenter
