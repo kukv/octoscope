@@ -92,6 +92,28 @@ func TestEachSetDrawsItsOwnGlyphs(t *testing.T) {
 	}
 }
 
+// TestAnIssueIsNotDrawnLikeADraft is what the marker column is for: an issue
+// and a draft pull request are the two things on a board that neither pass
+// nor fail, and a set that draws them the same leaves the column saying
+// nothing.
+func TestAnIssueIsNotDrawnLikeADraft(t *testing.T) {
+	for name, set := range allSets {
+		t.Run(name, func(t *testing.T) {
+			use(t, set)
+			if issue, draft := icon.Issue(), icon.Review(domain.ReviewNone, true); issue == draft {
+				t.Errorf("an issue and a draft are both %q", issue)
+			}
+		})
+	}
+}
+
+func TestIssue(t *testing.T) {
+	use(t, icon.Unicode)
+	if got := icon.Issue(); got != "⦿" {
+		t.Errorf("got %q, want ⦿", got)
+	}
+}
+
 func TestResolve(t *testing.T) {
 	tests := []struct {
 		name, flag, env string

@@ -118,13 +118,14 @@ func (m Model) boxed() bool { return m.width >= drawerMinColumns }
 // titles sat above the pointer.
 const titleLines = 2
 
-// cardHeight is how many lines one card occupies: the title, the meta line
-// under it, and — when there is room for one — the box's two borders.
+// cardHeight is how many lines one card occupies: the head line, the title,
+// the meta line under it, and — when there is room for one — the box's two
+// borders.
 func (m Model) cardHeight() int {
 	if m.boxed() {
-		return titleLines + 3
+		return titleLines + 4
 	}
-	return titleLines + 1
+	return titleLines + 2
 }
 
 // boardHeight is what is left for the columns once everything drawn below
@@ -271,8 +272,10 @@ func (m Model) cardWindow(s domain.WorkSection, height int) int {
 // gutter marks the selection instead.
 func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
 	if !m.boxed() {
-		lines := m.cardTitle(it, w-len(gutter), selected, gutter)
-		lines = append(lines, gutter+m.cardMeta(it, at, w-len(gutter)))
+		inner := w - len(gutter)
+		lines := append([]string{m.cardHead(it, inner, selected, gutter)},
+			m.cardTitle(it, inner, selected, gutter)...)
+		lines = append(lines, gutter+m.cardMeta(it, at, inner))
 		for i, line := range lines {
 			lines[i] = fit(line, w)
 		}
@@ -281,66 +284,72 @@ func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []st
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
-	body := append(m.cardTitle(it, inner, selected, ""), m.cardMeta(it, at, inner))
+	body := append([]string{m.cardHead(it, inner, selected, "")},
+		m.cardTitle(it, inner, selected, "")...)
+	body = append(body, m.cardMeta(it, at, inner))
 	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
 
-// cardTitle is the state marker, the number and the title, over titleLines
-// lines. The pieces are styled one at a time rather than as a whole line: a
-// style applied over a coloured marker would end at that marker's own reset.
+// cardHead is the first line: what state the item is in, which repository it
+// came from and which number it is there. The repository is clipped before
+// the number is — the number is what identifies the card, and half a number
+// identifies nothing.
 //
-// The continuation is not indented under the title. Lining it up would read
-// better, but the columns it would cost are what the second line was added to
-// win back.
-func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) []string {
+// The pieces are styled one at a time rather than as a whole line: a style
+// applied over a coloured marker would end at that marker's own reset.
+func (m Model) cardHead(it domain.WorkItem, w int, selected bool, marker string) string {
 	if selected && marker != "" {
 		marker = theme.Cursor().Render("▸ ")
 	}
-	head := marker + stateMarker(it) + " " + fmt.Sprintf("#%d ", it.Ref.Number)
-	indent := ansi.StringWidth(marker)
+	head := marker + stateMarker(it) + " "
+	number := fmt.Sprintf(" #%d", it.Ref.Number)
+	repo := clip(it.Ref.Repo, max(w-ansi.StringWidth(head)-ansi.StringWidth(number), 0))
+	return head + theme.Dim().Render(repo) + number
+}
 
-	first, second := wrapTitle(it.Title,
-		max(w-ansi.StringWidth(head), 0), max(w-indent, 0))
+// cardTitle is the title alone, over titleLines lines. It is not indented
+// under the head line: lining it up would read better, but the columns it
+// would cost are what the second line was added to win back.
+func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) []string {
+	indent := strings.Repeat(" ", ansi.StringWidth(marker))
+	first, second := wrapTitle(it.Title, max(w-len(indent), 0))
 	if selected {
 		first, second = theme.Cursor().Render(first), theme.Cursor().Render(second)
 	}
-	return []string{head + first, strings.Repeat(" ", indent) + second}
+	return []string{indent + first, indent + second}
 }
 
-// wrapTitle folds a title over two lines of different widths: the first is
-// what is left beside the marker and the number, the second is the whole card.
+// wrapTitle folds a title over two lines of w columns each.
 //
 // The second line is cut from the title itself rather than joined back up out
 // of the lines ansi.Wrap returned. A Japanese title has no spaces to break on
 // and comes back broken by column, and joining those pieces would put spaces
 // in the title that the author never wrote.
-func wrapTitle(title string, first, second int) (string, string) {
-	head := strings.Split(ansi.Wrap(title, max(first, 1), ""), "\n")[0]
-	return head, clip(strings.TrimSpace(strings.TrimPrefix(title, head)), second)
+func wrapTitle(title string, w int) (string, string) {
+	head := strings.Split(ansi.Wrap(title, max(w, 1), ""), "\n")[0]
+	return head, clip(strings.TrimSpace(strings.TrimPrefix(title, head)), w)
 }
 
-// cardMeta is the second line: where the item lives, how its checks are
-// doing, and how long it has sat there. The repository is named without its
-// owner — a column is too narrow for "owner/name", and the drawer gives the
-// full reference.
+// cardMeta is the last line: how the item's checks are doing, how long it has
+// sat there, and what it is labelled. Where it lives is on the head line.
 func (m Model) cardMeta(it domain.WorkItem, at time.Time, w int) string {
-	parts := []string{theme.Dim().Render(shortRepo(it.Ref.Repo))}
+	var parts []string
 	if bar := checksBar(it.Checks); bar != "" {
 		parts = append(parts, bar)
 	} else if word := reviewWord(it); word != "" {
 		parts = append(parts, word)
 	}
-	age := theme.Dim().Render(i18n.RelTime(at, it.UpdatedAt))
+	parts = append(parts, theme.Dim().Render(i18n.RelTime(at, it.UpdatedAt)))
 
 	// Labels are offered whatever the rest of the line has not already spent,
 	// so a badge is either drawn whole or left out. Measuring against the
 	// whole width would let the clip below cut one in half, which reads as a
 	// coloured smear rather than a label.
-	spent := ansi.StringWidth(strings.Join(parts, " ")) + 1 + ansi.StringWidth(age) + 1
+	spent := ansi.StringWidth(strings.Join(parts, " ")) + 1
 	if b := badges(it.Labels, w-spent); b != "" {
 		parts = append(parts, strings.TrimSpace(b))
 	}
-	return clip(strings.Join(append(parts, age), " "), w)
+	return clip(strings.Join(parts, " "), w)
 }
 
 // reviewWord is what a pull request with no checks says instead of a bar.
@@ -360,14 +369,6 @@ func reviewWord(it domain.WorkItem) string {
 	default:
 		return ""
 	}
-}
-
-// shortRepo drops the owner from "owner/name".
-func shortRepo(repo string) string {
-	if _, name, ok := strings.Cut(repo, "/"); ok {
-		return name
-	}
-	return repo
 }
 
 // badges draws the labels that fit in room columns, in the colours GitHub

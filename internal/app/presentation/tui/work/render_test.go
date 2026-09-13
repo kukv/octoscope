@@ -182,17 +182,18 @@ func boardOf(width int) Model {
 	return m
 }
 
-// TestABoxedCardIsFiveLines pins the shape the mockup draws: the title over
-// two lines and the meta line under it, inside a box of its own.
-func TestABoxedCardIsFiveLines(t *testing.T) {
+// TestABoxedCardIsSixLines pins the shape the mockup draws: the head line,
+// the title over two lines and the meta line under it, inside a box of its
+// own.
+func TestABoxedCardIsSixLines(t *testing.T) {
 	const w = 34
 	m := boardOf(160)
 	it := sampleWork()[domain.SectionReviewRequested][0] // a PR with failing checks
 
 	lines := m.card(it, boardClock, w, false)
-	if len(lines) != m.cardHeight() || len(lines) != titleLines+3 {
+	if len(lines) != m.cardHeight() || len(lines) != titleLines+4 {
 		t.Fatalf("a boxed card is %d lines, want %d:\n%s",
-			len(lines), titleLines+3, strings.Join(lines, "\n"))
+			len(lines), titleLines+4, strings.Join(lines, "\n"))
 	}
 	for i, line := range lines {
 		if got := ansi.StringWidth(line); got != w {
@@ -203,9 +204,11 @@ func TestABoxedCardIsFiveLines(t *testing.T) {
 	if !strings.HasPrefix(ansi.Strip(lines[0]), "╭") || !strings.HasPrefix(ansi.Strip(lines[last]), "╰") {
 		t.Errorf("the card has no box:\n%s", ansi.Strip(strings.Join(lines, "\n")))
 	}
-	if title := ansi.Strip(lines[1]); !strings.Contains(title, "#12") ||
-		!strings.Contains(title, it.Title) {
-		t.Errorf("the first line wants the number and the title: %q", title)
+	if head := ansi.Strip(lines[1]); !strings.Contains(head, "#12") {
+		t.Errorf("the first line inside the box wants the number: %q", head)
+	}
+	if title := ansi.Strip(lines[2]); !strings.Contains(title, it.Title) {
+		t.Errorf("the line under the head wants the title: %q", title)
 	}
 }
 
@@ -218,9 +221,9 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 	it := sampleWork()[domain.SectionReviewRequested][0]
 
 	lines := m.card(it, boardClock, w, false)
-	if len(lines) != m.cardHeight() || len(lines) != titleLines+1 {
+	if len(lines) != m.cardHeight() || len(lines) != titleLines+2 {
 		t.Fatalf("an unboxed card is %d lines, want %d:\n%s",
-			len(lines), titleLines+1, strings.Join(lines, "\n"))
+			len(lines), titleLines+2, strings.Join(lines, "\n"))
 	}
 	for i, line := range lines {
 		if got := ansi.StringWidth(line); got != w {
@@ -229,6 +232,83 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 	}
 	if strings.Contains(ansi.Strip(lines[0]), "╭") {
 		t.Error("the card still has a box below a hundred columns")
+	}
+}
+
+// TestTheCardHeadNamesTheRepositoryInFull is the first line of a card: which
+// repository, and which number in it. The owner is part of the answer — the
+// board gathers work from every repository the user touches, and half of them
+// are not theirs.
+func TestTheCardHeadNamesTheRepositoryInFull(t *testing.T) {
+	m := boardOf(80)
+	it := sampleWork()[domain.SectionReviewRequested][0] // kukv/octoscope#12
+
+	head := ansi.Strip(m.cardHead(it, 36, false, gutter))
+	if !strings.Contains(head, "kukv/octoscope") {
+		t.Errorf("the owner is missing from the first line: %q", head)
+	}
+	if !strings.Contains(head, "#12") {
+		t.Errorf("the number is missing from the first line: %q", head)
+	}
+}
+
+// TestANarrowCardHeadKeepsTheNumberWhole is what the first line gives up
+// first. The number is what identifies the card; half a repository name is
+// still a hint, half a number is nothing.
+func TestANarrowCardHeadKeepsTheNumberWhole(t *testing.T) {
+	m := boardOf(120)
+	it := domain.WorkItem{
+		Ref: domain.ItemRef{
+			Kind: domain.ItemPR, Repo: "kukv/a-repository-with-a-name-nobody-would-choose", Number: 999,
+		},
+	}
+
+	const w = 20
+	if full := ansi.Strip(m.cardHead(it, 100, false, "")); ansi.StringWidth(full) <= w {
+		t.Fatalf("the head fits in %d columns uncut; this test covers nothing: %q", w, full)
+	}
+	head := ansi.Strip(m.cardHead(it, w, false, ""))
+	if got := ansi.StringWidth(head); got > w {
+		t.Errorf("the head is %d columns, want at most %d: %q", got, w, head)
+	}
+	if !strings.Contains(head, "#999") {
+		t.Errorf("the number did not survive the clip: %q", head)
+	}
+	if !strings.Contains(head, "…") {
+		t.Errorf("nothing was clipped, so the number survived by luck: %q", head)
+	}
+}
+
+// TestTheTitleLinesCarryOnlyTheTitle pins what moved to the head line: a
+// title line that still spelled the number would spend the columns twice.
+func TestTheTitleLinesCarryOnlyTheTitle(t *testing.T) {
+	m := boardOf(80)
+	it := sampleWork()[domain.SectionReviewRequested][0]
+
+	for i, line := range m.cardTitle(it, 36, false, gutter) {
+		got := ansi.Strip(line)
+		if strings.Contains(got, "#12") || strings.Contains(got, "octoscope") {
+			t.Errorf("title line %d repeats the head: %q", i+1, got)
+		}
+	}
+}
+
+// TestTheCardMetaIsTheBarThenTheAgeThenTheLabels pins the order of the last
+// line. The repository left it for the head line.
+func TestTheCardMetaIsTheBarThenTheAgeThenTheLabels(t *testing.T) {
+	m := boardOf(160)
+	it := sampleWork()[domain.SectionReviewRequested][0] // failing checks, two labels
+
+	meta := ansi.Strip(m.cardMeta(it, boardClock, 60))
+	if strings.Contains(meta, "octoscope") {
+		t.Errorf("the repository is still on the meta line: %q", meta)
+	}
+	bar, age, label := strings.Index(meta, "▰"), strings.Index(meta, "3h ago"), strings.Index(meta, "bug")
+	if bar < 0 || age < 0 || label < 0 {
+		t.Fatalf("the meta line is missing the bar, the age or a label: %q", meta)
+	}
+	if bar >= age || age >= label {
+		t.Errorf("the meta line reads %q, want the bar, then the age, then the labels", meta)
 	}
 }
 
@@ -274,10 +354,7 @@ func TestAWrappedTitleLosesNothing(t *testing.T) {
 			Title: tc.title,
 		}
 		lines := m.cardTitle(it, 36, false, gutter)
-		_, first, ok := strings.Cut(ansi.Strip(lines[0]), "#12 ")
-		if !ok {
-			t.Fatalf("%s: the first line carries no title: %q", name, ansi.Strip(lines[0]))
-		}
+		first := strings.TrimPrefix(ansi.Strip(lines[0]), gutter)
 		second := strings.TrimPrefix(ansi.Strip(lines[1]), gutter)
 		if got := first + tc.sep + second; got != tc.title {
 			t.Errorf("%s: the two lines read %q, want the whole title %q", name, got, tc.title)
@@ -375,27 +452,6 @@ func TestACardIsDatedByItsOwnColumnsAnswer(t *testing.T) {
 	}
 	if strings.Contains(column, other) {
 		t.Errorf("the card carries another column's age %q:\n%s", other, column)
-	}
-}
-
-// TestTheCardMetaNamesTheRepositoryWithoutItsOwner keeps the second line
-// readable in a column thirty wide: the owner is the same for most of them,
-// and the drawer gives the full reference anyway.
-func TestTheCardMetaNamesTheRepositoryWithoutItsOwner(t *testing.T) {
-	m := boardOf(160)
-	it := sampleWork()[domain.SectionReviewRequested][0] // kukv/octoscope
-
-	meta := ansi.Strip(m.cardMeta(it, boardClock, 60))
-	if !strings.Contains(meta, "octoscope") {
-		t.Errorf("the repository is missing: %q", meta)
-	}
-	if strings.Contains(meta, "kukv/") {
-		t.Errorf("the owner is still on the card: %q", meta)
-	}
-	for _, want := range []string{"▰", "3h ago"} {
-		if !strings.Contains(meta, want) {
-			t.Errorf("the meta line is missing %q: %q", want, meta)
-		}
 	}
 }
 

@@ -134,10 +134,12 @@ func Review(s domain.ReviewState, draft bool) lipgloss.Style {
 		return success()
 	case domain.ReviewChangesRequested:
 		return danger()
-	case domain.ReviewRequired:
-		return attention()
 	default:
-		return muted()
+		// ReviewNone and ReviewRequired both mean nobody has reviewed it yet:
+		// GitHub reports no decision for a repository that requires none, and
+		// "required" for one that does. The difference is the repository's
+		// settings, not anything the user can act on differently.
+		return attention()
 	}
 }
 

@@ -48,7 +48,7 @@ type glyphs struct {
 var sets = map[Set]glyphs{
 	Unicode: {
 		approved: "✓", changesRequested: "×", reviewPending: "•", draft: "◌",
-		issue:        "◇",
+		issue:        "⦿",
 		checkSuccess: "✓", checkFailure: "×", checkRunning: "◍",
 		barDone: "▰", barRest: "▱",
 		collapsed: "▸", commentBar: "▌",
@@ -66,7 +66,7 @@ var sets = map[Set]glyphs{
 	},
 	ASCII: {
 		approved: "+", changesRequested: "x", reviewPending: "*", draft: "o",
-		issue:        "o",
+		issue:        "@",
 		checkSuccess: "+", checkFailure: "x", checkRunning: "~",
 		barDone: "#", barRest: "-",
 		collapsed: ">", commentBar: "|",
