@@ -26,6 +26,9 @@ func TestASearchEscapesTheTypedQueryIntoTheParameter(t *testing.T) {
 	if found[0].Name == "" {
 		t.Error("candidate has no name")
 	}
+	if found[0].Stars == 0 {
+		t.Error("candidate has no stars; the add dialog shows a star count beside each suggestion")
+	}
 	req := (*got)[0]
 	if q := req.URL.Query().Get("q"); q != "go tui/term" {
 		t.Errorf("q = %q, want the query as typed", q)

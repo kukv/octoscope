@@ -137,35 +137,6 @@ func TestEverySectionConstantIsASlotInWork(t *testing.T) {
 	}
 }
 
-func TestSplitRepo(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name      string
-		in        string
-		wantOwner string
-		wantName  string
-		wantOK    bool
-	}{
-		{"owner and name", "kukv/octoscope", "kukv", "octoscope", true},
-		{"no slash", "octoscope", "", "", false},
-		{"empty owner", "/octoscope", "", "", false},
-		{"empty name", "kukv/", "", "", false},
-		{"three parts", "github.com/kukv/octoscope", "", "", false},
-		{"surrounding space", " kukv/octoscope ", "", "", false},
-		{"empty", "", "", "", false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			owner, name, ok := domain.SplitRepo(c.in)
-			if owner != c.wantOwner || name != c.wantName || ok != c.wantOK {
-				t.Errorf("SplitRepo(%q) = (%q, %q, %v), want (%q, %q, %v)",
-					c.in, owner, name, ok, c.wantOwner, c.wantName, c.wantOK)
-			}
-		})
-	}
-}
-
 // The settings file's shape belongs to internal/app/config; this type
 // is what the application is written in terms of. A tag here would mean
 // the two had been merged back together.

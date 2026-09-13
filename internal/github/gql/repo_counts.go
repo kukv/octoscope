@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed repo_counts.graphql
@@ -64,7 +62,7 @@ func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]RepoCount, e
 	indices := []int{}
 	for i, repo := range repos {
 		counts[i].Repo = repo
-		owner, name, ok := domain.SplitRepo(repo)
+		owner, name, ok := SplitRepo(repo)
 		if !ok {
 			counts[i].Unavailable = true
 			continue

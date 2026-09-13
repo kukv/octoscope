@@ -2,11 +2,11 @@ package repo
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/dialog"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -80,7 +80,7 @@ func (m Model) handleAddKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // at someone who has not finished.
 func (m Model) addSelected() (Model, tea.Cmd) {
 	name := m.dlg.Value()
-	if _, _, ok := domain.SplitRepo(name); !ok {
+	if !isOwnerSlashName(name) {
 		m.dlg = m.dlg.SetError(i18n.T("dialog.invalid_name") + name)
 		return m, nil
 	}
@@ -95,6 +95,17 @@ func (m Model) addSelected() (Model, tea.Cmd) {
 	return next, tea.Batch(cmd,
 		fetchCounts(next.src, next.rowNames()),
 		saveRepos(next.src, savedNames(next.rows), next.tab))
+}
+
+// isOwnerSlashName reports whether name has the shape "owner/name": both
+// halves non-empty, no second "/", and no leading or trailing whitespace
+// that a stray keystroke could carry in unnoticed.
+func isOwnerSlashName(name string) bool {
+	if name != strings.TrimSpace(name) {
+		return false
+	}
+	owner, rest, ok := strings.Cut(name, "/")
+	return ok && owner != "" && rest != "" && !strings.Contains(rest, "/")
 }
 
 // removeSelected drops the repository under the sidebar's cursor. It is

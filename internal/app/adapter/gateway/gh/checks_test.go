@@ -145,6 +145,68 @@ func TestToChecksCountsAndRollsUpEachRun(t *testing.T) {
 	}
 }
 
+// TestToCheckStateCoversEveryOutcome exhausts both rollup shapes' status
+// vocabulary: a CheckRun reports status/conclusion, a StatusContext reports
+// a single state, and the two never overlap in what GitHub actually sends.
+func TestToCheckStateCoversEveryOutcome(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		node gql.CheckContext
+		want domain.CheckState
+	}{
+		{"CheckRun success", gql.CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "SUCCESS"}, domain.CheckSuccess},
+		{"CheckRun failure", gql.CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "FAILURE"}, domain.CheckFailure},
+		{"CheckRun in progress", gql.CheckContext{Typename: "CheckRun", Status: "IN_PROGRESS"}, domain.CheckRunning},
+		{"StatusContext success", gql.CheckContext{Typename: "StatusContext", State: "SUCCESS"}, domain.CheckSuccess},
+		{"StatusContext failure", gql.CheckContext{Typename: "StatusContext", State: "FAILURE"}, domain.CheckFailure},
+		{"StatusContext error", gql.CheckContext{Typename: "StatusContext", State: "ERROR"}, domain.CheckFailure},
+		{"StatusContext pending", gql.CheckContext{Typename: "StatusContext", State: "PENDING"}, domain.CheckPending},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := toCheckState(tt.node); got != tt.want {
+				t.Errorf("toCheckState(%+v) = %v, want %v", tt.node, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestToChecksFromContextsRollsUpTheRawRollup covers the conversion a search
+// or item document's embedded rollup goes through: unlike toChecks, it
+// starts from the plainer gql.CheckContext shape a search or single-item
+// document selects, and rolls up the same way.
+func TestToChecksFromContextsRollsUpTheRawRollup(t *testing.T) {
+	t.Parallel()
+
+	contexts := []gql.CheckContext{
+		{Typename: "CheckRun", Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS"},
+		{Typename: "CheckRun", Name: "test", Status: "COMPLETED", Conclusion: "FAILURE"},
+		{Typename: "CheckRun", Name: "deploy", Status: "IN_PROGRESS"},
+		{Typename: "StatusContext", Context: "ci/legacy", State: "SUCCESS"},
+	}
+
+	got := toChecksFromContexts(contexts)
+	want := domain.Checks{
+		Total:   4,
+		Passed:  2,
+		Failed:  1,
+		Running: 1,
+		State:   domain.CheckFailure,
+		Runs: []domain.CheckRun{
+			{Name: "build", State: domain.CheckSuccess, Kind: domain.CheckKindRun},
+			{Name: "test", State: domain.CheckFailure, Kind: domain.CheckKindRun},
+			{Name: "deploy", State: domain.CheckRunning, Kind: domain.CheckKindRun},
+			{Name: "ci/legacy", State: domain.CheckSuccess, Kind: domain.CheckKindStatus},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("toChecksFromContexts() = %+v, want %+v", got, want)
+	}
+}
+
 // TestPRChecksRollsUpWhatTheBackendReturns wires PRChecks through the
 // gateway end to end: the backend answers with wire nodes, and the gateway
 // hands back the rolled-up domain.Checks.

@@ -39,7 +39,7 @@ func toPR(n gql.PullRequest) domain.PR {
 		Comments:  toComments(n.Comments.Nodes),
 		Labels:    toLabels(n.Labels.Nodes),
 		Assignees: toAuthors(n.Assignees.Nodes),
-		Checks:    n.Checks(),
+		Checks:    toChecksFromContexts(n.StatusCheckContexts()),
 		Head:      n.HeadRefName,
 		Base:      n.BaseRefName,
 		Additions: n.Additions,

@@ -71,7 +71,7 @@ func TestListPRsFillsTheFieldsRESTCannotAnswer(t *testing.T) {
 		if pr.ReviewDecision != "" {
 			sawReview = true
 		}
-		if pr.Checks().Total > 0 {
+		if len(pr.StatusCheckContexts()) > 0 {
 			sawChecks = true
 		}
 		if pr.Additions > 0 || pr.Deletions > 0 {

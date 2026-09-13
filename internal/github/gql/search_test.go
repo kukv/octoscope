@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 const workJSON = `{"data":{"results":{"nodes":[
@@ -58,13 +56,9 @@ func TestASearchResultParsesIntoSearchItems(t *testing.T) {
 	if item.ReviewDecision != "REVIEW_REQUIRED" {
 		t.Errorf("review decision: got %q, want REVIEW_REQUIRED", item.ReviewDecision)
 	}
-	checks := item.Checks()
-	if checks.Total != 3 || checks.Passed != 1 ||
-		checks.Failed != 1 || checks.Running != 1 {
-		t.Errorf("checks counts: got %+v", checks)
-	}
-	if checks.State != domain.CheckFailure {
-		t.Errorf("checks state: got %v, want CheckFailure", checks.State)
+	contexts := item.StatusCheckContexts()
+	if len(contexts) != 3 {
+		t.Errorf("checks: got %d contexts, want 3", len(contexts))
 	}
 
 	if items[1].Typename != "Issue" {
@@ -82,7 +76,7 @@ func TestSearchItemsReportsAFailure(t *testing.T) {
 	}
 }
 
-func TestChecksNoCommitsYieldsCheckNone(t *testing.T) {
+func TestStatusCheckContextsWithNoRollupIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	const noRollupJSON = `{"data":{"results":{"nodes":[
@@ -103,41 +97,16 @@ func TestChecksNoCommitsYieldsCheckNone(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("the result holds %d items, want 1", len(items))
 	}
-	if got := items[0].Checks(); !reflect.DeepEqual(got, domain.Checks{State: domain.CheckNone}) {
-		t.Errorf("checks = %+v, want zero counts with CheckNone", got)
+	if got := items[0].StatusCheckContexts(); len(got) != 0 {
+		t.Errorf("contexts = %+v, want none", got)
 	}
 }
 
-func TestCheckOutcome(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		node CheckContext
-		want domain.CheckState
-	}{
-		{"CheckRun success", CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "SUCCESS"}, domain.CheckSuccess},
-		{"CheckRun failure", CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "FAILURE"}, domain.CheckFailure},
-		{"CheckRun in progress", CheckContext{Typename: "CheckRun", Status: "IN_PROGRESS"}, domain.CheckRunning},
-		{"StatusContext success", CheckContext{Typename: "StatusContext", State: "SUCCESS"}, domain.CheckSuccess},
-		{"StatusContext failure", CheckContext{Typename: "StatusContext", State: "FAILURE"}, domain.CheckFailure},
-		{"StatusContext error", CheckContext{Typename: "StatusContext", State: "ERROR"}, domain.CheckFailure},
-		{"StatusContext pending", CheckContext{Typename: "StatusContext", State: "PENDING"}, domain.CheckPending},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := checkOutcome(tt.node); got != tt.want {
-				t.Errorf("checkOutcome(%+v) = %v, want %v", tt.node, got, tt.want)
-			}
-		})
-	}
-}
-
-// TestEachCheckKeepsItsOwnName covers the field the two rollup shapes spell
-// differently: a CheckRun calls its name "name", a StatusContext calls it
-// "context". Reading only one of them leaves half the drawer's list blank.
-func TestEachCheckKeepsItsOwnName(t *testing.T) {
+// TestStatusCheckContextsKeepsEachShapesOwnFields covers the field the two
+// rollup shapes spell differently: a CheckRun calls its name "name", a
+// StatusContext calls it "context". Reading only one of them leaves half the
+// drawer's list blank once the gateway names each check.
+func TestStatusCheckContextsKeepsEachShapesOwnFields(t *testing.T) {
 	t.Parallel()
 
 	const namedJSON = `{"data":{"results":{"nodes":[
@@ -159,12 +128,12 @@ func TestEachCheckKeepsItsOwnName(t *testing.T) {
 		t.Fatalf("SearchItems: %v", err)
 	}
 	item := items[0]
-	want := []domain.CheckRun{
-		{Name: "build", State: domain.CheckSuccess, Kind: domain.CheckKindRun},
-		{Name: "ci/legacy", State: domain.CheckFailure, Kind: domain.CheckKindStatus},
+	want := []CheckContext{
+		{Typename: "CheckRun", Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS"},
+		{Typename: "StatusContext", Context: "ci/legacy", State: "FAILURE"},
 	}
-	if got := item.Checks().Runs; !reflect.DeepEqual(got, want) {
-		t.Errorf("runs = %+v, want %+v", got, want)
+	if got := item.StatusCheckContexts(); !reflect.DeepEqual(got, want) {
+		t.Errorf("contexts = %+v, want %+v", got, want)
 	}
 	if item.BodyText != "the body" {
 		t.Errorf("body = %q, want the body the drawer shows", item.BodyText)

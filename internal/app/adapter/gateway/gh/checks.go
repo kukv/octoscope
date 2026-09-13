@@ -67,6 +67,44 @@ func toChecks(runs []gql.CheckRun) domain.Checks {
 	return c
 }
 
+// toChecksFromContexts rolls up the check contexts a search or item
+// document embeds under a commit -- a different query from the
+// per-pull-request one toChecks reads, so it counts the same way but starts
+// from the plainer gql.CheckContext shape. Only Name, State and Kind are
+// filled on each run: the rollup carries nothing else (domain.CheckRun's own
+// comment says why).
+func toChecksFromContexts(nodes []gql.CheckContext) domain.Checks {
+	var c domain.Checks
+	for _, n := range nodes {
+		kind := domain.CheckKindRun
+		if n.Typename == "StatusContext" {
+			kind = domain.CheckKindStatus
+		}
+		run := domain.CheckRun{Name: checkContextName(n), State: toCheckState(n), Kind: kind}
+		c.Total++
+		c.Runs = append(c.Runs, run)
+		switch run.State {
+		case domain.CheckSuccess:
+			c.Passed++
+		case domain.CheckFailure:
+			c.Failed++
+		default:
+			c.Running++
+		}
+	}
+	switch {
+	case c.Total == 0:
+		c.State = domain.CheckNone
+	case c.Failed > 0:
+		c.State = domain.CheckFailure
+	case c.Running > 0:
+		c.State = domain.CheckRunning
+	default:
+		c.State = domain.CheckSuccess
+	}
+	return c
+}
+
 // toCheckRun converts one rollup context. A StatusContext and a CheckRun
 // report themselves through different fields, so the two shapes are read
 // separately.
@@ -93,6 +131,12 @@ func toCheckRun(n gql.CheckRun) domain.CheckRun {
 // checkRunName is what the check calls itself. The two shapes spell the
 // field differently, so the choice cannot be made by the JSON tags alone.
 func checkRunName(n gql.CheckRun) string {
+	return checkContextName(n.CheckContext)
+}
+
+// checkContextName is what one rollup context calls itself: a CheckRun
+// spells its name "name", a StatusContext calls it "context".
+func checkContextName(n gql.CheckContext) string {
 	if n.Typename == "StatusContext" {
 		return n.Context
 	}

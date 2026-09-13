@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed repo_prs.graphql
@@ -70,16 +68,16 @@ type PullRequest struct {
 	} `json:"commits"`
 }
 
-// Checks reads the roll-up off the last commit, which is where GitHub hangs
-// it: a pull request has no roll-up of its own.
-func (n PullRequest) Checks() domain.Checks {
+// StatusCheckContexts reads the roll-up off the last commit, which is where
+// GitHub hangs it: a pull request has no roll-up of its own.
+func (n PullRequest) StatusCheckContexts() []CheckContext {
 	var nodes []CheckContext
 	for _, commit := range n.Commits.Nodes {
 		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
 			nodes = append(nodes, rollup.Contexts.Nodes...)
 		}
 	}
-	return RollupContexts(nodes)
+	return nodes
 }
 
 // Issue is one issue as the documents in this package select it.

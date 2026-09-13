@@ -14,6 +14,31 @@ import (
 
 var errSaveFailed = errors.New("open config.yaml: permission denied")
 
+func TestIsOwnerSlashName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"owner and name", "kukv/octoscope", true},
+		{"no slash", "octoscope", false},
+		{"empty owner", "/octoscope", false},
+		{"empty name", "kukv/", false},
+		{"three parts", "github.com/kukv/octoscope", false},
+		{"surrounding space", " kukv/octoscope ", false},
+		{"empty", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isOwnerSlashName(c.in); got != c.want {
+				t.Errorf("isOwnerSlashName(%q) = %v, want %v", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 func backspace() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyBackspace} }
 
 func TestAOpensTheAddDialog(t *testing.T) {

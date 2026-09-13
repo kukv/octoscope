@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // jsonMediaType is what GitHub asks REST clients to send. A call that wants
@@ -109,7 +110,7 @@ func (c *Client) repoPath(repo string) (string, error) {
 			return "", err
 		}
 	}
-	if _, _, ok := domain.SplitRepo(repo); !ok {
+	if _, _, ok := gql.SplitRepo(repo); !ok {
 		return "", fmt.Errorf("repo %q has no owner/name separator", repo)
 	}
 	return repo, nil

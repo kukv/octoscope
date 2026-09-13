@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed work.graphql
@@ -56,10 +54,7 @@ type SearchItem struct {
 	} `json:"commits"`
 }
 
-// CheckContext is one entry of a commit's status check rollup. gh pr list
-// --json statusCheckRollup returns the same shape in a flat array, which is
-// why the roll-up below is a free function rather than a method on the
-// commit around it.
+// CheckContext is one entry of a commit's status check rollup.
 type CheckContext struct {
 	Typename   string `json:"__typename"`
 	Name       string `json:"name"`
@@ -67,15 +62,6 @@ type CheckContext struct {
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
 	State      string `json:"state"`
-}
-
-// name is what the check calls itself. The two shapes spell the field
-// differently, so the choice cannot be made by the JSON tags alone.
-func (n CheckContext) name() string {
-	if n.Typename == "StatusContext" {
-		return n.Context
-	}
-	return n.Name
 }
 
 // SearchItems runs one GitHub issue search and returns what it found. The
@@ -97,75 +83,14 @@ func (c *Client) SearchItems(ctx context.Context, search string) ([]SearchItem, 
 	return resp.Data.Results.Nodes, nil
 }
 
-// Checks reads the roll-up out of the commit the search returned.
-func (n SearchItem) Checks() domain.Checks {
+// StatusCheckContexts reads the roll-up out of the commit the search
+// returned.
+func (n SearchItem) StatusCheckContexts() []CheckContext {
 	var nodes []CheckContext
 	for _, commit := range n.Commits.Nodes {
 		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
 			nodes = append(nodes, rollup.Contexts.Nodes...)
 		}
 	}
-	return RollupContexts(nodes)
-}
-
-// RollupContexts counts every check-run context once: each context
-// increments Total and exactly one of Passed, Failed, or Running, so
-// Passed+Failed+Running always equals Total.
-func RollupContexts(nodes []CheckContext) domain.Checks {
-	var c domain.Checks
-	for _, node := range nodes {
-		c.Total++
-		state := checkOutcome(node)
-		kind := domain.CheckKindRun
-		if node.Typename == "StatusContext" {
-			kind = domain.CheckKindStatus
-		}
-		c.Runs = append(c.Runs, domain.CheckRun{Name: node.name(), State: state, Kind: kind})
-		switch state {
-		case domain.CheckSuccess:
-			c.Passed++
-		case domain.CheckFailure:
-			c.Failed++
-		default:
-			c.Running++
-		}
-	}
-	switch {
-	case c.Total == 0:
-		c.State = domain.CheckNone
-	case c.Failed > 0:
-		c.State = domain.CheckFailure
-	case c.Running > 0:
-		c.State = domain.CheckRunning
-	default:
-		c.State = domain.CheckSuccess
-	}
-	return c
-}
-
-// checkOutcome reads one context of the rollup. CheckRun reports status and
-// conclusion; the older StatusContext reports a single state, so the two
-// shapes have to be read differently.
-func checkOutcome(n CheckContext) domain.CheckState {
-	if n.Typename == "StatusContext" {
-		switch n.State {
-		case "SUCCESS":
-			return domain.CheckSuccess
-		case "FAILURE", "ERROR":
-			return domain.CheckFailure
-		default:
-			return domain.CheckPending
-		}
-	}
-	if n.Status != "COMPLETED" {
-		return domain.CheckRunning
-	}
-	switch n.Conclusion {
-	case "SUCCESS", "NEUTRAL", "SKIPPED":
-		return domain.CheckSuccess
-	case "FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE":
-		return domain.CheckFailure
-	default:
-		return domain.CheckPending
-	}
+	return nodes
 }

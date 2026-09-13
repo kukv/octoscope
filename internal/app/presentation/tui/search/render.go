@@ -363,7 +363,7 @@ func (m Model) resultRow(i int, width int) string {
 	if item.Ref.Kind == domain.ItemPR {
 		state = theme.Review(item.Review, item.IsDraft).Render(icon.Review(item.Review, item.IsDraft))
 	}
-	_, name, _ := domain.SplitRepo(item.Ref.Repo)
+	_, name, _ := strings.Cut(item.Ref.Repo, "/")
 	number := "#" + strconv.Itoa(item.Ref.Number)
 	age := i18n.RelTime(m.fetchedAt, item.UpdatedAt)
 
