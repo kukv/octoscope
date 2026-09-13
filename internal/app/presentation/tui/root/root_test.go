@@ -126,7 +126,6 @@ func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (usecase.Ite
 	}, f.prErr
 }
 
-func (f *fakeSource) OpenWeb(string) error                    { return nil }
 func (f *fakeSource) AddComment(domain.ItemRef, string) error { return nil }
 func (f *fakeSource) SetState(domain.ItemRef, bool) error     { return nil }
 func (f *fakeSource) EditLabels(domain.ItemRef, []string, []string) error {

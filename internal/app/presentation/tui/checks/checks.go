@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -19,7 +20,6 @@ type Source interface {
 	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
 	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
 	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
-	OpenWeb(url string) error
 }
 
 // ClosedMsg tells the parent the user left the checks view.
@@ -92,13 +92,17 @@ type Model struct {
 	// escalation path (errMsg -> ErrorMsg): the list may still be readable
 	// with no log open, so this stays a footer line instead.
 	errText string
+
+	// open shows a URL. It is browser.Open outside tests: opening a page is
+	// not a GitHub call, so it does not go through the backend.
+	open func(url string) error
 }
 
 // New builds the view for one pull request's checks.
 func New(src Source, ref domain.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return Model{src: src, ref: ref, loading: true, spin: s, failedOnly: true}
+	return Model{src: src, ref: ref, loading: true, spin: s, failedOnly: true, open: browser.Open}
 }
 
 // Init starts the fetch.
@@ -247,9 +251,9 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.declined = ""
-	src, ref := m.src, m.ref
+	open, ref := m.open, m.ref
 	return m, func() tea.Msg {
-		if err := src.OpenWeb(url); err != nil {
+		if err := open(url); err != nil {
 			return errMsg{ref: ref, err: err}
 		}
 		return nil

@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -18,11 +19,6 @@ import (
 // nothing to the layer below, which only sends it.
 type searcher interface {
 	SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error)
-}
-
-// webOpener shows an item in a browser.
-type webOpener interface {
-	OpenWeb(url string) error
 }
 
 // candidateSource fills the label and author chips under the filter pane:
@@ -36,7 +32,6 @@ type candidateSource interface {
 // Source is what the Search tab needs from the GitHub layer.
 type Source interface {
 	searcher
-	webOpener
 	candidateSource
 	queryStore
 }
@@ -148,12 +143,16 @@ type Model struct {
 	// fetchedAt is when items last arrived, for the rows' relative ages:
 	// View must not read the clock itself (.claude/rules/tui.md).
 	fetchedAt time.Time
+
+	// open shows a URL. It is browser.Open outside tests: opening a page is
+	// not a GitHub call, so it does not go through the backend.
+	open func(url string) error
 }
 
 func New(src Source) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return Model{src: src, loading: true, spin: s}
+	return Model{src: src, loading: true, spin: s, open: browser.Open}
 }
 
 // Capturing says every key belongs to the field or the raw editor while
@@ -200,9 +199,9 @@ func runSearch(src searcher, query string, gen int) tea.Cmd {
 	}
 }
 
-func openWeb(src webOpener, url string) tea.Cmd {
+func openWeb(open func(url string) error, url string) tea.Cmd {
 	return func() tea.Msg {
-		if err := src.OpenWeb(url); err != nil {
+		if err := open(url); err != nil {
 			return webErrMsg{err: err}
 		}
 		return nil
@@ -464,7 +463,7 @@ func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if len(m.items) == 0 {
 			return m, nil
 		}
-		return m, openWeb(m.src, m.items[m.sel].URL)
+		return m, openWeb(m.open, m.items[m.sel].URL)
 	case "e":
 		return m.openRaw(), nil
 	case "s":

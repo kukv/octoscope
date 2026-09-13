@@ -79,10 +79,6 @@ type reviewer interface {
 	DiscardReview(reviewID string) error
 }
 
-type opener interface {
-	OpenWeb(url string) error
-}
-
 type checksFetcher interface {
 	PRChecks(ctx context.Context, repo string, number int) ([]gql.CheckRun, error)
 	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]github.LogLine, error)
@@ -115,7 +111,6 @@ type backend interface {
 	repoFinder
 	reviewFetcher
 	reviewer
-	opener
 	checksFetcher
 	merger
 }

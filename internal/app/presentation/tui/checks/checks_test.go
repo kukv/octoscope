@@ -31,8 +31,6 @@ func (f *fakeSource) RerunWorkflow(context.Context, string, int64, domain.RerunS
 	return nil
 }
 
-func (f *fakeSource) OpenWeb(string) error { return nil }
-
 // fixture is two workflows, the failing one recorded second on purpose: the
 // view has to move it to the top.
 func fixture() domain.Checks {

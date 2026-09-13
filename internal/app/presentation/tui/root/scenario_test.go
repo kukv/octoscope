@@ -93,8 +93,6 @@ func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (usecase.Item,
 	}, nil
 }
 
-func (f *scenarioSource) OpenWeb(string) error { return nil }
-
 func (f *scenarioSource) AddComment(_ domain.ItemRef, body string) error {
 	f.pr.Comments = append(f.pr.Comments, domain.Comment{
 		Author: domain.Author{Login: "kukv"}, Body: body, CreatedAt: scenarioAt,

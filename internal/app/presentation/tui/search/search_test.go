@@ -29,8 +29,6 @@ func (f *fakeSource) SearchItems(_ context.Context, query string) ([]domain.Work
 	return f.items, f.err
 }
 
-func (f *fakeSource) OpenWeb(string) error { return nil }
-
 func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]domain.Label, error) {
 	f.labelRepo = repo
 	return f.labels, nil

@@ -92,10 +92,6 @@ type reviewer interface {
 	DiscardReview(reviewID string) error
 }
 
-type opener interface {
-	OpenWeb(url string) error
-}
-
 type checksFetcher interface {
 	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
 	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
@@ -120,7 +116,6 @@ type source interface {
 	repoFinder
 	reviewFetcher
 	reviewer
-	opener
 	checksFetcher
 	merger
 }
@@ -139,7 +134,6 @@ type Usecase struct {
 	queryStore queryStore
 	reviewInfo reviewFetcher
 	reviews    reviewer
-	web        opener
 	checks     checksFetcher
 	merges     merger
 }
@@ -160,7 +154,6 @@ func New(src source, store settingsStore) *Usecase {
 		queryStore: store,
 		reviewInfo: src,
 		reviews:    src,
-		web:        src,
 		checks:     src,
 		merges:     src,
 	}
@@ -282,8 +275,6 @@ func (u *Usecase) PRReviewContext(ctx context.Context, repo string, number int) 
 func (u *Usecase) DiscardReview(reviewID string) error {
 	return u.reviews.DiscardReview(reviewID)
 }
-
-func (u *Usecase) OpenWeb(url string) error { return u.web.OpenWeb(url) }
 
 func (u *Usecase) PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error) {
 	return u.checks.PRChecks(ctx, repo, number)

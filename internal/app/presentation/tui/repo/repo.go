@@ -25,13 +25,6 @@ type issueSource interface {
 	ListIssues(ctx context.Context, repo string) ([]domain.Issue, error)
 }
 
-// webOpener shows an item in a browser. It takes the URL GitHub gave the
-// item rather than a reference to it: building the address by hand would put
-// GitHub's URL layout in the UI.
-type webOpener interface {
-	OpenWeb(url string) error
-}
-
 // repoCounter is how many pull requests and issues are open in each
 // repository of the sidebar. It stands alone because it is the only call
 // that looks past the repository on screen.
@@ -55,7 +48,6 @@ type Source interface {
 	prSource
 	issueSource
 	repoCounter
-	webOpener
 	repoEditor
 }
 
@@ -249,6 +241,10 @@ type Model struct {
 	// times, and View must render the same string from the same state, so
 	// the clock is read here in Update rather than on every draw.
 	fetchedAt [2]time.Time
+
+	// open shows a URL. It is browser.Open outside tests: opening a page is
+	// not a GitHub call, so it does not go through the backend.
+	open func(url string) error
 }
 
 func New(src Source, opts Options) Model {
@@ -256,6 +252,7 @@ func New(src Source, opts Options) Model {
 	s.Spinner = spinner.Dot
 	m := Model{src: src, opts: opts}
 	m.spin = s
+	m.open = browser.Open
 	// --repo settles the question before the first frame; anything else
 	// waits for SetCurrent.
 	m.currentSettled = opts.Current != ""
@@ -374,9 +371,9 @@ func fetchCounts(src repoCounter, repos []string) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, url string, t tabID, gen int) tea.Cmd {
+func openWeb(open func(url string) error, url string, t tabID, gen int) tea.Cmd {
 	return func() tea.Msg {
-		if err := src.OpenWeb(url); err != nil {
+		if err := open(url); err != nil {
 			return errMsg{gen: gen, tab: t, kind: noticeOpen, err: err}
 		}
 		return nil
@@ -543,7 +540,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		if url, ok := m.selectedURL(); ok {
-			return m, openWeb(m.src, url, m.tab, m.gen)
+			return m, openWeb(m.open, url, m.tab, m.gen)
 		}
 		return m, nil
 	case "d":

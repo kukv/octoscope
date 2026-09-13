@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
@@ -136,15 +135,6 @@ func appendRepo(args []string, repo string) []string {
 // it. An empty repo means the working directory's, which gh fills in.
 func (c *Client) RepoName(ctx context.Context) (string, error) {
 	return c.Client.RepoName(ctx, c.repo)
-}
-
-// OpenWeb shows the item in a browser. It does not go through gh: `gh ... --web`
-// looks only for xdg-open, x-www-browser, www-browser and wslview, and a WSL
-// machine has none of them -- wslu, which provides wslview, is no longer
-// packaged for Ubuntu. GitHub gives every item its URL, so there is nothing
-// gh would add here.
-func (c *Client) OpenWeb(url string) error {
-	return browser.Open(url)
 }
 
 func (c *Client) AddPRComment(repo string, number int, body string) error {

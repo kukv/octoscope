@@ -18,10 +18,9 @@ import (
 
 // fakeSource implements Source and records calls.
 type fakeSource struct {
-	pr       domain.PR
-	issue    domain.Issue
-	err      error
-	webCalls []string // the URLs handed to the browser
+	pr    domain.PR
+	issue domain.Issue
+	err   error
 
 	commentCalls []string // "pr:<repo>:<n>:<body>" / "issue:<repo>:<n>:<body>"
 	commentErr   error
@@ -75,11 +74,6 @@ func kindName(ref domain.ItemRef) string {
 		return "pr"
 	}
 	return "issue"
-}
-
-func (f *fakeSource) OpenWeb(url string) error {
-	f.webCalls = append(f.webCalls, url)
-	return nil
 }
 
 func (f *fakeSource) AddComment(ref domain.ItemRef, body string) error {
@@ -313,13 +307,15 @@ func TestOOpensTheShownItemsOwnURL(t *testing.T) {
 	const want = "https://github.com/kukv/demo/pull/1"
 	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", URL: want}}
 	m := loaded(f, prRef())
+	var got string
+	m.open = func(url string) error { got = url; return nil }
 	_, cmd := m.Update(key("o"))
 	if cmd == nil {
 		t.Fatal("cmd = nil, want openWeb cmd")
 	}
 	cmd()
-	if len(f.webCalls) != 1 || f.webCalls[0] != want {
-		t.Errorf("webCalls = %v, want [%s]", f.webCalls, want)
+	if got != want {
+		t.Errorf("open got %q, want %q", got, want)
 	}
 }
 
