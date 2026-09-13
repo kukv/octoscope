@@ -65,7 +65,7 @@ func stars(n int) string {
 
 // boxWidth keeps the popup readable at eighty columns without letting it run
 // the full width of a wide terminal. The judgment is shared with
-// internal/tui/search's saved-queries popup, so it lives in layout; only
+// internal/app/presentation/tui/search's saved-queries popup, so it lives in layout; only
 // the type is not shared.
 func (m Model) boxWidth() int {
 	return layout.PopupWidth(m.width)

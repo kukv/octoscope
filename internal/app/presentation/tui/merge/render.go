@@ -10,7 +10,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// boxWidth is the popup's own cap, the width internal/tui/review draws its
+// boxWidth is the popup's own cap, the width internal/app/presentation/tui/review draws its
 // box at; boxWidth never exceeds what width actually leaves.
 const boxWidth = 50
 

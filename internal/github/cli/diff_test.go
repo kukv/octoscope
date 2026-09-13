@@ -10,7 +10,7 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// readSample reads the one recording of sample.diff, kept in internal/gh
+// readSample reads the one recording of sample.diff, kept in internal/app/domain
 // since that is where the parsing tests that assert on its content now live.
 // The tests here only need gh pr diff to return something a real diff could
 // be, not any particular content of it.

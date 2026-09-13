@@ -154,7 +154,7 @@ func TestGolden(t *testing.T) {
 // than the layout believes.
 // It does not run in parallel with the rest of the package: i18n.SetLanguage
 // is global state, and a parallel test reading i18n.T while this one is
-// mid-language-switch would race (internal/tui/diff's own golden test avoids
+// mid-language-switch would race (internal/app/presentation/tui/diff's own golden test avoids
 // the same way).
 func TestNothingOverrunsTheTerminal(t *testing.T) {
 	for _, lang := range goldenLanguages {

@@ -4,7 +4,7 @@
 //
 // It is a popup rather than a view of its own, so it has no place in the
 // root model's stack. The detail view holds one and draws it over itself.
-// Unlike internal/tui/review it fetches for itself: r has to be able to ask
+// Unlike internal/app/presentation/tui/review it fetches for itself: r has to be able to ask
 // GitHub again while the popup stays open (standalone design §4.4.4).
 package merge
 
@@ -41,7 +41,7 @@ type MergedMsg struct{ Merged bool }
 type CancelledMsg struct{}
 
 // ErrorMsg carries a failure the holder shows at footer level, the same way
-// internal/tui/review hands its failures up (.claude/rules/errors.md). It
+// internal/app/presentation/tui/review hands its failures up (.claude/rules/errors.md). It
 // names what raised it so a popup that has moved on can drop it; the holder
 // asks Owns before it shows the message.
 type ErrorMsg struct {

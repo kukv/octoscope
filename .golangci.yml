@@ -14,84 +14,93 @@ linters:
   settings:
     depguard:
       rules:
-        # The GitHub access layer must not know about the UI, nor about the
-        # layer that orchestrates it.
-        gh-layer:
+        # ドメインは何にも依存しない。encoding/json の禁止は PR 2 で足す。
+        domain-layer:
           files:
             - "**/internal/app/domain/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui
-              desc: the GitHub layer must not depend on the UI
             - pkg: github.com/kukv/octoscope/internal/app/usecase
-              desc: the GitHub layer must not depend on the layer above it
-        # The views talk to internal/app/usecase, not to the backend behind it.
-        # cmd/octoscope is the one place that names a backend.
-        tui-layer:
-          files:
-            - "**/internal/app/presentation/tui/**"
-          deny:
-            - pkg: github.com/kukv/octoscope/internal/github/cli
-              desc: views go through internal/app/usecase; only cmd/octoscope names a backend
-            - pkg: github.com/kukv/octoscope/internal/github/gql
-              desc: views go through internal/app/usecase; only cmd/octoscope names a backend
-            - pkg: github.com/kukv/octoscope/internal/github/api
-              desc: views go through internal/app/usecase; only cmd/octoscope names a backend
+              desc: ドメインは上の層を知らない
+            - pkg: github.com/kukv/octoscope/internal/app/presentation
+              desc: ドメインは UI を知らない
             - pkg: github.com/kukv/octoscope/internal/app/config
-              desc: settings reach the views through app.Options; cmd/octoscope reads them
-        # usecase sits below the UI: it decides which GitHub calls an
-        # operation takes, and knows nothing of screens or messages.
+              desc: ドメインは設定ファイルを知らない
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: ドメインは特定サービスのクライアントを知らない
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: ドメインは翻訳しない
+            - pkg: github.com/kukv/octoscope/internal/browser
+              desc: ドメインはブラウザを開かない
+        # GitHub クライアントはアプリの上位層を知らない。
+        # internal/app 全体の禁止は PR 2（domain 非依存化）で足す。
+        github-layer:
+          files:
+            - "**/internal/github/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
+              desc: クライアントは上の層を知らない
+            - pkg: github.com/kukv/octoscope/internal/app/presentation
+              desc: クライアントは UI を知らない
+            - pkg: github.com/kukv/octoscope/internal/app/config
+              desc: クライアントは設定ファイルを知らない
+        # usecase は画面も翻訳も知らない。
         usecase-layer:
           files:
             - "**/internal/app/usecase/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui
-              desc: internal/app/usecase must not depend on the UI
+            - pkg: github.com/kukv/octoscope/internal/app/presentation
+              desc: usecase は UI に依存しない
             - pkg: github.com/kukv/octoscope/internal/i18n
-              desc: internal/app/usecase must not translate; the UI does
-        # Reading the settings file is a leaf: it parses YAML and knows
-        # nothing of the screens or of GitHub.
+              desc: usecase は翻訳しない。訳すのは UI
+        # ビューは usecase を通す。どのクライアントが動いているかを
+        # 知っているのは cmd/octoscope だけである。
+        presentation-layer:
+          files:
+            - "**/internal/app/presentation/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: ビューは usecase を通す。クライアントを名指しするのは cmd/octoscope だけ
+            - pkg: github.com/kukv/octoscope/internal/app/config
+              desc: 設定は Options で届く。読むのは cmd/octoscope
+        # 設定ファイルの読み取りは葉である。
         config-layer:
           files:
             - "**/internal/app/config/**"
           deny:
             - pkg: github.com/kukv/octoscope/internal/app/domain
-              desc: internal/app/config must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui
-              desc: internal/app/config must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/i18n
-              desc: internal/app/config must not depend on other internal packages
+              desc: config は他のパッケージに依存しない
             - pkg: github.com/kukv/octoscope/internal/app/usecase
-              desc: internal/app/config must not depend on other internal packages
+              desc: config は他のパッケージに依存しない
+            - pkg: github.com/kukv/octoscope/internal/app/presentation
+              desc: config は他のパッケージに依存しない
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: config は他のパッケージに依存しない
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: config は他のパッケージに依存しない
             - pkg: github.com/kukv/octoscope/internal/browser
-              desc: internal/app/config must not depend on other internal packages
-        # Messages are a leaf: they depend on nothing of ours.
+              desc: config は他のパッケージに依存しない
+        # メッセージは葉である。
         i18n-layer:
           files:
             - "**/internal/i18n/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/app/domain
-              desc: internal/i18n must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui
-              desc: internal/i18n must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/config
-              desc: internal/i18n must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/usecase
-              desc: internal/i18n must not depend on other internal packages
-        # Opening a URL is a leaf: it depends on nothing of ours.
+            - pkg: github.com/kukv/octoscope/internal/app
+              desc: i18n は他のパッケージに依存しない
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: i18n は他のパッケージに依存しない
+            - pkg: github.com/kukv/octoscope/internal/browser
+              desc: i18n は他のパッケージに依存しない
+        # URL を開くことは葉である。
         browser-layer:
           files:
             - "**/internal/browser/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/app/domain
-              desc: internal/browser must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui
-              desc: internal/browser must not depend on other internal packages
+            - pkg: github.com/kukv/octoscope/internal/app
+              desc: browser は他のパッケージに依存しない
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: browser は他のパッケージに依存しない
             - pkg: github.com/kukv/octoscope/internal/i18n
-              desc: internal/browser must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/config
-              desc: internal/browser must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/app/usecase
-              desc: internal/browser must not depend on other internal packages
+              desc: browser は他のパッケージに依存しない
         # Views are siblings: a view must not reach into another view's model,
         # and no child may import its parent.
         tui-work:

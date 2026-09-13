@@ -31,7 +31,7 @@ const (
 	ageColumn    = 8
 
 	// promptCols is the "> " textinput draws in front of what is typed
-	// (internal/tui/dialog uses the same figure for the same reason).
+	// (internal/app/presentation/tui/dialog uses the same figure for the same reason).
 	promptCols = 2
 
 	// cursorCol is the extra column textinput reserves after the typed text
@@ -240,7 +240,7 @@ func (m Model) candidateChips() string {
 }
 
 // labelChips draws a repository's labels as chips in the colour GitHub gave
-// them, the same "drop whatever does not fit" rule internal/tui/repo's
+// them, the same "drop whatever does not fit" rule internal/app/presentation/tui/repo's
 // badges() uses for the same reason: a wrapped chip row would push the rest
 // of the pane down by an amount that depends on the repository.
 func labelChips(labels []domain.Label, room int) string {

@@ -458,7 +458,7 @@ func (f *fakeQueryStore) SaveQueries(queries []config.SavedQuery) error {
 }
 
 // SaveQueries converts usecase.SavedQuery into config.SavedQuery on the way
-// to the store: internal/config is not visible from internal/tui, so the
+// to the store: internal/app/config is not visible from internal/app/presentation/tui, so the
 // UI's type cannot be the one written to disk.
 func TestSaveQueriesConvertsAndReachesTheStore(t *testing.T) {
 	t.Parallel()

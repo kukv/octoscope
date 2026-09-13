@@ -130,7 +130,7 @@ func TestRepoVarsFallsBackToSplittingOwnerAndName(t *testing.T) {
 	}
 }
 
-// A Client that names a repository some other way (internal/gh/api resolves
+// A Client that names a repository some other way (internal/github/api resolves
 // "wherever we are" from the endpoint it talks to, not from a git remote)
 // must go through RepoVars instead of the owner/name split.
 func TestRepoVarsUsesTheProvidedSplitter(t *testing.T) {

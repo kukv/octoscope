@@ -1,5 +1,5 @@
 // Package api fetches GitHub data by talking to the API itself, for machines
-// that have no gh CLI. It answers the same domain types internal/gh/cli does
+// that have no gh CLI. It answers the same domain types internal/github/cli does
 // and sends the same GraphQL documents, through a different transport.
 package api
 

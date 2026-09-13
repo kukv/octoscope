@@ -1,6 +1,6 @@
 // Package gql holds the GraphQL documents octoscope sends to GitHub and the
 // decoding of their answers. What actually carries a document to GitHub is
-// the caller's business: internal/gh/cli runs gh api graphql, internal/gh/api
+// the caller's business: internal/github/cli runs gh api graphql, internal/github/api
 // posts to the endpoint itself.
 package gql
 

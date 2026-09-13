@@ -40,7 +40,7 @@ func upsert(qs []usecase.SavedQuery, q usecase.SavedQuery) []usecase.SavedQuery 
 }
 
 // removeSaved drops the entry at i and reports whether it was dropped, the
-// way internal/tui/repo/rows.go's removeRow does for the sidebar's own x.
+// way internal/app/presentation/tui/repo/rows.go's removeRow does for the sidebar's own x.
 func removeSaved(qs []usecase.SavedQuery, i int) ([]usecase.SavedQuery, bool) {
 	if i < 0 || i >= len(qs) {
 		return qs, false

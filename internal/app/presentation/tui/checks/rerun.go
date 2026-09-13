@@ -9,7 +9,7 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// mode is which overlay is on screen, the same shape internal/tui/diff's
+// mode is which overlay is on screen, the same shape internal/app/presentation/tui/diff's
 // own mode/phase pair uses.
 type mode uint8
 

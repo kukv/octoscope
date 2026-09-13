@@ -14,7 +14,7 @@ func (u *Usecase) SearchItems(ctx context.Context, query string) ([]domain.WorkI
 
 // SavedQuery is one of the Search tab's saved queries: what the user called
 // it, and the GitHub search it stands for. It crosses the boundary because
-// internal/tui cannot see internal/config, and this package can see both.
+// internal/app/presentation/tui cannot see internal/app/config, and this package can see both.
 type SavedQuery struct {
 	Name  string
 	Query string

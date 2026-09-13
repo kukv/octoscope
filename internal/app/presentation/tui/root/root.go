@@ -52,8 +52,8 @@ type Options struct {
 	Repo string
 
 	// Repositories is the settings file's list, which the Repos tab shows
-	// whether or not the working directory is a repository. internal/tui
-	// cannot read internal/config, so the list travels here.
+	// whether or not the working directory is a repository. internal/app/presentation/tui
+	// cannot read internal/app/config, so the list travels here.
 	Repositories []string
 
 	// SavedQueries is the settings file's saved queries, handed to the

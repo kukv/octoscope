@@ -418,7 +418,7 @@ func TestResolvedRepositoryFetchesCounts(t *testing.T) {
 
 // TestSidebarMoveAsksListPRsForTheNewRow covers the argument fetchList hands
 // down through the routing that reaches this package's Source: moving the
-// Repos sidebar's cursor here, not just inside internal/tui/repo, must ask
+// Repos sidebar's cursor here, not just inside internal/app/presentation/tui/repo, must ask
 // ListPRs for the row the cursor landed on.
 func TestSidebarMoveAsksListPRsForTheNewRow(t *testing.T) {
 	f := &fakeSource{}

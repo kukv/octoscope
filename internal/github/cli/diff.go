@@ -35,7 +35,7 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]domain.
 			return files, nil
 		}
 		// err is the one that describes what the user actually asked for and
-		// is reported as such (see showError() in internal/tui/app); ferr is
+		// is reported as such (see showError() in internal/app/presentation/tui/root); ferr is
 		// joined in rather than discarded so a bug in prFiles itself (a
 		// parse failure, say) is not silently swallowed
 		// (.claude/rules/errors.md). errors.Is still matches err through the

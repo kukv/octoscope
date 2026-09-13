@@ -7,7 +7,7 @@ import (
 )
 
 // key builds the KeyPressMsg for a key name, matching the shape the app uses
-// (internal/tui/diff/diff_test.go's key, with a tab case this package needs).
+// (internal/app/presentation/tui/diff/diff_test.go's key, with a tab case this package needs).
 func key(s string) tea.KeyMsg {
 	switch s {
 	case "esc":
