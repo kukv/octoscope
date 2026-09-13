@@ -94,6 +94,19 @@ linters:
               desc: datasource は GitHub クライアントを知らない
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: datasource は翻訳しない
+        # gateway はサービスの型を domain に訳す。上の層は知らない。
+        gateway-layer:
+          files:
+            - "**/internal/app/adapter/gateway/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
+              desc: gateway は port を暗黙に満たす。usecase を import しない
+            - pkg: github.com/kukv/octoscope/internal/app/presentation
+              desc: gateway は UI を知らない
+            - pkg: github.com/kukv/octoscope/internal/app/config
+              desc: gateway は設定ファイルを知らない
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: gateway は翻訳しない
         # メッセージは葉である。
         i18n-layer:
           files:
