@@ -162,7 +162,7 @@ func manyChecks() domain.Checks {
 				Kind:        domain.CheckKindRun,
 				Workflow:    wf,
 				Job:         domain.JobHandle(strconv.Itoa(id)),
-				WorkflowRun: domain.RunHandle(strconv.Itoa(id)),
+				WorkflowRun: domain.RunHandle(strconv.Itoa(id + 1000)),
 			})
 			id++
 		}

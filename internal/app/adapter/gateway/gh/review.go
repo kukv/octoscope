@@ -40,7 +40,7 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 func (g *Gateway) AddReviewThread(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
 	review := t.Pending
 	if review == "" {
-		id, err := g.StartReview(string(t.PullRequest))
+		id, err := g.backend.StartReview(string(t.PullRequest))
 		if err != nil {
 			return "", wrap(err)
 		}
@@ -57,7 +57,7 @@ func (g *Gateway) AddReviewThread(t domain.ReviewTarget, c domain.PendingComment
 // review behind if the submission then failed.
 func (g *Gateway) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	if t.Pending == "" {
-		return wrap(g.SubmitNewReview(string(t.PullRequest), fromReviewEvent(event), body))
+		return wrap(g.backend.SubmitNewReview(string(t.PullRequest), fromReviewEvent(event), body))
 	}
 	return wrap(g.backend.SubmitReview(string(t.Pending), fromReviewEvent(event), body))
 }
