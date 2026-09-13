@@ -278,7 +278,7 @@ gateway と独立しており、先に単独で落ちる。
 
 検証: `make check`。設定ファイルの保存と読み込みを実際に動かして確認する。
 
-#### PR 2b: gateway の導入と `internal/github` の domain 非依存化
+#### PR 2b: gateway の導入と `internal/github` の domain 非依存化（完了）
 
 **一括ではなく port グループ単位で進める。** `cmd/octoscope/main.go` は
 `if ghClient != nil { usecase.New(ghClient, store) } else { usecase.New(apiClient, store) }`
