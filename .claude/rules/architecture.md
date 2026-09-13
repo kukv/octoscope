@@ -42,8 +42,7 @@ gateway は domain だけを見て port を満たす。結線は `cmd/octoscope`
 これを断つのは PR 2 である。それまでは `internal/github` が domain を知っていても
 設計が壊れているわけではない。
 
-同様に、上の図にある `internal/app/adapter/gateway/gh` と `internal/app/adapter/datasource`
-はまだ存在しない。両方とも PR 2 / PR 3 で作られる。
+同様に、上の図にある `internal/app/adapter/gateway/gh` はまだ存在しない。PR 2 / PR 3 で作られる。
 
 この向きは目視ではなく lint で守る。`.golangci.yml` の `depguard` に禁止 import を
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**
@@ -162,6 +161,20 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
 足すと**増える**ものも書く。`internal/app/usecase` の場合は、GitHub への新しい操作を
 足すときに触るファイルが `internal/github/cli` + ビューの 2 つから
 `internal/github/cli` + `usecase` + ビューの 3 つになる。これが唯一の実コストである。
+
+**`internal/app/adapter/datasource` を入れる判断を 2026-09-13 にした。**
+
+- **無いと何が壊れるか（実測）:** `SavedQuery` が `config`（ファイル形式）→
+  `usecase`（再定義）→ `root.Options` の 3 段を経由していた。tui が `config` を
+  見られないためだけの中継で、変換関数 `SavedQueriesFrom` が `cmd/octoscope` の
+  起動処理に置かれていた
+- **足すと何が減るか:** その 3 段が 1 段になり、`usecase.SavedQuery` と
+  `SavedQueriesFrom` が消えた。設定の保存先を変えるときに触るのは `datasource`
+  だけになる
+- **足すと何が増えるか:** 設定ファイルを触るパッケージが 1 つから 2 つになった。
+  `config` が形を持ち、`datasource` が書き戻す。両者が食い違うと設定が静かに
+  壊れるので、`datasource_test.go` に「片方を保存しても、もう片方と起動時設定が
+  消えない」テストを置いた
 
 ## 名前は借りてよい、形は借りない
 
