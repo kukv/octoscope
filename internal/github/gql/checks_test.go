@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"testing"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // rollupPage wraps contexts nodes in the shape the query selects them in.
@@ -41,7 +39,7 @@ func TestPRChecksWalksEveryPageOfContexts(t *testing.T) {
 	f := &fakeSeq{outs: []string{page1, page2}}
 	c := &Client{Do: f.do}
 
-	checks, err := c.PRChecks(context.Background(), "kukv/octoscope", 61)
+	runs, err := c.PRChecks(context.Background(), "kukv/octoscope", 61)
 	if err != nil {
 		t.Fatalf("PRChecks: %v", err)
 	}
@@ -53,8 +51,8 @@ func TestPRChecksWalksEveryPageOfContexts(t *testing.T) {
 	if !slices.Contains(f.calls[1], S("after", "CUR1")) {
 		t.Errorf("second call = %v, want it to carry after=CUR1", f.calls[1])
 	}
-	if checks.Total != 2 {
-		t.Errorf("Total = %d, want 2 (one from each page)", checks.Total)
+	if len(runs) != 2 {
+		t.Errorf("runs = %d, want 2 (one from each page)", len(runs))
 	}
 }
 
@@ -62,28 +60,28 @@ func TestPRChecksReadsTheIdsTheViewActsOn(t *testing.T) {
 	t.Parallel()
 
 	c := fileClient(t, "testdata/pr_checks.json")
-	checks, err := c.PRChecks(context.Background(), "kukv/octoscope", 61)
+	runs, err := c.PRChecks(context.Background(), "kukv/octoscope", 61)
 	if err != nil {
 		t.Fatalf("PRChecks: %v", err)
 	}
-	i := slices.IndexFunc(checks.Runs, func(r domain.CheckRun) bool { return r.Name == "lint" })
+	i := slices.IndexFunc(runs, func(r CheckRun) bool { return r.Name == "lint" })
 	if i < 0 {
-		t.Fatalf("no check named lint in %v", checks.Runs)
+		t.Fatalf("no check named lint in %v", runs)
 	}
-	got := checks.Runs[i]
-	if got.Kind != domain.CheckKindRun {
-		t.Errorf("Kind = %v, want CheckKindRun", got.Kind)
+	got := runs[i]
+	if got.Typename != "CheckRun" {
+		t.Errorf("Typename = %q, want CheckRun", got.Typename)
 	}
-	if got.JobID != 101635448466 {
-		t.Errorf("JobID = %d, want 101635448466", got.JobID)
+	if got.DatabaseID != 101635448466 {
+		t.Errorf("DatabaseID = %d, want 101635448466", got.DatabaseID)
 	}
-	if got.RunID != 34087925535 {
-		t.Errorf("RunID = %d, want 34087925535", got.RunID)
+	if got.CheckSuite.WorkflowRun == nil || got.CheckSuite.WorkflowRun.DatabaseID != 34087925535 {
+		t.Errorf("CheckSuite.WorkflowRun.DatabaseID = %v, want 34087925535", got.CheckSuite.WorkflowRun)
 	}
-	if got.Workflow != "CI" {
-		t.Errorf("Workflow = %q, want %q", got.Workflow, "CI")
+	if got.CheckSuite.WorkflowRun == nil || got.CheckSuite.WorkflowRun.Workflow.Name != "CI" {
+		t.Errorf("CheckSuite.WorkflowRun.Workflow.Name = %v, want %q", got.CheckSuite.WorkflowRun, "CI")
 	}
-	if got.Duration() == 0 {
-		t.Error("Duration() = 0, want the time between startedAt and completedAt")
+	if got.StartedAt.IsZero() || got.CompletedAt.IsZero() || !got.CompletedAt.After(got.StartedAt) {
+		t.Errorf("StartedAt/CompletedAt = %v/%v, want CompletedAt after StartedAt", got.StartedAt, got.CompletedAt)
 	}
 }

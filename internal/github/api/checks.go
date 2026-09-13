@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // RerunWorkflow starts a workflow run again. GitHub has two endpoints rather
 // than one with a flag: the failed-jobs one leaves the jobs that passed alone.
-func (c *Client) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
+func (c *Client) RerunWorkflow(ctx context.Context, repo string, runID int64, scope github.RerunScope) error {
 	r, err := c.repoPath(repo)
 	if err != nil {
 		return err
 	}
 	endpoint := "rerun"
-	if scope == domain.RerunFailed {
+	if scope == github.RerunFailed {
 		endpoint = "rerun-failed-jobs"
 	}
 	path := fmt.Sprintf("repos/%s/actions/runs/%d/%s", r, runID, endpoint)
@@ -59,7 +59,7 @@ func failed(conclusion string) bool {
 //
 // A job that has not finished has no log yet, and a passing job has no failed
 // steps: neither is an error, and the second answers with no lines at all.
-func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
+func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]github.LogLine, error) {
 	r, err := c.repoPath(repo)
 	if err != nil {
 		return nil, err

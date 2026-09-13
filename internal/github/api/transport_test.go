@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -107,7 +107,7 @@ func TestAGatewayFailureIsTransient(t *testing.T) {
 	for _, status := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
 		c, _ := serve(t, status, "")
 		_, err := c.post(context.Background(), "query {}", nil)
-		if !errors.Is(err, domain.ErrTransient) {
+		if !errors.Is(err, github.ErrTransient) {
 			t.Errorf("status %d: err = %v, want ErrTransient", status, err)
 		}
 	}
@@ -118,11 +118,8 @@ func TestABadCredentialIsUnauthenticated(t *testing.T) {
 
 	c, _ := serve(t, http.StatusUnauthorized, `{"message":"Bad credentials"}`)
 	_, err := c.post(context.Background(), "query {}", nil)
-	if !errors.Is(err, domain.ErrUnauthenticated) {
+	if !errors.Is(err, github.ErrUnauthenticated) {
 		t.Fatalf("err = %v, want ErrUnauthenticated", err)
-	}
-	if !domain.IsFatal(err) {
-		t.Error("the UI would not show the error screen for this")
 	}
 }
 
@@ -162,7 +159,7 @@ func TestAnOrdinaryFailureKeepsWhatGitHubSaid(t *testing.T) {
 	if !strings.Contains(err.Error(), "API rate limit exceeded") {
 		t.Errorf("err = %q, want GitHub's own words", err)
 	}
-	if domain.IsFatal(err) {
+	if errors.Is(err, github.ErrUnauthenticated) || errors.Is(err, github.ErrNotInstalled) {
 		t.Error("a rate limit is not something the user has to fix before anything works")
 	}
 }

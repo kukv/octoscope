@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"slices"
 	"time"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed pr_comments.graphql
@@ -21,33 +19,15 @@ var issueCommentsQuery string
 // 100 nodes and answers with the oldest of them, so a thread longer than
 // that is only whole once the pages after the first have been walked.
 type commentPage struct {
-	PageInfo PageInfo      `json:"pageInfo"`
-	Nodes    []commentNode `json:"nodes"`
+	PageInfo PageInfo  `json:"pageInfo"`
+	Nodes    []Comment `json:"nodes"`
 }
 
-// commentNode is one comment. GraphQL nests the author under an object,
-// which domain.Comment already spells the same way.
-type commentNode struct {
-	Author struct {
-		Login string `json:"login"`
-	} `json:"author"`
+// Comment is one comment on a pull request or an issue.
+type Comment struct {
+	Author    Author    `json:"author"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"createdAt"`
-}
-
-func toComments(in []commentNode) []domain.Comment {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]domain.Comment, len(in))
-	for i, c := range in {
-		out[i] = domain.Comment{
-			Author:    domain.Author{Login: c.Author.Login},
-			Body:      c.Body,
-			CreatedAt: c.CreatedAt,
-		}
-	}
-	return out
 }
 
 type prCommentsResponse struct {
@@ -91,7 +71,7 @@ func decodeIssueComments(body []byte) (commentPage, error) {
 // comments connection, so a long thread does not re-fetch the whole item.
 func (c *Client) restOfConversation(ctx context.Context, doc string, repoVars []Var, number int, first commentPage,
 	decode func([]byte) (commentPage, error),
-) ([]commentNode, error) {
+) ([]Comment, error) {
 	nodes := first.Nodes
 	page := first
 	for page.PageInfo.HasNextPage && page.PageInfo.EndCursor != "" {

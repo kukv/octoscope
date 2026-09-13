@@ -1,17 +1,18 @@
 // Package domain holds the types the application is written in terms of.
 // It has no behaviour beyond the rules those types carry, and it depends on
-// nothing: the clients that fetch this data live under internal/github, and
-// they translate their own service's spelling into these values.
+// nothing: internal/app/adapter/gateway/gh translates a service's own
+// spelling into these values before anything reaches this package.
 package domain
 
 import (
 	"errors"
-	"strings"
 	"time"
 )
 
-// ErrGhNotFound is returned when the gh binary is not on PATH.
-var ErrGhNotFound = errors.New("gh CLI not found; install it and run: gh auth login")
+// ErrBackendUnavailable is returned when the backend that talks to GitHub
+// cannot be reached at all -- the gh binary missing is one backend's
+// problem, not a thing the application itself knows about.
+var ErrBackendUnavailable = errors.New("gh CLI not found; install it and run: gh auth login")
 
 // ErrTransient wraps a failure GitHub's front end produced rather than
 // answered -- 502, 503, 504. The request was well-formed, so asking again
@@ -21,33 +22,19 @@ var ErrTransient = errors.New("GitHub did not answer")
 // ErrUnauthenticated is returned when gh has no usable credentials.
 var ErrUnauthenticated = errors.New("not authenticated; run: gh auth login")
 
-// SplitRepo reports whether repo has the shape "owner/name": both halves
-// non-empty, no second "/", and no leading or trailing whitespace that a
-// hand-edited settings file could carry in unnoticed.
-func SplitRepo(repo string) (owner, name string, ok bool) {
-	if repo != strings.TrimSpace(repo) {
-		return "", "", false
-	}
-	owner, name, ok = strings.Cut(repo, "/")
-	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
-		return "", "", false
-	}
-	return owner, name, true
-}
-
 type Author struct {
-	Login string `json:"login"`
+	Login string
 }
 
 type Label struct {
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	Name  string
+	Color string
 }
 
 type Comment struct {
-	Author    Author    `json:"author"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"createdAt"`
+	Author    Author
+	Body      string
+	CreatedAt time.Time
 }
 
 // ItemState is whether a pull request or an issue is still open, translated
@@ -60,22 +47,8 @@ const (
 	StateMerged
 )
 
-// ParseItemState maps GitHub's state onto the domain value. GraphQL and REST
-// differ in case, so the comparison ignores it; anything unrecognised reads
-// as closed, which is the reading that offers no action.
-func ParseItemState(state string) ItemState {
-	switch strings.ToUpper(state) {
-	case "OPEN":
-		return StateOpen
-	case "MERGED":
-		return StateMerged
-	default:
-		return StateClosed
-	}
-}
-
 // PR and Issue carry no JSON tags: what a backend receives is that backend's
-// business, and both of them translate GitHub's own spelling into the values
+// business, and the gateway translates GitHub's own spelling into the values
 // above before handing anything over.
 type PR struct {
 	Number    int
@@ -139,22 +112,6 @@ const (
 	ReviewApproved
 	ReviewChangesRequested
 )
-
-// ParseReviewDecision maps the GraphQL reviewDecision enum onto the domain
-// value. An empty string means the pull request needs no review at all; an
-// unknown one is treated the same way rather than failing the whole fetch.
-func ParseReviewDecision(decision string) ReviewState {
-	switch decision {
-	case "APPROVED":
-		return ReviewApproved
-	case "CHANGES_REQUESTED":
-		return ReviewChangesRequested
-	case "REVIEW_REQUIRED":
-		return ReviewRequired
-	default:
-		return ReviewNone
-	}
-}
 
 // CheckState is the rolled-up outcome of a pull request's checks.
 type CheckState int
@@ -313,5 +270,5 @@ func Classify(kind error, msg string) error {
 // behind the sentinels it names, and the Work board and the Repos list would
 // then disagree about what costs the user their screen.
 func IsFatal(err error) bool {
-	return errors.Is(err, ErrGhNotFound) || errors.Is(err, ErrUnauthenticated)
+	return errors.Is(err, ErrBackendUnavailable) || errors.Is(err, ErrUnauthenticated)
 }

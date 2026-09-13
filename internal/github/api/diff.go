@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // diffMediaType is what asks the pull request endpoint for a unified diff
@@ -21,30 +21,30 @@ const diffMediaType = "application/vnd.github.v3.diff"
 // joined rather than one discarding the other: this one still describes what
 // the user actually asked for, but a bug in the fallback itself must not go
 // unseen either.
-func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
+func (c *Client) PRDiff(ctx context.Context, repo string, number int) (github.Diff, error) {
 	r, err := c.repoPath(repo)
 	if err != nil {
-		return nil, err
+		return github.Diff{}, err
 	}
 	out, derr := c.read(ctx, fmt.Sprintf("repos/%s/pulls/%d", r, number), diffMediaType)
 	if derr != nil {
 		files, ferr := c.prFiles(ctx, r, number)
 		if ferr == nil {
-			return files, nil
+			return github.Diff{Files: files}, nil
 		}
-		return nil, errors.Join(derr, ferr)
+		return github.Diff{}, errors.Join(derr, ferr)
 	}
-	return domain.ParseDiff(out), nil
+	return github.Diff{Raw: out}, nil
 }
 
 // prFiles is the files-API fallback for PRDiff. It walks every page: the
 // endpoint's default page is 30 files, and the pull request this fallback
 // exists for had 418.
-func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
+func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]github.PRFile, error) {
 	path := fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d", repo, number, pageSize)
-	var files []domain.FileDiff
+	var files []github.PRFile
 	err := c.walkPages(ctx, path, func(out []byte) error {
-		page, err := domain.ParseFilesAPI(out)
+		page, err := github.ParseFilesAPI(out)
 		if err != nil {
 			return err
 		}

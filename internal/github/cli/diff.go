@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // PRDiff returns the pull request's diff, one entry per file.
@@ -23,7 +23,7 @@ import (
 // joined rather than one discarding the other: this one still describes
 // what the user actually asked for, but a bug in the fallback itself must
 // not go unseen either.
-func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
+func (c *Client) PRDiff(ctx context.Context, repo string, number int) (github.Diff, error) {
 	args := appendRepo(
 		[]string{"pr", "diff", strconv.Itoa(number), "--color", "never"},
 		c.effectiveRepo(repo),
@@ -32,7 +32,7 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]domain.
 	if err != nil {
 		files, ferr := c.prFiles(ctx, repo, number)
 		if ferr == nil {
-			return files, nil
+			return github.Diff{Files: files}, nil
 		}
 		// err is the one that describes what the user actually asked for and
 		// is reported as such (see showError() in internal/app/presentation/tui/root); ferr is
@@ -40,21 +40,21 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]domain.
 		// parse failure, say) is not silently swallowed
 		// (.claude/rules/errors.md). errors.Is still matches err through the
 		// join.
-		return nil, errors.Join(err, ferr)
+		return github.Diff{}, errors.Join(err, ferr)
 	}
-	return domain.ParseDiff(out), nil
+	return github.Diff{Raw: out}, nil
 }
 
 // prFiles is the files-API fallback for PRDiff. --paginate is required: the
 // endpoint's default page is 30 files, and the pull request this fallback
 // exists for had 418. per_page=100 cuts that down to 5 requests instead of
 // 14 (ListAssignees in cli.go does the same for its own listing).
-func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
+func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]github.PRFile, error) {
 	out, err := c.read(ctx, c.dir, "api", prFilesPath(c.effectiveRepo(repo), number), "--paginate")
 	if err != nil {
 		return nil, err
 	}
-	return domain.ParseFilesAPI(out)
+	return github.ParseFilesAPI(out)
 }
 
 // prFilesPath builds the REST path for the files-API fallback. gh api

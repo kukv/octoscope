@@ -5,8 +5,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // commentsOnly is the answer pr_comments.graphql and issue_comments.graphql
@@ -56,7 +54,7 @@ func TestGetPRWalksEveryPageOfTheConversation(t *testing.T) {
 	}
 	// The later pages are appended, not substituted, and the thread keeps the
 	// order GitHub answered it in.
-	if got := logins(pr.Comments); !slices.Equal(got, []string{"oldest", "middle", "newest"}) {
+	if got := logins(pr.Comments.Nodes); !slices.Equal(got, []string{"oldest", "middle", "newest"}) {
 		t.Errorf("conversation = %v, want [oldest middle newest]", got)
 	}
 }
@@ -81,7 +79,7 @@ func TestGetIssueWalksEveryPageOfTheConversation(t *testing.T) {
 	if !slices.Contains(f.calls[1], S("after", "CUR1")) {
 		t.Errorf("second call = %v, want it to carry after=CUR1", f.calls[1])
 	}
-	if got := logins(issue.Comments); !slices.Equal(got, []string{"oldest", "newest"}) {
+	if got := logins(issue.Comments.Nodes); !slices.Equal(got, []string{"oldest", "newest"}) {
 		t.Errorf("conversation = %v, want [oldest newest]", got)
 	}
 }
@@ -125,7 +123,7 @@ func TestTheCommentPagingDocumentsSelectNothingButTheComments(t *testing.T) {
 }
 
 // logins names the authors of a conversation in order.
-func logins(comments []domain.Comment) []string {
+func logins(comments []Comment) []string {
 	out := make([]string, len(comments))
 	for i, c := range comments {
 		out[i] = c.Author.Login

@@ -298,7 +298,7 @@ func TestATransientFailureKeepsTheList(t *testing.T) {
 // Only what the user must act on takes the whole screen.
 func TestAMissingGhIsFatal(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{}), 120)
-	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrGhNotFound})
+	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrBackendUnavailable})
 	if cmd == nil {
 		t.Fatal("a missing gh produced no message")
 	}

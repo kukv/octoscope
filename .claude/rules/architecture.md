@@ -39,15 +39,14 @@ internal/{i18n,golden,browser} ──→ （何にも依存しない）
 **gateway は usecase を import しない。** Go の interface は暗黙に満たされるので、
 gateway は domain だけを見て port を満たす。結線は `cmd/octoscope` が行う。
 
-**`internal/github` は現時点ではまだ `internal/app/domain` を import している。**
-これを断つのは PR 2 である。それまでは `internal/github` が domain を知っていても
-設計が壊れているわけではない。
-
-同様に、上の図にある `internal/app/adapter/gateway/gh` はまだ存在しない。PR 2 / PR 3 で作られる。
-
 この向きは目視ではなく lint で守る。`.golangci.yml` の `depguard` に禁止 import を
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**
 足し忘れると、次に誰かが依存の向きを壊しても誰も気づかない。
+
+（`i18n-layer` と `browser-layer` の deny は今も `internal/app`（末尾スラッシュ無し）のままで、
+`github-layer` は `internal/app/`（末尾スラッシュ付き）に直した。前者は `internal/appfoo` のような
+無関係なパッケージ名も誤って拾う over-match の余地を残しているが、実害はまだ無い。
+直すなら 3 つ揃えて直す。）
 
 ## interface は利用側で定義する
 
@@ -94,6 +93,15 @@ const (
 
 理由は 2 つ。GraphQL と REST で綴りが違う場合にバックエンドの差が UI に漏れないこと、
 そして UI 側が「知らない文字列」を握りつぶす分岐を持たずに済むこと。
+
+**この境界はもう規約文ではなく CI が守る。** レビューで気づく必要はない。3 つの検査が
+それぞれ違う漏れ方を塞いでいる。
+
+- `internal/app/domain` の 21 個の公開 struct を reflect で再帰的に歩き、struct タグが
+  1 つでもあれば落ちる（ポインタ・スライス・配列を経由した無名 struct の中も見る）
+- その一覧が漏れなく網羅されているかを `go/ast` でパッケージを解析して照合するテスト
+- depguard で `internal/app/domain` の `encoding/json` import と、
+  `internal/github/**` の `internal/app/` import を禁止する
 
 ## 複数の API 呼び出しは `internal/app/usecase` に置く
 
@@ -177,6 +185,19 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
   `config` が形を持ち、`datasource` が書き戻す。両者が食い違うと設定が静かに
   壊れるので、`datasource_test.go` に「片方を保存しても、もう片方と起動時設定が
   消えない」テストを置いた
+
+**`internal/app/adapter/gateway/gh` を入れる判断を 2026-09-13 にした。**
+
+- **無いと何が壊れるか（実測）:** `internal/github` から domain への参照が
+  430 箇所 / 81 シンボルあった。`Author` `Label` `Comment` は json タグ付きのまま
+  domain とワイヤ型を兼ねており、`gql/search.go` は Work ボードの 4 カラムという
+  アプリの概念を GitHub の検索文字列へ直接変換していた
+- **足すと何が減るか:** domain がワイヤ形式を一切知らなくなり、それを CI が守る
+  （前節）。別サービスを足すときに書くのは `internal/<service>` と `gateway/<service>`
+  だけになり、domain・usecase・tui のどれも動かさずに済む
+- **足すと何が増えるか:** GitHub への新しい操作を足すときに触るファイルが
+  `internal/github` + `usecase` + ビューの 3 つから、`internal/github` + `gateway` +
+  `usecase` + ビューの 4 つになった。ワイヤ型が public API になった
 
 ## 名前は借りてよい、形は借りない
 

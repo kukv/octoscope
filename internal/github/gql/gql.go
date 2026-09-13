@@ -8,8 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // VarKind is how a transport has to spell one variable.
@@ -68,7 +69,7 @@ type Client struct {
 // that nothing arrived, so a repeated write could apply twice.
 func (c *Client) Read(ctx context.Context, doc string, vars ...Var) ([]byte, error) {
 	out, err := c.Do(ctx, doc, vars)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, domain.ErrTransient) {
+	if err == nil || ctx.Err() != nil || !errors.Is(err, github.ErrTransient) {
 		return out, err
 	}
 	return c.Do(ctx, doc, vars)
@@ -79,12 +80,26 @@ func (c *Client) Write(ctx context.Context, doc string, vars ...Var) ([]byte, er
 	return c.Do(ctx, doc, vars)
 }
 
+// SplitRepo reports whether repo has the shape "owner/name": both halves
+// non-empty, no second "/", and no leading or trailing whitespace that a
+// hand-edited settings file could carry in unnoticed.
+func SplitRepo(repo string) (owner, name string, ok bool) {
+	if repo != strings.TrimSpace(repo) {
+		return "", "", false
+	}
+	owner, name, ok = strings.Cut(repo, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return "", "", false
+	}
+	return owner, name, true
+}
+
 // SplitRepoVars names the repository by splitting "owner/name". It is what
 // a transport that cannot fill in a repository of its own gets: GraphQL's
 // repository() takes the two halves separately, unlike `gh pr`, which takes
 // the whole thing after --repo.
 func SplitRepoVars(repo string) ([]Var, error) {
-	owner, name, ok := domain.SplitRepo(repo)
+	owner, name, ok := SplitRepo(repo)
 	if !ok {
 		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
 	}

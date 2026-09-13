@@ -11,7 +11,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // jsonMediaType is what GitHub asks REST clients to send. A call that wants
@@ -78,7 +79,7 @@ func (c *Client) send(ctx context.Context, method, url string, body any, accept 
 // page too: read alone only ever asked for the first one.
 func (c *Client) readURL(ctx context.Context, url, accept string) ([]byte, http.Header, error) {
 	out, header, err := c.send(ctx, http.MethodGet, url, nil, accept)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, domain.ErrTransient) {
+	if err == nil || ctx.Err() != nil || !errors.Is(err, github.ErrTransient) {
 		return out, header, err
 	}
 	return c.send(ctx, http.MethodGet, url, nil, accept)
@@ -109,7 +110,7 @@ func (c *Client) repoPath(repo string) (string, error) {
 			return "", err
 		}
 	}
-	if _, _, ok := domain.SplitRepo(repo); !ok {
+	if _, _, ok := gql.SplitRepo(repo); !ok {
 		return "", fmt.Errorf("repo %q has no owner/name separator", repo)
 	}
 	return repo, nil

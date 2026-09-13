@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
@@ -62,8 +62,8 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rc.PullRequestID != "PR_kwDO1" {
-		t.Errorf("pull request id = %q", rc.PullRequestID)
+	if rc.ID != "PR_kwDO1" {
+		t.Errorf("id = %q", rc.ID)
 	}
 	if rc.PendingID != "PRR_kwDO9" {
 		t.Errorf("pending id = %q, want the unsubmitted review's", rc.PendingID)
@@ -72,35 +72,38 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 		t.Fatalf("%d threads, want the 5 in reviewThreads", len(rc.Threads))
 	}
 
+	// What the domain does with a null Line vs. an outdated thread's
+	// OriginalLine, and with a thread's DiffSide, is the gateway's
+	// toReviewThread's concern (gh/review_test.go); this only checks that
+	// the wire fields themselves came out of the JSON as sent.
 	tests := []struct {
-		name      string
-		thread    domain.ReviewThread
-		line      int
-		side      domain.DiffSide
-		collapsed bool
-		pending   bool
+		name         string
+		thread       ReviewThread
+		line         *int
+		originalLine int
+		diffSide     string
 	}{
-		{"open thread", rc.Threads[0], 14, domain.SideRight, false, false},
-		{"resolved threads collapse", rc.Threads[1], 12, domain.SideLeft, true, false},
-		{"outdated threads keep the line they were written against", rc.Threads[2], 3, domain.SideRight, true, false},
-		{"the viewer's unsubmitted comment", rc.Threads[3], 16, domain.SideRight, false, true},
-		{"line override distinguishes current from original", rc.Threads[4], 20, domain.SideRight, false, false},
+		{"open thread", rc.Threads[0], intPtr(14), 14, "RIGHT"},
+		{"resolved thread", rc.Threads[1], intPtr(12), 12, "LEFT"},
+		{"outdated thread has no current line", rc.Threads[2], nil, 3, "RIGHT"},
+		{"the viewer's unsubmitted comment", rc.Threads[3], intPtr(16), 16, "RIGHT"},
+		{"line override distinguishes current from original", rc.Threads[4], intPtr(20), 8, "RIGHT"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			th := tt.thread
-			if th.Line != tt.line || th.Side != tt.side {
-				t.Errorf("line %d side %v, want %d %v", th.Line, th.Side, tt.line, tt.side)
+			if (th.Line == nil) != (tt.line == nil) || (th.Line != nil && *th.Line != *tt.line) {
+				t.Errorf("line = %v, want %v", th.Line, tt.line)
 			}
-			if th.Collapsed() != tt.collapsed {
-				t.Errorf("Collapsed() = %v, want %v", th.Collapsed(), tt.collapsed)
-			}
-			if th.Pending() != tt.pending {
-				t.Errorf("Pending() = %v, want %v", th.Pending(), tt.pending)
+			if th.OriginalLine != tt.originalLine || th.DiffSide != tt.diffSide {
+				t.Errorf("originalLine = %d diffSide = %q, want %d %q",
+					th.OriginalLine, th.DiffSide, tt.originalLine, tt.diffSide)
 			}
 		})
 	}
 }
+
+func intPtr(n int) *int { return &n }
 
 func TestPRReviewContextCarriesTheHeader(t *testing.T) {
 	c := (&fake{body: []byte(reviewContextHeaderJSON)}).client()
@@ -111,8 +114,8 @@ func TestPRReviewContextCarriesTheHeader(t *testing.T) {
 	if rc.Title != "feat: add relation graph traversal" {
 		t.Errorf("title = %q", rc.Title)
 	}
-	if rc.Head != "feat/graph" || rc.Base != "main" {
-		t.Errorf("%s -> %s, want feat/graph -> main", rc.Head, rc.Base)
+	if rc.HeadRefName != "feat/graph" || rc.BaseRefName != "main" {
+		t.Errorf("%s -> %s, want feat/graph -> main", rc.HeadRefName, rc.BaseRefName)
 	}
 	if rc.Additions != 218 || rc.Deletions != 31 {
 		t.Errorf("+%d -%d, want +218 -31", rc.Additions, rc.Deletions)
@@ -131,7 +134,11 @@ func TestPRReviewContextWithNoPendingReview(t *testing.T) {
 	}
 }
 
-func TestThreadWithPublicThenPendingCommentReportsPending(t *testing.T) {
+// TestAThreadCarriesEveryCommentsReviewState guards a thread with more than
+// one comment against a decode that stops at the first: whether a comment is
+// pending is what the gateway's toReviewThread later decides from this, and
+// it needs every comment's own state to do that.
+func TestAThreadCarriesEveryCommentsReviewState(t *testing.T) {
 	c := (&fake{body: []byte(`{"data":{"repository":{"pullRequest":{
   "id":"PR_1",
   "reviews":{"nodes":[]},
@@ -151,8 +158,13 @@ func TestThreadWithPublicThenPendingCommentReportsPending(t *testing.T) {
 	if len(rc.Threads) != 1 {
 		t.Fatalf("%d threads, want 1", len(rc.Threads))
 	}
-	if !rc.Threads[0].Pending() {
-		t.Errorf("Pending() = false, want true for thread with pending reply")
+	comments := rc.Threads[0].Comments.Nodes
+	if len(comments) != 2 {
+		t.Fatalf("%d comments, want 2", len(comments))
+	}
+	if comments[0].PullRequestReview.State != "COMMENTED" || comments[1].PullRequestReview.State != "PENDING" {
+		t.Errorf("states = %q, %q, want COMMENTED then PENDING",
+			comments[0].PullRequestReview.State, comments[1].PullRequestReview.State)
 	}
 }
 
@@ -174,18 +186,15 @@ func TestStartReviewReturnsTheNewReviewID(t *testing.T) {
 func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 	tests := []struct {
 		name    string
-		comment domain.PendingComment
-		side    Var
+		comment PendingComment
 	}{
 		{
 			name:    "a comment on the new file",
-			comment: domain.PendingComment{Path: "graph/walk.go", Line: 15, Side: domain.SideRight, Body: "why?"},
-			side:    S("side", "RIGHT"),
+			comment: PendingComment{Path: "graph/walk.go", Line: 15, Side: "RIGHT", Body: "why?"},
 		},
 		{
 			name:    "a comment on a removed line",
-			comment: domain.PendingComment{Path: "graph/walk.go", Line: 14, Side: domain.SideLeft, Body: "why?"},
-			side:    S("side", "LEFT"),
+			comment: PendingComment{Path: "graph/walk.go", Line: 14, Side: "LEFT", Body: "why?"},
 		},
 	}
 	for _, tt := range tests {
@@ -199,7 +208,7 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 				S("reviewId", "PRR_9"),
 				S("path", tt.comment.Path),
 				N("line", tt.comment.Line),
-				tt.side,
+				S("side", tt.comment.Side),
 				S("body", tt.comment.Body),
 			} {
 				if !slices.Contains(f.vars[0], want) {
@@ -210,15 +219,19 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 	}
 }
 
+// TestSubmitReviewNamesTheEvent controls the exact strings GraphQL's
+// PullRequestReviewEvent enum receives. Do not change these literals without
+// checking GitHub's schema: APPROVE versus REQUEST_CHANGES is the difference
+// between signing a pull request off and blocking it.
 func TestSubmitReviewNamesTheEvent(t *testing.T) {
 	tests := []struct {
 		name  string
-		event domain.ReviewEvent
-		want  Var
+		event ReviewEvent
+		want  string
 	}{
-		{"approve", domain.EventApprove, S("event", "APPROVE")},
-		{"request changes", domain.EventRequestChanges, S("event", "REQUEST_CHANGES")},
-		{"comment", domain.EventComment, S("event", "COMMENT")},
+		{"approve", EventApprove, "APPROVE"},
+		{"request changes", EventRequestChanges, "REQUEST_CHANGES"},
+		{"comment", EventComment, "COMMENT"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -227,8 +240,8 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 			if err := c.SubmitReview("PRR_9", tt.event, "looks good"); err != nil {
 				t.Fatal(err)
 			}
-			if !slices.Contains(f.vars[0], tt.want) {
-				t.Errorf("vars %v do not carry %v", f.vars[0], tt.want)
+			if !slices.Contains(f.vars[0], S("event", tt.want)) {
+				t.Errorf("vars %v do not carry event %q", f.vars[0], tt.want)
 			}
 			if !slices.Contains(f.vars[0], S("body", "looks good")) {
 				t.Errorf("vars %v do not carry the body", f.vars[0])
@@ -240,7 +253,7 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	if err := c.SubmitNewReview("PR_1", domain.EventApprove, ""); err != nil {
+	if err := c.SubmitNewReview("PR_1", EventApprove, ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []Var{S("pullRequestId", "PR_1"), S("event", "APPROVE"), S("body", "")} {
@@ -264,7 +277,7 @@ func TestDiscardReviewNamesTheReview(t *testing.T) {
 func TestABodyThatStartsWithAtIsNotReadAsAFile(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"submitPullRequestReview":{"pullRequestReview":{"id":"PRR_9"}}}}`)}
 	c := f.client()
-	if err := c.SubmitReview("PRR_9", domain.EventComment, "@kukv please look"); err != nil {
+	if err := c.SubmitReview("PRR_9", EventComment, "@kukv please look"); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(f.vars[0], S("body", "@kukv please look")) {
@@ -280,9 +293,9 @@ func TestASubmittedReviewIsNeverSentTwice(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
+		return nil, github.Classify(github.ErrTransient, "HTTP 502")
 	}}
-	if err := c.SubmitReview("R_1", domain.EventApprove, ""); err == nil {
+	if err := c.SubmitReview("R_1", EventApprove, ""); err == nil {
 		t.Fatal("SubmitReview succeeded, want an error")
 	}
 	if calls != 1 {
@@ -307,16 +320,19 @@ func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
 	if rc.PendingID == "" {
 		t.Error("no pending review id, but the recording has an unsubmitted review")
 	}
-	sides := map[domain.DiffSide]bool{}
+	sides := map[string]bool{}
 	for _, th := range rc.Threads {
-		if !th.Pending() {
-			t.Errorf("thread on %s:%d is not pending, but every thread in the recording is", th.Path, th.Line)
+		pending := slices.ContainsFunc(th.Comments.Nodes, func(c ThreadComment) bool {
+			return c.PullRequestReview.State == "PENDING"
+		})
+		if !pending {
+			t.Errorf("thread on %s is not pending, but every thread in the recording is", th.Path)
 		}
-		sides[th.Side] = true
+		sides[th.DiffSide] = true
 	}
 	// Both sides have to survive the parse: the side of a pending thread is
 	// the one thing the old query could not ask for.
-	if !sides[domain.SideLeft] || !sides[domain.SideRight] {
+	if !sides["LEFT"] || !sides["RIGHT"] {
 		t.Errorf("threads land on %v, want both sides", sides)
 	}
 }
@@ -393,7 +409,7 @@ func TestPRReviewContextWalksEveryPageOfAThreadsComments(t *testing.T) {
 	if len(rc.Threads) != 1 {
 		t.Fatalf("Threads = %d, want 1", len(rc.Threads))
 	}
-	got := rc.Threads[0].Comments
+	got := rc.Threads[0].Comments.Nodes
 	if len(got) != 2 {
 		t.Fatalf("Comments = %d, want 2 (one from each page)", len(got))
 	}
@@ -451,7 +467,7 @@ func TestAThreadWithThreePagesOfCommentsIsFollowedToTheEnd(t *testing.T) {
 	if !slices.Contains(f.calls[2], S("after", "C150")) {
 		t.Errorf("third call = %v, want it to carry after=C150", f.calls[2])
 	}
-	if len(rc.Threads[0].Comments) != 3 {
-		t.Errorf("Comments = %d, want 3", len(rc.Threads[0].Comments))
+	if len(rc.Threads[0].Comments.Nodes) != 3 {
+		t.Errorf("Comments = %d, want 3", len(rc.Threads[0].Comments.Nodes))
 	}
 }

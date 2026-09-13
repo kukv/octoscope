@@ -752,7 +752,7 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 
 func TestGhNotFoundIsTranslated(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.FatalMsg{Err: domain.ErrGhNotFound})
+		Update(work.FatalMsg{Err: domain.ErrBackendUnavailable})
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.gh_not_found")) {
 		t.Errorf("gh_not_found was not translated:\n%s", view)
@@ -854,7 +854,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
-	next, _ = m.Update(work.FatalMsg{Err: domain.ErrGhNotFound})
+	next, _ = m.Update(work.FatalMsg{Err: domain.ErrBackendUnavailable})
 	m = next.(Model)
 	if m.errText == "" {
 		t.Fatal("the error screen did not show")
@@ -875,7 +875,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 // back to, so it must keep quitting like q does.
 func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.FatalMsg{Err: domain.ErrGhNotFound})
+		Update(work.FatalMsg{Err: domain.ErrBackendUnavailable})
 	m := next.(Model)
 	if len(m.stack) != 0 {
 		t.Fatalf("stack = %v, want empty for this case", m.stack)

@@ -306,7 +306,7 @@ func TestATransientFailureKeepsTheBoard(t *testing.T) {
 // Only what the user must act on takes the whole screen.
 func TestAMissingGhIsFatal(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	_, cmd := m.Update(errMsg{section: domain.SectionYourPRs, err: domain.ErrGhNotFound})
+	_, cmd := m.Update(errMsg{section: domain.SectionYourPRs, err: domain.ErrBackendUnavailable})
 	if cmd == nil {
 		t.Fatal("a missing gh produced no message")
 	}

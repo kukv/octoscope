@@ -16,12 +16,12 @@ func TestADiffAsksForTheDiffMediaType(t *testing.T) {
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, fixture(t, "pr_diff.txt"))
 	})
-	files, err := c.PRDiff(context.Background(), "kukv/octoscope", 66)
+	diff, err := c.PRDiff(context.Background(), "kukv/octoscope", 66)
 	if err != nil {
 		t.Fatalf("PRDiff: %v", err)
 	}
-	if len(files) == 0 {
-		t.Fatal("no files parsed")
+	if len(diff.Raw) == 0 {
+		t.Fatal("no raw diff returned")
 	}
 	req := (*got)[0]
 	if a := req.Header.Get("Accept"); a != "application/vnd.github.v3.diff" {
@@ -48,11 +48,11 @@ func TestADiffGitHubRefusesFallsBackToTheFilesApi(t *testing.T) {
 		}
 		_, _ = io.WriteString(w, fixture(t, "pr_files.json"))
 	})
-	files, err := c.PRDiff(context.Background(), "kukv/octoscope", 66)
+	diff, err := c.PRDiff(context.Background(), "kukv/octoscope", 66)
 	if err != nil {
 		t.Fatalf("PRDiff: %v", err)
 	}
-	if len(files) == 0 {
+	if len(diff.Files) == 0 {
 		t.Fatal("no files parsed from the fallback")
 	}
 	if (*got)[1].URL.Path != "/repos/kukv/octoscope/pulls/66/files" {
@@ -85,12 +85,12 @@ func TestTheFilesApiFallbackWalksEveryPage(t *testing.T) {
 	})
 	srvURL = c.baseURL
 
-	files, err := c.PRDiff(context.Background(), "kukv/octoscope", 66)
+	diff, err := c.PRDiff(context.Background(), "kukv/octoscope", 66)
 	if err != nil {
 		t.Fatalf("PRDiff: %v", err)
 	}
-	if len(files) != 3 {
-		t.Errorf("files = %d, want 3 (one per page)", len(files))
+	if len(diff.Files) != 3 {
+		t.Errorf("files = %d, want 3 (one per page)", len(diff.Files))
 	}
 	if len(*got) != 4 {
 		t.Errorf("requests = %d, want 4 (the refused diff and three pages)", len(*got))

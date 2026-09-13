@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // fixedTransport answers every document with one recorded body.
@@ -42,8 +40,8 @@ func TestListPRsReadsTheRecordedAnswer(t *testing.T) {
 	if first.Number == 0 || first.Title == "" || first.URL == "" {
 		t.Errorf("number/title/url not filled: %+v", first)
 	}
-	if first.State != domain.StateOpen {
-		t.Errorf("state = %v, want open", first.State)
+	if first.State != "OPEN" {
+		t.Errorf("state = %v, want OPEN", first.State)
 	}
 	if first.Author.Login == "" {
 		t.Error("author not filled")
@@ -70,10 +68,10 @@ func TestListPRsFillsTheFieldsRESTCannotAnswer(t *testing.T) {
 	}
 	var sawReview, sawChecks, sawSize bool
 	for _, pr := range prs {
-		if pr.Review != domain.ReviewNone {
+		if pr.ReviewDecision != "" {
 			sawReview = true
 		}
-		if pr.Checks.Total > 0 {
+		if len(pr.StatusCheckContexts()) > 0 {
 			sawChecks = true
 		}
 		if pr.Additions > 0 || pr.Deletions > 0 {
@@ -289,20 +287,20 @@ func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	if pr.Body == "" {
 		t.Error("body not filled; the list document leaves it empty, the single one must not")
 	}
-	if len(pr.Comments) == 0 {
+	if len(pr.Comments.Nodes) == 0 {
 		t.Fatal("no comments decoded")
 	}
-	if pr.Comments[0].Author.Login == "" || pr.Comments[0].Body == "" {
-		t.Errorf("comment not filled: %+v", pr.Comments[0])
+	if pr.Comments.Nodes[0].Author.Login == "" || pr.Comments.Nodes[0].Body == "" {
+		t.Errorf("comment not filled: %+v", pr.Comments.Nodes[0])
 	}
-	if pr.Comments[0].CreatedAt.IsZero() {
+	if pr.Comments.Nodes[0].CreatedAt.IsZero() {
 		t.Error("comment has no timestamp")
 	}
 	// The detail view names the branches the pull request merges between,
 	// and the size of the diff. Both pairs are two fields of the same type
 	// side by side, so only the recorded values say they were not swapped.
-	if pr.Head != "worktree-eventual-singing-gem" || pr.Base != "main" {
-		t.Errorf("head/base = %q/%q, want worktree-eventual-singing-gem/main", pr.Head, pr.Base)
+	if pr.HeadRefName != "worktree-eventual-singing-gem" || pr.BaseRefName != "main" {
+		t.Errorf("head/base = %q/%q, want worktree-eventual-singing-gem/main", pr.HeadRefName, pr.BaseRefName)
 	}
 	if pr.Additions != 6322 || pr.Deletions != 486 {
 		t.Errorf("additions/deletions = %d/%d, want 6322/486", pr.Additions, pr.Deletions)
@@ -310,15 +308,15 @@ func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	// GraphQL nests both of these under a "nodes" array, so a tag that names
 	// the connection instead of its nodes decodes into an empty list and the
 	// detail view shows an item with no labels and nobody assigned.
-	if len(pr.Assignees) == 0 {
+	if len(pr.Assignees.Nodes) == 0 {
 		t.Error("no assignees decoded")
-	} else if pr.Assignees[0].Login == "" {
-		t.Errorf("assignee not filled: %+v", pr.Assignees[0])
+	} else if pr.Assignees.Nodes[0].Login == "" {
+		t.Errorf("assignee not filled: %+v", pr.Assignees.Nodes[0])
 	}
-	if len(pr.Labels) == 0 {
+	if len(pr.Labels.Nodes) == 0 {
 		t.Error("no labels decoded")
-	} else if pr.Labels[0].Name == "" || pr.Labels[0].Color == "" {
-		t.Errorf("label not filled: %+v", pr.Labels[0])
+	} else if pr.Labels.Nodes[0].Name == "" || pr.Labels.Nodes[0].Color == "" {
+		t.Errorf("label not filled: %+v", pr.Labels.Nodes[0])
 	}
 }
 
@@ -399,24 +397,24 @@ func TestGetIssueFillsTheBodyAndTheConversation(t *testing.T) {
 	if issue.Body == "" {
 		t.Error("body not filled")
 	}
-	if len(issue.Comments) == 0 {
+	if len(issue.Comments.Nodes) == 0 {
 		t.Fatal("no comments decoded")
 	}
-	if issue.Comments[0].Author.Login == "" || issue.Comments[0].Body == "" {
-		t.Errorf("comment not filled: %+v", issue.Comments[0])
+	if issue.Comments.Nodes[0].Author.Login == "" || issue.Comments.Nodes[0].Body == "" {
+		t.Errorf("comment not filled: %+v", issue.Comments.Nodes[0])
 	}
-	if issue.Comments[0].CreatedAt.IsZero() {
+	if issue.Comments.Nodes[0].CreatedAt.IsZero() {
 		t.Error("comment has no timestamp")
 	}
-	if len(issue.Assignees) == 0 {
+	if len(issue.Assignees.Nodes) == 0 {
 		t.Error("no assignees decoded")
-	} else if issue.Assignees[0].Login == "" {
-		t.Errorf("assignee not filled: %+v", issue.Assignees[0])
+	} else if issue.Assignees.Nodes[0].Login == "" {
+		t.Errorf("assignee not filled: %+v", issue.Assignees.Nodes[0])
 	}
-	if len(issue.Labels) == 0 {
+	if len(issue.Labels.Nodes) == 0 {
 		t.Error("no labels decoded")
-	} else if issue.Labels[0].Name == "" || issue.Labels[0].Color == "" {
-		t.Errorf("label not filled: %+v", issue.Labels[0])
+	} else if issue.Labels.Nodes[0].Name == "" || issue.Labels.Nodes[0].Color == "" {
+		t.Errorf("label not filled: %+v", issue.Labels.Nodes[0])
 	}
 }
 

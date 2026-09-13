@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // jobNameLimit is how many UTF-16 code units of a job's name the server keeps
@@ -73,7 +73,7 @@ func caret(r rune) (string, bool) {
 // archive names neither. An archive that cannot be fetched or read at all is
 // an error rather than a fourth case: gh stops there too, and answering with
 // the job endpoint would hide a failure behind a log with no step names.
-func (c *Client) jobLogLines(ctx context.Context, repo string, j job, failedOnly bool) ([]domain.LogLine, error) {
+func (c *Client) jobLogLines(ctx context.Context, repo string, j job, failedOnly bool) ([]github.LogLine, error) {
 	archive, err := c.read(ctx, fmt.Sprintf("repos/%s/actions/runs/%d/logs", repo, j.RunID), "")
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ const unknownStep = "UNKNOWN STEP"
 // stepLines reads one entry per step. ok is false when the archive has no
 // per-step entry for this job at all, which is the caller's signal to fall
 // back rather than to show an empty log.
-func stepLines(zr *zip.Reader, j job, failedOnly bool) (lines []domain.LogLine, ok bool, err error) {
+func stepLines(zr *zip.Reader, j job, failedOnly bool) (lines []github.LogLine, ok bool, err error) {
 	steps := slices.Clone(j.Steps)
 	slices.SortFunc(steps, func(a, b jobStep) int { return a.Number - b.Number })
 
@@ -133,7 +133,7 @@ func stepLines(zr *zip.Reader, j job, failedOnly bool) (lines []domain.LogLine, 
 
 // wholeJobLog reads the job's own log endpoint, which answers with plain text
 // rather than an archive. There are no step boundaries in it.
-func (c *Client) wholeJobLog(ctx context.Context, repo string, j job) ([]domain.LogLine, error) {
+func (c *Client) wholeJobLog(ctx context.Context, repo string, j job) ([]github.LogLine, error) {
 	body, err := c.read(ctx, fmt.Sprintf("repos/%s/actions/jobs/%d/logs", repo, j.ID), "")
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (c *Client) wholeJobLog(ctx context.Context, repo string, j job) ([]domain.
 	return logLines(string(body), unknownStep), nil
 }
 
-func readEntry(f *zip.File, step string) ([]domain.LogLine, error) {
+func readEntry(f *zip.File, step string) ([]github.LogLine, error) {
 	rc, err := f.Open()
 	if err != nil {
 		return nil, fmt.Errorf("read log entry %s: %w", f.Name, err)
@@ -160,13 +160,13 @@ func readEntry(f *zip.File, step string) ([]domain.LogLine, error) {
 //
 // An entry with nothing in it is no lines at all, which is why the empty body
 // is answered before the split: splitting "" yields one empty line.
-func logLines(body, step string) []domain.LogLine {
+func logLines(body, step string) []github.LogLine {
 	if body == "" {
 		return nil
 	}
-	var lines []domain.LogLine
+	var lines []github.LogLine
 	for _, raw := range strings.Split(strings.TrimSuffix(body, "\n"), "\n") {
-		lines = append(lines, domain.NewLogLine(step, sanitizeControls(strings.TrimSuffix(raw, "\r"))))
+		lines = append(lines, github.ParseLogLine(step, sanitizeControls(strings.TrimSuffix(raw, "\r"))))
 	}
 	return lines
 }

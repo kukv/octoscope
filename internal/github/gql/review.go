@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"slices"
 	"time"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed review.graphql
@@ -32,6 +30,21 @@ var discardReviewMutation string
 //go:embed thread_comments.graphql
 var threadCommentsQuery string
 
+// ReviewContext is a pull request's review context as GraphQL answers it.
+type ReviewContext struct {
+	ID          string
+	Title       string
+	HeadRefName string
+	BaseRefName string
+	Additions   int
+	Deletions   int
+	// PendingID is the unsubmitted review's node id, empty when there is
+	// none. A pending review is visible only to its author, so anything that
+	// comes back here belongs to the viewer.
+	PendingID string
+	Threads   []ReviewThread
+}
+
 type reviewContextResponse struct {
 	Data struct {
 		Repository struct {
@@ -52,16 +65,18 @@ type reviewContextResponse struct {
 						HasNextPage bool   `json:"hasNextPage"`
 						EndCursor   string `json:"endCursor"`
 					} `json:"pageInfo"`
-					Nodes []threadNode `json:"nodes"`
+					Nodes []ReviewThread `json:"nodes"`
 				} `json:"reviewThreads"`
 			} `json:"pullRequest"`
 		} `json:"repository"`
 	} `json:"data"`
 }
 
-type threadNode struct {
-	// ID is not put into the domain type: only thread_comments.graphql
-	// uses it, and it never reaches the screen.
+// ReviewThread is one conversation attached to a line of the diff, as
+// GraphQL answers it.
+type ReviewThread struct {
+	// ID is not carried past this package: only thread_comments.graphql
+	// uses it, to page a thread's own comments.
 	ID         string `json:"id"`
 	IsResolved bool   `json:"isResolved"`
 	IsOutdated bool   `json:"isOutdated"`
@@ -72,17 +87,16 @@ type threadNode struct {
 	OriginalLine int    `json:"originalLine"`
 	DiffSide     string `json:"diffSide"`
 	Comments     struct {
-		PageInfo PageInfo            `json:"pageInfo"`
-		Nodes    []threadCommentNode `json:"nodes"`
+		PageInfo PageInfo        `json:"pageInfo"`
+		Nodes    []ThreadComment `json:"nodes"`
 	} `json:"comments"`
 }
 
-type threadCommentNode struct {
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"createdAt"`
-	Author    struct {
-		Login string `json:"login"`
-	} `json:"author"`
+// ThreadComment is one comment inside a review thread, as GraphQL answers it.
+type ThreadComment struct {
+	Body              string    `json:"body"`
+	CreatedAt         time.Time `json:"createdAt"`
+	Author            Author    `json:"author"`
 	PullRequestReview struct {
 		State string `json:"state"`
 	} `json:"pullRequestReview"`
@@ -93,14 +107,14 @@ type threadCommentNode struct {
 // `gh api --paginate` cannot follow a GraphQL cursor below the top level,
 // and follows a thread's own comments only when that thread says it has
 // more.
-func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error) {
+func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (ReviewContext, error) {
 	repoFields, err := c.repoVars(repo)
 	if err != nil {
-		return domain.ReviewContext{}, err
+		return ReviewContext{}, err
 	}
 
-	var rc domain.ReviewContext
-	var nodes []threadNode
+	var rc ReviewContext
+	var nodes []ReviewThread
 	cursor := ""
 	for {
 		vars := append(slices.Clone(repoFields), N("number", number))
@@ -109,20 +123,20 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		}
 		out, err := c.Read(ctx, reviewContextQuery, vars...)
 		if err != nil {
-			return domain.ReviewContext{}, err
+			return ReviewContext{}, err
 		}
 		var resp reviewContextResponse
 		if err := json.Unmarshal(out, &resp); err != nil {
-			return domain.ReviewContext{}, fmt.Errorf("parse review context: %w", err)
+			return ReviewContext{}, fmt.Errorf("parse review context: %w", err)
 		}
 		pr := resp.Data.Repository.PullRequest
 
 		// The pull request's own fields repeat on every page; taking them
 		// from the first is enough, and taking them again is harmless.
-		rc.PullRequestID = pr.ID
+		rc.ID = pr.ID
 		rc.Title = pr.Title
-		rc.Head = pr.HeadRefName
-		rc.Base = pr.BaseRefName
+		rc.HeadRefName = pr.HeadRefName
+		rc.BaseRefName = pr.BaseRefName
 		rc.Additions = pr.Additions
 		rc.Deletions = pr.Deletions
 		if len(pr.Reviews.Nodes) > 0 {
@@ -137,15 +151,14 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 	}
 
 	for _, n := range nodes {
-		t := n.toDomain()
 		if n.Comments.PageInfo.HasNextPage && n.Comments.PageInfo.EndCursor != "" {
 			rest, err := c.threadComments(ctx, n.ID, n.Comments.PageInfo.EndCursor)
 			if err != nil {
-				return domain.ReviewContext{}, fmt.Errorf("fetch thread comments: %w", err)
+				return ReviewContext{}, fmt.Errorf("fetch thread comments: %w", err)
 			}
-			t.Comments = append(t.Comments, rest...)
+			n.Comments.Nodes = append(n.Comments.Nodes, rest...)
 		}
-		rc.Threads = append(rc.Threads, t)
+		rc.Threads = append(rc.Threads, n)
 	}
 	return rc, nil
 }
@@ -154,8 +167,8 @@ type threadCommentsResponse struct {
 	Data struct {
 		Node struct {
 			Comments struct {
-				PageInfo PageInfo            `json:"pageInfo"`
-				Nodes    []threadCommentNode `json:"nodes"`
+				PageInfo PageInfo        `json:"pageInfo"`
+				Nodes    []ThreadComment `json:"nodes"`
 			} `json:"comments"`
 		} `json:"node"`
 	} `json:"data"`
@@ -163,8 +176,8 @@ type threadCommentsResponse struct {
 
 // threadComments reads what did not fit in the page PRReviewContext already
 // has, starting after the cursor that page ended on.
-func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]domain.ThreadComment, error) {
-	var rest []domain.ThreadComment
+func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]ThreadComment, error) {
+	var rest []ThreadComment
 	cursor := after
 	for {
 		out, err := c.Read(ctx, threadCommentsQuery, S("threadId", threadID), S("after", cursor))
@@ -176,43 +189,11 @@ func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]
 			return nil, fmt.Errorf("parse thread comments: %w", err)
 		}
 		page := resp.Data.Node.Comments
-		for _, n := range page.Nodes {
-			rest = append(rest, n.toDomain())
-		}
+		rest = append(rest, page.Nodes...)
 		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
 			return rest, nil
 		}
 		cursor = page.PageInfo.EndCursor
-	}
-}
-
-func (n threadNode) toDomain() domain.ReviewThread {
-	t := domain.ReviewThread{
-		Path:     n.Path,
-		Line:     n.OriginalLine,
-		Resolved: n.IsResolved,
-		Outdated: n.IsOutdated,
-	}
-	if n.Line != nil {
-		t.Line = *n.Line
-	}
-	if n.DiffSide == "LEFT" {
-		t.Side = domain.SideLeft
-	}
-	for _, c := range n.Comments.Nodes {
-		t.Comments = append(t.Comments, c.toDomain())
-	}
-	return t
-}
-
-func (c threadCommentNode) toDomain() domain.ThreadComment {
-	return domain.ThreadComment{
-		Author:    domain.Author{Login: c.Author.Login},
-		Body:      c.Body,
-		CreatedAt: c.CreatedAt,
-		// PENDING is the only review state that means "written but not
-		// sent"; every other one means the comment is already public.
-		Pending: c.PullRequestReview.State == "PENDING",
 	}
 }
 
@@ -244,44 +225,43 @@ func (c *Client) StartReview(pullRequestID string) (string, error) {
 	return resp.Data.AddPullRequestReview.PullRequestReview.ID, nil
 }
 
-// apiSide spells a side the way the GraphQL DiffSide enum does. It is the one
-// place that knows those words (.claude/rules/architecture.md).
-func apiSide(s domain.DiffSide) string {
-	if s == domain.SideLeft {
-		return "LEFT"
-	}
-	return "RIGHT"
+// PendingComment is a line comment on its way to GitHub.
+type PendingComment struct {
+	Path string
+	Line int
+	// Side spells which version of the file the comment sits on, the way
+	// GraphQL's DiffSide enum does.
+	Side string
+	Body string
 }
 
-// apiEvent spells an event the way PullRequestReviewEvent does.
-func apiEvent(e domain.ReviewEvent) string {
-	switch e {
-	case domain.EventApprove:
-		return "APPROVE"
-	case domain.EventRequestChanges:
-		return "REQUEST_CHANGES"
-	default:
-		return "COMMENT"
-	}
-}
+// ReviewEvent is what submitting a review says about it, spelled the way
+// GraphQL's PullRequestReviewEvent enum does.
+type ReviewEvent string
+
+const (
+	EventApprove        ReviewEvent = "APPROVE"
+	EventRequestChanges ReviewEvent = "REQUEST_CHANGES"
+	EventComment        ReviewEvent = "COMMENT"
+)
 
 // AddReviewThread attaches one line comment to an unsubmitted review.
-func (c *Client) AddReviewThread(reviewID string, comment domain.PendingComment) error {
+func (c *Client) AddReviewThread(reviewID string, comment PendingComment) error {
 	_, err := c.Write(context.Background(), addThreadMutation,
 		S("reviewId", reviewID),
 		S("path", comment.Path),
 		N("line", comment.Line),
-		S("side", apiSide(comment.Side)),
+		S("side", comment.Side),
 		S("body", comment.Body),
 	)
 	return err
 }
 
 // SubmitReview sends the unsubmitted review, with every comment on it.
-func (c *Client) SubmitReview(reviewID string, event domain.ReviewEvent, body string) error {
+func (c *Client) SubmitReview(reviewID string, event ReviewEvent, body string) error {
 	_, err := c.Write(context.Background(), submitReviewMutation,
 		S("reviewId", reviewID),
-		S("event", apiEvent(event)),
+		S("event", string(event)),
 		S("body", body),
 	)
 	return err
@@ -291,10 +271,10 @@ func (c *Client) SubmitReview(reviewID string, event domain.ReviewEvent, body st
 // addPullRequestReview takes an event, so creating and submitting is one
 // call. Approving a diff you had nothing to say about is the commonest review
 // there is, and it should not have to leave a pending review behind first.
-func (c *Client) SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error {
+func (c *Client) SubmitNewReview(pullRequestID string, event ReviewEvent, body string) error {
 	_, err := c.Write(context.Background(), reviewAtOnceMutation,
 		S("pullRequestId", pullRequestID),
-		S("event", apiEvent(event)),
+		S("event", string(event)),
 		S("body", body),
 	)
 	return err

@@ -527,7 +527,7 @@ func (m Model) failOverlay(err error, o overlay) (tea.Model, tea.Cmd) {
 func (m Model) showError(err error) (tea.Model, tea.Cmd) {
 	var noBrowser *browser.NoneError
 	switch {
-	case errors.Is(err, domain.ErrGhNotFound):
+	case errors.Is(err, domain.ErrBackendUnavailable):
 		m.errText = i18n.T("error.gh_not_found")
 	case errors.Is(err, domain.ErrUnauthenticated):
 		m.errText = i18n.T("error.unauthenticated")

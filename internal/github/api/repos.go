@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // repoJSON is one repository as REST spells it, in the two shapes that carry
@@ -17,8 +17,8 @@ type repoJSON struct {
 	Private  bool   `json:"private"`
 }
 
-func (r repoJSON) toDomain() domain.RepoCandidate {
-	return domain.RepoCandidate{Name: r.FullName, Stars: r.Stars, Private: r.Private}
+func (r repoJSON) toRepository() github.Repository {
+	return github.Repository{Name: r.FullName, Stars: r.Stars, Private: r.Private}
 }
 
 // page is what REST will actually answer with. Asking for more than a page is
@@ -32,7 +32,7 @@ func page(limit int) int {
 }
 
 // SearchRepos looks for repositories matching query.
-func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
+func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]github.Repository, error) {
 	path := fmt.Sprintf("search/repositories?q=%s&per_page=%d",
 		url.QueryEscape(query), page(limit))
 	out, err := c.read(ctx, path, "")
@@ -45,9 +45,9 @@ func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]do
 	if err := json.Unmarshal(out, &found); err != nil {
 		return nil, fmt.Errorf("parse repo search: %w", err)
 	}
-	candidates := make([]domain.RepoCandidate, len(found.Items))
+	candidates := make([]github.Repository, len(found.Items))
 	for i, f := range found.Items {
-		candidates[i] = f.toDomain()
+		candidates[i] = f.toRepository()
 	}
 	return candidates, nil
 }
@@ -59,7 +59,7 @@ func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]do
 // A named owner is read as an organisation: the only caller passes either an
 // empty string or one of ListOrgs' answers. /users/{owner}/repos would answer
 // for a person, but shows only public repositories.
-func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error) {
+func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]github.Repository, error) {
 	path := fmt.Sprintf("user/repos?affiliation=owner&sort=pushed&direction=desc&per_page=%d", page(limit))
 	if owner != "" {
 		path = fmt.Sprintf("orgs/%s/repos?sort=pushed&direction=desc&per_page=%d",
@@ -73,11 +73,11 @@ func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]d
 	if err := json.Unmarshal(out, &found); err != nil {
 		return nil, fmt.Errorf("parse repo list: %w", err)
 	}
-	repos := make([]domain.RepoCandidate, len(found))
+	repos := make([]github.Repository, len(found))
 	for i, f := range found {
 		// The listings carry a star count too, but the seeding dialog reads
 		// these by name; keeping it costs nothing and the field is there.
-		repos[i] = f.toDomain()
+		repos[i] = f.toRepository()
 	}
 	return repos, nil
 }

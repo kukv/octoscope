@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // fake records what was sent and answers with what it was given. The body is
@@ -48,7 +48,7 @@ func TestAReadAsksAgainWhenGitHubDidNotAnswer(t *testing.T) {
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
+			return nil, github.Classify(github.ErrTransient, "HTTP 502")
 		}
 		return []byte(`{"data":{}}`), nil
 	}}
@@ -67,9 +67,9 @@ func TestAWriteIsNeverSentTwice(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
+		return nil, github.Classify(github.ErrTransient, "HTTP 502")
 	}}
-	if _, err := c.Write(context.Background(), "mutation {}"); !errors.Is(err, domain.ErrTransient) {
+	if _, err := c.Write(context.Background(), "mutation {}"); !errors.Is(err, github.ErrTransient) {
 		t.Fatalf("Write err = %v, want ErrTransient", err)
 	}
 	if calls != 1 {
@@ -86,7 +86,7 @@ func TestACancelledReadStops(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
+		return nil, github.Classify(github.ErrTransient, "HTTP 502")
 	}}
 	if _, err := c.Read(ctx, "query {}"); err == nil {
 		t.Fatal("Read succeeded, want an error")
@@ -110,6 +110,35 @@ func TestTheBodyOfAFailedReadIsReturned(t *testing.T) {
 	}
 	if string(out) != `{"data":{"r0":null}}` {
 		t.Errorf("body = %q, want the partial body", out)
+	}
+}
+
+func TestSplitRepo(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		in        string
+		wantOwner string
+		wantName  string
+		wantOK    bool
+	}{
+		{"owner and name", "kukv/octoscope", "kukv", "octoscope", true},
+		{"no slash", "octoscope", "", "", false},
+		{"empty owner", "/octoscope", "", "", false},
+		{"empty name", "kukv/", "", "", false},
+		{"three parts", "github.com/kukv/octoscope", "", "", false},
+		{"surrounding space", " kukv/octoscope ", "", "", false},
+		{"empty", "", "", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			owner, name, ok := SplitRepo(c.in)
+			if owner != c.wantOwner || name != c.wantName || ok != c.wantOK {
+				t.Errorf("SplitRepo(%q) = (%q, %q, %v), want (%q, %q, %v)",
+					c.in, owner, name, ok, c.wantOwner, c.wantName, c.wantOK)
+			}
+		})
 	}
 }
 

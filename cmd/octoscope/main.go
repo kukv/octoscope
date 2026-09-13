@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/adapter/datasource"
+	"github.com/kukv/octoscope/internal/app/adapter/gateway/gh"
 	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/root"
@@ -74,9 +75,9 @@ func main() {
 	store := datasource.NewStore(path)
 	var uc *usecase.Usecase
 	if ghClient != nil {
-		uc = usecase.New(ghClient, store)
+		uc = usecase.New(gh.New(ghClient), store)
 	} else {
-		uc = usecase.New(apiClient, store)
+		uc = usecase.New(gh.New(apiClient), store)
 	}
 
 	// The lists come from the store rather than out of cfg: the file's shape

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed repo_counts.graphql
@@ -33,6 +31,15 @@ func buildRepoCountsQuery(n int) string {
 	return "query (" + decls.String() + ") {\n" + body.String() + "}\n"
 }
 
+// RepoCount is how much is open in one repository, as this package answers
+// it. Unavailable says GitHub did not answer for this one -- it was
+// renamed, deleted, or is no longer visible.
+type RepoCount struct {
+	Repo        string
+	PRs, Issues int
+	Unavailable bool
+}
+
 type repoCountsResponse struct {
 	Data map[string]*struct {
 		NameWithOwner string `json:"nameWithOwner"`
@@ -49,13 +56,13 @@ type repoCountsResponse struct {
 // repository, in one request. A repository whose name does not split into
 // owner/name, or that GitHub could not resolve, comes back Unavailable
 // instead of failing the rest.
-func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error) {
-	counts := make([]domain.RepoCount, len(repos))
+func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]RepoCount, error) {
+	counts := make([]RepoCount, len(repos))
 	var vars []Var
 	indices := []int{}
 	for i, repo := range repos {
 		counts[i].Repo = repo
-		owner, name, ok := domain.SplitRepo(repo)
+		owner, name, ok := SplitRepo(repo)
 		if !ok {
 			counts[i].Unavailable = true
 			continue

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -382,7 +382,7 @@ func TestFrontEndFailuresAreTransient(t *testing.T) {
 	for _, status := range []string{"502", "503", "504"} {
 		t.Run(status, func(t *testing.T) {
 			err := classify(fmt.Errorf("gh api: gh: HTTP %s", status))
-			if !errors.Is(err, domain.ErrTransient) {
+			if !errors.Is(err, github.ErrTransient) {
 				t.Errorf("HTTP %s did not classify as transient: %v", status, err)
 			}
 		})
@@ -395,7 +395,7 @@ func TestAnsweredFailuresAreNotTransient(t *testing.T) {
 		"gh api: gh: API rate limit exceeded",
 		"gh pr list: no pull requests match",
 	} {
-		if err := classify(errors.New(msg)); errors.Is(err, domain.ErrTransient) {
+		if err := classify(errors.New(msg)); errors.Is(err, github.ErrTransient) {
 			t.Errorf("%q classified as transient", msg)
 		}
 	}
@@ -409,7 +409,7 @@ func TestMissingCredentialsAreTold(t *testing.T) {
 		"gh api: gh: Bad credentials (HTTP 401)",
 		"gh api: To get started with GitHub CLI, please run:  gh auth login",
 	} {
-		if err := classify(errors.New(msg)); !errors.Is(err, domain.ErrUnauthenticated) {
+		if err := classify(errors.New(msg)); !errors.Is(err, github.ErrUnauthenticated) {
 			t.Errorf("%q did not classify as unauthenticated: %v", msg, err)
 		}
 	}
@@ -440,7 +440,7 @@ func TestAReadIsAskedAgainAfterATransientFailure(t *testing.T) {
 	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, fmt.Errorf("%w: gh: HTTP 502", domain.ErrTransient)
+			return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 		}
 		return []byte(emptyDataJSON), nil
 	}
@@ -457,7 +457,7 @@ func TestAReadIsAskedAgainOnlyOnce(t *testing.T) {
 	calls := 0
 	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 		calls++
-		return nil, fmt.Errorf("%w: gh: HTTP 502", domain.ErrTransient)
+		return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 	}
 	if _, err := c.ListPRs(context.Background(), ""); err == nil {
 		t.Fatal("ListPRs succeeded on a failing gh")
@@ -489,7 +489,7 @@ func TestACancelledReadIsNotAskedAgain(t *testing.T) {
 	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 		calls++
 		cancel()
-		return nil, fmt.Errorf("%w: gh: HTTP 502", domain.ErrTransient)
+		return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 	}
 	_, _ = c.ListPRs(ctx, "")
 	if calls != 1 {
@@ -511,15 +511,15 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 		"EditIssueLabels":    func(c *Client) error { return c.EditIssueLabels("kukv/demo", 1, []string{"bug"}, nil) },
 		"EditPRAssignees":    func(c *Client) error { return c.EditPRAssignees("kukv/demo", 1, []string{"kukv"}, nil) },
 		"EditIssueAssignees": func(c *Client) error { return c.EditIssueAssignees("kukv/demo", 1, []string{"kukv"}, nil) },
-		"MergePR":            func(c *Client) error { return c.MergePR("id", domain.MergeSquash) },
-		"EnableAutoMerge":    func(c *Client) error { return c.EnableAutoMerge("id", domain.MergeSquash) },
+		"MergePR":            func(c *Client) error { return c.MergePR("id", gql.MergeMethodSquash) },
+		"EnableAutoMerge":    func(c *Client) error { return c.EnableAutoMerge("id", gql.MergeMethodSquash) },
 		"DisableAutoMerge":   func(c *Client) error { return c.DisableAutoMerge("id") },
-		"AddReviewThread":    func(c *Client) error { return c.AddReviewThread("id", domain.PendingComment{}) },
-		"SubmitReview":       func(c *Client) error { return c.SubmitReview("id", domain.EventApprove, "") },
-		"SubmitNewReview":    func(c *Client) error { return c.SubmitNewReview("id", domain.EventApprove, "") },
+		"AddReviewThread":    func(c *Client) error { return c.AddReviewThread("id", gql.PendingComment{}) },
+		"SubmitReview":       func(c *Client) error { return c.SubmitReview("id", gql.EventApprove, "") },
+		"SubmitNewReview":    func(c *Client) error { return c.SubmitNewReview("id", gql.EventApprove, "") },
 		"DiscardReview":      func(c *Client) error { return c.DiscardReview("id") },
 		"RerunWorkflow": func(c *Client) error {
-			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), domain.RerunFailed)
+			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), github.RerunFailed)
 		},
 	}
 	for name, call := range writes {
@@ -528,7 +528,7 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			calls := 0
 			c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 				calls++
-				return nil, fmt.Errorf("%w: gh: HTTP 502", domain.ErrTransient)
+				return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 			}
 			_ = call(c)
 			if calls != 1 {
@@ -541,7 +541,7 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 		calls := 0
 		c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 			calls++
-			return nil, fmt.Errorf("%w: gh: HTTP 502", domain.ErrTransient)
+			return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 		}
 		_, _ = c.StartReview("id")
 		if calls != 1 {

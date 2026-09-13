@@ -200,7 +200,7 @@ gateway が無かった時点では usecase が唯一の置き場所だったが
 | 項目 | 行き先 | PR |
 |---|---|---|
 | `Author` `Label` `Comment` の json タグ | タグを外し、デコードは `internal/github` の private 型で行う | 2 |
-| `ParseItemState` `ParseReviewDecision` | `internal/github`（GitHub の綴りを読む処理） | 2 |
+| `ParseItemState` `ParseReviewDecision` | `internal/app/adapter/gateway/gh`（domain の型を返すため `internal/github` には置けない） | 2 |
 | `ParseFilesAPI` + `prFileJSON` | `internal/github` | **2** |
 | `ParseDiff`（git の unified diff） | domain に残す。GitLab も同形式 | — |
 | `ErrGhNotFound` `ErrTransient` `ErrUnauthenticated` `Classify` | `internal/github`。gateway が中立な sentinel に変換し、`IsFatal` は中立なものだけを見る | **2** |
@@ -278,7 +278,7 @@ gateway と独立しており、先に単独で落ちる。
 
 検証: `make check`。設定ファイルの保存と読み込みを実際に動かして確認する。
 
-#### PR 2b: gateway の導入と `internal/github` の domain 非依存化
+#### PR 2b: gateway の導入と `internal/github` の domain 非依存化（完了）
 
 **一括ではなく port グループ単位で進める。** `cmd/octoscope/main.go` は
 `if ghClient != nil { usecase.New(ghClient, store) } else { usecase.New(apiClient, store) }`
@@ -290,7 +290,8 @@ embed し、**変換済みのメソッドだけ override する**形が取れる
 - `internal/app/adapter/gateway/gh` を作り、既存の変換関数 8 個をそこへ移す
 - `internal/github` の private ワイヤ型を public にし、domain の import を外す
 - `Author` `Label` `Comment` の json タグを外す
-- `ParseItemState` `ParseReviewDecision` `ParseFilesAPI` + `prFileJSON` を `internal/github` へ
+- `ParseItemState` `ParseReviewDecision` を `internal/app/adapter/gateway/gh` へ（domain の型を
+  返すため `internal/github` には置けない）。`ParseFilesAPI` + `prFileJSON` は `internal/github` へ
 - エラー sentinel（`ErrGhNotFound` `ErrTransient` `ErrUnauthenticated` `Classify`）を
   `internal/github` へ移し、gateway が中立な sentinel に変換する。`IsFatal` は
   中立なものだけを見る
@@ -305,10 +306,7 @@ golden テストの差分がゼロ。
 
 - `PullRequestID` `PendingID` `JobID` `RunID` を不透明ハンドルへ
 - `StartReview` / `SubmitNewReview` を畳み、pending の作成を gateway へ（§6）
-- `ErrGhNotFound` を `internal/github/cli` へ移し、gateway で中立 sentinel に変換。
-  `IsFatal` は中立な sentinel だけを見る
 - `SplitRepo` を domain から外す
-- `ParseFilesAPI` + `prFileJSON` を `internal/github` へ
 - `opener` port を削除し、tui が `internal/browser` を直接呼ぶ
 
 検証: `make check`。レビューの提出（pending あり / なし）と checks の再実行を
