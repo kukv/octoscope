@@ -51,11 +51,11 @@ type lister interface {
 
 // crossRepoLister is what an operation that cannot name a single repository
 // takes: unlike lister's operations, none of these are "the contents of one
-// named repository".
+// named repository". Which columns the Work board has, and what each one
+// means, is the gateway's own knowledge: the backend only runs a search.
 type crossRepoLister interface {
-	ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error)
-	RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error)
-	SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error)
+	SearchItems(ctx context.Context, query string) ([]gql.SearchItem, error)
+	RepoCounts(ctx context.Context, repos []string) ([]gql.RepoCount, error)
 }
 
 // repoFinder is what the add dialog offers: candidates while it is typed

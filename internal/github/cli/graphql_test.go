@@ -12,9 +12,9 @@ import (
 
 const emptyColumnJSON = `{"data":{"results":{"nodes":[]}}}`
 
-// One request per column, each carrying only its own search string. Four
-// searches in one request is what made GitHub's front end stop answering.
-func TestListWorkSectionSendsOneSearch(t *testing.T) {
+// One request per search. Four searches in one request is what made
+// GitHub's front end stop answering.
+func TestSearchItemsSendsOneSearch(t *testing.T) {
 	t.Parallel()
 
 	c := New("/tmp", "")
@@ -24,8 +24,8 @@ func TestListWorkSectionSendsOneSearch(t *testing.T) {
 		return []byte(emptyColumnJSON), nil
 	}
 
-	if _, err := c.ListWorkSection(context.Background(), domain.SectionAssigned); err != nil {
-		t.Fatalf("ListWorkSection: %v", err)
+	if _, err := c.SearchItems(context.Background(), "is:open assignee:@me"); err != nil {
+		t.Fatalf("SearchItems: %v", err)
 	}
 
 	if len(got) < 2 || got[0] != "api" || got[1] != "graphql" {
@@ -36,10 +36,10 @@ func TestListWorkSectionSendsOneSearch(t *testing.T) {
 		t.Errorf("the document holds %d searches, want 1:\n%s", n, joined)
 	}
 	if !strings.Contains(joined, "assignee:@me") {
-		t.Errorf("the assigned column's search string is missing:\n%s", joined)
+		t.Errorf("the query is missing:\n%s", joined)
 	}
 	if strings.Contains(joined, "review-requested:@me") {
-		t.Errorf("another column's search string came along:\n%s", joined)
+		t.Errorf("another query's search string came along:\n%s", joined)
 	}
 	for _, want := range []string{"reviewDecision", "statusCheckRollup"} {
 		if !strings.Contains(joined, want) {
@@ -119,58 +119,10 @@ func TestSearchItemsReportsWhatGitHubSaidAboutABadQuery(t *testing.T) {
 	}
 }
 
-// TestEverySectionHasItsOwnSearch pins what each column of the board means.
-// The search string is not an implementation detail the code happens to
-// build: "review requested" is defined by review-requested:@me and by
-// nothing else, and a column paired with the wrong one silently shows the
-// wrong work. Asserting only that the four differ leaves two of them free to
-// swap.
-func TestEverySectionHasItsOwnSearch(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		section domain.WorkSection
-		search  string
-	}{
-		{"review requested", domain.SectionReviewRequested, "is:open is:pr review-requested:@me"},
-		{"your PRs", domain.SectionYourPRs, "is:open is:pr author:@me"},
-		{"assigned", domain.SectionAssigned, "is:open assignee:@me"},
-		{"mentioned", domain.SectionMentioned, "is:open mentions:@me"},
-	}
-	// A column added without a line here would go untested rather than fail.
-	if len(tests) != domain.WorkSectionCount {
-		t.Fatalf("the table covers %d columns, the board has %d", len(tests), domain.WorkSectionCount)
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			c := New("/tmp", "")
-			var search string
-			c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-				for _, a := range args {
-					if rest, ok := strings.CutPrefix(a, "search="); ok {
-						search = rest
-					}
-				}
-				return []byte(emptyColumnJSON), nil
-			}
-			if _, err := c.ListWorkSection(context.Background(), tt.section); err != nil {
-				t.Fatalf("ListWorkSection: %v", err)
-			}
-			if search != tt.search {
-				t.Errorf("%s sends %q, want %q", tt.name, search, tt.search)
-			}
-		})
-	}
-}
-
 // The board is where the 502s were being seen: four searches leave GitHub's
-// front end four chances to refuse, and a column that gives up on the first
+// front end four chances to refuse, and a search that gives up on the first
 // refusal is the failure this retry exists for.
-func TestAWorkSectionIsAskedAgainAfterATransientFailure(t *testing.T) {
+func TestASearchIsAskedAgainAfterATransientFailure(t *testing.T) {
 	t.Parallel()
 
 	c := New("/tmp", "")
@@ -183,26 +135,11 @@ func TestAWorkSectionIsAskedAgainAfterATransientFailure(t *testing.T) {
 		return []byte(emptyColumnJSON), nil
 	}
 
-	if _, err := c.ListWorkSection(context.Background(), domain.SectionAssigned); err != nil {
-		t.Fatalf("ListWorkSection: %v", err)
+	if _, err := c.SearchItems(context.Background(), "is:open assignee:@me"); err != nil {
+		t.Fatalf("SearchItems: %v", err)
 	}
 	if calls != 2 {
-		t.Errorf("gh ran %d times, want 2: the column gave up on a failure worth retrying", calls)
-	}
-}
-
-// A section outside the board is a bug in the caller, not a search GitHub
-// should be asked to run.
-func TestListWorkSectionRejectsASectionTheBoardDoesNotHave(t *testing.T) {
-	t.Parallel()
-
-	c := New("/tmp", "")
-	c.run = func(context.Context, string, ...string) ([]byte, error) {
-		t.Error("an unknown section was sent to gh")
-		return []byte(emptyColumnJSON), nil
-	}
-	if _, err := c.ListWorkSection(context.Background(), domain.WorkSectionCount); err == nil {
-		t.Error("ListWorkSection accepted a section the board does not have")
+		t.Errorf("gh ran %d times, want 2: the search gave up on a failure worth retrying", calls)
 	}
 }
 
@@ -253,7 +190,7 @@ func TestPRReviewContextRejectsARepoWithNoSlash(t *testing.T) {
 	}
 }
 
-func TestListWorkSectionPropagatesRunError(t *testing.T) {
+func TestSearchItemsPropagatesRunError(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("gh api: no such host")
@@ -262,12 +199,12 @@ func TestListWorkSectionPropagatesRunError(t *testing.T) {
 		return nil, wantErr
 	}
 
-	items, err := c.ListWorkSection(context.Background(), domain.SectionAssigned)
+	items, err := c.SearchItems(context.Background(), "is:open assignee:@me")
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("err = %v, want %v", err, wantErr)
 	}
 	if len(items) != 0 {
-		t.Errorf("the column holds %d items, want 0", len(items))
+		t.Errorf("the result holds %d items, want 0", len(items))
 	}
 }
 

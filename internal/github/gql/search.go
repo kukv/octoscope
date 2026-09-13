@@ -13,24 +13,16 @@ import (
 //go:embed work.graphql
 var workQuery string
 
-// workSearches is each column's GitHub search. The strings are fixed text,
-// not user input: they are the definition of what the column means.
-var workSearches = [domain.WorkSectionCount]string{
-	domain.SectionReviewRequested: "is:open is:pr review-requested:@me",
-	domain.SectionYourPRs:         "is:open is:pr author:@me",
-	domain.SectionAssigned:        "is:open assignee:@me",
-	domain.SectionMentioned:       "is:open mentions:@me",
-}
-
 type workResponse struct {
 	Data struct {
 		Results struct {
-			Nodes []searchNode `json:"nodes"`
+			Nodes []SearchItem `json:"nodes"`
 		} `json:"results"`
 	} `json:"data"`
 }
 
-type searchNode struct {
+// SearchItem is one row of a GitHub issue search, as work.graphql selects it.
+type SearchItem struct {
 	Typename       string    `json:"__typename"`
 	Number         int       `json:"number"`
 	Title          string    `json:"title"`
@@ -44,14 +36,12 @@ type searchNode struct {
 	BaseRefName    string    `json:"baseRefName"`
 	Additions      int       `json:"additions"`
 	Deletions      int       `json:"deletions"`
-	Author         struct {
-		Login string `json:"login"`
-	} `json:"author"`
-	Repository struct {
+	Author         Author    `json:"author"`
+	Repository     struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
 	Labels struct {
-		Nodes []domain.Label `json:"nodes"`
+		Nodes []Label `json:"nodes"`
 	} `json:"labels"`
 	Commits struct {
 		Nodes []struct {
@@ -88,30 +78,14 @@ func (n CheckContext) name() string {
 	return n.Name
 }
 
-// ListWorkSection fetches one column of the Work board. Its search string is
-// fixed text embedded at build time, not anything the user typed.
-func (c *Client) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
-	if s < 0 || int(s) >= len(workSearches) {
-		return nil, fmt.Errorf("unknown work section %d", s)
-	}
-	return c.searchItems(ctx, workSearches[s])
-}
-
 // SearchItems runs one GitHub issue search and returns what it found. The
 // query is the user's, so a rejected one is an ordinary failure to report
 // rather than a broken document.
-func (c *Client) SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error) {
-	return c.searchItems(ctx, query)
-}
-
-// searchItems is the one call behind both. The document itself travels as
-// gh's own "query" parameter, so the search string has to go under a
-// different name.
 //
-// Unlike RepoCounts there is no partial body worth salvaging: a search has
+// There is no partial body worth salvaging, unlike RepoCounts: a search has
 // one result set, and half of one would be read as "that is all there is".
 // The error carries what GitHub said, which is what a user has to act on.
-func (c *Client) searchItems(ctx context.Context, search string) ([]domain.WorkItem, error) {
+func (c *Client) SearchItems(ctx context.Context, search string) ([]SearchItem, error) {
 	out, err := c.Read(ctx, workQuery, S("search", search))
 	if err != nil {
 		return nil, err
@@ -120,45 +94,11 @@ func (c *Client) searchItems(ctx context.Context, search string) ([]domain.WorkI
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return nil, fmt.Errorf("parse search: %w", err)
 	}
-	nodes := resp.Data.Results.Nodes
-	items := make([]domain.WorkItem, 0, len(nodes))
-	for _, n := range nodes {
-		items = append(items, n.toWorkItem())
-	}
-	return items, nil
+	return resp.Data.Results.Nodes, nil
 }
 
-func (n searchNode) toWorkItem() domain.WorkItem {
-	item := domain.WorkItem{
-		Ref: domain.ItemRef{
-			Kind:   domain.ItemIssue,
-			Repo:   n.Repository.NameWithOwner,
-			Number: n.Number,
-		},
-		Title:     n.Title,
-		State:     domain.ParseItemState(n.State),
-		Body:      n.BodyText,
-		Author:    n.Author.Login,
-		Labels:    n.Labels.Nodes,
-		UpdatedAt: n.UpdatedAt,
-		URL:       n.URL,
-	}
-	if n.Typename != "PullRequest" {
-		return item
-	}
-	item.Ref.Kind = domain.ItemPR
-	item.IsDraft = n.IsDraft
-	item.Review = domain.ParseReviewDecision(n.ReviewDecision)
-	item.Head = n.HeadRefName
-	item.Base = n.BaseRefName
-	item.Additions = n.Additions
-	item.Deletions = n.Deletions
-	item.Checks = n.checks()
-	return item
-}
-
-// checks reads the roll-up out of the commit the search returned.
-func (n searchNode) checks() domain.Checks {
+// Checks reads the roll-up out of the commit the search returned.
+func (n SearchItem) Checks() domain.Checks {
 	var nodes []CheckContext
 	for _, commit := range n.Commits.Nodes {
 		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
