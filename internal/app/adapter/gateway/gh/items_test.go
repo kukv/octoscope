@@ -209,3 +209,48 @@ func TestGetIssueTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 		t.Errorf("GetIssue() = %+v, want %+v", issue, want)
 	}
 }
+
+func TestParseItemState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		state string
+		want  domain.ItemState
+	}{
+		{"OPEN", domain.StateOpen},
+		{"CLOSED", domain.StateClosed},
+		{"MERGED", domain.StateMerged},
+		// gh's REST output lower-cases what GraphQL sends in capitals.
+		{"open", domain.StateOpen},
+		{"merged", domain.StateMerged},
+		{"", domain.StateClosed},
+		{"SOMETHING_NEW", domain.StateClosed},
+	}
+
+	for _, tt := range tests {
+		if got := parseItemState(tt.state); got != tt.want {
+			t.Errorf("%q: got %v, want %v", tt.state, got, tt.want)
+		}
+	}
+}
+
+func TestParseReviewDecision(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		decision string
+		want     domain.ReviewState
+	}{
+		{"APPROVED", domain.ReviewApproved},
+		{"CHANGES_REQUESTED", domain.ReviewChangesRequested},
+		{"REVIEW_REQUIRED", domain.ReviewRequired},
+		{"", domain.ReviewNone},
+		{"SOMETHING_NEW", domain.ReviewNone},
+	}
+
+	for _, tt := range tests {
+		if got := parseReviewDecision(tt.decision); got != tt.want {
+			t.Errorf("%q: got %v, want %v", tt.decision, got, tt.want)
+		}
+	}
+}

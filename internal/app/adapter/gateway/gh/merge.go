@@ -34,7 +34,7 @@ func toMergeContext(c gql.MergeContext) domain.MergeContext {
 		IsDraft:                  c.IsDraft,
 		Mergeable:                parseMergeable(c.Mergeable),
 		State:                    parseMergeState(c.MergeStateStatus),
-		Review:                   domain.ParseReviewDecision(c.ReviewDecision),
+		Review:                   parseReviewDecision(c.ReviewDecision),
 		Methods:                  allowedMethods(c.SquashMergeAllowed, c.MergeCommitAllowed, c.RebaseMergeAllowed),
 		DeleteBranchOnMerge:      c.DeleteBranchOnMerge,
 		AutoMergeAllowed:         c.AutoMergeAllowed,

@@ -60,7 +60,7 @@ func toWorkItem(n gql.SearchItem) domain.WorkItem {
 			Number: n.Number,
 		},
 		Title:     n.Title,
-		State:     domain.ParseItemState(n.State),
+		State:     parseItemState(n.State),
 		Body:      n.BodyText,
 		Author:    n.Author.Login,
 		Labels:    toLabels(n.Labels.Nodes),
@@ -72,7 +72,7 @@ func toWorkItem(n gql.SearchItem) domain.WorkItem {
 	}
 	item.Ref.Kind = domain.ItemPR
 	item.IsDraft = n.IsDraft
-	item.Review = domain.ParseReviewDecision(n.ReviewDecision)
+	item.Review = parseReviewDecision(n.ReviewDecision)
 	item.Head = n.HeadRefName
 	item.Base = n.BaseRefName
 	item.Additions = n.Additions

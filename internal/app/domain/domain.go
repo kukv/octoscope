@@ -1,12 +1,11 @@
 // Package domain holds the types the application is written in terms of.
 // It has no behaviour beyond the rules those types carry, and it depends on
-// nothing: the clients that fetch this data live under internal/github, and
-// they translate their own service's spelling into these values.
+// nothing: internal/app/adapter/gateway/gh translates a service's own
+// spelling into these values before anything reaches this package.
 package domain
 
 import (
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -48,22 +47,8 @@ const (
 	StateMerged
 )
 
-// ParseItemState maps GitHub's state onto the domain value. GraphQL and REST
-// differ in case, so the comparison ignores it; anything unrecognised reads
-// as closed, which is the reading that offers no action.
-func ParseItemState(state string) ItemState {
-	switch strings.ToUpper(state) {
-	case "OPEN":
-		return StateOpen
-	case "MERGED":
-		return StateMerged
-	default:
-		return StateClosed
-	}
-}
-
 // PR and Issue carry no JSON tags: what a backend receives is that backend's
-// business, and both of them translate GitHub's own spelling into the values
+// business, and the gateway translates GitHub's own spelling into the values
 // above before handing anything over.
 type PR struct {
 	Number    int
@@ -127,22 +112,6 @@ const (
 	ReviewApproved
 	ReviewChangesRequested
 )
-
-// ParseReviewDecision maps the GraphQL reviewDecision enum onto the domain
-// value. An empty string means the pull request needs no review at all; an
-// unknown one is treated the same way rather than failing the whole fetch.
-func ParseReviewDecision(decision string) ReviewState {
-	switch decision {
-	case "APPROVED":
-		return ReviewApproved
-	case "CHANGES_REQUESTED":
-		return ReviewChangesRequested
-	case "REVIEW_REQUIRED":
-		return ReviewRequired
-	default:
-		return ReviewNone
-	}
-}
 
 // CheckState is the rolled-up outcome of a pull request's checks.
 type CheckState int

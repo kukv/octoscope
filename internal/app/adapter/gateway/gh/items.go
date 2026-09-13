@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"strings"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github/gql"
@@ -30,10 +31,10 @@ func toPR(n gql.PullRequest) domain.PR {
 		Number:    n.Number,
 		Title:     n.Title,
 		Author:    domain.Author{Login: n.Author.Login},
-		State:     domain.ParseItemState(n.State),
+		State:     parseItemState(n.State),
 		IsDraft:   n.IsDraft,
 		UpdatedAt: n.UpdatedAt,
-		Review:    domain.ParseReviewDecision(n.ReviewDecision),
+		Review:    parseReviewDecision(n.ReviewDecision),
 		URL:       n.URL,
 		Body:      n.Body,
 		Comments:  toComments(n.Comments.Nodes),
@@ -52,7 +53,7 @@ func toIssue(n gql.Issue) domain.Issue {
 		Number:    n.Number,
 		Title:     n.Title,
 		Author:    domain.Author{Login: n.Author.Login},
-		State:     domain.ParseItemState(n.State),
+		State:     parseItemState(n.State),
 		UpdatedAt: n.UpdatedAt,
 		URL:       n.URL,
 		Body:      n.Body,
@@ -75,4 +76,34 @@ func toComments(in []gql.Comment) []domain.Comment {
 		}
 	}
 	return out
+}
+
+// parseItemState maps GitHub's state onto the domain value. GraphQL and REST
+// differ in case, so the comparison ignores it; anything unrecognised reads
+// as closed, which is the reading that offers no action.
+func parseItemState(state string) domain.ItemState {
+	switch strings.ToUpper(state) {
+	case "OPEN":
+		return domain.StateOpen
+	case "MERGED":
+		return domain.StateMerged
+	default:
+		return domain.StateClosed
+	}
+}
+
+// parseReviewDecision maps the GraphQL reviewDecision enum onto the domain
+// value. An empty string means the pull request needs no review at all; an
+// unknown one is treated the same way rather than failing the whole fetch.
+func parseReviewDecision(decision string) domain.ReviewState {
+	switch decision {
+	case "APPROVED":
+		return domain.ReviewApproved
+	case "CHANGES_REQUESTED":
+		return domain.ReviewChangesRequested
+	case "REVIEW_REQUIRED":
+		return domain.ReviewRequired
+	default:
+		return domain.ReviewNone
+	}
 }

@@ -66,51 +66,6 @@ func TestWorkIndexesBySection(t *testing.T) {
 	}
 }
 
-func TestParseItemState(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		state string
-		want  domain.ItemState
-	}{
-		{"OPEN", domain.StateOpen},
-		{"CLOSED", domain.StateClosed},
-		{"MERGED", domain.StateMerged},
-		// gh's REST output lower-cases what GraphQL sends in capitals.
-		{"open", domain.StateOpen},
-		{"merged", domain.StateMerged},
-		{"", domain.StateClosed},
-		{"SOMETHING_NEW", domain.StateClosed},
-	}
-
-	for _, tt := range tests {
-		if got := domain.ParseItemState(tt.state); got != tt.want {
-			t.Errorf("%q: got %v, want %v", tt.state, got, tt.want)
-		}
-	}
-}
-
-func TestParseReviewDecision(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		decision string
-		want     domain.ReviewState
-	}{
-		{"APPROVED", domain.ReviewApproved},
-		{"CHANGES_REQUESTED", domain.ReviewChangesRequested},
-		{"REVIEW_REQUIRED", domain.ReviewRequired},
-		{"", domain.ReviewNone},
-		{"SOMETHING_NEW", domain.ReviewNone},
-	}
-
-	for _, tt := range tests {
-		if got := domain.ParseReviewDecision(tt.decision); got != tt.want {
-			t.Errorf("%q: got %v, want %v", tt.decision, got, tt.want)
-		}
-	}
-}
-
 // A section added without widening Work panics at run time with no compiler
 // error. The list below is written by hand (.claude/rules/testing.md).
 func TestEverySectionConstantIsASlotInWork(t *testing.T) {
