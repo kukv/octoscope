@@ -475,7 +475,7 @@ func TestSaveQueriesConvertsAndReachesTheStore(t *testing.T) {
 }
 
 // cmd/octoscope reads config.SavedQuery from the settings file and must
-// hand app.Options the UI's own type instead.
+// hand root.Options the UI's own type instead.
 func TestSavedQueriesFromConvertsForStartup(t *testing.T) {
 	t.Parallel()
 

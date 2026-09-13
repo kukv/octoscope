@@ -1,0 +1,135 @@
+package root
+
+import (
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
+	"github.com/kukv/octoscope/internal/i18n"
+)
+
+func (m Model) View() tea.View {
+	var content string
+	switch top, ok := m.top(); {
+	case m.errText != "":
+		content = m.errorView()
+	case ok && top == overlayDiff:
+		content = m.diff.View()
+	case ok && top == overlayChecks:
+		content = m.checks.View()
+	case ok:
+		content = m.detail.View()
+	default:
+		content = m.tabRow() + "\n\n" + m.activeTab()
+	}
+	v := tea.NewView(content)
+	v.AltScreen = true
+	// Nothing else turns the mouse on: without this the terminal reports no
+	// clicks and no wheel at all.
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+func (m Model) activeTab() string {
+	switch m.tab {
+	case tabRepos:
+		return m.repo.View()
+	case tabSearch:
+		return m.search.View()
+	}
+	return m.work.View()
+}
+
+// tabLabels names the tabs on offer, in display order. Both the tab row and
+// the mouse hit-test read this, so they cannot disagree about where a label
+// sits.
+func (m Model) tabLabels() []string {
+	return []string{"1 " + i18n.T("tab.work"), "2 " + i18n.T("tab.repos"), "3 " + i18n.T("tab.search")}
+}
+
+// tabRow labels each tab with the key that reaches it, and reports on the
+// board at the far right: what is waiting, what is broken, and how old the
+// answer is. The summary lives here rather than on the board because it is
+// true of the whole application, and is worth seeing from the Repos tab too.
+func (m Model) tabRow() string {
+	labels := m.tabLabels()
+	for i, label := range labels {
+		if tabID(i) == m.tab {
+			labels[i] = theme.ActiveTab().Render(label)
+		} else {
+			labels[i] = theme.Dim().Render(label)
+		}
+	}
+	row := strings.Join(labels, tabGap)
+	if m.repoLookupTimedOut {
+		row += tabGap + theme.Error().Render(i18n.T("tab.repo_lookup_timeout"))
+	}
+	if m.opts.ConfigError != "" {
+		row += tabGap + theme.Error().Render(i18n.T("tab.config_unreadable"))
+	}
+
+	summary := m.summary()
+	pad := m.width - ansi.StringWidth(row) - ansi.StringWidth(summary)
+	if summary == "" || pad < 2 {
+		return row // too narrow to say anything beyond which tab this is
+	}
+	return row + strings.Repeat(" ", pad) + summary
+}
+
+// summary is the board's tally, in the order the mockup puts it. A count of
+// zero is left out: the row is there to show what needs doing, and a row of
+// zeroes is noise.
+func (m Model) summary() string {
+	s := m.work.Summary()
+	if !s.Ready {
+		return ""
+	}
+	var parts []string
+	if s.Attention > 0 {
+		parts = append(parts, theme.Count(true).Render(i18n.Tn("summary.attention", s.Attention)))
+	}
+	if s.Failing > 0 {
+		parts = append(parts, theme.Error().Render(i18n.Tn("summary.failing", s.Failing)))
+	}
+	// A board every column of which failed is ready and has never been
+	// answered: there is no time to report, and the zero time would be dated
+	// from the year one.
+	if !s.FetchedAt.IsZero() {
+		parts = append(parts, theme.Dim().Render(i18n.Tf("summary.updated", map[string]any{
+			"Ago": i18n.RelTime(m.now, s.FetchedAt),
+		})))
+	}
+	return strings.Join(parts, theme.Dim().Render(" · "))
+}
+
+// errorView shows the failure that stopped the run. The heading and the key
+// hint are ours and are short in both languages; the message itself came from
+// gh or GitHub and can be any length, so it is wrapped rather than cut short
+// (.claude/rules/errors.md).
+func (m Model) errorView() string {
+	return theme.Error().Bold(true).Render(i18n.T("app.error_title")) + "\n\n" +
+		wrap(m.errText, m.width) + "\n\n" +
+		theme.Dim().Render(layout.FitKeyBar(m.errorHints(), m.width))
+}
+
+// errorHints is the error screen's key bar, most important hint first. esc
+// only appears once the stack holds a view to go back to (see handleKey);
+// with nothing behind it, q:quit is the only key on offer.
+func (m Model) errorHints() []string {
+	if len(m.stack) == 0 {
+		return []string{i18n.T("footer.error.quit")}
+	}
+	return []string{i18n.T("footer.error.esc"), i18n.T("footer.error.quit")}
+}
+
+// wrap folds s to w display columns, breaking a word that has to be broken.
+// A w of zero or less means there is no width yet.
+func wrap(s string, w int) string {
+	if w <= 0 {
+		return s
+	}
+	return ansi.Wrap(s, w, "")
+}

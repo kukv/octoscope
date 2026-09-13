@@ -1,0 +1,176 @@
+package theme_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
+)
+
+// dark restores the default background assumption, because it is process-wide
+// state (.claude/rules/testing.md).
+func dark(t *testing.T) {
+	t.Helper()
+	t.Cleanup(func() { theme.SetDark(true) })
+}
+
+func TestTheBackgroundChangesTheColour(t *testing.T) {
+	dark(t)
+
+	theme.SetDark(true)
+	onDark := theme.Dim().Render("x")
+	theme.SetDark(false)
+	onLight := theme.Dim().Render("x")
+
+	if onDark == onLight {
+		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
+	}
+	for _, s := range []string{onDark, onLight} {
+		if !strings.Contains(s, "\x1b[") {
+			t.Errorf("no colour was emitted at all: %q", s)
+		}
+	}
+}
+
+// TestEachReviewStateHasItsOwnColour is what makes the state colours worth
+// having: two states that render the same are indistinguishable on screen.
+func TestEachReviewStateHasItsOwnColour(t *testing.T) {
+	dark(t)
+
+	seen := map[string]string{}
+	for name, s := range map[string]domain.ReviewState{
+		"approved":          domain.ReviewApproved,
+		"changes requested": domain.ReviewChangesRequested,
+		"review required":   domain.ReviewRequired,
+	} {
+		got := theme.Review(s, false).Render("x")
+		if other, clash := seen[got]; clash {
+			t.Errorf("%s and %s render identically: %q", name, other, got)
+		}
+		seen[got] = name
+	}
+
+	if theme.Review(domain.ReviewApproved, true).Render("x") == theme.Review(domain.ReviewApproved, false).Render("x") {
+		t.Error("a draft is coloured as though it were waiting on a review")
+	}
+}
+
+func TestEachCheckStateHasItsOwnColour(t *testing.T) {
+	dark(t)
+
+	seen := map[string]string{}
+	for name, s := range map[string]domain.CheckState{
+		"success": domain.CheckSuccess,
+		"failure": domain.CheckFailure,
+		"running": domain.CheckRunning,
+		"none":    domain.CheckNone,
+	} {
+		got := theme.Check(s).Render("x")
+		if other, clash := seen[got]; clash {
+			t.Errorf("%s and %s render identically: %q", name, other, got)
+		}
+		seen[got] = name
+	}
+}
+
+func TestBadgeChoosesReadableTextForTheLabelColour(t *testing.T) {
+	dark(t)
+
+	tests := []struct {
+		name, hex, wantText string
+	}{
+		{"a pale label takes black text", "d4c5f9", "0;0;0"},
+		{"a dark label takes white text", "0e8a16", "255;255;255"},
+		{"white takes black text", "ffffff", "0;0;0"},
+		{"black takes white text", "000000", "255;255;255"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := theme.Badge(tc.hex).Render("bug")
+			if !strings.Contains(got, tc.wantText) {
+				t.Errorf("Badge(%q) = %q, want foreground %s", tc.hex, got, tc.wantText)
+			}
+			if !strings.Contains(got, "48;2;") {
+				t.Errorf("Badge(%q) = %q, want a filled background", tc.hex, got)
+			}
+		})
+	}
+}
+
+func TestAnUnusableLabelColourStillRendersTheName(t *testing.T) {
+	dark(t)
+
+	for _, hex := range []string{"", "xyz", "1234567", "gggggg"} {
+		got := theme.Badge(hex).Render("bug")
+		if !strings.Contains(got, "bug") {
+			t.Errorf("Badge(%q) lost the label name: %q", hex, got)
+		}
+		if strings.Contains(got, "48;2;") {
+			t.Errorf("Badge(%q) filled a background from a colour it could not read: %q", hex, got)
+		}
+	}
+}
+
+func TestHighlightColoursCodeItKnows(t *testing.T) {
+	got := theme.Highlight("walk.go", "func Walk() {}")
+	if !strings.Contains(got, "\x1b[") {
+		t.Errorf("Highlight returned no escapes for Go source: %q", got)
+	}
+	if ansi.Strip(got) != "func Walk() {}" {
+		t.Errorf("Highlight changed the text: %q", ansi.Strip(got))
+	}
+}
+
+func TestHighlightLeavesUnknownFilesAlone(t *testing.T) {
+	const line = "some prose"
+	if got := theme.Highlight("NOTES", line); got != line {
+		t.Errorf("Highlight(%q) = %q, want it untouched", line, got)
+	}
+}
+
+// TestHighlightFollowsTheBackground: the palette that reads on a dark
+// terminal is unreadable on a light one, so the two must not come out the
+// same.
+func TestHighlightFollowsTheBackground(t *testing.T) {
+	theme.SetDark(true)
+	t.Cleanup(func() { theme.SetDark(true) })
+	dark := theme.Highlight("walk.go", "func Walk() {}")
+	theme.SetDark(false)
+	light := theme.Highlight("walk.go", "func Walk() {}")
+	if dark == light {
+		t.Errorf("the same escapes on both backgrounds: %q", dark)
+	}
+}
+
+// TestHighlightKeepsTheWidth is what stops highlighting from breaking every
+// column downstream: ANSI escapes must not count towards the width, and the
+// text must come back rune for rune, not smuggling newlines or other characters.
+func TestHighlightKeepsTheWidth(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		line string
+	}{
+		{name: "Go with tab", path: "walk.go", line: "func Walk() {}"},
+		{name: "Go with Japanese", path: "walk.go", line: "\t// 日本語のコメント"},
+		{name: "empty", path: "walk.go", line: ""},
+		{name: "Makefile that triggers EnsureNL", path: "Makefile", line: "const x = 1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := theme.Highlight(tc.path, tc.line)
+			stripped := ansi.Strip(got)
+			if stripped != tc.line {
+				t.Errorf("Highlight(%q, %q) changed the text to %q", tc.path, tc.line, stripped)
+			}
+			if ansi.StringWidth(got) != ansi.StringWidth(tc.line) {
+				t.Errorf("Highlight(%q, %q) is %d columns, want %d",
+					tc.path, tc.line, ansi.StringWidth(got), ansi.StringWidth(tc.line))
+			}
+		})
+	}
+}

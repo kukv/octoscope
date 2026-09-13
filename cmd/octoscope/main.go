@@ -12,11 +12,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/config"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/root"
 	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/github/api"
 	"github.com/kukv/octoscope/internal/i18n"
-	"github.com/kukv/octoscope/internal/tui/app"
-	"github.com/kukv/octoscope/internal/tui/icon"
 )
 
 // version is set by GoReleaser via -ldflags at release build time.
@@ -77,7 +77,7 @@ func main() {
 	} else {
 		uc = usecase.New(apiClient, store)
 	}
-	p := tea.NewProgram(app.New(uc, app.Options{
+	p := tea.NewProgram(root.New(uc, root.Options{
 		Repo:         *repoFlag,
 		Repositories: cfg.Repositories,
 		SavedQueries: usecase.SavedQueriesFrom(cfg.SavedQueries),
