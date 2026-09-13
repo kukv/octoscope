@@ -36,7 +36,7 @@ jobs:
 
       # 人のレビューで見えない内容(不可視 Unicode・同形異字・AI 指示ファイルの
       # 隠しマークアップ・.gitattributes による差分隠し)を検知する
-      - uses: kukv/hidden-content-scan@92d4d65a0d79928e6b8bb4cd6ac52172df7f942b # main
+      - uses: kukv/hidden-content-scan@4643ed6ddf226db042fbce9a41a7f41a30aea6b6 # v1.0.0
         with:
           exclude: "**/testdata/**"
 
