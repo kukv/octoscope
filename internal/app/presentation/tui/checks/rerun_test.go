@@ -17,10 +17,10 @@ type recordingSource struct {
 	fakeSource
 	reruns int
 	scope  domain.RerunScope
-	runID  int64
+	runID  domain.RunHandle
 }
 
-func (s *recordingSource) RerunWorkflow(_ context.Context, _ string, runID int64, scope domain.RerunScope) error {
+func (s *recordingSource) RerunWorkflow(_ context.Context, _ string, runID domain.RunHandle, scope domain.RerunScope) error {
 	s.reruns++
 	s.scope = scope
 	s.runID = runID
@@ -56,8 +56,8 @@ func TestChoosingAScopeSendsIt(t *testing.T) {
 	}
 	// arrange puts the failing workflow first, so the cursor starts on sca,
 	// whose run is 20.
-	if src.runID != 20 {
-		t.Errorf("runID = %d, want 20, the run of the selected check", src.runID)
+	if src.runID != "20" {
+		t.Errorf("runID = %q, want %q, the run of the selected check", src.runID, "20")
 	}
 }
 

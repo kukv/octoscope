@@ -2,6 +2,8 @@ package gh
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github"
@@ -18,9 +20,14 @@ func (g *Gateway) PRChecks(ctx context.Context, repo string, number int) (domain
 	return toChecks(runs), nil
 }
 
-// JobLog reads one job's log.
-func (g *Gateway) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
-	lines, err := g.backend.JobLog(ctx, repo, jobID, failedOnly)
+// JobLog reads one job's log. The handle is the Actions database id the
+// gateway handed out; anything else is a caller bug, not a service failure.
+func (g *Gateway) JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error) {
+	id, err := strconv.ParseInt(string(job), 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("job handle %q: %w", job, err)
+	}
+	lines, err := g.backend.JobLog(ctx, repo, id, failedOnly)
 	if err != nil {
 		return nil, wrap(err)
 	}
@@ -31,9 +38,15 @@ func (g *Gateway) JobLog(ctx context.Context, repo string, jobID int64, failedOn
 	return out, nil
 }
 
-// RerunWorkflow starts a workflow run again.
-func (g *Gateway) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
-	return wrap(g.backend.RerunWorkflow(ctx, repo, runID, fromRerunScope(scope)))
+// RerunWorkflow starts a workflow run again. The handle is the Actions
+// database id the gateway handed out; anything else is a caller bug, not a
+// service failure.
+func (g *Gateway) RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error {
+	id, err := strconv.ParseInt(string(run), 10, 64)
+	if err != nil {
+		return fmt.Errorf("run handle %q: %w", run, err)
+	}
+	return wrap(g.backend.RerunWorkflow(ctx, repo, id, fromRerunScope(scope)))
 }
 
 // toChecks counts every check run once: each one increments Total and
@@ -117,11 +130,15 @@ func toCheckRun(n gql.CheckRun) domain.CheckRun {
 		return run
 	}
 	run.URL = n.DetailsURL
-	run.JobID = n.DatabaseID
+	if n.DatabaseID != 0 {
+		run.Job = domain.JobHandle(strconv.FormatInt(n.DatabaseID, 10))
+	}
 	run.StartedAt = n.StartedAt
 	run.CompletedAt = n.CompletedAt
 	if wr := n.CheckSuite.WorkflowRun; wr != nil {
-		run.RunID = wr.DatabaseID
+		if wr.DatabaseID != 0 {
+			run.WorkflowRun = domain.RunHandle(strconv.FormatInt(wr.DatabaseID, 10))
+		}
 		run.RunNumber = wr.RunNumber
 		run.Workflow = wr.Workflow.Name
 	}

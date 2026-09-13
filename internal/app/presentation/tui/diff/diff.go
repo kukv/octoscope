@@ -12,7 +12,6 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -21,8 +20,8 @@ import (
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
-	PostLineComment(t usecase.ReviewTarget, c domain.PendingComment) (string, error)
-	DiscardReview(reviewID string) error
+	PostLineComment(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	DiscardReview(review domain.ReviewHandle) error
 	review.Source
 }
 
@@ -352,7 +351,7 @@ func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
 	m.errText = ""
 	m.textarea.Reset()
 	m.target = domain.PendingComment{}
-	m.review.PendingID = msg.reviewID
+	m.review.Pending = msg.review
 	return m, m.fetchReview()
 }
 
@@ -383,7 +382,7 @@ func (m Model) submitDone() (Model, tea.Cmd) {
 	}
 	m.mode, m.phase = modeView, phaseIdle
 	m.errText = ""
-	m.review.PendingID = ""
+	m.review.Pending = ""
 	return m, m.fetchReview()
 }
 
@@ -407,7 +406,7 @@ func (m Model) discarded(msg discardedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.mode = modeView
-	m.review.PendingID = ""
+	m.review.Pending = ""
 	return m, m.fetchReview()
 }
 

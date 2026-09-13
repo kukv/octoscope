@@ -22,19 +22,19 @@ type fakeSource struct {
 
 	logLines  []domain.LogLine
 	logRepo   string
-	logJobID  int64
+	logJobID  domain.JobHandle
 	logFailed bool
 
 	rerunRepo  string
-	rerunRunID int64
+	rerunRunID domain.RunHandle
 	rerunScope domain.RerunScope
 
 	mergeContext        domain.MergeContext
-	mergedID            string
+	mergedID            domain.PullRequestHandle
 	mergedMethod        domain.MergeMethod
-	autoMergeID         string
+	autoMergeID         domain.PullRequestHandle
 	autoMergeMethod     domain.MergeMethod
-	disabledAutoMergeID string
+	disabledAutoMergeID domain.PullRequestHandle
 }
 
 func (f *fakeSource) GetPR(_ context.Context, _ string, _ int) (domain.PR, error) {
@@ -52,12 +52,12 @@ func (f *fakeSource) PRChecks(_ context.Context, repo string, number int) (domai
 	return f.checks, f.err
 }
 
-func (f *fakeSource) JobLog(_ context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
+func (f *fakeSource) JobLog(_ context.Context, repo string, jobID domain.JobHandle, failedOnly bool) ([]domain.LogLine, error) {
 	f.logRepo, f.logJobID, f.logFailed = repo, jobID, failedOnly
 	return f.logLines, f.err
 }
 
-func (f *fakeSource) RerunWorkflow(_ context.Context, repo string, runID int64, scope domain.RerunScope) error {
+func (f *fakeSource) RerunWorkflow(_ context.Context, repo string, runID domain.RunHandle, scope domain.RerunScope) error {
 	f.rerunRepo, f.rerunRunID, f.rerunScope = repo, runID, scope
 	return f.err
 }
@@ -66,18 +66,18 @@ func (f *fakeSource) PRMergeContext(_ context.Context, _ string, _ int) (domain.
 	return f.mergeContext, f.err
 }
 
-func (f *fakeSource) MergePR(pullRequestID string, method domain.MergeMethod) error {
-	f.mergedID, f.mergedMethod = pullRequestID, method
+func (f *fakeSource) MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	f.mergedID, f.mergedMethod = pr, method
 	return f.err
 }
 
-func (f *fakeSource) EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error {
-	f.autoMergeID, f.autoMergeMethod = pullRequestID, method
+func (f *fakeSource) EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	f.autoMergeID, f.autoMergeMethod = pr, method
 	return f.err
 }
 
-func (f *fakeSource) DisableAutoMerge(pullRequestID string) error {
-	f.disabledAutoMergeID = pullRequestID
+func (f *fakeSource) DisableAutoMerge(pr domain.PullRequestHandle) error {
+	f.disabledAutoMergeID = pr
 	return f.err
 }
 
@@ -386,15 +386,15 @@ func TestJobLogReachesTheBackend(t *testing.T) {
 	f := &fakeSource{logLines: []domain.LogLine{{Text: "hi"}}}
 	u := &Usecase{checks: f}
 
-	got, err := u.JobLog(t.Context(), "kukv/octoscope", 61, true)
+	got, err := u.JobLog(t.Context(), "kukv/octoscope", "61", true)
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
 	}
 	if !slices.Equal(got, f.logLines) {
 		t.Errorf("JobLog = %+v, want %+v", got, f.logLines)
 	}
-	if f.logRepo != "kukv/octoscope" || f.logJobID != 61 || !f.logFailed {
-		t.Errorf("backend was asked for %s job %d failedOnly=%v, want kukv/octoscope job 61 failedOnly=true",
+	if f.logRepo != "kukv/octoscope" || f.logJobID != "61" || !f.logFailed {
+		t.Errorf("backend was asked for %s job %q failedOnly=%v, want kukv/octoscope job 61 failedOnly=true",
 			f.logRepo, f.logJobID, f.logFailed)
 	}
 }
@@ -405,11 +405,11 @@ func TestRerunWorkflowReachesTheBackend(t *testing.T) {
 	f := &fakeSource{}
 	u := &Usecase{checks: f}
 
-	if err := u.RerunWorkflow(t.Context(), "kukv/octoscope", 61, domain.RerunAll); err != nil {
+	if err := u.RerunWorkflow(t.Context(), "kukv/octoscope", "61", domain.RerunAll); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
-	if f.rerunRepo != "kukv/octoscope" || f.rerunRunID != 61 || f.rerunScope != domain.RerunAll {
-		t.Errorf("backend was asked to rerun %s run %d scope=%v, want kukv/octoscope run 61 scope=RerunAll",
+	if f.rerunRepo != "kukv/octoscope" || f.rerunRunID != "61" || f.rerunScope != domain.RerunAll {
+		t.Errorf("backend was asked to rerun %s run %q scope=%v, want kukv/octoscope run 61 scope=RerunAll",
 			f.rerunRepo, f.rerunRunID, f.rerunScope)
 	}
 }

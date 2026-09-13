@@ -53,7 +53,7 @@ func TestToMergeContextTranslatesEveryField(t *testing.T) {
 	}
 	got := toMergeContext(c)
 	want := domain.MergeContext{
-		PullRequestID:            "PR_kwDOTVXF-M8AAAABCd9eQA",
+		PullRequest:              "PR_kwDOTVXF-M8AAAABCd9eQA",
 		IsDraft:                  true,
 		Mergeable:                domain.MergeableConflicting,
 		State:                    domain.MergeStateDirty,
@@ -192,7 +192,7 @@ func TestPRMergeContextTranslatesWhatTheBackendReturns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PRMergeContext: %v", err)
 	}
-	want := domain.MergeContext{PullRequestID: "PR_1", Mergeable: domain.MergeableYes, State: domain.MergeStateClean}
+	want := domain.MergeContext{PullRequest: "PR_1", Mergeable: domain.MergeableYes, State: domain.MergeStateClean}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("PRMergeContext() = %+v, want %+v", got, want)
 	}

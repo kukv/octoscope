@@ -40,6 +40,8 @@ linters:
           deny:
             - pkg: github.com/kukv/octoscope/internal/app/
               desc: クライアントはアプリケーションを知らない。変換は gateway が行う
+            - pkg: github.com/kukv/octoscope/internal/browser
+              desc: URL を開くのは UI の仕事。クライアントはブラウザを知らない
         # usecase は画面も翻訳も知らない。
         usecase-layer:
           files:
@@ -314,6 +316,15 @@ linters:
         linters:
           - gosec
         text: "G304"
+      # staticcheck QF1008 wants g.backend.StartReview / g.backend.SubmitNewReview
+      # simplified to the promoted g.StartReview / g.SubmitNewReview. Those two
+      # calls are deliberately explicit: they are the gateway calling its own
+      # backend, not a caller reaching through promotion (see the package
+      # comment in backend.go).
+      - path: internal/app/adapter/gateway/gh/review\.go
+        linters:
+          - staticcheck
+        text: "QF1008"
 
 issues:
   max-issues-per-linter: 0

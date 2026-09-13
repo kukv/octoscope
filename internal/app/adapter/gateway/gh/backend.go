@@ -5,6 +5,8 @@
 // converted yet is promoted from the embedded value unchanged; a converted
 // one is shadowed by an explicit method whose signature speaks the domain.
 // That is what lets the conversion land one port group at a time.
+// StartReview and SubmitNewReview stay off the usecase-facing port for
+// good; review.go calls them through g.backend rather than by promotion.
 package gh
 
 import (
@@ -79,10 +81,6 @@ type reviewer interface {
 	DiscardReview(reviewID string) error
 }
 
-type opener interface {
-	OpenWeb(url string) error
-}
-
 type checksFetcher interface {
 	PRChecks(ctx context.Context, repo string, number int) ([]gql.CheckRun, error)
 	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]github.LogLine, error)
@@ -115,7 +113,6 @@ type backend interface {
 	repoFinder
 	reviewFetcher
 	reviewer
-	opener
 	checksFetcher
 	merger
 }

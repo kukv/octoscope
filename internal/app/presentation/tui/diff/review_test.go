@@ -64,7 +64,7 @@ func TestOpeningAnOverlayLeavesAFailedSubmitBehind(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// X declines without a pending review to ask about.
 			ctx := threadFixture()
-			ctx.PendingID = "PRR_9"
+			ctx.Pending = "PRR_9"
 			m := loaded(t, 120, 40)
 			m, _ = m.Update(reviewMsg{ref: m.ref, ctx: ctx})
 			m = press(m, "v")

@@ -17,6 +17,7 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
 	"github.com/kukv/octoscope/internal/app/usecase"
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -26,7 +27,6 @@ type itemSource interface {
 	SetState(ref domain.ItemRef, closing bool) error
 	EditLabels(ref domain.ItemRef, add, remove []string) error
 	EditAssignees(ref domain.ItemRef, add, remove []string) error
-	OpenWeb(url string) error
 }
 
 // candidateSource lists what a picker offers. Labels and assignees belong to
@@ -203,6 +203,10 @@ type Model struct {
 
 	submit review.Model
 	merge  merge.Model
+
+	// open shows a URL. It is browser.Open outside tests: opening a page is
+	// not a GitHub call, so it does not go through the backend.
+	open func(url string) error
 }
 
 func New(src Source, ref domain.ItemRef) Model {
@@ -218,6 +222,7 @@ func New(src Source, ref domain.ItemRef) Model {
 		spin:     s,
 		body:     newBody(),
 		textarea: ta,
+		open:     browser.Open,
 	}
 }
 
@@ -256,9 +261,10 @@ func fetchReviewContext(src reviewOpener, ref domain.ItemRef) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, ref domain.ItemRef, url string) tea.Cmd {
+func (m Model) openWeb(ref domain.ItemRef, url string) tea.Cmd {
+	open := m.open
 	return func() tea.Msg {
-		if err := src.OpenWeb(url); err != nil {
+		if err := open(url); err != nil {
 			return errMsg{ref, err}
 		}
 		return nil
@@ -523,8 +529,8 @@ func (m Model) reviewContextArrived(msg reviewContextMsg) Model {
 		return m // an answer for an item the user has already left
 	}
 	target := review.Target{
-		PullRequestID:   msg.ctx.PullRequestID,
-		PendingID:       msg.ctx.PendingID,
+		PullRequest:     msg.ctx.PullRequest,
+		Pending:         msg.ctx.Pending,
 		PendingComments: msg.ctx.PendingCount(),
 	}
 	m.submit = review.New(m.src, target)
@@ -670,7 +676,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if m.url == "" {
 			return m, nil
 		}
-		return m, openWeb(m.src, m.ref, m.url)
+		return m, m.openWeb(m.ref, m.url)
 	case "d":
 		// An issue has no diff.
 		if m.ref.Kind != domain.ItemPR {

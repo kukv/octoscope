@@ -13,7 +13,7 @@ import (
 func threadFixture() domain.ReviewContext {
 	at := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 	return domain.ReviewContext{
-		PullRequestID: "PR_1",
+		PullRequest: "PR_1",
 		Threads: []domain.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
@@ -52,7 +52,7 @@ func withThreads(t *testing.T, width, height int) Model {
 // draw.
 func pendingFixture() domain.ReviewContext {
 	return domain.ReviewContext{
-		PullRequestID: "PR_1",
+		PullRequest: "PR_1",
 		Threads: []domain.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
@@ -117,7 +117,7 @@ func TestASettledThreadIsACountUntilItIsOpened(t *testing.T) {
 // opening it draws two rowThread rows sharing the same key.
 func settledThreadWithTwoComments() domain.ReviewContext {
 	return domain.ReviewContext{
-		PullRequestID: "PR_1",
+		PullRequest: "PR_1",
 		Threads: []domain.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: domain.SideRight, Resolved: true,
@@ -226,7 +226,7 @@ func TestAnswersForAnotherPullRequestAreDroppedForReview(t *testing.T) {
 // given multi-line text.
 func multiLineReview(body string) domain.ReviewContext {
 	return domain.ReviewContext{
-		PullRequestID: "PR_1",
+		PullRequest: "PR_1",
 		Threads: []domain.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,

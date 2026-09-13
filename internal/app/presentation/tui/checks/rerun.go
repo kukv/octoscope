@@ -52,12 +52,12 @@ func (p rerunPhase) String() string {
 // since left this pull request or started a rerun on another check.
 type rerunDoneMsg struct {
 	ref   domain.ItemRef
-	runID int64
+	runID domain.RunHandle
 }
 
 type rerunErrMsg struct {
 	ref   domain.ItemRef
-	runID int64
+	runID domain.RunHandle
 	err   error
 }
 
@@ -86,7 +86,7 @@ func (m Model) startRerun() Model {
 	m.mode = modeRerun
 	m.rerunPhase = rerunIdle
 	m.rerunScope = domain.RerunFailed
-	m.rerunRunID = r.RunID
+	m.rerunRun = r.WorkflowRun
 	m.rerunWorkflow = m.workflowTitle(r)
 	return m
 }
@@ -119,7 +119,7 @@ func (m Model) handleRerunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) sendRerun() (Model, tea.Cmd) {
 	m.rerunPhase = rerunWorking
 	m.errText = ""
-	src, ref, runID, scope := m.src, m.ref, m.rerunRunID, m.rerunScope
+	src, ref, runID, scope := m.src, m.ref, m.rerunRun, m.rerunScope
 	return m, func() tea.Msg {
 		if err := src.RerunWorkflow(context.Background(), ref.Repo, runID, scope); err != nil {
 			return rerunErrMsg{ref: ref, runID: runID, err: err}
@@ -132,7 +132,7 @@ func (m Model) sendRerun() (Model, tea.Cmd) {
 // refetch the checks list: a run just started still shows as it did before,
 // and r is what the user presses once it has something new to show.
 func (m Model) rerunDone(msg rerunDoneMsg) Model {
-	if msg.ref != m.ref || msg.runID != m.rerunRunID {
+	if msg.ref != m.ref || msg.runID != m.rerunRun {
 		return m
 	}
 	m.mode = modeView
@@ -142,7 +142,7 @@ func (m Model) rerunDone(msg rerunDoneMsg) Model {
 }
 
 func (m Model) rerunFailed(msg rerunErrMsg) Model {
-	if msg.ref != m.ref || msg.runID != m.rerunRunID {
+	if msg.ref != m.ref || msg.runID != m.rerunRun {
 		return m
 	}
 	m.rerunPhase = rerunIdle

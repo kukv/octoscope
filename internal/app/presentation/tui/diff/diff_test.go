@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -29,13 +28,13 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (domain.Revie
 	return f.review, nil
 }
 
-func (f *fakeSource) PostLineComment(usecase.ReviewTarget, domain.PendingComment) (string, error) {
+func (f *fakeSource) PostLineComment(domain.ReviewTarget, domain.PendingComment) (domain.ReviewHandle, error) {
 	return "", nil
 }
 
-func (f *fakeSource) DiscardReview(string) error { return nil }
+func (f *fakeSource) DiscardReview(domain.ReviewHandle) error { return nil }
 
-func (f *fakeSource) SubmitReview(usecase.ReviewTarget, domain.ReviewEvent, string) error { return nil }
+func (f *fakeSource) SubmitReview(domain.ReviewTarget, domain.ReviewEvent, string) error { return nil }
 
 // fixture is two files, so that moving between files is testable, with a
 // second hunk in the first so that hunk movement is too.
@@ -354,7 +353,7 @@ func TestReviewMsgClearsTheDeclineMessage(t *testing.T) {
 	if m.declined == "" {
 		t.Fatal("no decline message to begin with; this test proves nothing")
 	}
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequestID: "PR_1"}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequest: "PR_1"}})
 	if m.declined != "" {
 		t.Errorf("declined = %q after the review context landed, want cleared", m.declined)
 	}

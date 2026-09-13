@@ -76,7 +76,10 @@ func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]domain.Issu
 	return f.issues, f.err
 }
 
-func (f *fakeSource) OpenWeb(url string) error {
+// open stands in for browser.Open in tests: it is wired onto a Model's open
+// field rather than reached through Source, since opening a URL no longer
+// goes through the backend.
+func (f *fakeSource) open(url string) error {
 	f.webCalls = append(f.webCalls, url)
 	return f.webErr
 }
@@ -323,6 +326,7 @@ func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
 func TestAFailureToOpenTheBrowserIsNotFatal(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), webErr: &browser.NoneError{URL: samplePRs()[0].URL}}
 	m := loadedModel(f)
+	m.open = f.open
 	m, cmd := m.Update(key("o"))
 	if cmd == nil {
 		t.Fatal("o produced no command")
@@ -441,6 +445,7 @@ func TestAFetchDoesNotClearTheBrowsersNotice(t *testing.T) {
 	url := samplePRs()[0].URL
 	f := &fakeSource{prs: samplePRs(), webErr: &browser.NoneError{URL: url}}
 	m := currentModel(f, 120)
+	m.open = f.open
 
 	m, cmd := m.Update(key("o"))
 	m, _ = m.Update(cmd())
@@ -669,6 +674,7 @@ func TestKeyBarNamesTheChecksKey(t *testing.T) {
 func TestOOpensTheSelectionsOwnURL(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := loadedModel(f)
+	m.open = f.open
 	_, cmd := m.Update(key("o"))
 	if cmd == nil {
 		t.Fatal("cmd = nil, want openWeb cmd")

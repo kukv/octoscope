@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -23,15 +24,13 @@ func (f *fakeSource) PRChecks(context.Context, string, int) (domain.Checks, erro
 	return f.checks, nil
 }
 
-func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]domain.LogLine, error) {
+func (f *fakeSource) JobLog(context.Context, string, domain.JobHandle, bool) ([]domain.LogLine, error) {
 	return f.log, nil
 }
 
-func (f *fakeSource) RerunWorkflow(context.Context, string, int64, domain.RerunScope) error {
+func (f *fakeSource) RerunWorkflow(context.Context, string, domain.RunHandle, domain.RerunScope) error {
 	return nil
 }
-
-func (f *fakeSource) OpenWeb(string) error { return nil }
 
 // fixture is two workflows, the failing one recorded second on purpose: the
 // view has to move it to the top.
@@ -39,8 +38,8 @@ func fixture() domain.Checks {
 	return domain.Checks{
 		Total: 3, Passed: 1, Failed: 1, Running: 1, State: domain.CheckFailure,
 		Runs: []domain.CheckRun{
-			{Name: "lint", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
-			{Name: "sca", State: domain.CheckFailure, Kind: domain.CheckKindRun, Workflow: "security", JobID: 2, RunID: 20},
+			{Name: "lint", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", Job: "1", WorkflowRun: "10"},
+			{Name: "sca", State: domain.CheckFailure, Kind: domain.CheckKindRun, Workflow: "security", Job: "2", WorkflowRun: "20"},
 			{Name: "ci/circleci", State: domain.CheckRunning, Kind: domain.CheckKindStatus, URL: "https://circleci.example/1"},
 		},
 	}
@@ -101,10 +100,10 @@ func interleaved() domain.Checks {
 	return domain.Checks{
 		Total: 4, Passed: 4, State: domain.CheckSuccess,
 		Runs: []domain.CheckRun{
-			{Name: "a", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
-			{Name: "b", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "release", JobID: 2, RunID: 20},
-			{Name: "c", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", JobID: 3, RunID: 10},
-			{Name: "d", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "release", JobID: 4, RunID: 20},
+			{Name: "a", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", Job: "1", WorkflowRun: "10"},
+			{Name: "b", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "release", Job: "2", WorkflowRun: "20"},
+			{Name: "c", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", Job: "3", WorkflowRun: "10"},
+			{Name: "d", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "release", Job: "4", WorkflowRun: "20"},
 		},
 	}
 }
@@ -154,16 +153,16 @@ func TestJMovesTheCursorDownTheList(t *testing.T) {
 // headings drawn between the groups push the cursor off a short screen.
 func manyChecks() domain.Checks {
 	var runs []domain.CheckRun
-	id := int64(1)
+	id := 1
 	for _, wf := range []string{"alpha", "beta", "gamma", "delta"} {
 		for i := range 8 {
 			runs = append(runs, domain.CheckRun{
-				Name:     fmt.Sprintf("%s-job%d", wf, i),
-				State:    domain.CheckSuccess,
-				Kind:     domain.CheckKindRun,
-				Workflow: wf,
-				JobID:    id,
-				RunID:    id,
+				Name:        fmt.Sprintf("%s-job%d", wf, i),
+				State:       domain.CheckSuccess,
+				Kind:        domain.CheckKindRun,
+				Workflow:    wf,
+				Job:         domain.JobHandle(strconv.Itoa(id)),
+				WorkflowRun: domain.RunHandle(strconv.Itoa(id + 1000)),
 			})
 			id++
 		}
@@ -444,7 +443,7 @@ func appCheck() domain.Checks {
 	return domain.Checks{
 		Total: 1, Passed: 1, State: domain.CheckSuccess,
 		Runs: []domain.CheckRun{
-			{Name: "codecov/patch", State: domain.CheckSuccess, Kind: domain.CheckKindRun, JobID: 7},
+			{Name: "codecov/patch", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Job: "7"},
 		},
 	}
 }

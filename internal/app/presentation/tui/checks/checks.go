@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -17,9 +18,8 @@ import (
 // string targets the workspace repository.
 type Source interface {
 	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
-	OpenWeb(url string) error
+	JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error
 }
 
 // ClosedMsg tells the parent the user left the checks view.
@@ -67,13 +67,13 @@ type Model struct {
 
 	mode mode
 
-	// rerunPhase, rerunScope, rerunRunID and rerunWorkflow are the rerun
+	// rerunPhase, rerunScope, rerunRun and rerunWorkflow are the rerun
 	// popup's own state: which run it targets (captured at R-press time,
 	// see startRerun), which scope is picked, and whether a send is in
 	// flight.
 	rerunPhase    rerunPhase
 	rerunScope    domain.RerunScope
-	rerunRunID    int64
+	rerunRun      domain.RunHandle
 	rerunWorkflow string
 
 	// log is the lines of the currently open job, failed steps only unless
@@ -81,7 +81,7 @@ type Model struct {
 	// belongs to (or is being fetched for); an answer is kept only while the
 	// cursor is still on the job it was asked for.
 	log        []domain.LogLine
-	logJob     int64
+	logJob     domain.JobHandle
 	logRow     int
 	hscroll    int
 	failedOnly bool
@@ -92,13 +92,17 @@ type Model struct {
 	// escalation path (errMsg -> ErrorMsg): the list may still be readable
 	// with no log open, so this stays a footer line instead.
 	errText string
+
+	// open shows a URL. It is browser.Open outside tests: opening a page is
+	// not a GitHub call, so it does not go through the backend.
+	open func(url string) error
 }
 
 // New builds the view for one pull request's checks.
 func New(src Source, ref domain.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return Model{src: src, ref: ref, loading: true, spin: s, failedOnly: true}
+	return Model{src: src, ref: ref, loading: true, spin: s, failedOnly: true, open: browser.Open}
 }
 
 // Init starts the fetch.
@@ -222,13 +226,13 @@ func (m Model) moveRow(delta int) Model {
 	return m.follow()
 }
 
-// selectedJobID is the job id of the check under the cursor, 0 if the
+// selectedJob is the job handle of the check under the cursor, empty if the
 // cursor is on nothing (the list is empty or has not arrived yet).
-func (m Model) selectedJobID() int64 {
+func (m Model) selectedJob() domain.JobHandle {
 	if m.row < 0 || m.row >= len(m.order) {
-		return 0
+		return ""
 	}
-	return m.order[m.row].JobID
+	return m.order[m.row].Job
 }
 
 // openSelected opens the selected check's own page: detailsUrl for a check
@@ -247,9 +251,9 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.declined = ""
-	src, ref := m.src, m.ref
+	open, ref := m.open, m.ref
 	return m, func() tea.Msg {
-		if err := src.OpenWeb(url); err != nil {
+		if err := open(url); err != nil {
 			return errMsg{ref: ref, err: err}
 		}
 		return nil
@@ -323,9 +327,9 @@ func arrange(runs []domain.CheckRun) []domain.CheckRun {
 // hasWorkflow reports whether a check has a workflow run behind it to be
 // grouped under. A StatusContext never does, and neither does a check run an
 // App created: GitHub reports those with a null checkSuite.workflowRun,
-// leaving RunID zero and the workflow's name empty.
+// leaving WorkflowRun empty and the workflow's name empty.
 func hasWorkflow(r domain.CheckRun) bool {
-	return r.Kind == domain.CheckKindRun && r.RunID != 0
+	return r.Kind == domain.CheckKindRun && r.WorkflowRun != ""
 }
 
 func rank(s domain.CheckState) int {

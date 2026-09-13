@@ -41,7 +41,7 @@ func TestTheWheelIsIgnoredUnderAnOverlay(t *testing.T) {
 		f := &fakeSource{
 			pr:        longPR(),
 			labels:    []domain.Label{{Name: "bug"}},
-			reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+			reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 		}
 		m := loaded(f, prRef())
 		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})

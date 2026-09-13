@@ -85,28 +85,22 @@ type reviewFetcher interface {
 }
 
 type reviewer interface {
-	StartReview(pullRequestID string) (string, error)
-	AddReviewThread(reviewID string, c domain.PendingComment) error
-	SubmitReview(reviewID string, event domain.ReviewEvent, body string) error
-	SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error
-	DiscardReview(reviewID string) error
-}
-
-type opener interface {
-	OpenWeb(url string) error
+	AddReviewThread(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error
+	DiscardReview(review domain.ReviewHandle) error
 }
 
 type checksFetcher interface {
 	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
+	JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error
 }
 
 type merger interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
-	MergePR(pullRequestID string, method domain.MergeMethod) error
-	EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error
-	DisableAutoMerge(pullRequestID string) error
+	MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error
+	EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error
+	DisableAutoMerge(pr domain.PullRequestHandle) error
 }
 
 type source interface {
@@ -120,7 +114,6 @@ type source interface {
 	repoFinder
 	reviewFetcher
 	reviewer
-	opener
 	checksFetcher
 	merger
 }
@@ -139,7 +132,6 @@ type Usecase struct {
 	queryStore queryStore
 	reviewInfo reviewFetcher
 	reviews    reviewer
-	web        opener
 	checks     checksFetcher
 	merges     merger
 }
@@ -160,7 +152,6 @@ func New(src source, store settingsStore) *Usecase {
 		queryStore: store,
 		reviewInfo: src,
 		reviews:    src,
-		web:        src,
 		checks:     src,
 		merges:     src,
 	}
@@ -279,36 +270,34 @@ func (u *Usecase) PRReviewContext(ctx context.Context, repo string, number int) 
 	return u.reviewInfo.PRReviewContext(ctx, repo, number)
 }
 
-func (u *Usecase) DiscardReview(reviewID string) error {
-	return u.reviews.DiscardReview(reviewID)
+func (u *Usecase) DiscardReview(review domain.ReviewHandle) error {
+	return u.reviews.DiscardReview(review)
 }
-
-func (u *Usecase) OpenWeb(url string) error { return u.web.OpenWeb(url) }
 
 func (u *Usecase) PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error) {
 	return u.checks.PRChecks(ctx, repo, number)
 }
 
-func (u *Usecase) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
-	return u.checks.JobLog(ctx, repo, jobID, failedOnly)
+func (u *Usecase) JobLog(ctx context.Context, repo string, job domain.JobHandle, failedOnly bool) ([]domain.LogLine, error) {
+	return u.checks.JobLog(ctx, repo, job, failedOnly)
 }
 
-func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
-	return u.checks.RerunWorkflow(ctx, repo, runID, scope)
+func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error {
+	return u.checks.RerunWorkflow(ctx, repo, run, scope)
 }
 
 func (u *Usecase) PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error) {
 	return u.merges.PRMergeContext(ctx, repo, number)
 }
 
-func (u *Usecase) MergePR(pullRequestID string, method domain.MergeMethod) error {
-	return u.merges.MergePR(pullRequestID, method)
+func (u *Usecase) MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	return u.merges.MergePR(pr, method)
 }
 
-func (u *Usecase) EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error {
-	return u.merges.EnableAutoMerge(pullRequestID, method)
+func (u *Usecase) EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	return u.merges.EnableAutoMerge(pr, method)
 }
 
-func (u *Usecase) DisableAutoMerge(pullRequestID string) error {
-	return u.merges.DisableAutoMerge(pullRequestID)
+func (u *Usecase) DisableAutoMerge(pr domain.PullRequestHandle) error {
+	return u.merges.DisableAutoMerge(pr)
 }

@@ -155,8 +155,8 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		call func() error
 	}{
 		{"PRChecks", func() error { _, err := g.PRChecks(context.Background(), "kukv/octoscope", 1); return err }},
-		{"JobLog", func() error { _, err := g.JobLog(context.Background(), "kukv/octoscope", 1, false); return err }},
-		{"RerunWorkflow", func() error { return g.RerunWorkflow(context.Background(), "kukv/octoscope", 1, domain.RerunAll) }},
+		{"JobLog", func() error { _, err := g.JobLog(context.Background(), "kukv/octoscope", "1", false); return err }},
+		{"RerunWorkflow", func() error { return g.RerunWorkflow(context.Background(), "kukv/octoscope", "1", domain.RerunAll) }},
 		{"GetPR", func() error { _, err := g.GetPR(context.Background(), "kukv/octoscope", 1); return err }},
 		{"GetIssue", func() error { _, err := g.GetIssue(context.Background(), "kukv/octoscope", 1); return err }},
 		{"ListPRs", func() error { _, err := g.ListPRs(context.Background(), "kukv/octoscope"); return err }},
@@ -169,9 +169,16 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		{"ListOwnRepos", func() error { _, err := g.ListOwnRepos(context.Background(), "kukv", 10); return err }},
 		{"PRDiff", func() error { _, err := g.PRDiff(context.Background(), "kukv/octoscope", 1); return err }},
 		{"PRReviewContext", func() error { _, err := g.PRReviewContext(context.Background(), "kukv/octoscope", 1); return err }},
-		{"AddReviewThread", func() error { return g.AddReviewThread("review-id", domain.PendingComment{}) }},
-		{"SubmitReview", func() error { return g.SubmitReview("review-id", domain.EventApprove, "") }},
-		{"SubmitNewReview", func() error { return g.SubmitNewReview("pr-id", domain.EventApprove, "") }},
+		{"AddReviewThread", func() error {
+			_, err := g.AddReviewThread(domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.PendingComment{})
+			return err
+		}},
+		{"SubmitReview", func() error {
+			return g.SubmitReview(domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.EventApprove, "")
+		}},
+		{"SubmitReview (no pending)", func() error {
+			return g.SubmitReview(domain.ReviewTarget{PullRequest: "pr-id"}, domain.EventApprove, "")
+		}},
 		{"ListWorkSection", func() error { _, err := g.ListWorkSection(context.Background(), domain.SectionYourPRs); return err }},
 		{"SearchItems", func() error { _, err := g.SearchItems(context.Background(), "is:open"); return err }},
 		{"RepoCounts", func() error { _, err := g.RepoCounts(context.Background(), []string{"kukv/octoscope"}); return err }},

@@ -107,15 +107,20 @@ const (
 
 **`tea.Cmd` のクロージャの中に、2 つ以上の API 呼び出しを並べない。**
 
-「pending review が無ければ先に作る」は GitHub のレビュー API の仕様であって
-TUI の都合ではない。ビューが知るべきなのは「行コメントを送る」という 1 操作だけで、
-それが何回のリクエストになるかではない。
+順序をどちらの層に置くかは、その順序が何の都合かで決まる。
 
-置き場所を分けると、順序のテストに Bubble Tea が要る。`internal/app/usecase` に置けば、
-フェイクを 1 つ渡すだけで「pending があるとき / ないとき」を検証できる。
+**サービス固有の順序**（pending review が無ければ先に作る、など GitHub のレビュー
+API の仕様に由来するもの）は `internal/app/adapter/gateway` に置く。ビューはおろか
+usecase も、それが何回のリクエストになるかを知らない。`Gateway.SubmitReview` は
+pending の有無で `SubmitNewReview` 1 回と `SubmitReview` 1 回を切り替え、
+`Gateway.AddReviewThread` は pending が無ければ `StartReview` を先に呼ぶ
+（`internal/app/adapter/gateway/gh/review.go`）。
 
-同じことが「種別（PR / Issue）で呼ぶものが変わる」にも当てはまる。
-`domain.ItemRef.Kind` を View で `switch` しない。
+**アプリの都合による順序**（種別で呼ぶものが変わる、など）は `internal/app/usecase`
+に残る。`domain.ItemRef.Kind` を View で `switch` しない。
+
+置き場所を分けると、順序のテストに Bubble Tea が要る。順序を持つ層に
+フェイクを 1 つ渡すだけで検証できるようにする。
 
 ## `usecase.Item` を画面の写しにしない
 
@@ -216,10 +221,10 @@ port の中立化は行う。ただし**名前**と**形**を分けて扱う。
 
 | 変えない | 変える |
 |---|---|
-| `AddPRComment` `ClosePR` `EditPRLabels` `ListPRs` `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → 不透明ハンドル |
-| `CheckRun.Workflow` `RunNumber`（Forgejo Actions は同型、GitLab の pipeline も対応物がある） | `RerunWorkflow(runID int64)` → 不透明ハンドル |
-| `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → 不透明ハンドル名へ改名 |
-| | `StartReview` / `SubmitNewReview` → `SubmitReview` 1 つに畳む。pending review の作成は gateway が持つ（本規約の部分的な反転。設計 §6） |
+| `AddPRComment` `ClosePR` `EditPRLabels` `ListPRs` `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → `JobLog(job domain.JobHandle)` |
+| `CheckRun.Workflow` `RunNumber`（Forgejo Actions は同型、GitLab の pipeline も対応物がある） | `RerunWorkflow(runID int64)` → `RerunWorkflow(run domain.RunHandle)` |
+| `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → `domain.PullRequestHandle` `domain.ReviewHandle`（`ReviewContext.PullRequest` / `ReviewTarget.Pending`） |
+| | `StartReview` / `SubmitNewReview` を `SubmitReview` 1 つに畳んだ。pending review の作成は gateway が持つ（本規約の部分的な反転。設計 §6） |
 
 ## 規約そのものを変える
 

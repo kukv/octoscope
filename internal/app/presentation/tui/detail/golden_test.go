@@ -48,7 +48,7 @@ func goldenModel(width int) Model {
 	f := &fakeSource{
 		pr:        goldenPR(),
 		labels:    []domain.Label{{Name: "bug", Color: "d73a4a"}},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_128", PendingID: "PRR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_128", Pending: "PRR_1"},
 	}
 	m := New(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})

@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
@@ -103,10 +102,4 @@ func (c *Client) base() string {
 // endpointURL is where the GraphQL documents go.
 func (c *Client) endpointURL() string {
 	return c.base() + "/graphql"
-}
-
-// OpenWeb shows the item in a browser. It is the same call the cli backend
-// makes: GitHub gives every item its URL, and opening one needs no backend.
-func (c *Client) OpenWeb(url string) error {
-	return browser.Open(url)
 }

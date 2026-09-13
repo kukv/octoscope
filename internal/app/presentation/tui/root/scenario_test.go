@@ -25,7 +25,7 @@ type scenarioSource struct {
 	threads []domain.ReviewThread
 	checks  domain.Checks
 
-	pendingID string
+	pendingID domain.ReviewHandle
 	posted    []domain.PendingComment
 
 	prRepos    []string
@@ -93,8 +93,6 @@ func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (usecase.Item,
 	}, nil
 }
 
-func (f *scenarioSource) OpenWeb(string) error { return nil }
-
 func (f *scenarioSource) AddComment(_ domain.ItemRef, body string) error {
 	f.pr.Comments = append(f.pr.Comments, domain.Comment{
 		Author: domain.Author{Login: "kukv"}, Body: body, CreatedAt: scenarioAt,
@@ -141,13 +139,13 @@ func (f *scenarioSource) PRDiff(context.Context, string, int) ([]domain.FileDiff
 
 func (f *scenarioSource) PRReviewContext(context.Context, string, int) (domain.ReviewContext, error) {
 	return domain.ReviewContext{
-		PullRequestID: "PR_1", PendingID: f.pendingID, Threads: f.threads,
+		PullRequest: "PR_1", Pending: f.pendingID, Threads: f.threads,
 	}, nil
 }
 
 // PostLineComment starts the pending review the first time, the way the
 // usecase does.
-func (f *scenarioSource) PostLineComment(_ usecase.ReviewTarget, c domain.PendingComment) (string, error) {
+func (f *scenarioSource) PostLineComment(_ domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
 	f.posted = append(f.posted, c)
 	f.pendingID = "PRR_1"
 	f.threads = append(f.threads, domain.ReviewThread{
@@ -157,9 +155,9 @@ func (f *scenarioSource) PostLineComment(_ usecase.ReviewTarget, c domain.Pendin
 	return f.pendingID, nil
 }
 
-func (f *scenarioSource) DiscardReview(string) error { return nil }
+func (f *scenarioSource) DiscardReview(domain.ReviewHandle) error { return nil }
 
-func (f *scenarioSource) SubmitReview(usecase.ReviewTarget, domain.ReviewEvent, string) error {
+func (f *scenarioSource) SubmitReview(domain.ReviewTarget, domain.ReviewEvent, string) error {
 	return nil
 }
 
@@ -167,11 +165,11 @@ func (f *scenarioSource) PRChecks(context.Context, string, int) (domain.Checks, 
 	return f.checks, nil
 }
 
-func (f *scenarioSource) JobLog(context.Context, string, int64, bool) ([]domain.LogLine, error) {
+func (f *scenarioSource) JobLog(context.Context, string, domain.JobHandle, bool) ([]domain.LogLine, error) {
 	return nil, nil
 }
 
-func (f *scenarioSource) RerunWorkflow(context.Context, string, int64, domain.RerunScope) error {
+func (f *scenarioSource) RerunWorkflow(context.Context, string, domain.RunHandle, domain.RerunScope) error {
 	return nil
 }
 
@@ -179,9 +177,13 @@ func (f *scenarioSource) PRMergeContext(context.Context, string, int) (domain.Me
 	return domain.MergeContext{}, nil
 }
 
-func (f *scenarioSource) MergePR(string, domain.MergeMethod) error         { return nil }
-func (f *scenarioSource) EnableAutoMerge(string, domain.MergeMethod) error { return nil }
-func (f *scenarioSource) DisableAutoMerge(string) error                    { return nil }
+func (f *scenarioSource) MergePR(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+
+func (f *scenarioSource) EnableAutoMerge(domain.PullRequestHandle, domain.MergeMethod) error {
+	return nil
+}
+
+func (f *scenarioSource) DisableAutoMerge(domain.PullRequestHandle) error { return nil }
 
 var scenarioAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 

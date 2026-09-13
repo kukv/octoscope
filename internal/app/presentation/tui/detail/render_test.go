@@ -92,7 +92,7 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	f := &fakeSource{
 		pr:        domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen, Body: overlongBody},
 		labels:    []domain.Label{{Name: overlongLabel, Color: "ff0000"}},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	closed := &fakeSource{pr: domain.PR{Number: 2, Title: overlongTitle, State: domain.StateClosed}}
 

@@ -34,19 +34,37 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 	return toReviewContext(rc), nil
 }
 
-// AddReviewThread attaches one line comment to an unsubmitted review.
-func (g *Gateway) AddReviewThread(reviewID string, c domain.PendingComment) error {
-	return wrap(g.backend.AddReviewThread(reviewID, fromPendingComment(c)))
+// AddReviewThread attaches one line comment to the target's unsubmitted
+// review, starting one first if there is none: on GitHub a line comment has
+// to hang off a review. It answers the review the comment went onto.
+func (g *Gateway) AddReviewThread(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+	review := t.Pending
+	if review == "" {
+		id, err := g.backend.StartReview(string(t.PullRequest))
+		if err != nil {
+			return "", wrap(err)
+		}
+		review = domain.ReviewHandle(id)
+	}
+	if err := g.backend.AddReviewThread(string(review), fromPendingComment(c)); err != nil {
+		return "", wrap(err)
+	}
+	return review, nil
 }
 
-// SubmitReview sends the unsubmitted review, with every comment on it.
-func (g *Gateway) SubmitReview(reviewID string, event domain.ReviewEvent, body string) error {
-	return wrap(g.backend.SubmitReview(reviewID, fromReviewEvent(event), body))
+// SubmitReview sends the review out. With nothing waiting it creates and
+// submits in one call: starting a review first would leave an empty pending
+// review behind if the submission then failed.
+func (g *Gateway) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
+	if t.Pending == "" {
+		return wrap(g.backend.SubmitNewReview(string(t.PullRequest), fromReviewEvent(event), body))
+	}
+	return wrap(g.backend.SubmitReview(string(t.Pending), fromReviewEvent(event), body))
 }
 
-// SubmitNewReview submits a review that has no unsubmitted comments waiting.
-func (g *Gateway) SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error {
-	return wrap(g.backend.SubmitNewReview(pullRequestID, fromReviewEvent(event), body))
+// DiscardReview throws the unsubmitted review away, comments and all.
+func (g *Gateway) DiscardReview(review domain.ReviewHandle) error {
+	return wrap(g.backend.DiscardReview(string(review)))
 }
 
 func fromPendingComment(c domain.PendingComment) gql.PendingComment {
@@ -124,13 +142,13 @@ func toFileStatus(s string) domain.FileStatus {
 
 func toReviewContext(rc gql.ReviewContext) domain.ReviewContext {
 	dc := domain.ReviewContext{
-		PullRequestID: rc.ID,
-		Title:         rc.Title,
-		Head:          rc.HeadRefName,
-		Base:          rc.BaseRefName,
-		Additions:     rc.Additions,
-		Deletions:     rc.Deletions,
-		PendingID:     rc.PendingID,
+		PullRequest: domain.PullRequestHandle(rc.ID),
+		Title:       rc.Title,
+		Head:        rc.HeadRefName,
+		Base:        rc.BaseRefName,
+		Additions:   rc.Additions,
+		Deletions:   rc.Deletions,
+		Pending:     domain.ReviewHandle(rc.PendingID),
 	}
 	for _, t := range rc.Threads {
 		dc.Threads = append(dc.Threads, toReviewThread(t))
