@@ -160,7 +160,7 @@ func TestAFatalFailureGoesToTheRoot(t *testing.T) {
 	t.Parallel()
 
 	m := New(&fakeSource{})
-	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrGhNotFound})
+	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrBackendUnavailable})
 	if cmd == nil {
 		t.Fatal("no message went to the root")
 	}

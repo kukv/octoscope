@@ -13,7 +13,7 @@ import (
 func (g *Gateway) PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error) {
 	runs, err := g.backend.PRChecks(ctx, repo, number)
 	if err != nil {
-		return domain.Checks{}, err
+		return domain.Checks{}, wrap(err)
 	}
 	return toChecks(runs), nil
 }
@@ -22,7 +22,7 @@ func (g *Gateway) PRChecks(ctx context.Context, repo string, number int) (domain
 func (g *Gateway) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
 	lines, err := g.backend.JobLog(ctx, repo, jobID, failedOnly)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	out := make([]domain.LogLine, len(lines))
 	for i, l := range lines {
@@ -33,7 +33,7 @@ func (g *Gateway) JobLog(ctx context.Context, repo string, jobID int64, failedOn
 
 // RerunWorkflow starts a workflow run again.
 func (g *Gateway) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
-	return g.backend.RerunWorkflow(ctx, repo, runID, fromRerunScope(scope))
+	return wrap(g.backend.RerunWorkflow(ctx, repo, runID, fromRerunScope(scope)))
 }
 
 // toChecks counts every check run once: each one increments Total and

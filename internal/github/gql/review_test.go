@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
@@ -293,7 +293,7 @@ func TestASubmittedReviewIsNeverSentTwice(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
+		return nil, github.Classify(github.ErrTransient, "HTTP 502")
 	}}
 	if err := c.SubmitReview("R_1", EventApprove, ""); err == nil {
 		t.Fatal("SubmitReview succeeded, want an error")

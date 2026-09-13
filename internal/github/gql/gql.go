@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // VarKind is how a transport has to spell one variable.
@@ -69,7 +69,7 @@ type Client struct {
 // that nothing arrived, so a repeated write could apply twice.
 func (c *Client) Read(ctx context.Context, doc string, vars ...Var) ([]byte, error) {
 	out, err := c.Do(ctx, doc, vars)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, domain.ErrTransient) {
+	if err == nil || ctx.Err() != nil || !errors.Is(err, github.ErrTransient) {
 		return out, err
 	}
 	return c.Do(ctx, doc, vars)

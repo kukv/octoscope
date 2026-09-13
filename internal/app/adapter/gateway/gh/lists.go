@@ -11,7 +11,7 @@ import (
 func (g *Gateway) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
 	nodes, err := g.backend.ListPRs(ctx, repo)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	prs := make([]domain.PR, len(nodes))
 	for i, n := range nodes {
@@ -24,7 +24,7 @@ func (g *Gateway) ListPRs(ctx context.Context, repo string) ([]domain.PR, error)
 func (g *Gateway) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
 	nodes, err := g.backend.ListIssues(ctx, repo)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	issues := make([]domain.Issue, len(nodes))
 	for i, n := range nodes {
@@ -37,7 +37,7 @@ func (g *Gateway) ListIssues(ctx context.Context, repo string) ([]domain.Issue, 
 func (g *Gateway) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	labels, err := g.backend.ListLabels(ctx, repo)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	return toLabels(labels), nil
 }

@@ -11,7 +11,7 @@ import (
 func (g *Gateway) GetPR(ctx context.Context, repo string, number int) (domain.PR, error) {
 	n, err := g.backend.GetPR(ctx, repo, number)
 	if err != nil {
-		return domain.PR{}, err
+		return domain.PR{}, wrap(err)
 	}
 	return toPR(n), nil
 }
@@ -20,7 +20,7 @@ func (g *Gateway) GetPR(ctx context.Context, repo string, number int) (domain.PR
 func (g *Gateway) GetIssue(ctx context.Context, repo string, number int) (domain.Issue, error) {
 	n, err := g.backend.GetIssue(ctx, repo, number)
 	if err != nil {
-		return domain.Issue{}, err
+		return domain.Issue{}, wrap(err)
 	}
 	return toIssue(n), nil
 }

@@ -20,7 +20,7 @@ func TestIsFatalOnlyForWhatTheUserMustActOn(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"gh is missing", domain.ErrGhNotFound, true},
+		{"backend unavailable", domain.ErrBackendUnavailable, true},
 		{"not signed in", fmt.Errorf("gh pr list: %w", domain.ErrUnauthenticated), true},
 		{"GitHub did not answer", fmt.Errorf("gh pr list: %w", domain.ErrTransient), false},
 		{"anything else", errors.New("gh: HTTP 404"), false},

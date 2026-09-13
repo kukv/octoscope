@@ -10,8 +10,10 @@ import (
 	"time"
 )
 
-// ErrGhNotFound is returned when the gh binary is not on PATH.
-var ErrGhNotFound = errors.New("gh CLI not found; install it and run: gh auth login")
+// ErrBackendUnavailable is returned when the backend that talks to GitHub
+// cannot be reached at all -- the gh binary missing is one backend's
+// problem, not a thing the application itself knows about.
+var ErrBackendUnavailable = errors.New("gh CLI not found; install it and run: gh auth login")
 
 // ErrTransient wraps a failure GitHub's front end produced rather than
 // answered -- 502, 503, 504. The request was well-formed, so asking again
@@ -299,5 +301,5 @@ func Classify(kind error, msg string) error {
 // behind the sentinels it names, and the Work board and the Repos list would
 // then disagree about what costs the user their screen.
 func IsFatal(err error) bool {
-	return errors.Is(err, ErrGhNotFound) || errors.Is(err, ErrUnauthenticated)
+	return errors.Is(err, ErrBackendUnavailable) || errors.Is(err, ErrUnauthenticated)
 }

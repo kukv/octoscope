@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // readSample reads the one recording of sample.diff, kept in internal/app/domain
@@ -112,22 +112,22 @@ func TestPRDiffReportsTheOriginalErrorWhenBothFail(t *testing.T) {
 	}
 }
 
-// TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail guards the sentinel root.fail
-// checks with errors.Is: joining the fallback's error in must not stop
-// ErrGhNotFound from still being found in the result.
-func TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail(t *testing.T) {
+// TestPRDiffKeepsErrNotInstalledWhenBothCallsFail guards the sentinel
+// root.fail checks with errors.Is: joining the fallback's error in must not
+// stop ErrNotInstalled from still being found in the result.
+func TestPRDiffKeepsErrNotInstalledWhenBothCallsFail(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	calls := 0
 	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, domain.ErrGhNotFound
+			return nil, github.ErrNotInstalled
 		}
 		return nil, errors.New("gh api: HTTP 404: not found")
 	}
 	_, err := c.PRDiff(context.Background(), "", 412)
-	if !errors.Is(err, domain.ErrGhNotFound) {
-		t.Errorf("PRDiff() error = %v, want errors.Is(err, domain.ErrGhNotFound)", err)
+	if !errors.Is(err, github.ErrNotInstalled) {
+		t.Errorf("PRDiff() error = %v, want errors.Is(err, github.ErrNotInstalled)", err)
 	}
 }
 

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/browser"
+	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -39,7 +39,7 @@ func Token() (string, error) {
 			return v, nil
 		}
 	}
-	return "", domain.ErrUnauthenticated
+	return "", github.ErrUnauthenticated
 }
 
 // Client talks to GitHub over HTTPS. The GraphQL calls come from the

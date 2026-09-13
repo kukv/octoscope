@@ -12,20 +12,20 @@ import (
 func (g *Gateway) PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error) {
 	c, err := g.backend.PRMergeContext(ctx, repo, number)
 	if err != nil {
-		return domain.MergeContext{}, err
+		return domain.MergeContext{}, wrap(err)
 	}
 	return toMergeContext(c), nil
 }
 
 // MergePR merges the pull request now.
 func (g *Gateway) MergePR(pullRequestID string, method domain.MergeMethod) error {
-	return g.backend.MergePR(pullRequestID, fromMergeMethod(method))
+	return wrap(g.backend.MergePR(pullRequestID, fromMergeMethod(method)))
 }
 
 // EnableAutoMerge asks GitHub to merge the pull request once what it is
 // waiting on is in.
 func (g *Gateway) EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error {
-	return g.backend.EnableAutoMerge(pullRequestID, fromMergeMethod(method))
+	return wrap(g.backend.EnableAutoMerge(pullRequestID, fromMergeMethod(method)))
 }
 
 func toMergeContext(c gql.MergeContext) domain.MergeContext {

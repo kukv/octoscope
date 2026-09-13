@@ -12,7 +12,7 @@ import (
 func (g *Gateway) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
 	d, err := g.backend.PRDiff(ctx, repo, number)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	if d.Files != nil {
 		files := make([]domain.FileDiff, len(d.Files))
@@ -29,24 +29,24 @@ func (g *Gateway) PRDiff(ctx context.Context, repo string, number int) ([]domain
 func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error) {
 	rc, err := g.backend.PRReviewContext(ctx, repo, number)
 	if err != nil {
-		return domain.ReviewContext{}, err
+		return domain.ReviewContext{}, wrap(err)
 	}
 	return toReviewContext(rc), nil
 }
 
 // AddReviewThread attaches one line comment to an unsubmitted review.
 func (g *Gateway) AddReviewThread(reviewID string, c domain.PendingComment) error {
-	return g.backend.AddReviewThread(reviewID, fromPendingComment(c))
+	return wrap(g.backend.AddReviewThread(reviewID, fromPendingComment(c)))
 }
 
 // SubmitReview sends the unsubmitted review, with every comment on it.
 func (g *Gateway) SubmitReview(reviewID string, event domain.ReviewEvent, body string) error {
-	return g.backend.SubmitReview(reviewID, fromReviewEvent(event), body)
+	return wrap(g.backend.SubmitReview(reviewID, fromReviewEvent(event), body))
 }
 
 // SubmitNewReview submits a review that has no unsubmitted comments waiting.
 func (g *Gateway) SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error {
-	return g.backend.SubmitNewReview(pullRequestID, fromReviewEvent(event), body)
+	return wrap(g.backend.SubmitNewReview(pullRequestID, fromReviewEvent(event), body))
 }
 
 func fromPendingComment(c domain.PendingComment) gql.PendingComment {

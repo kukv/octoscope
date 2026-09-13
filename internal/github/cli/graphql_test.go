@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 const emptyColumnJSON = `{"data":{"results":{"nodes":[]}}}`
@@ -114,7 +114,7 @@ func TestSearchItemsReportsWhatGitHubSaidAboutABadQuery(t *testing.T) {
 	}
 	// The Search tab shows this on its notice line. A fatal error would
 	// replace the whole screen over one mistyped query.
-	if domain.IsFatal(err) {
+	if errors.Is(err, github.ErrUnauthenticated) || errors.Is(err, github.ErrNotInstalled) {
 		t.Errorf("err = %v, want it not to be fatal", err)
 	}
 }
@@ -130,7 +130,7 @@ func TestASearchIsAskedAgainAfterATransientFailure(t *testing.T) {
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, domain.Classify(domain.ErrTransient, "gh api: gh: HTTP 502")
+			return nil, github.Classify(github.ErrTransient, "gh api: gh: HTTP 502")
 		}
 		return []byte(emptyColumnJSON), nil
 	}

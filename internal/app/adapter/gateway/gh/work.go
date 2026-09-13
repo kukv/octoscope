@@ -30,7 +30,7 @@ func (g *Gateway) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]
 	}
 	nodes, err := g.backend.SearchItems(ctx, workQuery(s))
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	return toWorkItems(nodes), nil
 }
@@ -39,7 +39,7 @@ func (g *Gateway) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]
 func (g *Gateway) SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error) {
 	nodes, err := g.backend.SearchItems(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	return toWorkItems(nodes), nil
 }
@@ -86,7 +86,7 @@ func toWorkItem(n gql.SearchItem) domain.WorkItem {
 func (g *Gateway) RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error) {
 	nodes, err := g.backend.RepoCounts(ctx, repos)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	counts := make([]domain.RepoCount, len(nodes))
 	for i, n := range nodes {

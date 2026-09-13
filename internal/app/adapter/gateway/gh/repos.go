@@ -11,7 +11,7 @@ import (
 func (g *Gateway) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
 	found, err := g.backend.SearchRepos(ctx, query, limit)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	candidates := make([]domain.RepoCandidate, len(found))
 	for i, f := range found {
@@ -25,7 +25,7 @@ func (g *Gateway) SearchRepos(ctx context.Context, query string, limit int) ([]d
 func (g *Gateway) ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error) {
 	found, err := g.backend.ListOwnRepos(ctx, owner, limit)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err)
 	}
 	repos := make([]domain.RepoCandidate, len(found))
 	for i, f := range found {
