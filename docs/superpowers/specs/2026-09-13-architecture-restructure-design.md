@@ -121,6 +121,7 @@ internal/app/adapter/gateway/gh ──→ internal/github/{cli,api,gql}
                                 ──→ internal/app/domain
 
 internal/app/adapter/datasource ──→ internal/app/domain
+                                ──→ internal/app/config
                                 ──→ （YAML などのファイル形式）
 
 internal/github/**             ──→ （internal/app のどこにも依存しない）

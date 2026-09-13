@@ -26,6 +26,7 @@ internal/app/adapter/gateway/gh ──→ internal/github/{cli,api,gql}
                                 ──→ internal/app/domain
 
 internal/app/adapter/datasource ──→ internal/app/domain
+                                ──→ internal/app/config
                                 ──→ （YAML などのファイル形式）
 
 internal/github/**             ──→ （internal/app のどこにも依存しない）
@@ -166,11 +167,12 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
 
 - **無いと何が壊れるか（実測）:** `SavedQuery` が `config`（ファイル形式）→
   `usecase`（再定義）→ `root.Options` の 3 段を経由していた。tui が `config` を
-  見られないためだけの中継で、変換関数 `SavedQueriesFrom` が `cmd/octoscope` の
-  起動処理に置かれていた
+  見られないためだけの中継で、変換関数 `SavedQueriesFrom` が `usecase/search.go`
+  に置かれていた（呼び出しだけが `cmd/octoscope` の起動処理にあった）
 - **足すと何が減るか:** その 3 段が 1 段になり、`usecase.SavedQuery` と
-  `SavedQueriesFrom` が消えた。設定の保存先を変えるときに触るのは `datasource`
-  だけになる
+  `SavedQueriesFrom` が消えた。`config.Config` から `Repositories` と
+  `SavedQueries` の両フィールドが消える日が来れば、設定の保存先を変えるときに
+  触るのは `datasource` だけになる
 - **足すと何が増えるか:** 設定ファイルを触るパッケージが 1 つから 2 つになった。
   `config` が形を持ち、`datasource` が書き戻す。両者が食い違うと設定が静かに
   壊れるので、`datasource_test.go` に「片方を保存しても、もう片方と起動時設定が

@@ -22,6 +22,7 @@ func write(t *testing.T, raw string) string {
 }
 
 func TestSavedQueriesComeBackAsDomainValues(t *testing.T) {
+	t.Parallel()
 	path := write(t, "saved_queries:\n  - name: mine\n    query: is:open author:@me\n")
 	got, err := datasource.NewStore(path).SavedQueries()
 	if err != nil {
@@ -34,6 +35,7 @@ func TestSavedQueriesComeBackAsDomainValues(t *testing.T) {
 }
 
 func TestRepositoriesComeBackInFileOrder(t *testing.T) {
+	t.Parallel()
 	path := write(t, "repositories:\n  - kukv/octoscope\n  - kukv/koto\n")
 	got, err := datasource.NewStore(path).Repositories()
 	if err != nil {
@@ -46,6 +48,7 @@ func TestRepositoriesComeBackInFileOrder(t *testing.T) {
 
 // A settings file that is not there is not a failure: a first run has none.
 func TestAMissingFileReadsAsNothingSaved(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	s := datasource.NewStore(path)
 	repos, err := s.Repositories()
@@ -67,6 +70,7 @@ func TestAMissingFileReadsAsNothingSaved(t *testing.T) {
 // This is the test the split exists for: two packages now touch one file,
 // and what one writes the other has to be able to read.
 func TestSavingQueriesLeavesTheStartupSettingsAlone(t *testing.T) {
+	t.Parallel()
 	path := write(t, "language: ja\nicons: nerdfont\ndefault_tab: search\nrepositories:\n  - kukv/octoscope\n")
 	if err := datasource.NewStore(path).SaveQueries([]domain.SavedQuery{{Name: "mine", Query: "is:open"}}); err != nil {
 		t.Fatal(err)
@@ -91,9 +95,17 @@ func TestSavingQueriesLeavesTheStartupSettingsAlone(t *testing.T) {
 	if len(repos) != 1 || repos[0] != "kukv/octoscope" {
 		t.Errorf("repositories = %v, want [kukv/octoscope]", repos)
 	}
+	queries, err := datasource.NewStore(path).SavedQueries()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(queries) != 1 || queries[0].Name != "mine" || queries[0].Query != "is:open" {
+		t.Errorf("saved queries = %v, want [{mine is:open}]", queries)
+	}
 }
 
 func TestSavingRepositoriesLeavesTheQueriesAlone(t *testing.T) {
+	t.Parallel()
 	path := write(t, "saved_queries:\n  - name: mine\n    query: is:open\n")
 	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/koto"}); err != nil {
 		t.Fatal(err)
@@ -111,6 +123,7 @@ func TestSavingRepositoriesLeavesTheQueriesAlone(t *testing.T) {
 // so that the failure surfaces on the first save rather than as a save that
 // silently does nothing.
 func TestAStoreWithNoPathReportsItRatherThanSavingNothing(t *testing.T) {
+	t.Parallel()
 	if err := datasource.NewStore("").SaveRepositories([]string{"kukv/octoscope"}); err == nil {
 		t.Error("SaveRepositories() with no path returned no error")
 	}
@@ -124,6 +137,7 @@ func TestAStoreWithNoPathReportsItRatherThanSavingNothing(t *testing.T) {
 // writing a Config built from that alone would drop everything else in the
 // file.
 func TestSaveRepositoriesKeepsTheOtherSettings(t *testing.T) {
+	t.Parallel()
 	path := write(t, "language: ja\nicons: nerd\ndefault_tab: repos\n")
 	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/octoscope"}); err != nil {
 		t.Fatalf("SaveRepositories: %v", err)
@@ -144,6 +158,7 @@ func TestSaveRepositoriesKeepsTheOtherSettings(t *testing.T) {
 // this feature can have: one keypress flattening a settings file whose YAML
 // the user is in the middle of hand-editing.
 func TestSaveRepositoriesRefusesAFileItCannotParse(t *testing.T) {
+	t.Parallel()
 	const broken = "language: [ja\n"
 	path := write(t, broken)
 	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/octoscope"}); err == nil {
@@ -161,6 +176,7 @@ func TestSaveRepositoriesRefusesAFileItCannotParse(t *testing.T) {
 // TestSaveQueriesRefusesAFileItCannotParse is SaveRepositories' guard above,
 // for the other write path.
 func TestSaveQueriesRefusesAFileItCannotParse(t *testing.T) {
+	t.Parallel()
 	const broken = "language: [ja\n"
 	path := write(t, broken)
 	if err := datasource.NewStore(path).SaveQueries(nil); err == nil {
@@ -178,6 +194,7 @@ func TestSaveQueriesRefusesAFileItCannotParse(t *testing.T) {
 // TestSaveRepositoriesCreatesTheFileAndItsDirectory covers the first run:
 // nothing under the OS config directory exists yet.
 func TestSaveRepositoriesCreatesTheFileAndItsDirectory(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "octoscope", "config.yaml")
 	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/koto"}); err != nil {
 		t.Fatalf("SaveRepositories: %v", err)
@@ -195,6 +212,7 @@ func TestSaveRepositoriesCreatesTheFileAndItsDirectory(t *testing.T) {
 // half-written file must never be the one Load reads, and a successful save
 // must not litter the config directory either.
 func TestSaveRepositoriesLeavesNoTempBehind(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/koto"}); err != nil {
