@@ -14,7 +14,7 @@ GitHub の返し方が変わったときに気づけることがこの testdata 
 そう返さない形」でも通ってしまい、返し方が変わったときに気づけない。
 
 ```bash
-D=internal/gh/cli/testdata
+D=internal/github/cli/testdata
 gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D/pr_files.json
 ```
 
@@ -25,7 +25,7 @@ gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D
 先頭行の BOM も含めて手を入れていない。
 
 ```bash
-D=internal/gh/cli/testdata
+D=internal/github/cli/testdata
 gh run view -R kukv/octoscope --job 88970766114 --log-failed > $D/job_log_failed.txt
 gh run view -R kukv/octoscope --job 101635448466 --log | head -40 > $D/job_log.txt
 ```
@@ -38,7 +38,7 @@ stderr of `gh run view --job <id> --log`（`--log-failed` も同じ文言）を�
 
 ```bash
 gh run view -R kukv/octoscope --job <実行中のジョブ id> --log 2> \
-  internal/gh/cli/testdata/job_log_in_progress.txt
+  internal/github/cli/testdata/job_log_in_progress.txt
 ```
 
 ## `search_repos.json`
@@ -49,7 +49,7 @@ gh run view -R kukv/octoscope --job <実行中のジョブ id> --log 2> \
 
 ```bash
 gh search repos lipgloss --limit 5 --json fullName,stargazersCount,isPrivate \
-  > internal/gh/cli/testdata/search_repos.json
+  > internal/github/cli/testdata/search_repos.json
 ```
 
 ## `own_repos.json`
@@ -61,9 +61,9 @@ gh search repos lipgloss --limit 5 --json fullName,stargazersCount,isPrivate \
 ```bash
 gh repo list --limit 100 --json nameWithOwner,isPrivate \
   | jq '[.[] | select(.isPrivate == false)][:5]' \
-  > internal/gh/cli/testdata/own_repos.json
+  > internal/github/cli/testdata/own_repos.json
 ```
 
-`sample.diff` は `internal/gh/testdata` にある（README も同じ場所）。パース
-そのものを見るテストが `internal/gh` に移ったので、録りものはそちらにしか
+`sample.diff` は `internal/app/domain/testdata` にある（README も同じ場所）。パース
+そのものを見るテストが `internal/app/domain` に移ったので、録りものはそちらにしか
 置かない。

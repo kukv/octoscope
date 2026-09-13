@@ -110,7 +110,7 @@ func TestPRDiffReportsTheOriginalErrorWhenBothFail(t *testing.T) {
 	}
 }
 
-// TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail guards the sentinel app.fail
+// TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail guards the sentinel root.fail
 // checks with errors.Is: joining the fallback's error in must not stop
 // ErrGhNotFound from still being found in the result.
 func TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail(t *testing.T) {

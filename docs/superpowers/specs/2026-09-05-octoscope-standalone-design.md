@@ -84,9 +84,9 @@ internal/tui/         Bubble Tea モデル群
 「何を表示するか」「どの操作を受け付けるか」を自身の `Update`/`View` に閉じ込め、
 親モデルとはメッセージ型のみで通信する。
 
-> **この節は `2026-09-13-architecture-restructure-design.md` に置き換えられた（2026-09-13）。**
-
 ### 3.2 バックエンド抽象
+
+> **この節は `2026-09-13-architecture-restructure-design.md` に置き換えられた（2026-09-13）。**
 
 `internal/gh` は interface を export しない（`.claude/rules/architecture.md`
 「interface は利用側で定義する」）。バックエンドの差し替えは、`internal/gh` 側に

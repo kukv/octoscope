@@ -703,7 +703,7 @@ func TestRefreshRefetchesTheCurrentTab(t *testing.T) {
 }
 
 // With no rows there is nothing to fetch, and fetchList("") would fail:
-// gh pr list with no --repo reads the working directory, which the app.fail
+// gh pr list with no --repo reads the working directory, which the root.fail
 // screen would then swallow the whole UI for.
 func TestRefreshWithNoRowsFetchesNothing(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{}), 120)

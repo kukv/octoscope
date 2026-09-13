@@ -25,7 +25,7 @@ nameWithOwner,isPrivate` で 1 つずつ private かどうかを確認し、
 `isPrivate: false` のものだけを残す。
 
 ```bash
-gh api graphql -F query=@internal/gh/gql/work.graphql \
+gh api graphql -F query=@internal/github/gql/work.graphql \
   -f search='is:open assignee:@me' > /tmp/work-raw.json
 jq -r '[.data.results.nodes[]?.repository.nameWithOwner] | unique[]' /tmp/work-raw.json
 # 出てきたリポジトリを 1 つずつ確認する
@@ -52,7 +52,7 @@ IP レンジ・認証情報・私有リポジトリ名が出てくるノード�
 ```bash
 jq '.data.results.nodes |= map(select("\(.repository.nameWithOwner)#\(.number)" as $k
   | ["kukv/wsl-setup#113", <採用したもの...>] | index($k)))' \
-  /tmp/work-public.json > internal/gh/gql/testdata/work_section.json
+  /tmp/work-public.json > internal/github/gql/testdata/work_section.json
 ```
 
 **これは秘密情報の除去であって、「テストを通すための編集」ではない。**
@@ -61,7 +61,7 @@ jq '.data.results.nodes |= map(select("\(.repository.nameWithOwner)#\(.number)" 
 
 ## `schema.json`
 
-`internal/gh/gql/*.graphql` が選んでいるフィールドが実在するかを
+`internal/github/gql/*.graphql` が選んでいるフィールドが実在するかを
 `schema_test.go` が突き合わせるための、GraphQL スキーマの抜粋。
 
 `{ 型名: { kind, possibleTypes, fields: { フィールド名: 型名 } } }` の形。
@@ -92,7 +92,7 @@ def named: if .name != null then .name else (.ofType | named) end;
 JQ
 
 jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection","IssueComment","IssueCommentConnection","User","UserConnection"]' \
-  -f /tmp/trim.jq /tmp/schema-full.json > internal/gh/gql/testdata/schema.json
+  -f /tmp/trim.jq /tmp/schema-full.json > internal/github/gql/testdata/schema.json
 ```
 
 `PullRequestConnection` と `IssueConnection` は 2026-09-08 に `repo_counts.graphql`
@@ -114,9 +114,9 @@ jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Acto
 **録り終えたあと pending レビューは削除済み**（`deletePullRequestReview`）。
 
 ```bash
-gh api graphql -F query=@internal/gh/gql/review.graphql \
+gh api graphql -F query=@internal/github/gql/review.graphql \
   -f owner=kukv -f name=octoscope -F number=55 | jq . \
-  > internal/gh/gql/testdata/review_context.json
+  > internal/github/gql/testdata/review_context.json
 ```
 
 同じ内容を録り直すには pending レビューを作る必要がある。
@@ -137,8 +137,8 @@ gh api graphql -f query='mutation($rid:ID!){deletePullRequestReview(input:{pullR
 `checks_test.go` 内のインライン JSON で確かめる。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/checks.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/checks.graphql \
   -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/pr_checks.json
 ```
 
@@ -159,8 +159,8 @@ gh api graphql -F query=@internal/gh/gql/checks.graphql \
 `deleteBranchOnMerge` を有効にしており、`autoMergeAllowed` は無効。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/merge.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/merge.graphql \
   -f owner=kukv -f name=octoscope -F number=61 | jq . > $D/merge_context.json
 ```
 
@@ -176,7 +176,7 @@ gh api graphql -F query=@internal/gh/gql/merge.graphql \
 パイプにすると `gh` の非 0 終了で `jq` に何も渡らず失敗する。
 
 ```bash
-D=internal/gh/gql/testdata
+D=internal/github/gql/testdata
 cat > /tmp/counts.graphql <<'EOF'
 query ($o0: String!, $n0: String!, $o1: String!, $n1: String!) {
   r0: repository(owner: $o0, name: $n0) { nameWithOwner pullRequests(states: OPEN) { totalCount } issues(states: OPEN) { totalCount } }
@@ -201,8 +201,8 @@ jq . /tmp/counts_partial_raw.json > $D/repo_counts_partial.json
 OPEN 1 件 / CLOSED 4 件 / MERGED 45 件）。
 
 ```bash
-gh api graphql -F query=@internal/gh/gql/work.graphql \
-  -f search='repo:kukv/octoscope' | jq . > internal/gh/gql/testdata/search_items.json
+gh api graphql -F query=@internal/github/gql/work.graphql \
+  -f search='repo:kukv/octoscope' | jq . > internal/github/gql/testdata/search_items.json
 ```
 
 ## `repo_prs.json`
@@ -213,8 +213,8 @@ gh api graphql -F query=@internal/gh/gql/work.graphql \
 いたため、それをそのまま残している。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/repo_prs.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/repo_prs.graphql \
   -f owner=kukv -f name=octoscope | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
 ```
 
@@ -225,8 +225,8 @@ gh api graphql -F query=@internal/gh/gql/repo_prs.graphql \
 Dashboard）の 2 件で、両方をそのまま残している。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/repo_issues.graphql \
   -f owner=kukv -f name=octoscope | jq '.data.repository.issues.nodes |= .[0:5]' > $D/repo_issues.json
 ```
 
@@ -248,8 +248,8 @@ gh api graphql -F query=@internal/gh/gql/repo_issues.graphql \
 コメントが 100 件を超える実在の PR が要り、それはこのリポジトリには無い。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/pr.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/pr.graphql \
   -f owner=kukv -f name=octoscope -F number=59 | jq . > $D/pr.json
 ```
 
@@ -265,8 +265,8 @@ gh api graphql -F query=@internal/gh/gql/pr.graphql \
 2026-09-13 に `comments` の `pageInfo` を選ぶようになったのに合わせて録り直した。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/issue.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/issue.graphql \
   -f owner=kukv -f name=octoscope -F number=54 | jq . > $D/issue.json
 ```
 
@@ -276,7 +276,7 @@ gh api graphql -F query=@internal/gh/gql/issue.graphql \
 `kukv/octoscope`。
 
 ```bash
-D=internal/gh/gql/testdata
-gh api graphql -F query=@internal/gh/gql/repo_name.graphql \
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/repo_name.graphql \
   -f owner=kukv -f name=octoscope | jq . > $D/repo_name.json
 ```

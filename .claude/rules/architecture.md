@@ -42,6 +42,9 @@ gateway は domain だけを見て port を満たす。結線は `cmd/octoscope`
 これを断つのは PR 2 である。それまでは `internal/github` が domain を知っていても
 設計が壊れているわけではない。
 
+同様に、上の図にある `internal/app/adapter/gateway/gh` と `internal/app/adapter/datasource`
+はまだ存在しない。両方とも PR 2 / PR 3 で作られる。
+
 この向きは目視ではなく lint で守る。`.golangci.yml` の `depguard` に禁止 import を
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**
 足し忘れると、次に誰かが依存の向きを壊しても誰も気づかない。

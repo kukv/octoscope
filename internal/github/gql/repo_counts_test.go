@@ -175,7 +175,7 @@ func TestRepoCountsDoesNotAskAboutAMalformedName(t *testing.T) {
 // strings.Cut alone would treat "a/", "/b" and "a/b/c" as valid owner/name
 // splits, even though none of them names a repository; a leading or
 // trailing space would pass through unnoticed the same way. None of these
-// must reach gh.
+// must reach domain.
 func TestRepoCountsRejectsNamesThatOnlyLookLikeTheyCanSplit(t *testing.T) {
 	t.Parallel()
 
