@@ -19,7 +19,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/search"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/work"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -58,7 +57,7 @@ type Options struct {
 
 	// SavedQueries is the settings file's saved queries, handed to the
 	// Search tab the same way Repositories is handed to the Repos tab.
-	SavedQueries []usecase.SavedQuery
+	SavedQueries []domain.SavedQuery
 
 	// DefaultTab is the settings file's opening tab ("repos", "search", or
 	// "" for none). "repos" cannot be honoured until the current repository

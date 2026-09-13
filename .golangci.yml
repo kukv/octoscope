@@ -62,6 +62,8 @@ linters:
               desc: ビューは usecase を通す。クライアントを名指しするのは cmd/octoscope だけ
             - pkg: github.com/kukv/octoscope/internal/app/config
               desc: 設定は Options で届く。読むのは cmd/octoscope
+            - pkg: github.com/kukv/octoscope/internal/app/adapter
+              desc: 保存は usecase を通す。store を組むのは cmd/octoscope だけ
         # 設定ファイルの読み取りは葉である。
         config-layer:
           files:
@@ -79,6 +81,19 @@ linters:
               desc: config は他のパッケージに依存しない
             - pkg: github.com/kukv/octoscope/internal/browser
               desc: config は他のパッケージに依存しない
+        # データの出し入れは adapter である。UI も GitHub クライアントも知らない。
+        datasource-layer:
+          files:
+            - "**/internal/app/adapter/datasource/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
+              desc: datasource は上の層を知らない
+            - pkg: github.com/kukv/octoscope/internal/app/presentation
+              desc: datasource は UI を知らない
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: datasource は GitHub クライアントを知らない
+            - pkg: github.com/kukv/octoscope/internal/i18n
+              desc: datasource は翻訳しない
         # メッセージは葉である。
         i18n-layer:
           files:

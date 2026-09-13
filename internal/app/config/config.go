@@ -1,6 +1,6 @@
-// Package config reads the settings file that persists what a flag cannot:
-// the repositories the Repos tab lists, the saved search queries, and the
-// choices a user makes once rather than every run.
+// Package config is the shape of the settings file and how to read it. What
+// the application does with the data inside is not this package's business:
+// internal/app/adapter/datasource owns that, and writes the file back.
 package config
 
 import (
@@ -27,12 +27,13 @@ type Config struct {
 
 	// SavedQueries is the Search tab's saved queries, in the order the user
 	// saved them.
-	SavedQueries []SavedQuery `yaml:"saved_queries,omitempty"`
+	SavedQueries []SavedQueryEntry `yaml:"saved_queries,omitempty"`
 }
 
-// SavedQuery is one entry of saved_queries: what the user called it, and
-// the GitHub search it stands for.
-type SavedQuery struct {
+// SavedQueryEntry is one entry of saved_queries as the file spells it. The
+// application's own type is domain.SavedQuery; this one exists to carry the
+// yaml tags, which the domain does not have.
+type SavedQueryEntry struct {
 	Name  string `yaml:"name"`
 	Query string `yaml:"query"`
 }
@@ -77,74 +78,4 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse %s: %w", path, err)
 	}
 	return c, nil
-}
-
-// Store reads and writes one settings file.
-type Store struct{ path string }
-
-// NewStore returns a store for the settings file at path.
-func NewStore(path string) *Store { return &Store{path: path} }
-
-// SaveRepositories replaces the repository list and leaves every other
-// setting as it was. A file that cannot be parsed is not written at all: a
-// list is not worth flattening the rest of someone's settings for.
-func (s *Store) SaveRepositories(repos []string) error {
-	// main builds a store even when it could not locate the config
-	// directory, so that the failure surfaces here rather than as a save
-	// that silently does nothing.
-	if s.path == "" {
-		return errors.New("no settings file to write: the config directory could not be located")
-	}
-	c, err := Load(s.path)
-	if err != nil {
-		return err
-	}
-	c.Repositories = repos
-	return s.save(c)
-}
-
-// SaveQueries replaces the saved queries and leaves every other setting as
-// it was. A file that cannot be parsed is not written at all: a query is
-// not worth flattening the rest of someone's settings for.
-func (s *Store) SaveQueries(queries []SavedQuery) error {
-	if s.path == "" {
-		return errors.New("no settings file to write: the config directory could not be located")
-	}
-	c, err := Load(s.path)
-	if err != nil {
-		return err
-	}
-	c.SavedQueries = queries
-	return s.save(c)
-}
-
-// save writes through a temporary file in the same directory so that an
-// interrupted write cannot leave a half-written settings file behind.
-func (s *Store) save(c Config) error {
-	dir := filepath.Dir(s.path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create %s: %w", dir, err)
-	}
-	raw, err := yaml.Marshal(c)
-	if err != nil {
-		return fmt.Errorf("encode %s: %w", s.path, err)
-	}
-	tmp, err := os.CreateTemp(dir, "config-*.yaml")
-	if err != nil {
-		return fmt.Errorf("create a temporary file in %s: %w", dir, err)
-	}
-	// Removing the temporary file fails once the rename below has moved it,
-	// which is the successful path and not something to report.
-	defer func() { _ = os.Remove(tmp.Name()) }()
-	if _, err := tmp.Write(raw); err != nil {
-		_ = tmp.Close() // the write already failed; the file is about to go
-		return fmt.Errorf("write %s: %w", tmp.Name(), err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", tmp.Name(), err)
-	}
-	if err := os.Rename(tmp.Name(), s.path); err != nil {
-		return fmt.Errorf("replace %s: %w", s.path, err)
-	}
-	return nil
 }

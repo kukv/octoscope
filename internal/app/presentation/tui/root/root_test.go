@@ -111,7 +111,7 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 	return nil
 }
 
-func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+func (f *fakeSource) SaveQueries([]domain.SavedQuery) error { return nil }
 
 func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (usecase.Item, error) {
 	if ref.Kind == domain.ItemIssue {
@@ -1472,7 +1472,7 @@ func TestTheSettingsFileSavedQueriesReachThePicker(t *testing.T) {
 
 	src := &fakeSource{}
 	next, cmd := New(src, Options{
-		SavedQueries: []usecase.SavedQuery{{Name: "from-the-file", Query: "is:open author:@me"}},
+		SavedQueries: []domain.SavedQuery{{Name: "from-the-file", Query: "is:open author:@me"}},
 	}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m := resolve(t, next.(Model), cmd)
 

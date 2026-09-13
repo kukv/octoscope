@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
@@ -70,11 +69,11 @@ type repoStore interface {
 
 // queryStore is where the Search tab's saved queries survive a restart.
 type queryStore interface {
-	SaveQueries(queries []config.SavedQuery) error
+	SaveQueries(queries []domain.SavedQuery) error
 }
 
 // settingsStore is the settings file: it satisfies repoStore and queryStore
-// both, which is what New's caller (cmd/octoscope's config.Store) writes.
+// both, which is what New's caller (cmd/octoscope's datasource.Store) writes.
 type settingsStore interface {
 	repoStore
 	queryStore

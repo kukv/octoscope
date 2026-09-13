@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 )
 
 // sized is a model with results in it, at the width the test cares about.
@@ -215,9 +214,9 @@ func TestThePickerFitsTheHeight(t *testing.T) {
 	t.Parallel()
 
 	m := sized(t, 120, nil)
-	qs := make([]usecase.SavedQuery, 60)
+	qs := make([]domain.SavedQuery, 60)
 	for i := range qs {
-		qs[i] = usecase.SavedQuery{Name: fmt.Sprintf("q%d", i), Query: "is:open"}
+		qs[i] = domain.SavedQuery{Name: fmt.Sprintf("q%d", i), Query: "is:open"}
 	}
 	m = m.SetSavedQueries(qs)
 	m, _ = press(m, "ctrl+o")
@@ -233,9 +232,9 @@ func TestThePickerWindowFollowsTheCursor(t *testing.T) {
 	t.Parallel()
 
 	m := sized(t, 120, nil)
-	qs := make([]usecase.SavedQuery, 60)
+	qs := make([]domain.SavedQuery, 60)
 	for i := range qs {
-		qs[i] = usecase.SavedQuery{Name: fmt.Sprintf("q%d", i), Query: "is:open"}
+		qs[i] = domain.SavedQuery{Name: fmt.Sprintf("q%d", i), Query: "is:open"}
 	}
 	m = m.SetSavedQueries(qs)
 	m, _ = press(m, "ctrl+o")

@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/adapter/datasource"
 	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/root"
@@ -70,17 +71,26 @@ func main() {
 
 	// The store is built even when config.Path failed: it reports that
 	// failure when something is saved, rather than saving nothing in silence.
-	store := config.NewStore(path)
+	store := datasource.NewStore(path)
 	var uc *usecase.Usecase
 	if ghClient != nil {
 		uc = usecase.New(ghClient, store)
 	} else {
 		uc = usecase.New(apiClient, store)
 	}
+
+	// The lists come from the store rather than out of cfg: the file's shape
+	// is config's business, and what the application keeps in it is the
+	// store's. A read failure here is the same one config.Load already put in
+	// configErr, so it is not reported a second time; the run carries on with
+	// nothing saved, which is what a first run does anyway.
+	repos, _ := store.Repositories()
+	queries, _ := store.SavedQueries()
+
 	p := tea.NewProgram(root.New(uc, root.Options{
 		Repo:         *repoFlag,
-		Repositories: cfg.Repositories,
-		SavedQueries: usecase.SavedQueriesFrom(cfg.SavedQueries),
+		Repositories: repos,
+		SavedQueries: queries,
 		DefaultTab:   cfg.DefaultTabName(),
 		ConfigError:  configErr,
 	}))

@@ -5,9 +5,9 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -67,7 +67,7 @@ func (m Model) pickerWindow(rows int) int {
 // savedRow draws one entry: its name, and its query beside it in a dimmer
 // colour if there is room. layout.Clip cuts it to the box instead of
 // leaving lipgloss to wrap it, which would split the row across two lines.
-func (m Model) savedRow(q usecase.SavedQuery, i int, width int) string {
+func (m Model) savedRow(q domain.SavedQuery, i int, width int) string {
 	line := q.Name
 	if rest := width - ansi.StringWidth(line) - 1; rest > 0 {
 		line += " " + theme.Dim().Render(layout.Clip(q.Query, rest))

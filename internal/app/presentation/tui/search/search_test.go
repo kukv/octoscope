@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -42,18 +41,18 @@ func (f *fakeSource) ListAssignees(_ context.Context, repo string) ([]string, er
 	return f.users, nil
 }
 
-func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
+func (f *fakeSource) SaveQueries([]domain.SavedQuery) error { return nil }
 
 // fakeStore is a fakeSource whose SaveQueries records what was saved and can
 // be made to fail, for the tests that check what actually reaches the
 // store rather than only what the model does.
 type fakeStore struct {
 	fakeSource
-	saved []usecase.SavedQuery
+	saved []domain.SavedQuery
 	err   error
 }
 
-func (f *fakeStore) SaveQueries(qs []usecase.SavedQuery) error {
+func (f *fakeStore) SaveQueries(qs []domain.SavedQuery) error {
 	f.saved = qs
 	return f.err
 }
@@ -398,7 +397,7 @@ func TestSavingTheSameNameReplacesIt(t *testing.T) {
 
 	store := &fakeStore{}
 	m := newTestModel(t, store)
-	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:draft"}})
+	m = m.SetSavedQueries([]domain.SavedQuery{{Name: "mine", Query: "is:draft"}})
 	m, _ = press(m, "s")
 	m = typeInto(m, "mine")
 	m, cmd := press(m, "enter")
@@ -438,7 +437,7 @@ func TestTheNoticeShowsWhileThePickerIsOpen(t *testing.T) {
 	store := &fakeStore{err: errors.New("disk is full")}
 	m := newTestModel(t, store)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m = m.SetSavedQueries([]domain.SavedQuery{{Name: "mine", Query: "is:open"}})
 	m, _ = press(m, "ctrl+o")
 	m, cmd := press(m, "x")
 	m = resolve(t, m, cmd)
@@ -627,7 +626,7 @@ func TestCtrlOOpensTheSavedQueriesAndEnterRunsOne(t *testing.T) {
 	t.Parallel()
 
 	m := newTestModel(t, &fakeStore{})
-	m = m.SetSavedQueries([]usecase.SavedQuery{
+	m = m.SetSavedQueries([]domain.SavedQuery{
 		{Name: "mine", Query: "is:open author:@me"},
 		{Name: "reviews", Query: "is:open review-requested:@me"},
 	})
@@ -652,7 +651,7 @@ func TestXRemovesASavedQueryAndSavesTheRest(t *testing.T) {
 
 	store := &fakeStore{}
 	m := newTestModel(t, store)
-	m = m.SetSavedQueries([]usecase.SavedQuery{
+	m = m.SetSavedQueries([]domain.SavedQuery{
 		{Name: "mine", Query: "is:open author:@me"},
 		{Name: "reviews", Query: "is:open review-requested:@me"},
 	})
@@ -676,7 +675,7 @@ func TestRemovingTheLastRowKeepsTheCursorInRange(t *testing.T) {
 
 	store := &fakeStore{}
 	m := newTestModel(t, store)
-	m = m.SetSavedQueries([]usecase.SavedQuery{
+	m = m.SetSavedQueries([]domain.SavedQuery{
 		{Name: "a", Query: "is:open"},
 		{Name: "b", Query: "is:pr"},
 	})
@@ -718,7 +717,7 @@ func TestThePopupHoldsTheKeys(t *testing.T) {
 	t.Parallel()
 
 	m := newTestModel(t, &fakeStore{})
-	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open"}})
+	m = m.SetSavedQueries([]domain.SavedQuery{{Name: "mine", Query: "is:open"}})
 	m, _ = press(m, "ctrl+o")
 	if !m.Capturing() {
 		t.Error("the popup does not capture keys")
@@ -731,7 +730,7 @@ func TestReopeningThePickerResetsTheCursor(t *testing.T) {
 	t.Parallel()
 
 	m := newTestModel(t, &fakeStore{})
-	m = m.SetSavedQueries([]usecase.SavedQuery{
+	m = m.SetSavedQueries([]domain.SavedQuery{
 		{Name: "a", Query: "is:open"},
 		{Name: "b", Query: "is:closed"},
 	})
@@ -764,7 +763,7 @@ func TestEscapeClosesThePopup(t *testing.T) {
 
 	m := newTestModel(t, &fakeStore{})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
-	m = m.SetSavedQueries([]usecase.SavedQuery{{Name: "mine", Query: "is:open author:@me"}})
+	m = m.SetSavedQueries([]domain.SavedQuery{{Name: "mine", Query: "is:open author:@me"}})
 	before := m.View()
 	m, _ = press(m, "ctrl+o")
 	if !strings.Contains(m.View(), "mine") {

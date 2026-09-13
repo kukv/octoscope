@@ -121,6 +121,7 @@ internal/app/adapter/gateway/gh ──→ internal/github/{cli,api,gql}
                                 ──→ internal/app/domain
 
 internal/app/adapter/datasource ──→ internal/app/domain
+                                ──→ internal/app/config
                                 ──→ （YAML などのファイル形式）
 
 internal/github/**             ──→ （internal/app のどこにも依存しない）
@@ -200,9 +201,11 @@ gateway が無かった時点では usecase が唯一の置き場所だったが
 |---|---|---|
 | `Author` `Label` `Comment` の json タグ | タグを外し、デコードは `internal/github` の private 型で行う | 2 |
 | `ParseItemState` `ParseReviewDecision` | `internal/github`（GitHub の綴りを読む処理） | 2 |
-| `ParseFilesAPI` + `prFileJSON` | `internal/github` | 3 |
+| `ParseFilesAPI` + `prFileJSON` | `internal/github` | **2** |
 | `ParseDiff`（git の unified diff） | domain に残す。GitLab も同形式 | — |
-| `ErrGhNotFound` | `internal/github/cli`。gateway が中立な sentinel に変換し、`IsFatal` は中立なものだけを見る | 3 |
+| `ErrGhNotFound` `ErrTransient` `ErrUnauthenticated` `Classify` | `internal/github`。gateway が中立な sentinel に変換し、`IsFatal` は中立なものだけを見る | **2** |
+| `NewLogLine`（Actions のタイムスタンプ接頭辞を解釈する） | 解釈は `internal/github` へ。domain には素の構築だけ残す | 2 |
+| `WorkSection` → GitHub の検索文字列（`gql/search.go`） | gateway がクエリを組み、`gql` は文字列を受け取る | 2 |
 | `PullRequestID` `PendingID` | 不透明ハンドルへ改名。domain には残す | 3 |
 | `CheckRun.JobID` `RunID` | 不透明ハンドルへ | 3 |
 | `SplitRepo` | domain から外す。呼び出し元は tui 2 / infra 5 | 3 |
@@ -256,14 +259,44 @@ golden テストの差分がゼロであること。
 
 ### PR 2: gateway と datasource の導入、`internal/github` の domain 非依存化
 
-- `internal/app/adapter/gateway/gh` を作り、既存の変換関数 9 個をそこへ移す
-- `internal/github` の private ワイヤ型を public にし、domain の import を外す
-- §4 の reflect テストと depguard ルールを red で入れ、この PR の中で green にする
-- `Author` `Label` `Comment` の json タグを外す
-- `ParseItemState` `ParseReviewDecision` を `internal/github` へ
+**2026-09-13 に 2 本に割った。** PR 1 の完了後に実測したところ、`internal/github` から
+domain への参照は **430 箇所 / 81 シンボル**、public メソッド 51 個のうち約 35 個が
+domain 型に触り、うち 5 個は domain の列挙型を**引数として**受けていた（`RerunScope`
+`PendingComment` `ReviewEvent` `MergeMethod` `WorkSection`）。1 本にまとめると、
+意味のある変更を含んだまま PR 1 と同じ規模のレビューを 1 回で行うことになる。
+
+#### PR 2a: datasource の導入と `SavedQuery` の domain 化
+
+gateway と独立しており、先に単独で落ちる。
+
 - `internal/app/adapter/datasource` を作り、`config.Store` の
   `SaveRepositories` / `SaveQueries` と `Repositories` / `SavedQueries` の読み書きを移す
-- `SavedQuery` を domain の型にする
+- `SavedQuery` を domain の型にする。`config` は YAML の形だけを持ち続ける
+- `usecase.SavedQuery` と `usecase.SavedQueriesFrom` を削除する。これは
+  「tui が config を見られない」ために置かれた re-export で、`domain.SavedQuery` が
+  できた時点で不要になる
+
+検証: `make check`。設定ファイルの保存と読み込みを実際に動かして確認する。
+
+#### PR 2b: gateway の導入と `internal/github` の domain 非依存化
+
+**一括ではなく port グループ単位で進める。** `cmd/octoscope/main.go` は
+`if ghClient != nil { usecase.New(ghClient, store) } else { usecase.New(apiClient, store) }`
+という形なので、`gateway/gh.CLI` と `gateway/gh.API` がそれぞれ具象クライアントを
+embed し、**変換済みのメソッドだけ override する**形が取れる。embed が残りを素通しするので、
+`itemFetcher` / `lister` / `reviewer` / `merger` のような port グループごとに
+1 コミットずつ緑のまま進められる。
+
+- `internal/app/adapter/gateway/gh` を作り、既存の変換関数 8 個をそこへ移す
+- `internal/github` の private ワイヤ型を public にし、domain の import を外す
+- `Author` `Label` `Comment` の json タグを外す
+- `ParseItemState` `ParseReviewDecision` `ParseFilesAPI` + `prFileJSON` を `internal/github` へ
+- エラー sentinel（`ErrGhNotFound` `ErrTransient` `ErrUnauthenticated` `Classify`）を
+  `internal/github` へ移し、gateway が中立な sentinel に変換する。`IsFatal` は
+  中立なものだけを見る
+- `WorkSection` から GitHub の検索文字列を組む処理を gateway へ移す
+- §4 の reflect テストと depguard ルールは**最後のタスク**で入れる。
+  reflect テストは main では落ちるので、それが green になるのは変換が全部終わった時点である
 
 検証: reflect テストが green。depguard が `internal/github` からの domain import を落とす。
 golden テストの差分がゼロ。
