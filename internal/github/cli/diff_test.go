@@ -4,30 +4,18 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/github"
 )
 
-// readSample reads the one recording of sample.diff, kept in internal/app/domain
-// since that is where the parsing tests that assert on its content now live.
-// The tests here only need gh pr diff to return something a real diff could
-// be, not any particular content of it.
-func readSample(t *testing.T) []byte {
-	t.Helper()
-	b, err := os.ReadFile("../../app/domain/testdata/sample.diff")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
-}
-
 func TestPRDiffBuildsTheCommand(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	var got []string
-	sample := readSample(t)
+	// PRDiff returns gh pr diff's output unparsed, so the content here does
+	// not matter; only that it is what run() returned comes under test.
+	sample := []byte("diff --git a/main.go b/main.go\n--- a/main.go\n+++ b/main.go\n@@ -1,1 +1,1 @@\n-old\n+new\n")
 	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		got = args
 		return sample, nil
