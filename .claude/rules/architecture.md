@@ -10,23 +10,37 @@ paths:
 ## 依存の向き
 
 ```
-cmd/octoscope                     （合成ルート: cli.New → usecase.New → app.New）
-     ↓
-internal/tui  ──→  internal/usecase  ──→  internal/gh/cli  ──→  internal/browser
-     │                    │                      │
-     └────────────────────┴──────────────────────┴──→  internal/gh  （ドメイン型）
-     ↓
-internal/i18n                                     （誰にも依存しない）
+cmd/octoscope
+     │
+     ├──→ internal/github/{cli,api}        （どのバックエンドかを知る唯一の場所）
+     ├──→ internal/app/adapter/gateway/gh
+     ├──→ internal/app/adapter/datasource
+     ├──→ internal/app/config
+     └──→ internal/app/presentation/tui
+
+internal/app/presentation/tui ──→ internal/app/usecase ──→ internal/app/domain
+                              ──→ internal/app/domain
+                              ──→ internal/i18n, internal/browser
+
+internal/app/adapter/gateway/gh ──→ internal/github/{cli,api,gql}
+                                ──→ internal/app/domain
+
+internal/app/adapter/datasource ──→ internal/app/domain
+                                ──→ （YAML などのファイル形式）
+
+internal/github/**             ──→ （internal/app のどこにも依存しない）
+internal/app/domain            ──→ （stdlib のみ）
+internal/{i18n,golden,browser} ──→ （何にも依存しない）
 ```
 
-**下の層は上の層を知らない。** GitHub アクセス層が TUI を import したら設計が壊れている。
+**下の層は上の層を知らない。** GitHub アクセス層が UI を import したら設計が壊れている。
 
-- `internal/tui` は `internal/gh/cli` を **import しない**。どのバックエンドが
-  動いているかを知っているのは `cmd/octoscope` だけである
-- `internal/tui` は `internal/gh` を import してよい（ドメイン型を画面に出すため）
-- `internal/usecase` は `internal/tui` と `internal/i18n` を import しない
-- `internal/gh` と `internal/gh/cli` は `internal/usecase` を import しない
-- `internal/i18n` と `internal/browser` は他の internal パッケージを import しない
+**gateway は usecase を import しない。** Go の interface は暗黙に満たされるので、
+gateway は domain だけを見て port を満たす。結線は `cmd/octoscope` が行う。
+
+**`internal/github` は現時点ではまだ `internal/app/domain` を import している。**
+これを断つのは PR 2 である。それまでは `internal/github` が domain を知っていても
+設計が壊れているわけではない。
 
 この向きは目視ではなく lint で守る。`.golangci.yml` の `depguard` に禁止 import を
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**
@@ -39,9 +53,9 @@ internal/i18n                                     （誰にも依存しない）
 必要な操作の interface は、**それを使う側**が宣言する。
 
 ```go
-// internal/tui/detail/detail.go
+// internal/app/presentation/tui/detail/detail.go
 type source interface {
-    GetPR(repo string, number int) (gh.PR, error)
+    GetPR(repo string, number int) (domain.PR, error)
     AddPRComment(repo string, number int, body string) error
 }
 ```
@@ -78,7 +92,7 @@ const (
 理由は 2 つ。GraphQL と REST で綴りが違う場合にバックエンドの差が UI に漏れないこと、
 そして UI 側が「知らない文字列」を握りつぶす分岐を持たずに済むこと。
 
-## 複数の API 呼び出しは `internal/usecase` に置く
+## 複数の API 呼び出しは `internal/app/usecase` に置く
 
 **`tea.Cmd` のクロージャの中に、2 つ以上の API 呼び出しを並べない。**
 
@@ -86,11 +100,11 @@ const (
 TUI の都合ではない。ビューが知るべきなのは「行コメントを送る」という 1 操作だけで、
 それが何回のリクエストになるかではない。
 
-置き場所を分けると、順序のテストに Bubble Tea が要る。`internal/usecase` に置けば、
+置き場所を分けると、順序のテストに Bubble Tea が要る。`internal/app/usecase` に置けば、
 フェイクを 1 つ渡すだけで「pending があるとき / ないとき」を検証できる。
 
 同じことが「種別（PR / Issue）で呼ぶものが変わる」にも当てはまる。
-`gh.ItemRef.Kind` を View で `switch` しない。
+`domain.ItemRef.Kind` を View で `switch` しない。
 
 ## `usecase.Item` を画面の写しにしない
 
@@ -99,13 +113,13 @@ TUI の都合ではない。ビューが知るべきなのは「行コメント�
 
 - **`Item` に共通フィールドを足してよいのは、PR と Issue の両方に GitHub 側の
   対応物があるときだけ。**
-- PR にしか無いものは `Item.PR`（`*gh.PR`）から読む。`Item` に写さない
-- 「画面に出したいものが `Item` に無い」と思ったら、まず `internal/gh` の
-  ドメイン型に無いのではないかを疑う。`gh.Issue` の公開フィールドは 10 個あり、
+- PR にしか無いものは `Item.PR`（`*domain.PR`）から読む。`Item` に写さない
+- 「画面に出したいものが `Item` に無い」と思ったら、まず `internal/app/domain` の
+  ドメイン型に無いのではないかを疑う。`domain.Issue` の公開フィールドは 10 個あり、
   `Item` はその全部を持っている（2026-09-07 に数えた）
 
 この規則があるかぎり、UI だけの修正（色・桁・文言・キー・状態遷移・
-何を描くかの選び方）は `internal/usecase` に波及しない。波及するのは
+何を描くかの選び方）は `internal/app/usecase` に波及しない。波及するのは
 GitHub への**新しい操作**を足すときだけで、それは元から UI だけの修正ではない。
 
 ## パッケージを増やす基準
@@ -121,9 +135,9 @@ GitHub への**新しい操作**を足すときだけで、それは元から UI
 DI コンテナ、ドメインモデルとインフラモデルの二重定義、Input/Output DTO は
 **入れていない**。
 
-**`internal/usecase` を入れる判断を 2026-09-07 にした。**
+**`internal/app/usecase` を入れる判断を 2026-09-07 にした。**
 それまでは「Web サービス向けの構造だから入れない」という一般論で退けていたが、
-その判断は `internal/tui` が 1 行も存在しない時点（Phase 0、`67ba0de`）に書かれ、
+その判断は `internal/app/presentation/tui` が 1 行も存在しない時点（Phase 0、`67ba0de`）に書かれ、
 以後一度も再検証されていなかった。再検証したときの実測は次のとおりである。
 
 - API 呼び出し順序が `tea.Cmd` のクロージャに漏れていた（2 箇所）
@@ -140,11 +154,33 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
 2. **足したあと何が減るか。** 触る場所、重複、テストの手間のどれが減るか
 
 両方書けるなら提案する価値がある。書けないなら足さない。
-上の `internal/usecase` の記述が、書けたときの見本である。
+上の `internal/app/usecase` の記述が、書けたときの見本である。
 
-足すと**増える**ものも書く。`internal/usecase` の場合は、GitHub への新しい操作を
-足すときに触るファイルが `gh/cli` + ビューの 2 つから `gh/cli` + `usecase` + ビューの
-3 つになる。これが唯一の実コストである。
+足すと**増える**ものも書く。`internal/app/usecase` の場合は、GitHub への新しい操作を
+足すときに触るファイルが `internal/github/cli` + ビューの 2 つから
+`internal/github/cli` + `usecase` + ビューの 3 つになる。これが唯一の実コストである。
+
+## 名前は借りてよい、形は借りない
+
+port の中立化は行う。ただし**名前**と**形**を分けて扱う。
+
+> **規則「名前は借りてよい、形は借りない」**
+>
+> - **名詞と操作名は GitHub のものでよい。** PR / Issue / Review / Label / Assignee /
+>   AutoMerge / Workflow は Forgejo でも同じ語で、GitLab でも対応物がある
+> - **中立でなければならないのは port の形である。**
+>   (i) 識別子は不透明な `string` ハンドル。`int64` の Actions ID や GraphQL node ID を
+>   その名前のまま port に出さない
+>   (ii) **GitHub が余計に 1 回呼ぶ必要があるから存在する port メソッドを作らない**
+
+適用結果:
+
+| 変えない | 変える |
+|---|---|
+| `AddPRComment` `ClosePR` `EditPRLabels` `ListPRs` `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → 不透明ハンドル |
+| `CheckRun.Workflow` `RunNumber`（Forgejo Actions は同型、GitLab の pipeline も対応物がある） | `RerunWorkflow(runID int64)` → 不透明ハンドル |
+| `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → 不透明ハンドル名へ改名 |
+| | `StartReview` / `SubmitNewReview` → 本規約の「複数の API 呼び出しは `internal/app/usecase` に置く」 |
 
 ## 規約そのものを変える
 
