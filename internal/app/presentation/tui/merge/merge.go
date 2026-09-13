@@ -26,9 +26,9 @@ var nextGen atomic.Int64
 // Source is what merging needs.
 type Source interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
-	MergePR(pullRequestID string, method domain.MergeMethod) error
-	EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error
-	DisableAutoMerge(pullRequestID string) error
+	MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error
+	EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error
+	DisableAutoMerge(pr domain.PullRequestHandle) error
 }
 
 // MergedMsg tells the holder the pull request was merged, queued, or taken
@@ -177,15 +177,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) send() (Model, tea.Cmd) {
 	switch {
 	case m.ctx.AutoMergeEnabled:
-		return m.sendCmd(false, func() error { return m.src.DisableAutoMerge(m.ctx.PullRequestID) })
+		return m.sendCmd(false, func() error { return m.src.DisableAutoMerge(m.ctx.PullRequest) })
 	case m.ctx.Block() != domain.BlockNone:
 		return m, nil
 	case m.auto:
 		method := m.method()
-		return m.sendCmd(false, func() error { return m.src.EnableAutoMerge(m.ctx.PullRequestID, method) })
+		return m.sendCmd(false, func() error { return m.src.EnableAutoMerge(m.ctx.PullRequest, method) })
 	default:
 		method := m.method()
-		return m.sendCmd(true, func() error { return m.src.MergePR(m.ctx.PullRequestID, method) })
+		return m.sendCmd(true, func() error { return m.src.MergePR(m.ctx.PullRequest, method) })
 	}
 }
 

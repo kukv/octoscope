@@ -212,13 +212,13 @@ func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	}
 
 	want := domain.ReviewContext{
-		PullRequestID: "PR_1",
-		Title:         "add the gateway",
-		Head:          "refactor/pr2b-gateway",
-		Base:          "main",
-		Additions:     42,
-		Deletions:     7,
-		PendingID:     "PRR_9",
+		PullRequest: "PR_1",
+		Title:       "add the gateway",
+		Head:        "refactor/pr2b-gateway",
+		Base:        "main",
+		Additions:   42,
+		Deletions:   7,
+		Pending:     "PRR_9",
 		Threads: []domain.ReviewThread{
 			{
 				Path:     "a.go",

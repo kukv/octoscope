@@ -32,17 +32,17 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return f.ctx, f.err
 }
 
-func (f *fakeSource) MergePR(_ string, m domain.MergeMethod) error {
+func (f *fakeSource) MergePR(_ domain.PullRequestHandle, m domain.MergeMethod) error {
 	f.merged = append(f.merged, m)
 	return nil
 }
 
-func (f *fakeSource) EnableAutoMerge(_ string, m domain.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(_ domain.PullRequestHandle, m domain.MergeMethod) error {
 	f.enabled = append(f.enabled, m)
 	return nil
 }
 
-func (f *fakeSource) DisableAutoMerge(string) error {
+func (f *fakeSource) DisableAutoMerge(domain.PullRequestHandle) error {
 	f.offCall++
 	return nil
 }
@@ -87,10 +87,10 @@ func autoMergeable() domain.MergeContext {
 
 func mergeable() domain.MergeContext {
 	return domain.MergeContext{
-		PullRequestID: "PR_1",
-		Mergeable:     domain.MergeableYes,
-		State:         domain.MergeStateUnstable,
-		Methods:       []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase},
+		PullRequest: "PR_1",
+		Mergeable:   domain.MergeableYes,
+		State:       domain.MergeStateUnstable,
+		Methods:     []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase},
 	}
 }
 
@@ -324,12 +324,12 @@ func TestAnAnswerForAnotherPullRequestIsDropped(t *testing.T) {
 	m := loaded(t, &fakeSource{ctx: mergeable()})
 	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 62}
 	m, _ = m.Update(contextMsg{ref: other, gen: m.gen, ctx: domain.MergeContext{
-		PullRequestID: "PR_2",
-		Methods:       []domain.MergeMethod{domain.MergeRebase},
+		PullRequest: "PR_2",
+		Methods:     []domain.MergeMethod{domain.MergeRebase},
 	}})
-	if m.ctx.PullRequestID != "PR_1" {
-		t.Errorf("PullRequestID = %q, want PR_1: the popup took another pull request's answer",
-			m.ctx.PullRequestID)
+	if m.ctx.PullRequest != "PR_1" {
+		t.Errorf("PullRequest = %q, want PR_1: the popup took another pull request's answer",
+			m.ctx.PullRequest)
 	}
 }
 

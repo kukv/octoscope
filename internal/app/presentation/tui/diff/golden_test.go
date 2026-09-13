@@ -42,10 +42,10 @@ func goldenFixture() []domain.FileDiff {
 // and a thread row at once.
 func goldenReview() domain.ReviewContext {
 	return domain.ReviewContext{
-		PullRequestID: "PR_128",
-		Title:         "add relation graph traversal",
-		Head:          "feat/graph",
-		Base:          "main",
+		PullRequest: "PR_128",
+		Title:       "add relation graph traversal",
+		Head:        "feat/graph",
+		Base:        "main",
 		Threads: []domain.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
@@ -163,7 +163,7 @@ func reviewFailureModel(width int) Model {
 // thread comment is not pending, so the popup counts no line comments.
 func submittingModel(width int) Model {
 	m := goldenModel(width)
-	m.review.PendingID = "PRR_1"
+	m.review.Pending = "PRR_1"
 	return press(m, "v")
 }
 
@@ -171,7 +171,7 @@ func submittingModel(width int) Model {
 // pending review: X does nothing without one to discard.
 func discardingModel(width int) Model {
 	m := goldenModel(width)
-	m.review.PendingID = "PRR_1"
+	m.review.Pending = "PRR_1"
 	return press(m, "X")
 }
 
@@ -197,7 +197,7 @@ func declinedLoadingModel(width int) Model {
 }
 
 // declinedNoPendingReviewModel is goldenModel with X pressed: goldenReview
-// has no PendingID, so there is nothing to discard.
+// has no Pending, so there is nothing to discard.
 func declinedNoPendingReviewModel(width int) Model {
 	return press(goldenModel(width), "X")
 }

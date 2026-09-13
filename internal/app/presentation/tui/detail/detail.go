@@ -529,8 +529,8 @@ func (m Model) reviewContextArrived(msg reviewContextMsg) Model {
 		return m // an answer for an item the user has already left
 	}
 	target := review.Target{
-		PullRequestID:   msg.ctx.PullRequestID,
-		PendingID:       msg.ctx.PendingID,
+		PullRequest:     msg.ctx.PullRequest,
+		Pending:         msg.ctx.Pending,
 		PendingComments: msg.ctx.PendingCount(),
 	}
 	m.submit = review.New(m.src, target)

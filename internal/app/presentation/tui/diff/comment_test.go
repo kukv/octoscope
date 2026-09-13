@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -19,12 +18,12 @@ import (
 type recordingSource struct {
 	fakeSource
 	mu           sync.Mutex
-	targets      []usecase.ReviewTarget
+	targets      []domain.ReviewTarget
 	comments     []domain.PendingComment
 	discardCalls int
 }
 
-func (s *recordingSource) PostLineComment(t usecase.ReviewTarget, c domain.PendingComment) (string, error) {
+func (s *recordingSource) PostLineComment(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.targets = append(s.targets, t)
@@ -32,7 +31,7 @@ func (s *recordingSource) PostLineComment(t usecase.ReviewTarget, c domain.Pendi
 	return "PRR_new", nil
 }
 
-func (s *recordingSource) DiscardReview(string) error {
+func (s *recordingSource) DiscardReview(domain.ReviewHandle) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.discardCalls++
@@ -55,7 +54,7 @@ func loadedWithAt(t *testing.T, src Source, width, height int) Model {
 	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequestID: "PR_1"}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequest: "PR_1"}})
 	return m
 }
 
@@ -143,8 +142,8 @@ func TestCommentingOnARemovedLineQuotesTheLeftSide(t *testing.T) {
 	}
 }
 
-// commentPostedMsg sets PendingID synchronously; the refetch that would
-// confirm it is not. Handing over an empty PendingID leaves two pending
+// commentPostedMsg sets Pending synchronously; the refetch that would
+// confirm it is not. Handing over an empty Pending leaves two pending
 // reviews open on the pull request.
 func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
@@ -157,7 +156,7 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	posted := cmd()
 	m, _ = m.Update(posted)
 	// posted's own fetchReview command is deliberately never run: the
-	// refetch's answer must not be what makes PendingID available.
+	// refetch's answer must not be what makes Pending available.
 
 	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
@@ -168,8 +167,8 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	if len(src.targets) != 2 {
 		t.Fatalf("%d comments sent, want 2", len(src.targets))
 	}
-	if got := src.targets[1].PendingID; got != "PRR_new" {
-		t.Errorf("the second comment went to PendingID %q, want the id the first came back with", got)
+	if got := src.targets[1].Pending; got != "PRR_new" {
+		t.Errorf("the second comment went to Pending %q, want the id the first came back with", got)
 	}
 }
 
@@ -186,9 +185,9 @@ func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 }
 
 // TestCDoesNothingOnAHunkHeader has to be built with loadedWith, not loaded:
-// with loaded, m.review.PullRequestID is always "" (no reviewMsg ever
+// with loaded, m.review.PullRequest is always "" (no reviewMsg ever
 // arrives), so the r.kind != rowLine clause is not what makes the test pass
-// -- the PullRequestID guard alone already suppresses the composer regardless of
+// -- the PullRequest guard alone already suppresses the composer regardless of
 // the cursor. Deleting r.kind != rowLine must make this fail; it did not
 // against the old loaded-based version.
 func TestCDoesNothingOnAHunkHeader(t *testing.T) {
@@ -262,7 +261,7 @@ func TestCBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 // reviewErr already says so" clause, so a single failed fetch (before any
 // reviewMsg) does not draw the loading message on top of reviewErr's own
 // footer line. This is built with loaded, not loadedWith: with loaded,
-// m.review.PullRequestID is always "" (no reviewMsg ever arrives), which is
+// m.review.PullRequest is always "" (no reviewMsg ever arrives), which is
 // exactly the case the guard exists for. Each guard is deleted in turn while
 // developing this test to confirm the corresponding row fails without it.
 func TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived(t *testing.T) {
@@ -298,12 +297,12 @@ func TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived(t *test
 // wave exists for: reviewErrMsg only means the last refetch failed, it never
 // touches m.review (diff.go's reviewErrMsg case sets m.reviewErr alone), so a
 // pull request id and a pending review confirmed by an earlier, successful
-// fetch are still good. c used to check reviewErr before PullRequestID and
+// fetch are still good. c used to check reviewErr before PullRequest and
 // decline unconditionally, which meant posting a comment, letting the
 // automatic refetch after it hiccup, and losing c for the rest of the
 // session -- exactly the silence this branch was written to remove.
 func TestCStillWorksAfterASecondReviewContextFetchFails(t *testing.T) {
-	m := withThreads(t, 120, 40) // a real PullRequestID from threadFixture
+	m := withThreads(t, 120, 40) // a real PullRequest from threadFixture
 	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
 	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
@@ -423,12 +422,12 @@ func TestAFailedPostKeepsTheDraftAndShowsTheError(t *testing.T) {
 // back as a Pending thread.
 func TestAPostedCommentReusesTheReviewIDAndRefetches(t *testing.T) {
 	m := loaded(t, 120, 40)
-	m, cmd := m.Update(commentPostedMsg{ref: m.ref, reviewID: "PRR_1"})
+	m, cmd := m.Update(commentPostedMsg{ref: m.ref, review: "PRR_1"})
 	if m.mode != modeView || m.phase != phaseIdle {
 		t.Errorf("mode = %v, phase = %v after commentPostedMsg, want the composer closed and idle", m.mode, m.phase)
 	}
-	if m.review.PendingID != "PRR_1" {
-		t.Errorf("review.PendingID = %q, want %q", m.review.PendingID, "PRR_1")
+	if m.review.Pending != "PRR_1" {
+		t.Errorf("review.Pending = %q, want %q", m.review.Pending, "PRR_1")
 	}
 	if cmd == nil {
 		t.Fatal("commentPostedMsg produced no command to refetch the review context")
@@ -462,7 +461,7 @@ func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 	m = typeInto(m, "still about line 14")
 
 	shifted := domain.ReviewContext{
-		PullRequestID: "PR_1",
+		PullRequest: "PR_1",
 		Threads: []domain.ReviewThread{
 			{
 				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
@@ -527,7 +526,7 @@ func TestARefetchReclampsTheCursorIntoRange(t *testing.T) {
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
 	m.row = len(m.rows) - 1 // parked at the end of the widened row set
 
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequestID: "PR_1"}}) // threads gone
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequest: "PR_1"}}) // threads gone
 	if m.row >= len(m.rows) {
 		t.Fatalf("row = %d out of range for %d rows", m.row, len(m.rows))
 	}
@@ -541,14 +540,14 @@ func TestARefetchReclampsTheCursorIntoRange(t *testing.T) {
 // nothing to say about is the commonest review there is.
 func TestVOpensThePopupWithOrWithoutAPendingReview(t *testing.T) {
 	m := withThreads(t, 120, 40) // the context has arrived; nothing waiting
-	m.review.PendingID = ""
+	m.review.Pending = ""
 	m = press(m, "v")
 	if m.mode != modeSubmit {
 		t.Error("v did nothing with no pending review; approving needs no comments")
 	}
 
 	m2 := withThreads(t, 120, 40)
-	m2.review.PendingID = "PRR_9"
+	m2.review.Pending = "PRR_9"
 	m2 = press(m2, "v")
 	if m2.mode != modeSubmit {
 		t.Error("v did not open the popup when a review was waiting")
@@ -567,7 +566,7 @@ func TestVDoesNothingBeforeTheContextArrives(t *testing.T) {
 }
 
 // TestVBeforeTheContextArrivesSaysItIsLoading is v's share of the same fix
-// c got: it has the same PullRequestID guard, and the same silence.
+// c got: it has the same PullRequest guard, and the same silence.
 func TestVBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
 	m = press(m, "v")
@@ -580,7 +579,7 @@ func TestVBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 }
 
 // TestXBeforeTheContextArrivesSaysItIsLoading is X's share of the same fix c
-// and v got: PendingID == "" before the context has arrived is not "no
+// and v got: Pending == "" before the context has arrived is not "no
 // pending review" but "not known yet", and the two need different messages
 // -- one says wait, the other says there is nothing to do.
 func TestXBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
@@ -596,7 +595,7 @@ func TestXBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 
 func TestXWithNoPendingReviewSaysWhyNothingHappened(t *testing.T) {
 	m := withThreads(t, 120, 40)
-	m.review.PendingID = ""
+	m.review.Pending = ""
 	m = press(m, "X")
 	if m.mode == modeDiscard {
 		t.Fatal("X asked to discard with no pending review")
@@ -608,7 +607,7 @@ func TestXWithNoPendingReviewSaysWhyNothingHappened(t *testing.T) {
 
 func TestCapitalXAsksBeforeDiscarding(t *testing.T) {
 	m := withThreads(t, 120, 40)
-	m.review.PendingID = "PRR_9"
+	m.review.Pending = "PRR_9"
 	m = press(m, "X")
 	if m.mode != modeDiscard {
 		t.Fatal("X did not ask")
@@ -630,7 +629,7 @@ func TestASecondYWhileDiscardingDoesNotCallDiscardTwice(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
-	m.review.PendingID = "PRR_9"
+	m.review.Pending = "PRR_9"
 	m = press(m, "X")
 
 	m, cmd1 := m.Update(keyPress("y")) // starts the discard; DiscardReview not yet run
@@ -653,7 +652,7 @@ func TestTheSubmitPopupFitsTheTerminal(t *testing.T) {
 	for _, width := range []int{80, 120} {
 		for _, height := range []int{24, 40} {
 			m := withThreads(t, width, height)
-			m.review.PendingID = "PRR_9"
+			m.review.Pending = "PRR_9"
 			m = press(m, "v")
 			out := m.View()
 			if got := len(strings.Split(out, "\n")); got > height {
@@ -672,7 +671,7 @@ func TestTheDiscardConfirmationFitsTheTerminal(t *testing.T) {
 	for _, width := range []int{80, 120} {
 		for _, height := range []int{24, 40} {
 			m := withThreads(t, width, height)
-			m.review.PendingID = "PRR_9"
+			m.review.Pending = "PRR_9"
 			m = press(m, "X")
 			out := m.View()
 			if got := len(strings.Split(out, "\n")); got > height {

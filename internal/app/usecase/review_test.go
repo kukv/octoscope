@@ -16,27 +16,27 @@ type fakeReviewer struct {
 	submitErr error
 }
 
-func (f *fakeReviewer) StartReview(_ string) (string, error) {
+func (f *fakeReviewer) StartReview(_ domain.PullRequestHandle) (domain.ReviewHandle, error) {
 	f.calls = append(f.calls, "StartReview")
-	return f.newID, f.startErr
+	return domain.ReviewHandle(f.newID), f.startErr
 }
 
-func (f *fakeReviewer) AddReviewThread(reviewID string, _ domain.PendingComment) error {
-	f.calls = append(f.calls, "AddReviewThread("+reviewID+")")
+func (f *fakeReviewer) AddReviewThread(review domain.ReviewHandle, _ domain.PendingComment) error {
+	f.calls = append(f.calls, "AddReviewThread("+string(review)+")")
 	return f.threadErr
 }
 
-func (f *fakeReviewer) SubmitReview(_ string, _ domain.ReviewEvent, _ string) error {
+func (f *fakeReviewer) SubmitReview(_ domain.ReviewHandle, _ domain.ReviewEvent, _ string) error {
 	f.calls = append(f.calls, "SubmitReview")
 	return f.submitErr
 }
 
-func (f *fakeReviewer) SubmitNewReview(_ string, _ domain.ReviewEvent, _ string) error {
+func (f *fakeReviewer) SubmitNewReview(_ domain.PullRequestHandle, _ domain.ReviewEvent, _ string) error {
 	f.calls = append(f.calls, "SubmitNewReview")
 	return f.submitErr
 }
 
-func (f *fakeReviewer) DiscardReview(_ string) error {
+func (f *fakeReviewer) DiscardReview(_ domain.ReviewHandle) error {
 	return nil
 }
 
@@ -73,7 +73,7 @@ func TestPostLineCommentStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 			u := &Usecase{reviews: f}
 
 			id, err := u.PostLineComment(
-				ReviewTarget{PullRequestID: "PR_1", PendingID: tc.pendingID},
+				domain.ReviewTarget{PullRequest: "PR_1", Pending: domain.ReviewHandle(tc.pendingID)},
 				domain.PendingComment{Path: "a.go", Line: 1, Body: "nit"},
 			)
 			if err != nil {
@@ -84,8 +84,8 @@ func TestPostLineCommentStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 			}
 			// The caller reuses the id for the next comment, so a wrong one
 			// means every later comment starts another review.
-			if id != tc.wantID {
-				t.Errorf("%s: reviewID = %q, want %q", tc.name, id, tc.wantID)
+			if string(id) != tc.wantID {
+				t.Errorf("%s: review = %q, want %q", tc.name, id, tc.wantID)
 			}
 		})
 	}
@@ -100,7 +100,7 @@ func TestPostLineCommentStopsWhenTheReviewCannotBeStarted(t *testing.T) {
 	f := &fakeReviewer{startErr: boom}
 	u := &Usecase{reviews: f}
 
-	if _, err := u.PostLineComment(ReviewTarget{PullRequestID: "PR_1"}, domain.PendingComment{}); !errors.Is(err, boom) {
+	if _, err := u.PostLineComment(domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{}); !errors.Is(err, boom) {
 		t.Errorf("err = %v, want it to wrap %v", err, boom)
 	}
 	if !slices.Equal(f.calls, []string{"StartReview"}) {
@@ -129,7 +129,7 @@ func TestSubmitReviewPicksTheOneCallThatFitsTheTarget(t *testing.T) {
 			u := &Usecase{reviews: f}
 
 			err := u.SubmitReview(
-				ReviewTarget{PullRequestID: "PR_1", PendingID: tc.pendingID},
+				domain.ReviewTarget{PullRequest: "PR_1", Pending: domain.ReviewHandle(tc.pendingID)},
 				domain.EventApprove, "lgtm",
 			)
 			if err != nil {

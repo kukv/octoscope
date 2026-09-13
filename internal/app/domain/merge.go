@@ -50,11 +50,11 @@ const (
 // MergeContext is everything the merge popup draws and acts on: what the
 // repository allows, and what state this pull request is in.
 type MergeContext struct {
-	PullRequestID string
-	IsDraft       bool
-	Mergeable     Mergeable
-	State         MergeState
-	Review        ReviewState
+	PullRequest PullRequestHandle
+	IsDraft     bool
+	Mergeable   Mergeable
+	State       MergeState
+	Review      ReviewState
 
 	// Methods holds only the methods the repository allows, in the order
 	// the popup lists them: squash, merge commit, rebase.

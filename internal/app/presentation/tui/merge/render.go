@@ -40,7 +40,7 @@ func (m Model) View() string {
 // method, no auto-merge and an answer GitHub is still working out, none of
 // which was measured. The failure itself is shown by the holder at footer
 // level.
-func (m Model) answered() bool { return m.ctx.PullRequestID != "" }
+func (m Model) answered() bool { return m.ctx.PullRequest != "" }
 
 func (m Model) body() string {
 	var b strings.Builder

@@ -112,8 +112,8 @@ func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (d
 	return f.reviewCtx, f.reviewErr
 }
 
-func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event domain.ReviewEvent, body string) error {
-	f.submitCalls = append(f.submitCalls, t.PendingID+":"+body)
+func (f *fakeSource) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
+	f.submitCalls = append(f.submitCalls, string(t.Pending)+":"+body)
 	return f.submitErr
 }
 
@@ -121,9 +121,11 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return f.mergeCtx, f.mergeErr
 }
 
-func (f *fakeSource) MergePR(string, domain.MergeMethod) error         { return nil }
-func (f *fakeSource) EnableAutoMerge(string, domain.MergeMethod) error { return nil }
-func (f *fakeSource) DisableAutoMerge(string) error                    { return nil }
+func (f *fakeSource) MergePR(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+
+func (f *fakeSource) EnableAutoMerge(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+
+func (f *fakeSource) DisableAutoMerge(domain.PullRequestHandle) error { return nil }
 
 func editSuffix(add, remove []string) string {
 	return ":add=" + strings.Join(add, ",") + ":remove=" + strings.Join(remove, ",")
@@ -611,7 +613,7 @@ func TestConfirmViewReopenWording(t *testing.T) {
 func TestVFetchesReviewContextAndOpensThePopup(t *testing.T) {
 	f := &fakeSource{
 		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
@@ -665,7 +667,7 @@ func TestReviewContextFailureStaysInline(t *testing.T) {
 func TestSubmitEscCancelsThePopup(t *testing.T) {
 	f := &fakeSource{
 		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
@@ -689,7 +691,7 @@ func TestSubmitEscCancelsThePopup(t *testing.T) {
 func TestSubmitSuccessRefetches(t *testing.T) {
 	f := &fakeSource{
 		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
@@ -1016,10 +1018,10 @@ func TestTheMergePopupGetsItsOwnAnswer(t *testing.T) {
 	f := &fakeSource{
 		pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		mergeCtx: domain.MergeContext{
-			PullRequestID: "PR_1",
-			Mergeable:     domain.MergeableYes,
-			State:         domain.MergeStateUnstable,
-			Methods:       []domain.MergeMethod{domain.MergeSquash},
+			PullRequest: "PR_1",
+			Mergeable:   domain.MergeableYes,
+			State:       domain.MergeStateUnstable,
+			Methods:     []domain.MergeMethod{domain.MergeSquash},
 		},
 	}
 	m := loaded(f, prRef())
@@ -1078,7 +1080,7 @@ func TestAnAutoMergeChangeKeepsTheDetailViewOpen(t *testing.T) {
 	f := &fakeSource{
 		pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		mergeCtx: domain.MergeContext{
-			PullRequestID:            "PR_1",
+			PullRequest:              "PR_1",
 			Mergeable:                domain.MergeableYes,
 			State:                    domain.MergeStateUnstable,
 			Methods:                  []domain.MergeMethod{domain.MergeSquash},

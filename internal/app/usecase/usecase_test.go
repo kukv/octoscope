@@ -30,11 +30,11 @@ type fakeSource struct {
 	rerunScope domain.RerunScope
 
 	mergeContext        domain.MergeContext
-	mergedID            string
+	mergedID            domain.PullRequestHandle
 	mergedMethod        domain.MergeMethod
-	autoMergeID         string
+	autoMergeID         domain.PullRequestHandle
 	autoMergeMethod     domain.MergeMethod
-	disabledAutoMergeID string
+	disabledAutoMergeID domain.PullRequestHandle
 }
 
 func (f *fakeSource) GetPR(_ context.Context, _ string, _ int) (domain.PR, error) {
@@ -66,18 +66,18 @@ func (f *fakeSource) PRMergeContext(_ context.Context, _ string, _ int) (domain.
 	return f.mergeContext, f.err
 }
 
-func (f *fakeSource) MergePR(pullRequestID string, method domain.MergeMethod) error {
-	f.mergedID, f.mergedMethod = pullRequestID, method
+func (f *fakeSource) MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	f.mergedID, f.mergedMethod = pr, method
 	return f.err
 }
 
-func (f *fakeSource) EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error {
-	f.autoMergeID, f.autoMergeMethod = pullRequestID, method
+func (f *fakeSource) EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	f.autoMergeID, f.autoMergeMethod = pr, method
 	return f.err
 }
 
-func (f *fakeSource) DisableAutoMerge(pullRequestID string) error {
-	f.disabledAutoMergeID = pullRequestID
+func (f *fakeSource) DisableAutoMerge(pr domain.PullRequestHandle) error {
+	f.disabledAutoMergeID = pr
 	return f.err
 }
 

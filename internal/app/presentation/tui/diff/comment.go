@@ -4,20 +4,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type (
-	// commentPostedMsg carries the review id the post went through, so
-	// Update can set m.review.PendingID synchronously, before the refetch
-	// it also triggers comes back. The refetch is asynchronous; without this
-	// field, a second c sent before it lands would still see PendingID
-	// empty and start a second review, leaving two pending reviews open on
-	// the pull request.
+	// commentPostedMsg carries the review handle the post went through, so
+	// Update can set m.review.Pending synchronously, before the refetch it
+	// also triggers comes back. The refetch is asynchronous; without this
+	// field, a second c sent before it lands would still see Pending empty
+	// and start a second review, leaving two pending reviews open on the
+	// pull request.
 	commentPostedMsg struct {
-		ref      domain.ItemRef
-		reviewID string
+		ref    domain.ItemRef
+		review domain.ReviewHandle
 	}
 	commentErrorMsg struct {
 		ref domain.ItemRef
@@ -30,12 +29,13 @@ type (
 // A hunk header, a thread and a note have no line to comment on, so c does
 // nothing there rather than posting somewhere arbitrary. Neither does it open
 // before the review context has arrived: the diff and the context are fetched
-// in parallel, and starting a review needs the pull request's node id, which
-// only the context carries. Whether c can act is decided by PullRequestID
-// alone -- reviewErr only decides whether the loading message is shown on top
-// of it, because reviewErr just means the last refetch failed, not that the
-// pull request id or a pending review that request already confirmed have
-// gone away (reviewErrMsg never touches m.review). Both declines say why at
+// in parallel, and starting a review needs the pull request it belongs to,
+// which only the context carries. Whether c can act is decided by
+// PullRequest alone -- reviewErr only decides whether the loading message is
+// shown on top of it, because reviewErr just means the last refetch failed,
+// not that the pull request or a pending review that request already
+// confirmed have gone away (reviewErrMsg never touches m.review). Both
+// declines say why at
 // footer level (m.declined) rather than leaving the screen unchanged -- that
 // silence is what made c look broken in the first place. A context that
 // failed outright before ever arriving is the one exception: reviewErr
@@ -53,7 +53,7 @@ func (m Model) startComposing() Model {
 	case r.kind != rowLine:
 		m.declined = i18n.T("diff.decline_no_line")
 		return m
-	case m.review.PullRequestID == "":
+	case m.review.PullRequest == "":
 		if m.reviewErr == nil {
 			m.declined = i18n.T("diff.decline_loading")
 		}
@@ -80,9 +80,9 @@ func (m Model) post() (Model, tea.Cmd) {
 	comment.Body = body
 
 	src, ref := m.src, m.ref
-	target := usecase.ReviewTarget{
-		PullRequestID: m.review.PullRequestID,
-		PendingID:     m.review.PendingID,
+	target := domain.ReviewTarget{
+		PullRequest: m.review.PullRequest,
+		Pending:     m.review.Pending,
 	}
 	m.phase = phaseWorking
 	m.errText = ""
@@ -91,7 +91,7 @@ func (m Model) post() (Model, tea.Cmd) {
 		if err != nil {
 			return commentErrorMsg{ref: ref, err: err}
 		}
-		return commentPostedMsg{ref: ref, reviewID: id}
+		return commentPostedMsg{ref: ref, review: id}
 	}
 }
 

@@ -58,7 +58,7 @@ func TestTheDiscardFooterFitsAt80InBothLanguages(t *testing.T) {
 			t.Cleanup(func() { i18n.SetLanguage(language.English) })
 			m := loaded(t, 80, 30)
 			m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
-			m.review.PendingID = "PRR_9"
+			m.review.Pending = "PRR_9"
 			m = press(m, "X")
 			if got := ansi.StringWidth(ansi.Strip(m.keyBar())); got > 80 {
 				t.Errorf("discard footer is %d columns wide at 80: %q", got, ansi.Strip(m.keyBar()))

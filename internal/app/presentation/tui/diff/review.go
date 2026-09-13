@@ -20,11 +20,11 @@ type discardedMsg struct {
 // approving a diff the viewer had nothing to say about is the commonest
 // review there is. It does nothing before the review context has arrived --
 // the diff and the context are fetched in parallel, and submitting needs the
-// pull request's node id, which only the context carries. Same decline
+// pull request it belongs to, which only the context carries. Same decline
 // treatment as c (comment.go): say why at footer level, except when reviewErr
 // already does.
 func (m Model) openSubmit() Model {
-	if m.review.PullRequestID == "" {
+	if m.review.PullRequest == "" {
 		if m.reviewErr == nil {
 			m.declined = i18n.T("diff.decline_loading")
 		}
@@ -32,8 +32,8 @@ func (m Model) openSubmit() Model {
 	}
 	m.declined = ""
 	target := review.Target{
-		PullRequestID:   m.review.PullRequestID,
-		PendingID:       m.review.PendingID,
+		PullRequest:     m.review.PullRequest,
+		Pending:         m.review.Pending,
 		PendingComments: m.pendingCount(),
 	}
 	m.submit = review.New(m.src, target)
@@ -54,19 +54,19 @@ func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // there is no pending review to discard, and says so at footer level rather
 // than leaving the screen unchanged.
 //
-// PendingID == "" is ambiguous on its own: it also means "not known yet",
+// Pending == "" is ambiguous on its own: it also means "not known yet",
 // during the ~6.5s the review context takes to load, or after a refetch has
-// failed and left the last confirmed state in place. Only once PullRequestID
-// is known does an empty PendingID mean what X should call "no pending
+// failed and left the last confirmed state in place. Only once PullRequest
+// is known does an empty Pending mean what X should call "no pending
 // review" -- so that check comes first, mirroring openSubmit's shape.
 func (m Model) startDiscard() Model {
 	switch {
-	case m.review.PullRequestID == "":
+	case m.review.PullRequest == "":
 		if m.reviewErr == nil {
 			m.declined = i18n.T("diff.decline_loading")
 		}
 		return m
-	case m.review.PendingID == "":
+	case m.review.Pending == "":
 		m.declined = i18n.T("diff.decline_no_pending_review")
 		return m
 	}
@@ -94,10 +94,10 @@ func (m Model) handleDiscardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) discard() (Model, tea.Cmd) {
-	src, ref, reviewID := m.src, m.ref, m.review.PendingID
+	src, ref, pending := m.src, m.ref, m.review.Pending
 	m.phase = phaseWorking
 	m.errText = ""
 	return m, func() tea.Msg {
-		return discardedMsg{ref: ref, err: src.DiscardReview(reviewID)}
+		return discardedMsg{ref: ref, err: src.DiscardReview(pending)}
 	}
 }

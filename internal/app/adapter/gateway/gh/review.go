@@ -34,19 +34,33 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 	return toReviewContext(rc), nil
 }
 
+// StartReview opens an unsubmitted review on the pull request.
+func (g *Gateway) StartReview(pr domain.PullRequestHandle) (domain.ReviewHandle, error) {
+	id, err := g.backend.StartReview(string(pr))
+	if err != nil {
+		return "", wrap(err)
+	}
+	return domain.ReviewHandle(id), nil
+}
+
 // AddReviewThread attaches one line comment to an unsubmitted review.
-func (g *Gateway) AddReviewThread(reviewID string, c domain.PendingComment) error {
-	return wrap(g.backend.AddReviewThread(reviewID, fromPendingComment(c)))
+func (g *Gateway) AddReviewThread(review domain.ReviewHandle, c domain.PendingComment) error {
+	return wrap(g.backend.AddReviewThread(string(review), fromPendingComment(c)))
 }
 
 // SubmitReview sends the unsubmitted review, with every comment on it.
-func (g *Gateway) SubmitReview(reviewID string, event domain.ReviewEvent, body string) error {
-	return wrap(g.backend.SubmitReview(reviewID, fromReviewEvent(event), body))
+func (g *Gateway) SubmitReview(review domain.ReviewHandle, event domain.ReviewEvent, body string) error {
+	return wrap(g.backend.SubmitReview(string(review), fromReviewEvent(event), body))
 }
 
 // SubmitNewReview submits a review that has no unsubmitted comments waiting.
-func (g *Gateway) SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error {
-	return wrap(g.backend.SubmitNewReview(pullRequestID, fromReviewEvent(event), body))
+func (g *Gateway) SubmitNewReview(pr domain.PullRequestHandle, event domain.ReviewEvent, body string) error {
+	return wrap(g.backend.SubmitNewReview(string(pr), fromReviewEvent(event), body))
+}
+
+// DiscardReview throws the unsubmitted review away, comments and all.
+func (g *Gateway) DiscardReview(review domain.ReviewHandle) error {
+	return wrap(g.backend.DiscardReview(string(review)))
 }
 
 func fromPendingComment(c domain.PendingComment) gql.PendingComment {
@@ -124,13 +138,13 @@ func toFileStatus(s string) domain.FileStatus {
 
 func toReviewContext(rc gql.ReviewContext) domain.ReviewContext {
 	dc := domain.ReviewContext{
-		PullRequestID: rc.ID,
-		Title:         rc.Title,
-		Head:          rc.HeadRefName,
-		Base:          rc.BaseRefName,
-		Additions:     rc.Additions,
-		Deletions:     rc.Deletions,
-		PendingID:     rc.PendingID,
+		PullRequest: domain.PullRequestHandle(rc.ID),
+		Title:       rc.Title,
+		Head:        rc.HeadRefName,
+		Base:        rc.BaseRefName,
+		Additions:   rc.Additions,
+		Deletions:   rc.Deletions,
+		Pending:     domain.ReviewHandle(rc.PendingID),
 	}
 	for _, t := range rc.Threads {
 		dc.Threads = append(dc.Threads, toReviewThread(t))

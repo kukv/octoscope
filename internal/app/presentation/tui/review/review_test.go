@@ -9,25 +9,24 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 )
 
 type fakeSource struct {
-	target usecase.ReviewTarget
+	target domain.ReviewTarget
 	event  domain.ReviewEvent
 	body   string
 	calls  int
 	err    error
 }
 
-func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event domain.ReviewEvent, body string) error {
+func (f *fakeSource) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	f.calls++
 	f.target, f.event, f.body = t, event, body
 	return f.err
 }
 
 func open(src Source) Model {
-	m := New(src, Target{PullRequestID: "PR_1", PendingID: "PRR_9", PendingComments: 2})
+	m := New(src, Target{PullRequest: "PR_1", Pending: "PRR_9", PendingComments: 2})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }
@@ -63,7 +62,7 @@ func TestSubmitSendsTheTargetItWasOpenedOn(t *testing.T) {
 	if src.body != "looks good" {
 		t.Errorf("body = %q", src.body)
 	}
-	want := usecase.ReviewTarget{PullRequestID: "PR_1", PendingID: "PRR_9"}
+	want := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_9"}
 	if src.target != want {
 		t.Errorf("target = %+v, want %+v", src.target, want)
 	}

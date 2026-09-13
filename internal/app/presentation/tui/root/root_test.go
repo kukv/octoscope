@@ -149,13 +149,13 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (domain.Revie
 	return domain.ReviewContext{}, nil
 }
 
-func (f *fakeSource) PostLineComment(usecase.ReviewTarget, domain.PendingComment) (string, error) {
+func (f *fakeSource) PostLineComment(domain.ReviewTarget, domain.PendingComment) (domain.ReviewHandle, error) {
 	return "", nil
 }
 
-func (f *fakeSource) DiscardReview(string) error { return nil }
+func (f *fakeSource) DiscardReview(domain.ReviewHandle) error { return nil }
 
-func (f *fakeSource) SubmitReview(usecase.ReviewTarget, domain.ReviewEvent, string) error { return nil }
+func (f *fakeSource) SubmitReview(domain.ReviewTarget, domain.ReviewEvent, string) error { return nil }
 
 func (f *fakeSource) PRChecks(context.Context, string, int) (domain.Checks, error) {
 	return f.checks, f.checksErr
@@ -173,9 +173,11 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return domain.MergeContext{}, nil
 }
 
-func (f *fakeSource) MergePR(string, domain.MergeMethod) error         { return nil }
-func (f *fakeSource) EnableAutoMerge(string, domain.MergeMethod) error { return nil }
-func (f *fakeSource) DisableAutoMerge(string) error                    { return nil }
+func (f *fakeSource) MergePR(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+
+func (f *fakeSource) EnableAutoMerge(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+
+func (f *fakeSource) DisableAutoMerge(domain.PullRequestHandle) error { return nil }
 
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)

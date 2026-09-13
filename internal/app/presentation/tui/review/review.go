@@ -11,21 +11,20 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // Source is what submitting needs.
 type Source interface {
-	SubmitReview(t usecase.ReviewTarget, event domain.ReviewEvent, body string) error
+	SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error
 }
 
 // Target names what the popup submits against: the pull request it belongs
 // to, the unsubmitted review if there is one, and how many line comments are
 // waiting to go out with it.
 type Target struct {
-	PullRequestID   string
-	PendingID       string
+	PullRequest     domain.PullRequestHandle
+	Pending         domain.ReviewHandle
 	PendingComments int
 }
 
@@ -73,7 +72,7 @@ func New(src Source, target Target) Model {
 
 // Active reports whether the popup has anything to show. A zero Model,
 // before New has built it, reports false.
-func (m Model) Active() bool { return m.target.PullRequestID != "" }
+func (m Model) Active() bool { return m.target.PullRequest != "" }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -128,9 +127,9 @@ func nextEvent(e domain.ReviewEvent) domain.ReviewEvent {
 
 func (m Model) submit() (Model, tea.Cmd) {
 	src := m.src
-	target := usecase.ReviewTarget{
-		PullRequestID: m.target.PullRequestID,
-		PendingID:     m.target.PendingID,
+	target := domain.ReviewTarget{
+		PullRequest: m.target.PullRequest,
+		Pending:     m.target.Pending,
 	}
 	event, body := m.event, m.textarea.Value()
 	m.sending = true

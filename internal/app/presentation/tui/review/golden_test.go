@@ -24,7 +24,7 @@ var goldenLanguages = []struct {
 }
 
 func goldenModel(width int) Model {
-	m := New(&fakeSource{}, Target{PullRequestID: "PR_1", PendingID: "PRR_9", PendingComments: 2})
+	m := New(&fakeSource{}, Target{PullRequest: "PR_1", Pending: "PRR_9", PendingComments: 2})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	m, _ = m.Update(keyPress("tab")) // approve, so a selected option is recorded too
 	return m
@@ -83,7 +83,7 @@ func TestNoUnresolvedIDsInTheReviewView(t *testing.T) {
 		t.Run(lang.name, func(t *testing.T) {
 			i18n.SetLanguage(lang.tag)
 			t.Cleanup(func() { i18n.SetLanguage(language.English) })
-			noPending, _ := New(&fakeSource{}, Target{PullRequestID: "PR_1"}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+			noPending, _ := New(&fakeSource{}, Target{PullRequest: "PR_1"}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 			for name, view := range map[string]string{
 				"idle":       goldenModel(120).View(),
 				"sending":    sendingModel(120).View(),

@@ -29,7 +29,7 @@ func typeInto(m Model, s string) Model {
 func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	f := &fakeSource{
 		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -63,7 +63,7 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 // TestAStaleReviewContextIsDropped pins the ref guard on reviewContextMsg
 // and reviewContextErrMsg: a context fetched for an item the user has since
 // left must not open the popup here. If it did, ctrl+s would build a Target
-// carrying the item the user left behind's PullRequestID while the screen
+// carrying the item the user left behind's PullRequest while the screen
 // shows a different one -- the worst failure in this phase, since the
 // review would go to the wrong pull request.
 func TestAStaleReviewContextIsDropped(t *testing.T) {
@@ -72,7 +72,7 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 
 	t.Run("reviewContextMsg", func(t *testing.T) {
 		m := loaded(f, prRef())
-		m, _ = m.Update(reviewContextMsg{ref: other, ctx: domain.ReviewContext{PullRequestID: "PR_OTHER"}})
+		m, _ = m.Update(reviewContextMsg{ref: other, ctx: domain.ReviewContext{PullRequest: "PR_OTHER"}})
 		if m.mode == modeSubmit {
 			t.Error("the popup opened on a stale reviewContextMsg, want it to stay closed")
 		}
@@ -100,7 +100,7 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 func TestLeavingTheSubmitPopupTakesItsErrorWithIt(t *testing.T) {
 	f := &fakeSource{
 		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
-		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
