@@ -27,7 +27,7 @@
 | 対象 | 値 |
 |---|---|
 | `.go` ファイル総数 | 173 |
-| `internal/gh"`（ドメイン）を import するファイル | 127 |
+| `internal/gh"`（ドメイン）を import するファイル | 115 |
 | `internal/gh/{cli,api,gql}` を import するファイル | 15 |
 | `internal/tui` を import するファイル | 46 |
 | `internal/usecase` を import するファイル | 23 |
@@ -308,7 +308,7 @@ EOF
 
 **Files:**
 - Move: `internal/gh/` → `internal/app/domain/`
-- Modify: `internal/app/domain/gh.go:1`（パッケージ doc）、`internal/app/domain/*.go` のパッケージ節、`internal/gh"` を import する 127 ファイル
+- Modify: `internal/app/domain/gh.go:1`（パッケージ doc）、`internal/app/domain/*.go` のパッケージ節、`internal/gh"` を import する 115 ファイル
 - Rename: `internal/app/domain/gh.go` → `internal/app/domain/domain.go`
 
 **Interfaces:**
@@ -319,7 +319,7 @@ EOF
 
 ```bash
 git diff --stat   # 空であること
-grep -rl 'kukv/octoscope/internal/gh"' --include='*.go' . | wc -l    # 127 を期待
+grep -rl 'kukv/octoscope/internal/gh"' --include='*.go' . | wc -l    # 115 を期待
 grep -rho '\bgh\.[A-Z][A-Za-z]*' --include='*.go' . | wc -l          # 1962 を期待
 grep -rn '\bgh\.[a-z]' --include='*.go' . | wc -l                    # 0 を期待
 ```
@@ -370,6 +370,24 @@ grep -rl 'kukv/octoscope/internal/gh"' --include='*.go' . \
 grep -rl '\bgh\.[A-Z]' --include='*.go' . \
   | xargs sed -i 's/\bgh\.\([A-Z]\)/domain.\1/g'
 ```
+
+- [ ] **Step 6.5: testdata への相対パスを直す**
+
+`internal/github/cli/diff_test.go` が `../../gh/testdata/sample.diff` を読んでいる。
+Task 3 でディレクトリの深さが変わったときに付いたパスで、`internal/gh` が消えるこの
+タスクで必ず壊れる。新しい位置に合わせる。
+
+```bash
+grep -rn 'gh/testdata' --include='*_test.go' .
+```
+
+出たパスを `../../app/domain/testdata/sample.diff` に直す。指す先は同じファイルである。
+
+```bash
+grep -rn 'testdata' --include='*_test.go' internal | grep '\.\.'
+```
+
+期待: 他にパッケージをまたぐ相対 testdata 参照が無いこと。あれば同様に直す。
 
 - [ ] **Step 7: 残りが無いことを確認する**
 
@@ -441,7 +459,7 @@ EOF
 - Move: `internal/tui/` → `internal/app/presentation/tui/`
 - Move: `internal/app/presentation/tui/app/` → `internal/app/presentation/tui/root/`
 - Rename: `.../tui/root/app.go` → `.../tui/root/root.go`
-- Modify: `internal/tui` を import する 46 ファイル、`cmd/octoscope/main.go:80`
+- Modify: `internal/tui` を import する 37 ファイル、`cmd/octoscope/main.go:80`
 - Modify: `.../tui/root/root.go:1`（パッケージ doc）
 
 **Interfaces:**
@@ -452,7 +470,7 @@ EOF
 
 ```bash
 git diff --stat   # 空であること
-grep -rl 'kukv/octoscope/internal/tui' --include='*.go' . | wc -l   # 46 を期待
+grep -rl 'kukv/octoscope/internal/tui' --include='*.go' . | wc -l   # 37 を期待
 grep -rn '\bapp\.[A-Z]' --include='*.go' . | grep -v '^./internal/tui/app/'
 ```
 
