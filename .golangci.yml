@@ -14,7 +14,7 @@ linters:
   settings:
     depguard:
       rules:
-        # ドメインは何にも依存しない。encoding/json の禁止は PR 2 で足す。
+        # ドメインは何にも依存しない。
         domain-layer:
           files:
             - "**/internal/app/domain/**"
@@ -31,18 +31,15 @@ linters:
               desc: ドメインは翻訳しない
             - pkg: github.com/kukv/octoscope/internal/browser
               desc: ドメインはブラウザを開かない
+            - pkg: encoding/json
+              desc: ドメインはワイヤ形式を知らない。デコードは internal/github が行う
         # GitHub クライアントはアプリの上位層を知らない。
-        # internal/app 全体の禁止は PR 2（domain 非依存化）で足す。
         github-layer:
           files:
             - "**/internal/github/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/app/usecase
-              desc: クライアントは上の層を知らない
-            - pkg: github.com/kukv/octoscope/internal/app/presentation
-              desc: クライアントは UI を知らない
-            - pkg: github.com/kukv/octoscope/internal/app/config
-              desc: クライアントは設定ファイルを知らない
+            - pkg: github.com/kukv/octoscope/internal/app
+              desc: クライアントはアプリケーションを知らない。変換は gateway が行う
         # usecase は画面も翻訳も知らない。
         usecase-layer:
           files:
