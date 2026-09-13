@@ -4,8 +4,6 @@ import (
 	"context"
 	"slices"
 	"testing"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
@@ -21,73 +19,46 @@ func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
 	}
 	// Measured on 2026-09-08: kukv/octoscope has all three merge methods
 	// on, deleteBranchOnMerge on, and autoMergeAllowed off. The recording
-	// is what says the three flags are read into the order the popup lists
-	// them in.
-	want := []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase}
-	if len(got.Methods) != len(want) {
-		t.Fatalf("Methods = %v, want %v", got.Methods, want)
-	}
-	for i := range want {
-		if got.Methods[i] != want[i] {
-			t.Fatalf("Methods = %v, want %v", got.Methods, want)
-		}
+	// is what says the three flags come back as read.
+	if !got.SquashMergeAllowed || !got.MergeCommitAllowed || !got.RebaseMergeAllowed {
+		t.Errorf("allowed methods = %+v, want all three true", got)
 	}
 	if got.AutoMergeAllowed {
 		t.Error("AutoMergeAllowed = true, want false (measured on kukv/octoscope, spec §2)")
 	}
 }
 
-func TestPRMergeContextTranslatesTheEnums(t *testing.T) {
+func TestPRMergeContextReadsEveryField(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name          string
-		mergeable     string
-		state         string
-		wantMergeable domain.Mergeable
-		wantState     domain.MergeState
-	}{
-		{"clean", "MERGEABLE", "CLEAN", domain.MergeableYes, domain.MergeStateClean},
-		{"conflicting", "CONFLICTING", "DIRTY", domain.MergeableConflicting, domain.MergeStateDirty},
-		{"still computing", "UNKNOWN", "UNKNOWN", domain.MergeableUnknown, domain.MergeStateUnknown},
-		{"failing checks", "MERGEABLE", "UNSTABLE", domain.MergeableYes, domain.MergeStateUnstable},
-		{"protected", "MERGEABLE", "BLOCKED", domain.MergeableYes, domain.MergeStateBlocked},
-		{"behind", "MERGEABLE", "BEHIND", domain.MergeableYes, domain.MergeStateBehind},
-		{"hooks", "MERGEABLE", "HAS_HOOKS", domain.MergeableYes, domain.MergeStateHasHooks},
-		{"a word we do not know is not a failure", "WAT", "WAT", domain.MergeableUnknown, domain.MergeStateUnknown},
+	body := `{"data":{"repository":{"squashMergeAllowed":true,"mergeCommitAllowed":false,` +
+		`"rebaseMergeAllowed":false,"deleteBranchOnMerge":true,"autoMergeAllowed":true,` +
+		`"pullRequest":{"id":"PR_1","isDraft":false,"mergeable":"MERGEABLE",` +
+		`"mergeStateStatus":"CLEAN","reviewDecision":"APPROVED",` +
+		`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
+	f := &fakeSeq{outs: []string{body}}
+	c := &Client{Do: f.do}
+
+	got, err := c.PRMergeContext(context.Background(), "kukv/octoscope", 61)
+	if err != nil {
+		t.Fatalf("PRMergeContext: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			body := `{"data":{"repository":{"squashMergeAllowed":true,"mergeCommitAllowed":false,` +
-				`"rebaseMergeAllowed":false,"deleteBranchOnMerge":true,"autoMergeAllowed":true,` +
-				`"pullRequest":{"id":"PR_1","isDraft":false,"mergeable":"` + tt.mergeable + `",` +
-				`"mergeStateStatus":"` + tt.state + `","reviewDecision":"APPROVED",` +
-				`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
-			f := &fakeSeq{outs: []string{body}}
-			c := &Client{Do: f.do}
-
-			got, err := c.PRMergeContext(context.Background(), "kukv/octoscope", 61)
-			if err != nil {
-				t.Fatalf("PRMergeContext: %v", err)
-			}
-			if got.Mergeable != tt.wantMergeable {
-				t.Errorf("Mergeable = %v, want %v", got.Mergeable, tt.wantMergeable)
-			}
-			if got.State != tt.wantState {
-				t.Errorf("State = %v, want %v", got.State, tt.wantState)
-			}
-			if got.Review != domain.ReviewApproved {
-				t.Errorf("Review = %v, want ReviewApproved", got.Review)
-			}
-			if !got.DeleteBranchOnMerge {
-				t.Error("DeleteBranchOnMerge = false, want true")
-			}
-			if got.AutoMergeEnabled {
-				t.Error("AutoMergeEnabled = true, want false (autoMergeRequest is null)")
-			}
-		})
+	want := MergeContext{
+		PullRequestID:            "PR_1",
+		IsDraft:                  false,
+		Mergeable:                "MERGEABLE",
+		MergeStateStatus:         "CLEAN",
+		ReviewDecision:           "APPROVED",
+		SquashMergeAllowed:       true,
+		MergeCommitAllowed:       false,
+		RebaseMergeAllowed:       false,
+		DeleteBranchOnMerge:      true,
+		AutoMergeAllowed:         true,
+		ViewerCanEnableAutoMerge: true,
+		AutoMergeEnabled:         false,
+	}
+	if got != want {
+		t.Errorf("PRMergeContext() = %+v, want %+v", got, want)
 	}
 }
 
@@ -115,12 +86,12 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		method domain.MergeMethod
+		method MergeMethod
 		want   Var
 	}{
-		{domain.MergeSquash, S("mergeMethod", "SQUASH")},
-		{domain.MergeCommit, S("mergeMethod", "MERGE")},
-		{domain.MergeRebase, S("mergeMethod", "REBASE")},
+		{MergeMethodSquash, S("mergeMethod", "SQUASH")},
+		{MergeMethodMerge, S("mergeMethod", "MERGE")},
+		{MergeMethodRebase, S("mergeMethod", "REBASE")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want.Str, func(t *testing.T) {
@@ -146,7 +117,7 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 
 	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
 	c := &Client{Do: on.do}
-	if err := c.EnableAutoMerge("PR_1", domain.MergeRebase); err != nil {
+	if err := c.EnableAutoMerge("PR_1", MergeMethodRebase); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if !slices.Contains(on.calls[0], S("mergeMethod", "REBASE")) {

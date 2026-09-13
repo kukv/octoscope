@@ -10,7 +10,6 @@ package gh
 import (
 	"context"
 
-	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
@@ -91,9 +90,9 @@ type checksFetcher interface {
 }
 
 type merger interface {
-	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
-	MergePR(pullRequestID string, method domain.MergeMethod) error
-	EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error
+	PRMergeContext(ctx context.Context, repo string, number int) (gql.MergeContext, error)
+	MergePR(pullRequestID string, method gql.MergeMethod) error
+	EnableAutoMerge(pullRequestID string, method gql.MergeMethod) error
 	DisableAutoMerge(pullRequestID string) error
 }
 
