@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/usecase"
+	"github.com/kukv/octoscope/internal/app/usecase"
 )
 
 // queryStore is where the Search tab's saved queries survive a restart.

@@ -8,8 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 type fakeSource struct {

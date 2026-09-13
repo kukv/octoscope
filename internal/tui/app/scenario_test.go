@@ -10,9 +10,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // scenarioSource answers like the real thing does: a change lands, and the

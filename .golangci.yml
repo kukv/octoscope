@@ -22,32 +22,32 @@ linters:
           deny:
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: the GitHub layer must not depend on the UI
-            - pkg: github.com/kukv/octoscope/internal/usecase
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
               desc: the GitHub layer must not depend on the layer above it
-        # The views talk to internal/usecase, not to the backend behind it.
+        # The views talk to internal/app/usecase, not to the backend behind it.
         # cmd/octoscope is the one place that names a backend.
         tui-layer:
           files:
             - "**/internal/tui/**"
           deny:
             - pkg: github.com/kukv/octoscope/internal/gh/cli
-              desc: views go through internal/usecase; only cmd/octoscope names a backend
+              desc: views go through internal/app/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/gh/gql
-              desc: views go through internal/usecase; only cmd/octoscope names a backend
+              desc: views go through internal/app/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/gh/api
-              desc: views go through internal/usecase; only cmd/octoscope names a backend
+              desc: views go through internal/app/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/app/config
               desc: settings reach the views through app.Options; cmd/octoscope reads them
         # usecase sits below the UI: it decides which GitHub calls an
         # operation takes, and knows nothing of screens or messages.
         usecase-layer:
           files:
-            - "**/internal/usecase/**"
+            - "**/internal/app/usecase/**"
           deny:
             - pkg: github.com/kukv/octoscope/internal/tui
-              desc: internal/usecase must not depend on the UI
+              desc: internal/app/usecase must not depend on the UI
             - pkg: github.com/kukv/octoscope/internal/i18n
-              desc: internal/usecase must not translate; the UI does
+              desc: internal/app/usecase must not translate; the UI does
         # Reading the settings file is a leaf: it parses YAML and knows
         # nothing of the screens or of GitHub.
         config-layer:
@@ -60,7 +60,7 @@ linters:
               desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: internal/app/config must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/usecase
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
               desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/browser
               desc: internal/app/config must not depend on other internal packages
@@ -75,7 +75,7 @@ linters:
               desc: internal/i18n must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/app/config
               desc: internal/i18n must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/usecase
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
               desc: internal/i18n must not depend on other internal packages
         # Opening a URL is a leaf: it depends on nothing of ours.
         browser-layer:
@@ -90,7 +90,7 @@ linters:
               desc: internal/browser must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/app/config
               desc: internal/browser must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/usecase
+            - pkg: github.com/kukv/octoscope/internal/app/usecase
               desc: internal/browser must not depend on other internal packages
         # Views are siblings: a view must not reach into another view's model,
         # and no child may import its parent.

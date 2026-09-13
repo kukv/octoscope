@@ -10,10 +10,10 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // Source is what the diff view needs. repo is "owner/repo"; the empty string

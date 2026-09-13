@@ -7,11 +7,11 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 func (m Model) View() string {

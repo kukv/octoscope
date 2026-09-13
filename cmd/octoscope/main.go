@@ -12,11 +12,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/config"
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/gh/api"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"
 	"github.com/kukv/octoscope/internal/tui/icon"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // version is set by GoReleaser via -ldflags at release build time.

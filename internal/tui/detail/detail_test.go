@@ -10,10 +10,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/merge"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // fakeSource implements Source and records calls.

@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
@@ -24,7 +25,6 @@ import (
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
 	"github.com/kukv/octoscope/internal/tui/work"
-	"github.com/kukv/octoscope/internal/usecase"
 )
 
 // fakeSource satisfies Source. The child views have their own tests; here we

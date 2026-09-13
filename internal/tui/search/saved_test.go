@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/kukv/octoscope/internal/usecase"
+	"github.com/kukv/octoscope/internal/app/usecase"
 )
 
 // upsert must not write into the caller's backing array: handleNameKey hands
