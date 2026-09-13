@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"slices"
 	"time"
-
-	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed review.graphql
@@ -227,44 +225,43 @@ func (c *Client) StartReview(pullRequestID string) (string, error) {
 	return resp.Data.AddPullRequestReview.PullRequestReview.ID, nil
 }
 
-// apiSide spells a side the way the GraphQL DiffSide enum does. It is the one
-// place that knows those words (.claude/rules/architecture.md).
-func apiSide(s domain.DiffSide) string {
-	if s == domain.SideLeft {
-		return "LEFT"
-	}
-	return "RIGHT"
+// PendingComment is a line comment on its way to GitHub.
+type PendingComment struct {
+	Path string
+	Line int
+	// Side spells which version of the file the comment sits on, the way
+	// GraphQL's DiffSide enum does.
+	Side string
+	Body string
 }
 
-// apiEvent spells an event the way PullRequestReviewEvent does.
-func apiEvent(e domain.ReviewEvent) string {
-	switch e {
-	case domain.EventApprove:
-		return "APPROVE"
-	case domain.EventRequestChanges:
-		return "REQUEST_CHANGES"
-	default:
-		return "COMMENT"
-	}
-}
+// ReviewEvent is what submitting a review says about it, spelled the way
+// GraphQL's PullRequestReviewEvent enum does.
+type ReviewEvent string
+
+const (
+	EventApprove        ReviewEvent = "APPROVE"
+	EventRequestChanges ReviewEvent = "REQUEST_CHANGES"
+	EventComment        ReviewEvent = "COMMENT"
+)
 
 // AddReviewThread attaches one line comment to an unsubmitted review.
-func (c *Client) AddReviewThread(reviewID string, comment domain.PendingComment) error {
+func (c *Client) AddReviewThread(reviewID string, comment PendingComment) error {
 	_, err := c.Write(context.Background(), addThreadMutation,
 		S("reviewId", reviewID),
 		S("path", comment.Path),
 		N("line", comment.Line),
-		S("side", apiSide(comment.Side)),
+		S("side", comment.Side),
 		S("body", comment.Body),
 	)
 	return err
 }
 
 // SubmitReview sends the unsubmitted review, with every comment on it.
-func (c *Client) SubmitReview(reviewID string, event domain.ReviewEvent, body string) error {
+func (c *Client) SubmitReview(reviewID string, event ReviewEvent, body string) error {
 	_, err := c.Write(context.Background(), submitReviewMutation,
 		S("reviewId", reviewID),
-		S("event", apiEvent(event)),
+		S("event", string(event)),
 		S("body", body),
 	)
 	return err
@@ -274,10 +271,10 @@ func (c *Client) SubmitReview(reviewID string, event domain.ReviewEvent, body st
 // addPullRequestReview takes an event, so creating and submitting is one
 // call. Approving a diff you had nothing to say about is the commonest review
 // there is, and it should not have to leave a pending review behind first.
-func (c *Client) SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error {
+func (c *Client) SubmitNewReview(pullRequestID string, event ReviewEvent, body string) error {
 	_, err := c.Write(context.Background(), reviewAtOnceMutation,
 		S("pullRequestId", pullRequestID),
-		S("event", apiEvent(event)),
+		S("event", string(event)),
 		S("body", body),
 	)
 	return err

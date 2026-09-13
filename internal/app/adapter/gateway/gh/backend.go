@@ -74,9 +74,9 @@ type reviewFetcher interface {
 
 type reviewer interface {
 	StartReview(pullRequestID string) (string, error)
-	AddReviewThread(reviewID string, c domain.PendingComment) error
-	SubmitReview(reviewID string, event domain.ReviewEvent, body string) error
-	SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error
+	AddReviewThread(reviewID string, c gql.PendingComment) error
+	SubmitReview(reviewID string, event gql.ReviewEvent, body string) error
+	SubmitNewReview(pullRequestID string, event gql.ReviewEvent, body string) error
 	DiscardReview(reviewID string) error
 }
 

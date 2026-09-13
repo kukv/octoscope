@@ -19,6 +19,18 @@ func (f fakeBackend) PRReviewContext(ctx context.Context, repo string, number in
 	return f.prReviewContext(ctx, repo, number)
 }
 
+func (f fakeBackend) AddReviewThread(reviewID string, c gql.PendingComment) error {
+	return f.addReviewThread(reviewID, c)
+}
+
+func (f fakeBackend) SubmitReview(reviewID string, event gql.ReviewEvent, body string) error {
+	return f.submitReview(reviewID, event, body)
+}
+
+func (f fakeBackend) SubmitNewReview(pullRequestID string, event gql.ReviewEvent, body string) error {
+	return f.submitNewReview(pullRequestID, event, body)
+}
+
 // TestFileStatusFromAPIMapsEveryValue guards the files API's status
 // spelling, including GitHub saying "removed" rather than "deleted".
 func TestFileStatusFromAPIMapsEveryValue(t *testing.T) {
@@ -232,5 +244,131 @@ func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("PRReviewContext() = %+v, want %+v", got, want)
+	}
+}
+
+// TestFromReviewEventMapsEveryValue guards the only place that decides what
+// PullRequestReviewEvent string a review's event turns into. APPROVE versus
+// REQUEST_CHANGES is the difference between signing a pull request off and
+// blocking it, and a wrong mapping submits the wrong one to GitHub without
+// ever failing, so every domain.ReviewEvent value is covered here.
+func TestFromReviewEventMapsEveryValue(t *testing.T) {
+	tests := []struct {
+		event domain.ReviewEvent
+		want  gql.ReviewEvent
+	}{
+		{domain.EventComment, gql.EventComment},
+		{domain.EventApprove, gql.EventApprove},
+		{domain.EventRequestChanges, gql.EventRequestChanges},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.want), func(t *testing.T) {
+			if got := fromReviewEvent(tt.event); got != tt.want {
+				t.Errorf("fromReviewEvent(%v) = %v, want %v", tt.event, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestFromDiffSideMapsBothValues covers both domain.DiffSide values.
+func TestFromDiffSideMapsBothValues(t *testing.T) {
+	tests := []struct {
+		side domain.DiffSide
+		want string
+	}{
+		{domain.SideLeft, "LEFT"},
+		{domain.SideRight, "RIGHT"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := fromDiffSide(tt.side); got != tt.want {
+				t.Errorf("fromDiffSide(%v) = %q, want %q", tt.side, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestFromPendingCommentTranslatesEveryField gives every field of
+// domain.PendingComment a distinct, non-zero value and compares the whole
+// resulting gql.PendingComment against a fully written-out expectation.
+func TestFromPendingCommentTranslatesEveryField(t *testing.T) {
+	t.Parallel()
+
+	c := domain.PendingComment{
+		Path: "graph/walk.go",
+		Line: 42,
+		Side: domain.SideLeft,
+		Body: "why?",
+	}
+	got := fromPendingComment(c)
+	want := gql.PendingComment{
+		Path: "graph/walk.go",
+		Line: 42,
+		Side: "LEFT",
+		Body: "why?",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("fromPendingComment() = %+v, want %+v", got, want)
+	}
+}
+
+// TestAddReviewThreadConvertsThePendingCommentBeforeCallingTheBackend checks
+// that the gateway hands the backend the converted wire value, not the
+// domain one.
+func TestAddReviewThreadConvertsThePendingCommentBeforeCallingTheBackend(t *testing.T) {
+	t.Parallel()
+
+	var got gql.PendingComment
+	g := New(fakeBackend{addReviewThread: func(reviewID string, c gql.PendingComment) error {
+		got = c
+		return nil
+	}})
+
+	in := domain.PendingComment{Path: "a.go", Line: 3, Side: domain.SideRight, Body: "hi"}
+	if err := g.AddReviewThread("PRR_1", in); err != nil {
+		t.Fatalf("AddReviewThread: %v", err)
+	}
+
+	want := gql.PendingComment{Path: "a.go", Line: 3, Side: "RIGHT", Body: "hi"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("backend received %+v, want %+v", got, want)
+	}
+}
+
+// TestSubmitReviewConvertsTheEventBeforeCallingTheBackend checks that the
+// gateway hands the backend the converted wire event, not the domain one.
+func TestSubmitReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
+	t.Parallel()
+
+	var gotEvent gql.ReviewEvent
+	g := New(fakeBackend{submitReview: func(reviewID string, event gql.ReviewEvent, body string) error {
+		gotEvent = event
+		return nil
+	}})
+
+	if err := g.SubmitReview("PRR_1", domain.EventApprove, "lgtm"); err != nil {
+		t.Fatalf("SubmitReview: %v", err)
+	}
+	if gotEvent != gql.EventApprove {
+		t.Errorf("backend received event %v, want %v", gotEvent, gql.EventApprove)
+	}
+}
+
+// TestSubmitNewReviewConvertsTheEventBeforeCallingTheBackend checks that the
+// gateway hands the backend the converted wire event, not the domain one.
+func TestSubmitNewReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
+	t.Parallel()
+
+	var gotEvent gql.ReviewEvent
+	g := New(fakeBackend{submitNewReview: func(pullRequestID string, event gql.ReviewEvent, body string) error {
+		gotEvent = event
+		return nil
+	}})
+
+	if err := g.SubmitNewReview("PR_1", domain.EventRequestChanges, ""); err != nil {
+		t.Fatalf("SubmitNewReview: %v", err)
+	}
+	if gotEvent != gql.EventRequestChanges {
+		t.Errorf("backend received event %v, want %v", gotEvent, gql.EventRequestChanges)
 	}
 }

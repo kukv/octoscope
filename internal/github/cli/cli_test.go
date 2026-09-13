@@ -514,9 +514,9 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 		"MergePR":            func(c *Client) error { return c.MergePR("id", domain.MergeSquash) },
 		"EnableAutoMerge":    func(c *Client) error { return c.EnableAutoMerge("id", domain.MergeSquash) },
 		"DisableAutoMerge":   func(c *Client) error { return c.DisableAutoMerge("id") },
-		"AddReviewThread":    func(c *Client) error { return c.AddReviewThread("id", domain.PendingComment{}) },
-		"SubmitReview":       func(c *Client) error { return c.SubmitReview("id", domain.EventApprove, "") },
-		"SubmitNewReview":    func(c *Client) error { return c.SubmitNewReview("id", domain.EventApprove, "") },
+		"AddReviewThread":    func(c *Client) error { return c.AddReviewThread("id", gql.PendingComment{}) },
+		"SubmitReview":       func(c *Client) error { return c.SubmitReview("id", gql.EventApprove, "") },
+		"SubmitNewReview":    func(c *Client) error { return c.SubmitNewReview("id", gql.EventApprove, "") },
 		"DiscardReview":      func(c *Client) error { return c.DiscardReview("id") },
 		"RerunWorkflow": func(c *Client) error {
 			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), domain.RerunFailed)

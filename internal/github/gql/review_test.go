@@ -186,18 +186,15 @@ func TestStartReviewReturnsTheNewReviewID(t *testing.T) {
 func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 	tests := []struct {
 		name    string
-		comment domain.PendingComment
-		side    Var
+		comment PendingComment
 	}{
 		{
 			name:    "a comment on the new file",
-			comment: domain.PendingComment{Path: "graph/walk.go", Line: 15, Side: domain.SideRight, Body: "why?"},
-			side:    S("side", "RIGHT"),
+			comment: PendingComment{Path: "graph/walk.go", Line: 15, Side: "RIGHT", Body: "why?"},
 		},
 		{
 			name:    "a comment on a removed line",
-			comment: domain.PendingComment{Path: "graph/walk.go", Line: 14, Side: domain.SideLeft, Body: "why?"},
-			side:    S("side", "LEFT"),
+			comment: PendingComment{Path: "graph/walk.go", Line: 14, Side: "LEFT", Body: "why?"},
 		},
 	}
 	for _, tt := range tests {
@@ -211,7 +208,7 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 				S("reviewId", "PRR_9"),
 				S("path", tt.comment.Path),
 				N("line", tt.comment.Line),
-				tt.side,
+				S("side", tt.comment.Side),
 				S("body", tt.comment.Body),
 			} {
 				if !slices.Contains(f.vars[0], want) {
@@ -222,15 +219,19 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 	}
 }
 
+// TestSubmitReviewNamesTheEvent controls the exact strings GraphQL's
+// PullRequestReviewEvent enum receives. Do not change these literals without
+// checking GitHub's schema: APPROVE versus REQUEST_CHANGES is the difference
+// between signing a pull request off and blocking it.
 func TestSubmitReviewNamesTheEvent(t *testing.T) {
 	tests := []struct {
 		name  string
-		event domain.ReviewEvent
-		want  Var
+		event ReviewEvent
+		want  string
 	}{
-		{"approve", domain.EventApprove, S("event", "APPROVE")},
-		{"request changes", domain.EventRequestChanges, S("event", "REQUEST_CHANGES")},
-		{"comment", domain.EventComment, S("event", "COMMENT")},
+		{"approve", EventApprove, "APPROVE"},
+		{"request changes", EventRequestChanges, "REQUEST_CHANGES"},
+		{"comment", EventComment, "COMMENT"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -239,8 +240,8 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 			if err := c.SubmitReview("PRR_9", tt.event, "looks good"); err != nil {
 				t.Fatal(err)
 			}
-			if !slices.Contains(f.vars[0], tt.want) {
-				t.Errorf("vars %v do not carry %v", f.vars[0], tt.want)
+			if !slices.Contains(f.vars[0], S("event", tt.want)) {
+				t.Errorf("vars %v do not carry event %q", f.vars[0], tt.want)
 			}
 			if !slices.Contains(f.vars[0], S("body", "looks good")) {
 				t.Errorf("vars %v do not carry the body", f.vars[0])
@@ -252,7 +253,7 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	if err := c.SubmitNewReview("PR_1", domain.EventApprove, ""); err != nil {
+	if err := c.SubmitNewReview("PR_1", EventApprove, ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []Var{S("pullRequestId", "PR_1"), S("event", "APPROVE"), S("body", "")} {
@@ -276,7 +277,7 @@ func TestDiscardReviewNamesTheReview(t *testing.T) {
 func TestABodyThatStartsWithAtIsNotReadAsAFile(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"submitPullRequestReview":{"pullRequestReview":{"id":"PRR_9"}}}}`)}
 	c := f.client()
-	if err := c.SubmitReview("PRR_9", domain.EventComment, "@kukv please look"); err != nil {
+	if err := c.SubmitReview("PRR_9", EventComment, "@kukv please look"); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(f.vars[0], S("body", "@kukv please look")) {
@@ -294,7 +295,7 @@ func TestASubmittedReviewIsNeverSentTwice(t *testing.T) {
 		calls++
 		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
 	}}
-	if err := c.SubmitReview("R_1", domain.EventApprove, ""); err == nil {
+	if err := c.SubmitReview("R_1", EventApprove, ""); err == nil {
 		t.Fatal("SubmitReview succeeded, want an error")
 	}
 	if calls != 1 {

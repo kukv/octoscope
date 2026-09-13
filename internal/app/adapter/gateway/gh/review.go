@@ -34,6 +34,51 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 	return toReviewContext(rc), nil
 }
 
+// AddReviewThread attaches one line comment to an unsubmitted review.
+func (g *Gateway) AddReviewThread(reviewID string, c domain.PendingComment) error {
+	return g.backend.AddReviewThread(reviewID, fromPendingComment(c))
+}
+
+// SubmitReview sends the unsubmitted review, with every comment on it.
+func (g *Gateway) SubmitReview(reviewID string, event domain.ReviewEvent, body string) error {
+	return g.backend.SubmitReview(reviewID, fromReviewEvent(event), body)
+}
+
+// SubmitNewReview submits a review that has no unsubmitted comments waiting.
+func (g *Gateway) SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error {
+	return g.backend.SubmitNewReview(pullRequestID, fromReviewEvent(event), body)
+}
+
+func fromPendingComment(c domain.PendingComment) gql.PendingComment {
+	return gql.PendingComment{
+		Path: c.Path,
+		Line: c.Line,
+		Side: fromDiffSide(c.Side),
+		Body: c.Body,
+	}
+}
+
+// fromDiffSide spells a side the way the GraphQL DiffSide enum does. It is
+// the one place that knows those words (.claude/rules/architecture.md).
+func fromDiffSide(s domain.DiffSide) string {
+	if s == domain.SideLeft {
+		return "LEFT"
+	}
+	return "RIGHT"
+}
+
+// fromReviewEvent spells an event the way PullRequestReviewEvent does.
+func fromReviewEvent(e domain.ReviewEvent) gql.ReviewEvent {
+	switch e {
+	case domain.EventApprove:
+		return gql.EventApprove
+	case domain.EventRequestChanges:
+		return gql.EventRequestChanges
+	default:
+		return gql.EventComment
+	}
+}
+
 // toFileDiff converts one files-API entry. Patch is a pointer because GitHub
 // omits the field entirely for a file it declines to send a diff for (too
 // large, or binary); that is PatchOmitted, not Binary, since the files API
