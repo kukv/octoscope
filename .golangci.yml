@@ -242,6 +242,8 @@ linters:
               desc: the golden recorder compares strings and knows nothing of ours
             - pkg: github.com/kukv/octoscope/internal/app/domain
               desc: the golden recorder compares strings and knows nothing of ours
+            - pkg: github.com/kukv/octoscope/internal/github
+              desc: the golden recorder compares strings and knows nothing of ours
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: the golden recorder compares strings and knows nothing of ours
   exclusions:
