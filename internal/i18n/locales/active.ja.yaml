@@ -243,7 +243,7 @@ submit:
 
 footer:
   # list のキーバーはこの並びから組み立てる。重要なものから先に並べ、端末幅が
-  # 足りないときは末尾から落とす（internal/tui/layout.FitKeyBar）。
+  # 足りないときは末尾から落とす（internal/app/presentation/tui/layout.FitKeyBar）。
   list:
     move:
       other: "j/k:移動"
@@ -327,7 +327,7 @@ footer:
   work:
     other: "h/l:列  j/k:移動  enter:詳細  r:再取得  d:diff  s:checks  q:終了"
   # detail のキーバーはこの並びから組み立てる。重要なものから先に並べ、
-  # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar。
+  # 端末幅が足りないときは末尾から落とす（internal/app/presentation/tui/layout.FitKeyBar。
   # diff の下の同じ仕組み）。esc は先頭に置く — 落としてはいけない
   # 唯一の出口だから。state は close か reopen のどちらか該当する方で、
   # どちらも該当しない（マージ済み）ときは丸ごと外れる。
@@ -359,7 +359,7 @@ footer:
   discard:
     other: "y:破棄  n:やめる"
   # diff のキーバーはこの並びから組み立てる。重要なものから先に並べ、
-  # 端末幅が足りないときは末尾から落とす（internal/tui/layout.FitKeyBar）。
+  # 端末幅が足りないときは末尾から落とす（internal/app/presentation/tui/layout.FitKeyBar）。
   # esc は先頭に置く — 落としてはいけない唯一の出口だから。
   diff:
     esc:
@@ -384,7 +384,7 @@ footer:
       other: "r:再取得"
   diff_comment:
     other: "ctrl+s:送信  esc:取消"
-  # diff の下と同じ仕組み（internal/tui/layout.FitKeyBar）で、checks の
+  # diff の下と同じ仕組み（internal/app/presentation/tui/layout.FitKeyBar）で、checks の
   # キーバーはこの並びから組み立てる。esc は先頭に置く — 落としてはいけない
   # 唯一の出口だから。
   checks:

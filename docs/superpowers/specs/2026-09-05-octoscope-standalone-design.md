@@ -46,6 +46,8 @@ Herdr との統合は完全に廃止する（Herdr からは通常のコマン�
 
 ## 3. 全体アーキテクチャ
 
+> **この節は `2026-09-13-architecture-restructure-design.md` に置き換えられた（2026-09-13）。**
+
 ### 3.1 パッケージ構成
 
 凡例: `[Phase 1]` は実装済み、無印は未着手（設計上の置き場所として予約してある）。
@@ -83,6 +85,8 @@ internal/tui/         Bubble Tea モデル群
 親モデルとはメッセージ型のみで通信する。
 
 ### 3.2 バックエンド抽象
+
+> **この節は `2026-09-13-architecture-restructure-design.md` に置き換えられた（2026-09-13）。**
 
 `internal/gh` は interface を export しない（`.claude/rules/architecture.md`
 「interface は利用側で定義する」）。バックエンドの差し替えは、`internal/gh` 側に

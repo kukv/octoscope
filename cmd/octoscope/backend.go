@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/api"
-	"github.com/kukv/octoscope/internal/gh/cli"
+	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github/api"
+	"github.com/kukv/octoscope/internal/github/cli"
 )
 
 // chooseBackend picks which client talks to GitHub. gh comes first: it is
@@ -27,7 +27,7 @@ func chooseBackend(dir, repo string, lookPath func(string) (string, error),
 	}
 	t, err := token()
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: %w", gh.ErrUnauthenticated, err)
+		return nil, nil, fmt.Errorf("%w: %w", domain.ErrUnauthenticated, err)
 	}
 	return nil, api.New(dir, repo, t), nil
 }

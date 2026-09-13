@@ -1,0 +1,265 @@
+package repo
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"golang.org/x/text/language"
+
+	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/i18n"
+)
+
+func click(x, y int) tea.MouseClickMsg {
+	return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}
+}
+
+func wheel(up bool) tea.MouseWheelMsg {
+	button := tea.MouseWheelDown
+	if up {
+		button = tea.MouseWheelUp
+	}
+	return tea.MouseWheelMsg{X: 2, Y: listTop, Button: button}
+}
+
+func wheelDown(x, y int) tea.MouseWheelMsg {
+	return tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown}
+}
+
+// tokenAt finds where a token is actually drawn. The tests ask the rendered
+// list where a row is rather than recomputing the layout, so a hit-test that
+// has drifted from the drawing fails here.
+func tokenAt(t *testing.T, m Model, token string) (x, y int) {
+	t.Helper()
+	for row, line := range strings.Split(m.View(), "\n") {
+		s := ansi.Strip(line)
+		if i := strings.Index(s, token); i >= 0 {
+			return ansi.StringWidth(s[:i]), row
+		}
+	}
+	t.Fatalf("%q is not in the list:\n%s", token, ansi.Strip(m.View()))
+	return 0, 0
+}
+
+func TestClickingARowSelectsItAndClickingAgainOpensIt(t *testing.T) {
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		i18n.SetLanguage(lang)
+		for _, width := range []int{80, 120, 160} {
+			m := sized(loadedModel(&fakeSource{prs: samplePRs()}), width)
+			x, y := tokenAt(t, m, "second pr") // the cursor starts on the first
+
+			selected, cmd := m.Update(click(x, y))
+			if cmd != nil {
+				t.Errorf("lang %s width %d: the first click opened the row", lang, width)
+			}
+			ref, ok := selected.SelectedRef()
+			if !ok || ref.Number != 2 {
+				t.Fatalf("lang %s width %d: clicking selected %+v, want #2", lang, width, ref)
+			}
+
+			_, cmd = selected.Update(click(x, y))
+			if cmd == nil {
+				t.Fatalf("lang %s width %d: clicking the selected row did not open it", lang, width)
+			}
+			open, ok := cmd().(OpenDetailMsg)
+			if !ok || open.Ref.Number != 2 {
+				t.Errorf("lang %s width %d: got %v, want OpenDetailMsg for #2", lang, width, cmd())
+			}
+		}
+	}
+}
+
+func TestClickingASubTabSwitchesToIt(t *testing.T) {
+	// Under 100 columns the sidebar folds away: with one it would sit at
+	// column 0 too, where this test clicks to switch back to Pull Requests.
+	m := currentModel(&fakeSource{prs: samplePRs()}, 90)
+	x, y := tokenAt(t, m, i18n.T("list.tab_issues"))
+
+	next, cmd := m.Update(click(x, y))
+	if next.tab != tabIssues {
+		t.Fatal("clicking the Issues sub-tab did not switch to it")
+	}
+	if cmd == nil {
+		t.Fatal("switching to an unloaded sub-tab did not fetch it")
+	}
+	if _, ok := cmd().(issueListMsg); !ok {
+		t.Errorf("got %T, want the issue list to be fetched", cmd())
+	}
+
+	back, _ := next.Update(click(0, y))
+	if back.tab != tabPRs {
+		t.Error("clicking the Pull Requests sub-tab did not switch back")
+	}
+}
+
+func TestClickingOutsideTheRowsChangesNothing(t *testing.T) {
+	m := sized(loadedModel(&fakeSource{prs: samplePRs(), issues: []domain.Issue{}}), 120)
+	before, _ := m.SelectedRef()
+
+	for name, point := range map[string][2]int{
+		"the title":                    {0, 0},
+		"the blank line":               {0, 1},
+		"the gap between the sub-tabs": {ansi.StringWidth(i18n.T("list.tab_prs")), subTabRow},
+		"below the last row":           {2, 30},
+	} {
+		after, cmd := m.Update(click(point[0], point[1]))
+		if got, _ := after.SelectedRef(); got != before || after.tab != m.tab {
+			t.Errorf("clicking %s changed the list", name)
+		}
+		if cmd != nil {
+			t.Errorf("clicking %s produced a command", name)
+		}
+	}
+}
+
+func TestTheWheelMovesTheCursor(t *testing.T) {
+	m := sized(loadedModel(&fakeSource{prs: samplePRs()}), 120)
+
+	down, _ := m.Update(wheel(false))
+	if got, _ := down.SelectedRef(); got.Number != 2 {
+		t.Errorf("scrolling down selected #%d, want #2", got.Number)
+	}
+	up, _ := down.Update(wheel(true))
+	if got, _ := up.SelectedRef(); got.Number != 1 {
+		t.Errorf("scrolling back up selected #%d, want #1", got.Number)
+	}
+	// The wheel must stop at the ends rather than wrap.
+	for range 5 {
+		up, _ = up.Update(wheel(true))
+	}
+	if got, _ := up.SelectedRef(); got.Number != 1 {
+		t.Errorf("scrolling past the top selected #%d, want #1", got.Number)
+	}
+}
+
+// A click in the sidebar selects that repository and moves the focus there.
+func TestClickingASidebarRowSelectsIt(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(click(2, sidebarTop+1)) // the second repository
+	drain(t, cmd)
+	if m.selected != 1 || m.focus != paneSidebar {
+		t.Errorf("selected = %d focus = %v, want the clicked row focused", m.selected, m.focus)
+	}
+}
+
+// The add button is the one line of the sidebar the keyboard cursor never
+// stops on, so a click is the only way to reach it with the mouse.
+func TestClickingTheAddButtonOpensTheDialog(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	// The heading, its blank line, one line per repository, then a blank
+	// line: counted here rather than read off the model, so a hit-test that
+	// drifted from the drawing would show up.
+	y := sidebarTop + len(m.rows) + 1
+	m, _ = m.Update(click(2, y))
+	if !strings.Contains(m.View(), i18n.T("dialog.add_repo_hint")) {
+		t.Errorf("clicking the add button at y=%d opened nothing:\n%s", y, m.View())
+	}
+}
+
+// The sub-tab row starts at the sidebar's right edge, not at column zero: a
+// hit-test that forgot the offset would switch tabs on a sidebar click.
+func TestSubTabHitTestIsOffsetByTheSidebar(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	before := m.tab
+	m, _ = m.Update(click(1, subTabRow))
+	if m.tab != before {
+		t.Error("a click inside the sidebar switched the sub-tab")
+	}
+	// The cursor starts on the PRs tab already, so a click that landed there
+	// by coincidence (offset ignored, or missed entirely) would look the
+	// same as one that hit it correctly. Clicking Issues instead tells the
+	// two apart.
+	issuesAt := ansi.StringWidth(i18n.T("list.tab_prs")) + len(subTabGap)
+	m, cmd := m.Update(click(m.sidebarCols()+issuesAt, subTabRow))
+	drain(t, cmd)
+	if m.tab != tabIssues {
+		t.Error("a click on the second sub-tab, offset by the sidebar, missed it")
+	}
+}
+
+// showTab must not fetch when there are no rows, the same way Refresh must
+// not: it is reached with no rows whenever tab is pressed on an empty Repos
+// tab.
+func TestSwitchingTabWithNoRowsFetchesNothing(t *testing.T) {
+	m := sized(New(&fakeSource{}, Options{}), 120)
+	m, cmd := m.showTab(tabIssues, true)
+	if cmd != nil {
+		t.Errorf("cmd = %v, want nil with no rows to fetch", cmd)
+	}
+	if m.loading[tabIssues] {
+		t.Error("loading was set with nothing to load")
+	}
+	if m.tab != tabIssues {
+		t.Error("the tab should still switch even with nothing to show")
+	}
+}
+
+// A click below the last drawn repository must not select one: sidebarRowAt
+// maps it onto a row past the screen (the footer, or further), and only
+// sidebarRows() of the list are ever drawn.
+func TestClickingBelowTheDrawnSidebarRowsSelectsNothing(t *testing.T) {
+	var many []string
+	for i := range 50 {
+		many = append(many, fmt.Sprintf("kukv/repo-%02d", i))
+	}
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Repositories: many}), 120)
+	m, _ = m.Update(prListMsg{prs: f.prs})
+
+	m, cmd := m.Update(click(2, sidebarTop+m.sidebarRows()))
+	if cmd != nil {
+		t.Errorf("clicking below the drawn rows produced a command")
+	}
+	if m.selected != 0 {
+		t.Errorf("selected = %d, want the click below the drawn rows to change nothing", m.selected)
+	}
+}
+
+// The wheel moves whichever pane the pointer is over.
+func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(wheelDown(2, sidebarTop))
+	drain(t, cmd)
+	if m.selected != 1 {
+		t.Errorf("selected = %d, want the wheel to move the sidebar", m.selected)
+	}
+	if m.cursors[m.tab] != 0 {
+		t.Error("the wheel moved the table too")
+	}
+}
+
+// TestClickingARowInAScrolledList is what the fixtures above never reach: a
+// list taller than the terminal draws its nth visible row, not its nth item,
+// and a hit-test that ignored the offset would select the wrong one exactly
+// when the list is long enough to be worth scrolling.
+func TestClickingARowInAScrolledList(t *testing.T) {
+	var prs []domain.PR
+	for i := range 60 {
+		prs = append(prs, domain.PR{Number: i + 1, Title: fmt.Sprintf("pr-%d", i)})
+	}
+	m := loadedModel(&fakeSource{prs: prs})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
+
+	for range m.visibleRows() + 2 {
+		m, _ = m.Update(key("j"))
+	}
+	if m.rowWindow(m.visibleRows()) == 0 {
+		t.Fatal("the list did not scroll; this test covers nothing")
+	}
+
+	want := m.cursors[tabPRs]
+	x, y := tokenAt(t, m, fmt.Sprintf("pr-%d", want))
+	after, _ := m.Update(click(x, y))
+	if got, _ := after.SelectedRef(); got.Number != want+1 {
+		t.Errorf("clicking pr-%d selected #%d, want #%d", want, got.Number, want+1)
+	}
+}

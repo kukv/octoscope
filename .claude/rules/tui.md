@@ -1,6 +1,6 @@
 ---
 paths:
-  - "internal/tui/**"
+  - "internal/app/presentation/tui/**"
   - "internal/i18n/**"
 ---
 
@@ -106,7 +106,7 @@ i18n.Tn("time.hours_ago", 3)   // 複数形。テンプレート変数は .Count
 
 ## 色
 
-**色は `internal/tui/theme` にだけ書く。** ビューは `theme.Dim()` のような
+**色は `internal/app/presentation/tui/theme` にだけ書く。** ビューは `theme.Dim()` のような
 役割の名前で引き、16 進の色をビューのファイルに書かない。
 状態（approved / changes requested / check failure など）に色を足すときも
 theme に足す。同じ状態が画面ごとに違う色になるのを防ぐためである。

@@ -253,7 +253,7 @@ submit:
 footer:
   # the list's key bar is built from these, most important first, and
   # dropped from the end when the terminal is too narrow for all of them
-  # (internal/tui/layout.FitKeyBar).
+  # (internal/app/presentation/tui/layout.FitKeyBar).
   list:
     move:
       other: "j/k:move"
@@ -338,7 +338,7 @@ footer:
     other: "h/l:column  j/k:move  enter:detail  r:refresh  d:diff  s:checks  q:quit"
   # detail's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
-  # internal/tui/layout.FitKeyBar, the same mechanism as diff's below). esc
+  # internal/app/presentation/tui/layout.FitKeyBar, the same mechanism as diff's below). esc
   # is first because it must never be the one dropped: it is the only way
   # out of the view. state is close or reopen, whichever applies, and is
   # left out entirely once the item can do neither (merged).
@@ -371,7 +371,7 @@ footer:
     other: "y:discard  n:keep"
   # diff's key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
-  # internal/tui/layout.FitKeyBar). esc is first because it must never be
+  # internal/app/presentation/tui/layout.FitKeyBar). esc is first because it must never be
   # the one dropped: it is the only way out of the view.
   diff:
     esc:
@@ -398,7 +398,7 @@ footer:
     other: "ctrl+s:send  esc:cancel"
   # checks' key bar is built from these, most important first, and dropped
   # from the end when the terminal is too narrow for all of them (see
-  # internal/tui/layout.FitKeyBar, the same mechanism as diff's above). esc
+  # internal/app/presentation/tui/layout.FitKeyBar, the same mechanism as diff's above). esc
   # is first because it must never be the one dropped: it is the only way
   # out of the view.
   checks:

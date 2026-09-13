@@ -218,6 +218,8 @@ Phase 4 の範囲外である。
 いる手順」としては今も正しいが、「現在の GitHub が返すアーカイブの形」としては
 古い可能性がある。
 
+> **この節は `2026-09-13-architecture-restructure-design.md` に置き換えられた（2026-09-13）。**
+
 ## 7. 境界
 
 Phase 2・Phase 3 と同じ。`internal/tui` は `internal/gh/cli` も `internal/gh/api` も

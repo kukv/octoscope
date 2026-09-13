@@ -59,7 +59,7 @@ func TestPRListAsksForMoreThanTheDefaultThirty(t *testing.T) {
 
 ## 画面をまたぐ操作はキー入力だけで通す
 
-複数のビューにまたがる操作は、`internal/tui/app` にキー入力だけのシナリオテストを
+複数のビューにまたがる操作は、`internal/app/presentation/tui/root` にキー入力だけのシナリオテストを
 置いて担保する。**tty は要らない。** `Update` に `tea.KeyPressMsg` を順に渡し、
 `View()` の出力を見る。
 

@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // gh wins when it is there: it carries the user's own login, which the
@@ -46,15 +46,15 @@ func TestNeitherGhNorATokenIsAnAuthenticationFailure(t *testing.T) {
 
 	_, _, err := chooseBackend("/work", "kukv/octoscope",
 		func(string) (string, error) { return "", exec.ErrNotFound },
-		func() (string, error) { return "", gh.ErrUnauthenticated })
-	if !errors.Is(err, gh.ErrUnauthenticated) {
-		t.Errorf("err = %v, want gh.ErrUnauthenticated", err)
+		func() (string, error) { return "", domain.ErrUnauthenticated })
+	if !errors.Is(err, domain.ErrUnauthenticated) {
+		t.Errorf("err = %v, want domain.ErrUnauthenticated", err)
 	}
 }
 
 // token's own error is the reason chooseBackend concluded there is no
 // authentication at all, and it is lost the moment token grows a failure mode
-// other than gh.ErrUnauthenticated itself. Discarding it here would leave that
+// other than domain.ErrUnauthenticated itself. Discarding it here would leave that
 // future failure with nothing to tell errors.Is or the user apart from the
 // sentinel's own text.
 func TestTheUnderlyingTokenErrorSurvives(t *testing.T) {

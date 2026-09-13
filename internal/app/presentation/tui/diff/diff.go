@@ -1,0 +1,635 @@
+// Package diff shows one pull request's diff: the files it touches down the
+// left, the changes to the selected one on the right, and the review threads
+// that hang off its lines.
+package diff
+
+import (
+	"context"
+
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
+	"github.com/kukv/octoscope/internal/app/usecase"
+	"github.com/kukv/octoscope/internal/i18n"
+)
+
+// Source is what the diff view needs. repo is "owner/repo"; the empty string
+// targets the workspace repository.
+type Source interface {
+	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
+	PostLineComment(t usecase.ReviewTarget, c domain.PendingComment) (string, error)
+	DiscardReview(reviewID string) error
+	review.Source
+}
+
+// ClosedMsg tells the parent the user left the diff view.
+type ClosedMsg struct{}
+
+// ErrorMsg carries a failure the parent shows on its error screen.
+type ErrorMsg struct{ Err error }
+
+type diffMsg struct {
+	ref   domain.ItemRef
+	files []domain.FileDiff
+}
+
+type reviewMsg struct {
+	ref domain.ItemRef
+	ctx domain.ReviewContext
+}
+
+// errMsg is the diff fetch's own failure: with no diff there is nothing to
+// show, so it escalates to the parent's whole-screen error view (ErrorMsg).
+type errMsg struct {
+	ref domain.ItemRef
+	err error
+}
+
+// reviewErrMsg is the review context's own failure: the diff itself may
+// still be readable, so this is shown on one line above the key bar instead
+// of escalating (.claude/rules/errors.md's Bubble Tea section).
+type reviewErrMsg struct {
+	ref domain.ItemRef
+	err error
+}
+
+// rowKind separates the three things a line of the diff pane can be.
+type rowKind int
+
+const (
+	rowHunkHeader rowKind = iota
+	rowLine
+	rowNote      // "binary file", "no files changed": text with nothing behind it
+	rowThread    // one comment of an open review thread
+	rowCollapsed // a count of settled (resolved or outdated) threads
+)
+
+// row is one drawable line of the diff pane. hunk is the index of the hunk it
+// belongs to, which is what { and } move between; a note belongs to none and
+// carries -1. thread, comment and key are set on rowThread and rowCollapsed
+// rows: key names the thread's position (see threadKey) and is what enter
+// looks up in Model.expanded.
+type row struct {
+	kind    rowKind
+	hunk    int
+	line    domain.DiffLine
+	text    string
+	thread  domain.ReviewThread
+	comment domain.ThreadComment
+	key     string
+}
+
+// mode is which overlay is on screen (.claude/rules/tui.md). loading is not
+// one of these: c, v and X are gated on the review context, not on the diff,
+// so an overlay can be open while the files are still on their way.
+type mode uint8
+
+const (
+	modeView mode = iota
+	modeCompose
+	modeSubmit
+	modeDiscard
+)
+
+// String names the mode wherever it is printed. Every assertion on the state
+// of this view reports it with %v, and "mode = 3" leaves the reader counting
+// the constants to find out which overlay that was.
+func (m mode) String() string {
+	switch m {
+	case modeView:
+		return "view"
+	case modeCompose:
+		return "compose"
+	case modeSubmit:
+		return "submit"
+	case modeDiscard:
+		return "discard"
+	}
+	return "mode(?)"
+}
+
+// phase is where the current mode is in its round trip. There is no loading
+// phase: what an overlay needs is on the model before its key is accepted.
+type phase uint8
+
+const (
+	phaseIdle    phase = iota
+	phaseWorking       // sending
+)
+
+func (p phase) String() string {
+	switch p {
+	case phaseIdle:
+		return "idle"
+	case phaseWorking:
+		return "working"
+	}
+	return "phase(?)"
+}
+
+type Model struct {
+	src Source
+	ref domain.ItemRef
+
+	width, height int
+
+	loading bool
+	spin    spinner.Model
+
+	files   []domain.FileDiff
+	file    int
+	fileTop int // the first file drawn in the sidebar
+
+	// review is the review context: the header's title and branches, and the
+	// threads already on the diff. It arrives separately from files (fetch),
+	// and either may land first.
+	review domain.ReviewContext
+
+	// reviewErr is set when the review context fails to fetch. The diff may
+	// still be readable, so this is drawn on its own footer line rather than
+	// replacing the whole screen; nil means no failure to show.
+	reviewErr error
+
+	// expanded is the set of settled threads the user has opened, keyed by
+	// threadKey. It survives a refetch because it is keyed by position, not
+	// by the thread's own id.
+	expanded map[string]bool
+
+	// rows is the current file, flattened for drawing. It is rebuilt whenever
+	// the file changes rather than on every draw, because View may do no work
+	// that a state change did not ask for.
+	rows []row
+	row  int
+	top  int // the first row on screen
+
+	// sidebar is where the cursor is: false in the diff pane, true in the
+	// file list. h and l move between them.
+	sidebar bool
+
+	mode  mode
+	phase phase
+
+	// errText is the last failure of whichever overlay is up. modeView
+	// draws it nowhere -- the diff's own failures go to reviewErr and
+	// declined -- so c, v and X each clear it before they open.
+	errText string
+
+	textarea textarea.Model
+
+	// target is the line and side the open (or in-flight) comment was
+	// started against, captured by startComposing at c-time rather than read
+	// again from the cursor at send time (see comment.go).
+	target domain.PendingComment
+
+	// declined says why the last c, v or X did nothing: the cursor is on a
+	// row with no line, the review context has not arrived yet, or (X only)
+	// there is no pending review to discard. It is drawn on its own footer
+	// line, empty otherwise. reviewErr takes precedence over the loading
+	// case: once the context has failed, that line already says so, and a
+	// second message would only repeat it.
+	declined string
+
+	// submit is the popup drawn over this view rather than a view of its
+	// own (see review.go).
+	submit review.Model
+}
+
+// New builds the view for one pull request. It takes only what names the
+// pull request: the title, the branches and the size of the change arrive
+// with the review context, because a Work card and a Repos row know different
+// amounts about a pull request and neither knows all of it. It also keeps the
+// argument list to two (.claude/rules/go-style.md).
+func New(src Source, ref domain.ItemRef) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	ta := textarea.New()
+	ta.Placeholder = i18n.T("diff.comment_placeholder")
+	ta.ShowLineNumbers = false
+	ta.SetHeight(composerRows)
+	return Model{src: src, ref: ref, loading: true, spin: s, textarea: ta}
+}
+
+// Init starts the fetch. Unlike the Work board this view is built once per
+// pull request, so there is no refresh whose cancel function has to outlive
+// an Init with a value receiver.
+func (m Model) Init() tea.Cmd { return tea.Batch(m.spin.Tick, m.fetch()) }
+
+// fetch takes the diff and the review context in parallel: neither has to
+// wait for the other, and the view draws with whatever has landed.
+func (m Model) fetch() tea.Cmd {
+	return tea.Batch(m.fetchDiff(), m.fetchReview())
+}
+
+func (m Model) fetchDiff() tea.Cmd {
+	src, ref := m.src, m.ref
+	return func() tea.Msg {
+		files, err := src.PRDiff(context.Background(), ref.Repo, ref.Number)
+		if err != nil {
+			return errMsg{ref: ref, err: err}
+		}
+		return diffMsg{ref: ref, files: files}
+	}
+}
+
+func (m Model) fetchReview() tea.Cmd {
+	src, ref := m.src, m.ref
+	return func() tea.Msg {
+		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
+		if err != nil {
+			return reviewErrMsg{ref: ref, err: err}
+		}
+		return reviewMsg{ref: ref, ctx: ctx}
+	}
+}
+
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		return m.resize(msg), nil
+	case diffMsg:
+		return m.filesArrived(msg), nil
+	case reviewMsg:
+		return m.reviewArrived(msg), nil
+	case reviewErrMsg:
+		return m.reviewFailed(msg), nil
+	case errMsg:
+		return m.fetchFailed(msg)
+	case commentPostedMsg:
+		return m.commentPosted(msg)
+	case commentErrorMsg:
+		return m.commentFailed(msg), nil
+	case review.CancelledMsg:
+		return m.submitCancelled(), nil
+	case review.SubmittedMsg:
+		return m.submitDone()
+	case review.ErrorMsg:
+		return m.submitFailed(msg)
+	case discardedMsg:
+		return m.discarded(msg)
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
+	case spinner.TickMsg:
+		return m.tick(msg)
+	}
+	return m, nil
+}
+
+func (m Model) resize(msg tea.WindowSizeMsg) Model {
+	m.width, m.height = msg.Width, msg.Height
+	// Below minWidthForSidebar the file list is not drawn at all; a
+	// cursor left pointing at it would be on a pane that no longer
+	// exists.
+	if !m.showSidebar() {
+		m.sidebar = false
+	}
+	m.textarea.SetWidth(max(m.width, 0))
+	if m.submit.Active() {
+		m.submit, _ = m.submit.Update(msg)
+	}
+	return m
+}
+
+func (m Model) filesArrived(msg diffMsg) Model {
+	// The request for the pull request the user just left is still in
+	// flight; its answer must not replace this one's.
+	if msg.ref != m.ref {
+		return m
+	}
+	m.loading = false
+	m.files = msg.files
+	m.file, m.top, m.fileTop = 0, 0, 0
+	m.rows = m.buildRows()
+	m.row = firstRow(m.rows)
+	m.declined = ""
+	return m.follow()
+}
+
+func (m Model) reviewArrived(msg reviewMsg) Model {
+	// The review context for the pull request the user just left is
+	// still in flight; its answer must not land here.
+	if msg.ref != m.ref {
+		return m
+	}
+	m.review = msg.ctx
+	m.reviewErr = nil
+	m.declined = ""
+	m.rows = m.buildRows()
+	m.row = clamp(m.row, len(m.rows)-1)
+	m = m.follow()
+	return m
+}
+
+func (m Model) reviewFailed(msg reviewErrMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.reviewErr = msg.err
+	m.declined = ""
+	return m
+}
+
+func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.loading = false
+	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+}
+
+func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.textarea.Reset()
+	m.target = domain.PendingComment{}
+	m.review.PendingID = msg.reviewID
+	return m, m.fetchReview()
+}
+
+func (m Model) commentFailed(msg commentErrorMsg) Model {
+	if msg.ref != m.ref {
+		return m
+	}
+	m.phase = phaseIdle
+	m.errText = msg.err.Error()
+	return m
+}
+
+func (m Model) submitCancelled() Model {
+	// Also reaches here when the diff is drawn over the detail view and
+	// the submission was detail's own (broadcast hands the message to
+	// both); only the one that actually opened the popup acts on it.
+	if m.mode != modeSubmit {
+		return m
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	return m
+}
+
+func (m Model) submitDone() (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	m.mode, m.phase = modeView, phaseIdle
+	m.errText = ""
+	m.review.PendingID = ""
+	return m, m.fetchReview()
+}
+
+func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
+	if m.mode != modeSubmit {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.submit, cmd = m.submit.Update(msg)
+	m.errText = msg.Err.Error()
+	return m, cmd
+}
+
+func (m Model) discarded(msg discardedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
+	m.phase = phaseIdle
+	if msg.err != nil {
+		m.errText = msg.err.Error()
+		return m, nil
+	}
+	m.mode = modeView
+	m.review.PendingID = ""
+	return m, m.fetchReview()
+}
+
+func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spin, cmd = m.spin.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch m.mode {
+	case modeCompose:
+		return m.handleComposeKey(msg)
+	case modeSubmit:
+		return m.handleSubmitKey(msg)
+	case modeDiscard:
+		return m.handleDiscardKey(msg)
+	case modeView:
+	}
+	switch msg.String() {
+	case "esc", "q":
+		return m, func() tea.Msg { return ClosedMsg{} }
+	case "r":
+		m.loading = true
+		m.reviewErr = nil
+		m.declined = ""
+		return m, tea.Batch(m.spin.Tick, m.fetch())
+	case "j", "down":
+		return m.moveRow(1), nil
+	case "k", "up":
+		return m.moveRow(-1), nil
+	case "]":
+		return m.moveFile(1), nil
+	case "[":
+		return m.moveFile(-1), nil
+	case "}":
+		return m.moveHunk(1), nil
+	case "{":
+		return m.moveHunk(-1), nil
+	case "h":
+		// There is nowhere to move to once the sidebar is folded.
+		if m.showSidebar() {
+			m.sidebar = true
+		}
+		return m, nil
+	case "l":
+		m.sidebar = false
+		return m, nil
+	case "enter":
+		return m.toggleCollapsed(), nil
+	case "c":
+		return m.startComposing(), nil
+	case "v":
+		return m.openSubmit(), nil
+	case "X":
+		return m.startDiscard(), nil
+	}
+	return m, nil
+}
+
+// toggleCollapsed opens or closes the settled thread under the cursor.
+// Opening replaces the rowCollapsed row with the thread's own rows, which
+// moves the cursor onto one of them (same index, new content) rather than
+// off the thread entirely, so a second enter must still recognise it as the
+// same thread to close it again.
+//
+// This is why rowThread is accepted here too, not only rowCollapsed: once
+// open, an every-comment thread draws one rowThread per comment, all sharing
+// the same key, and enter has to close the group from whichever of those
+// rows the cursor happens to be on -- not only the first.
+func (m Model) toggleCollapsed() Model {
+	r := m.currentRow()
+	if r.kind != rowCollapsed && r.kind != rowThread {
+		return m
+	}
+	if r.key == "" {
+		return m
+	}
+	if m.expanded == nil {
+		m.expanded = map[string]bool{}
+	}
+	m.expanded[r.key] = !m.expanded[r.key]
+	m.rows = m.buildRows()
+	m.row = clamp(m.row, len(m.rows)-1)
+	m.declined = ""
+	return m.follow()
+}
+
+// buildRows flattens the selected file into the lines the diff pane draws.
+func (m Model) buildRows() []row {
+	if len(m.files) == 0 {
+		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.no_changes")}}
+	}
+	f := m.files[m.file]
+	if f.Binary {
+		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.binary")}}
+	}
+	if f.PatchOmitted {
+		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.patch_omitted")}}
+	}
+	var rows []row
+	placed := map[string]bool{}
+	for i, h := range f.Hunks {
+		rows = append(rows, row{kind: rowHunkHeader, hunk: i, text: h.Header})
+		for _, l := range h.Lines {
+			// A literal tab has no fixed display width: a terminal advances
+			// to the next tab stop, and lipgloss's own Style.Render silently
+			// expands it to four spaces while ansi.StringWidth counts it as
+			// zero. Expanding it here, once, before anything measures or
+			// truncates the line, is what keeps every later width
+			// calculation honest.
+			l.Text = expandTabs(l.Text)
+			rows = append(rows, row{kind: rowLine, hunk: i, line: l})
+			line, side := l.Line()
+			if tr := m.threadRows(i, f.Path, line, side); tr != nil {
+				placed[threadKey(f.Path, line, side)] = true
+				rows = append(rows, tr...)
+			}
+		}
+	}
+	rows = append(rows, m.orphanRows(placed)...)
+	return rows
+}
+
+func (m Model) moveRow(delta int) Model {
+	if m.sidebar {
+		return m.moveFile(delta)
+	}
+	m.row = clamp(m.row+delta, len(m.rows)-1)
+	m.declined = ""
+	return m.follow()
+}
+
+func (m Model) moveFile(delta int) Model {
+	if len(m.files) == 0 {
+		return m
+	}
+	m.file = clamp(m.file+delta, len(m.files)-1)
+	m.top = 0
+	m.declined = ""
+	m.rows = m.buildRows()
+	m.row = firstRow(m.rows)
+	m = m.follow()
+	return m.followSidebar()
+}
+
+// followSidebar scrolls the file list so the selected file stays visible,
+// the same way follow keeps the diff pane's cursor on screen. Each file
+// takes two lines (its path and its size), so the window is counted in
+// files, not lines.
+func (m Model) followSidebar() Model {
+	visible := max(m.paneHeight()/2, 1)
+	if m.file < m.fileTop {
+		m.fileTop = m.file
+	}
+	if m.file >= m.fileTop+visible {
+		m.fileTop = m.file - visible + 1
+	}
+	m.fileTop = max(m.fileTop, 0)
+	return m
+}
+
+// moveHunk puts the cursor on the header of the next or previous hunk. It
+// moves between hunks rather than by a fixed number of lines, which is the
+// whole point of the key: a hunk is as long as it is.
+func (m Model) moveHunk(delta int) Model {
+	if len(m.rows) == 0 {
+		return m
+	}
+	want := m.rows[m.row].hunk + delta
+	for i, r := range m.rows {
+		if r.kind == rowHunkHeader && r.hunk == want {
+			m.row = i
+			m.declined = ""
+			return m.follow()
+		}
+	}
+	return m
+}
+
+// follow scrolls the window so the cursor stays on it. Only the pane the
+// cursor is in scrolls, the same rule the Work board follows.
+func (m Model) follow() Model {
+	h := m.paneHeight()
+	if m.row < m.top {
+		m.top = m.row
+	}
+	if m.row >= m.top+h {
+		m.top = m.row - h + 1
+	}
+	m.top = max(m.top, 0)
+	return m
+}
+
+// currentRow returns the row under the cursor, and the zero row when there
+// are none: a key can be pressed before any diff has landed.
+func (m Model) currentRow() row {
+	if len(m.rows) == 0 {
+		return row{}
+	}
+	return m.rows[m.row]
+}
+
+// firstRow is the index of the first rowLine, so the cursor opens on a line
+// it can comment on rather than the hunk header buildRows always puts at
+// index 0. It falls back to 0 when the file has no line at all -- a binary
+// file, a file whose patch GitHub omitted, or an empty diff, all of which
+// buildRows renders as a single rowNote.
+func firstRow(rows []row) int {
+	for i, r := range rows {
+		if r.kind == rowLine {
+			return i
+		}
+	}
+	return 0
+}
+
+// clamp keeps v within [0, hi]. Every caller clamps a cursor index, which is
+// never negative, so the floor is fixed rather than a parameter.
+func clamp(v, hi int) int {
+	if hi < 0 {
+		return 0
+	}
+	return min(max(v, 0), hi)
+}
