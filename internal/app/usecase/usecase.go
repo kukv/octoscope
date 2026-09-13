@@ -85,10 +85,8 @@ type reviewFetcher interface {
 }
 
 type reviewer interface {
-	StartReview(pr domain.PullRequestHandle) (domain.ReviewHandle, error)
-	AddReviewThread(review domain.ReviewHandle, c domain.PendingComment) error
-	SubmitReview(review domain.ReviewHandle, event domain.ReviewEvent, body string) error
-	SubmitNewReview(pr domain.PullRequestHandle, event domain.ReviewEvent, body string) error
+	AddReviewThread(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error
 	DiscardReview(review domain.ReviewHandle) error
 }
 

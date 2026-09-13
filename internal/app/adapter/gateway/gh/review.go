@@ -34,28 +34,32 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 	return toReviewContext(rc), nil
 }
 
-// StartReview opens an unsubmitted review on the pull request.
-func (g *Gateway) StartReview(pr domain.PullRequestHandle) (domain.ReviewHandle, error) {
-	id, err := g.backend.StartReview(string(pr))
-	if err != nil {
+// AddReviewThread attaches one line comment to the target's unsubmitted
+// review, starting one first if there is none: on GitHub a line comment has
+// to hang off a review. It answers the review the comment went onto.
+func (g *Gateway) AddReviewThread(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+	review := t.Pending
+	if review == "" {
+		id, err := g.StartReview(string(t.PullRequest))
+		if err != nil {
+			return "", wrap(err)
+		}
+		review = domain.ReviewHandle(id)
+	}
+	if err := g.backend.AddReviewThread(string(review), fromPendingComment(c)); err != nil {
 		return "", wrap(err)
 	}
-	return domain.ReviewHandle(id), nil
+	return review, nil
 }
 
-// AddReviewThread attaches one line comment to an unsubmitted review.
-func (g *Gateway) AddReviewThread(review domain.ReviewHandle, c domain.PendingComment) error {
-	return wrap(g.backend.AddReviewThread(string(review), fromPendingComment(c)))
-}
-
-// SubmitReview sends the unsubmitted review, with every comment on it.
-func (g *Gateway) SubmitReview(review domain.ReviewHandle, event domain.ReviewEvent, body string) error {
-	return wrap(g.backend.SubmitReview(string(review), fromReviewEvent(event), body))
-}
-
-// SubmitNewReview submits a review that has no unsubmitted comments waiting.
-func (g *Gateway) SubmitNewReview(pr domain.PullRequestHandle, event domain.ReviewEvent, body string) error {
-	return wrap(g.backend.SubmitNewReview(string(pr), fromReviewEvent(event), body))
+// SubmitReview sends the review out. With nothing waiting it creates and
+// submits in one call: starting a review first would leave an empty pending
+// review behind if the submission then failed.
+func (g *Gateway) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
+	if t.Pending == "" {
+		return wrap(g.SubmitNewReview(string(t.PullRequest), fromReviewEvent(event), body))
+	}
+	return wrap(g.backend.SubmitReview(string(t.Pending), fromReviewEvent(event), body))
 }
 
 // DiscardReview throws the unsubmitted review away, comments and all.

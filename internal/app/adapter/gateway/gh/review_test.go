@@ -3,6 +3,7 @@ package gh
 import (
 	"context"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -29,6 +30,89 @@ func (f fakeBackend) SubmitReview(reviewID string, event gql.ReviewEvent, body s
 
 func (f fakeBackend) SubmitNewReview(pullRequestID string, event gql.ReviewEvent, body string) error {
 	return f.submitNewReview(pullRequestID, event, body)
+}
+
+// recordingBackend records which review calls were made, in order. Asserting
+// "no error" here would pass for either arrangement, and the two differ only
+// in what they leave behind on GitHub when the submit fails.
+type recordingBackend struct {
+	backend
+	calls []string
+}
+
+func (b *recordingBackend) StartReview(string) (string, error) {
+	b.calls = append(b.calls, "StartReview")
+	return "PRR_new", nil
+}
+
+func (b *recordingBackend) SubmitReview(string, gql.ReviewEvent, string) error {
+	b.calls = append(b.calls, "SubmitReview")
+	return nil
+}
+
+func (b *recordingBackend) SubmitNewReview(string, gql.ReviewEvent, string) error {
+	b.calls = append(b.calls, "SubmitNewReview")
+	return nil
+}
+
+func (b *recordingBackend) AddReviewThread(string, gql.PendingComment) error {
+	b.calls = append(b.calls, "AddReviewThread")
+	return nil
+}
+
+func TestSubmitReviewWithNoPendingCreatesAndSubmitsInOneCall(t *testing.T) {
+	t.Parallel()
+	b := &recordingBackend{}
+	g := &Gateway{backend: b}
+	tgt := domain.ReviewTarget{PullRequest: "PR_1"}
+	if err := g.SubmitReview(tgt, domain.EventComment, "body"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"SubmitNewReview"}; !slices.Equal(b.calls, want) {
+		t.Errorf("calls = %v, want %v", b.calls, want)
+	}
+}
+
+func TestSubmitReviewWithAPendingSubmitsThatOne(t *testing.T) {
+	t.Parallel()
+	b := &recordingBackend{}
+	g := &Gateway{backend: b}
+	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
+	if err := g.SubmitReview(tgt, domain.EventApprove, "body"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"SubmitReview"}; !slices.Equal(b.calls, want) {
+		t.Errorf("calls = %v, want %v", b.calls, want)
+	}
+}
+
+func TestAddReviewThreadStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
+	t.Parallel()
+	b := &recordingBackend{}
+	g := &Gateway{backend: b}
+	id, err := g.AddReviewThread(domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != domain.ReviewHandle("PRR_new") {
+		t.Errorf("handle = %q, want PRR_new", id)
+	}
+	if want := []string{"StartReview", "AddReviewThread"}; !slices.Equal(b.calls, want) {
+		t.Errorf("calls = %v, want %v", b.calls, want)
+	}
+
+	b2 := &recordingBackend{}
+	g2 := &Gateway{backend: b2}
+	id, err = g2.AddReviewThread(domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != domain.ReviewHandle("PRR_1") {
+		t.Errorf("handle = %q, want PRR_1", id)
+	}
+	if want := []string{"AddReviewThread"}; !slices.Equal(b2.calls, want) {
+		t.Errorf("calls = %v, want %v", b2.calls, want)
+	}
 }
 
 // TestFileStatusFromAPIMapsEveryValue guards the files API's status
@@ -325,7 +409,8 @@ func TestAddReviewThreadConvertsThePendingCommentBeforeCallingTheBackend(t *test
 	}})
 
 	in := domain.PendingComment{Path: "a.go", Line: 3, Side: domain.SideRight, Body: "hi"}
-	if err := g.AddReviewThread("PRR_1", in); err != nil {
+	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
+	if _, err := g.AddReviewThread(tgt, in); err != nil {
 		t.Fatalf("AddReviewThread: %v", err)
 	}
 
@@ -346,7 +431,8 @@ func TestSubmitReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
 		return nil
 	}})
 
-	if err := g.SubmitReview("PRR_1", domain.EventApprove, "lgtm"); err != nil {
+	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
+	if err := g.SubmitReview(tgt, domain.EventApprove, "lgtm"); err != nil {
 		t.Fatalf("SubmitReview: %v", err)
 	}
 	if gotEvent != gql.EventApprove {
@@ -354,9 +440,10 @@ func TestSubmitReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
 	}
 }
 
-// TestSubmitNewReviewConvertsTheEventBeforeCallingTheBackend checks that the
-// gateway hands the backend the converted wire event, not the domain one.
-func TestSubmitNewReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
+// TestSubmitReviewWithNoPendingConvertsTheEventBeforeCallingTheBackend
+// checks that the gateway hands the backend the converted wire event on the
+// SubmitNewReview path too, not the domain one.
+func TestSubmitReviewWithNoPendingConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
 	t.Parallel()
 
 	var gotEvent gql.ReviewEvent
@@ -365,8 +452,9 @@ func TestSubmitNewReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
 		return nil
 	}})
 
-	if err := g.SubmitNewReview("PR_1", domain.EventRequestChanges, ""); err != nil {
-		t.Fatalf("SubmitNewReview: %v", err)
+	tgt := domain.ReviewTarget{PullRequest: "PR_1"}
+	if err := g.SubmitReview(tgt, domain.EventRequestChanges, ""); err != nil {
+		t.Fatalf("SubmitReview: %v", err)
 	}
 	if gotEvent != gql.EventRequestChanges {
 		t.Errorf("backend received event %v, want %v", gotEvent, gql.EventRequestChanges)
