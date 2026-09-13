@@ -16,10 +16,12 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// goldenWidths are the three regimes the board degrades through: four columns
-// with boxed cards and a drawer, four plain columns without one, and a single
-// paged column (spec 4.6).
-var goldenWidths = []int{160, 120, 80}
+// goldenWidths are the tiers the board degrades through: four columns with
+// boxed cards and a drawer at two widths, two plain columns, and a single
+// paged column. Fifty is here because eighty stopped being the narrow case
+// when the two-column tier was added, and no other recording reaches one
+// column.
+var goldenWidths = []int{160, 120, 80, 50}
 
 var goldenLanguages = []struct {
 	name string

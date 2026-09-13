@@ -182,23 +182,25 @@ func boardOf(width int) Model {
 	return m
 }
 
-// TestABoxedCardIsFourLines pins the shape the mockup draws: two lines of
-// text inside a box of its own.
-func TestABoxedCardIsFourLines(t *testing.T) {
+// TestABoxedCardIsFiveLines pins the shape the mockup draws: the title over
+// two lines and the meta line under it, inside a box of its own.
+func TestABoxedCardIsFiveLines(t *testing.T) {
 	const w = 34
 	m := boardOf(160)
 	it := sampleWork()[domain.SectionReviewRequested][0] // a PR with failing checks
 
 	lines := m.card(it, boardClock, w, false)
-	if len(lines) != m.cardHeight() || len(lines) != 4 {
-		t.Fatalf("a boxed card is %d lines, want 4:\n%s", len(lines), strings.Join(lines, "\n"))
+	if len(lines) != m.cardHeight() || len(lines) != titleLines+3 {
+		t.Fatalf("a boxed card is %d lines, want %d:\n%s",
+			len(lines), titleLines+3, strings.Join(lines, "\n"))
 	}
 	for i, line := range lines {
 		if got := ansi.StringWidth(line); got != w {
 			t.Errorf("line %d is %d columns, want %d: %q", i+1, got, w, ansi.Strip(line))
 		}
 	}
-	if !strings.HasPrefix(ansi.Strip(lines[0]), "╭") || !strings.HasPrefix(ansi.Strip(lines[3]), "╰") {
+	last := len(lines) - 1
+	if !strings.HasPrefix(ansi.Strip(lines[0]), "╭") || !strings.HasPrefix(ansi.Strip(lines[last]), "╰") {
 		t.Errorf("the card has no box:\n%s", ansi.Strip(strings.Join(lines, "\n")))
 	}
 	if title := ansi.Strip(lines[1]); !strings.Contains(title, "#12") ||
@@ -207,17 +209,18 @@ func TestABoxedCardIsFourLines(t *testing.T) {
 	}
 }
 
-// TestANarrowCardLosesItsBox is the degradation step the boxes forced: at
-// eighty columns a column is seventeen wide, and a border would take two of
-// them (spec 4.6).
+// TestANarrowCardLosesItsBox is the degradation step the boxes forced: below
+// a hundred columns the drawer and the fourth column go, and a border would
+// cost two lines of every card on a screen that is usually short too.
 func TestANarrowCardLosesItsBox(t *testing.T) {
-	const w = 17
+	const w = 38
 	m := boardOf(80)
 	it := sampleWork()[domain.SectionReviewRequested][0]
 
 	lines := m.card(it, boardClock, w, false)
-	if len(lines) != m.cardHeight() || len(lines) != 2 {
-		t.Fatalf("an unboxed card is %d lines, want 2:\n%s", len(lines), strings.Join(lines, "\n"))
+	if len(lines) != m.cardHeight() || len(lines) != titleLines+1 {
+		t.Fatalf("an unboxed card is %d lines, want %d:\n%s",
+			len(lines), titleLines+1, strings.Join(lines, "\n"))
 	}
 	for i, line := range lines {
 		if got := ansi.StringWidth(line); got != w {
@@ -225,7 +228,118 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 		}
 	}
 	if strings.Contains(ansi.Strip(lines[0]), "╭") {
-		t.Error("the card still has a box at seventeen columns")
+		t.Error("the card still has a box below a hundred columns")
+	}
+}
+
+// TestALongTitleRunsOntoTheSecondLine is why the card grew a line: a title
+// cut at the width of one narrow column says nothing about the pull request.
+func TestALongTitleRunsOntoTheSecondLine(t *testing.T) {
+	m := boardOf(80)
+	it := domain.WorkItem{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
+		Title: "replace the whole rendering pipeline with something readable",
+	}
+
+	lines := m.cardTitle(it, 36, false, gutter)
+	if len(lines) != titleLines {
+		t.Fatalf("the title is %d lines, want %d", len(lines), titleLines)
+	}
+	first, second := ansi.Strip(lines[0]), strings.TrimSpace(ansi.Strip(lines[1]))
+	if !strings.Contains(first, "replace") {
+		t.Errorf("the first line carries no title: %q", first)
+	}
+	if second == "" {
+		t.Errorf("the second line is empty; the title was cut instead of wrapped: %q", first)
+	}
+	if strings.Contains(second, "replace") {
+		t.Errorf("the second line repeats the first: %q", second)
+	}
+}
+
+// TestAWrappedTitleLosesNothing is the assertion the width checks cannot
+// make: a wrap that joined the pieces back with a space, or one whose second
+// line started from the top of the title again, still fits the column.
+func TestAWrappedTitleLosesNothing(t *testing.T) {
+	m := boardOf(80)
+	for name, tc := range map[string]struct{ title, sep string }{
+		// English wraps on a space, and that one space is consumed by the
+		// break. Japanese has no space to break on, so nothing is consumed
+		// and nothing may be invented either.
+		"english":  {"replace the whole rendering pipeline", " "},
+		"japanese": {"レンダリングのパイプラインをまるごと置き換える", ""},
+	} {
+		it := domain.WorkItem{
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
+			Title: tc.title,
+		}
+		lines := m.cardTitle(it, 36, false, gutter)
+		_, first, ok := strings.Cut(ansi.Strip(lines[0]), "#12 ")
+		if !ok {
+			t.Fatalf("%s: the first line carries no title: %q", name, ansi.Strip(lines[0]))
+		}
+		second := strings.TrimPrefix(ansi.Strip(lines[1]), gutter)
+		if got := first + tc.sep + second; got != tc.title {
+			t.Errorf("%s: the two lines read %q, want the whole title %q", name, got, tc.title)
+		}
+	}
+}
+
+// TestAWrappedJapaneseTitleGainsNoSpaces is the case the two-line fixtures
+// above cannot reach: a title long enough to wrap three times. Folding the
+// leftover lines back together with a space would put spaces into a title
+// whose author wrote none, and only a title that overflows twice shows it.
+func TestAWrappedJapaneseTitleGainsNoSpaces(t *testing.T) {
+	const title = "レンダリングのパイプラインをまるごと置き換えるための大きな変更"
+	m := boardOf(80)
+	it := domain.WorkItem{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
+		Title: title,
+	}
+
+	lines := m.cardTitle(it, 36, false, gutter)
+	if n := len(strings.Split(ansi.Wrap(title, 28, ""), "\n")); n < 3 {
+		t.Fatalf("the title wraps to %d lines; this test covers nothing", n)
+	}
+	second := strings.TrimPrefix(ansi.Strip(lines[1]), gutter)
+	if strings.Contains(second, " ") {
+		t.Errorf("the second line gained a space the title never had: %q", second)
+	}
+	if !strings.Contains(title, strings.TrimSuffix(second, "…")) {
+		t.Errorf("the second line is not part of the title: %q", second)
+	}
+}
+
+// TestAShortTitleStillFillsTheCard keeps the card a fixed height: visibleCards,
+// cardWindow and the mouse hit-test all divide by it, and a card that shrank
+// with its title would put them out by however many short titles sat above.
+func TestAShortTitleStillFillsTheCard(t *testing.T) {
+	it := domain.WorkItem{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3},
+		Title: "docs",
+	}
+	for width, w := range map[int]int{80: 38, 160: 34} {
+		m := boardOf(width)
+		if got := len(m.card(it, boardClock, w, false)); got != m.cardHeight() {
+			t.Errorf("width %d: a short title makes a %d-line card, want %d",
+				width, got, m.cardHeight())
+		}
+	}
+}
+
+// TestAShortBoardStillDrawsACard covers the floor under the height budget: a
+// terminal too short for one card must not produce a board of zero rows.
+func TestAShortBoardStillDrawsACard(t *testing.T) {
+	m := loaded()
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
+	out := ansi.Strip(m.View())
+	if !strings.Contains(out, "#12") {
+		t.Errorf("a ten-line terminal draws no card:\n%s", out)
+	}
+	for _, line := range strings.Split(m.View(), "\n") {
+		if got := ansi.StringWidth(line); got > 120 {
+			t.Errorf("a line is %d columns: %q", got, ansi.Strip(line))
+		}
 	}
 }
 
@@ -389,6 +503,92 @@ func TestVeryNarrowTerminalShowsOneColumn(t *testing.T) {
 	}
 }
 
+// headingTexts is every column heading, in the order the columns are drawn.
+func headingTexts() []string {
+	texts := make([]string, 0, len(domain.WorkSections()))
+	for _, s := range domain.WorkSections() {
+		texts = append(texts, i18n.T(sectionTitleIDs[s]))
+	}
+	return texts
+}
+
+// headingsOn reports which column headings a board drew, by name.
+func headingsOn(m Model) []string {
+	out := ansi.Strip(m.View())
+	var drawn []string
+	for _, text := range headingTexts() {
+		if strings.Contains(out, text) {
+			drawn = append(drawn, text)
+		}
+	}
+	return drawn
+}
+
+// TestTheHeadingsAreAllDifferent is what the two tests below rest on: they
+// count headings to count columns, which says nothing if two columns are
+// named the same.
+func TestTheHeadingsAreAllDifferent(t *testing.T) {
+	seen := map[string]bool{}
+	for _, text := range headingTexts() {
+		if text == "" || seen[text] {
+			t.Fatalf("the column headings are not distinct: %q", headingTexts())
+		}
+		seen[text] = true
+	}
+}
+
+// TestHowManyColumnsFitTheWidth pins the three tiers. Four columns at eighty
+// leave seven columns for a title, which says nothing about the pull request;
+// two columns leave twenty-eight.
+func TestHowManyColumnsFitTheWidth(t *testing.T) {
+	for _, tc := range []struct{ width, want int }{
+		{50, 1}, {59, 1}, {60, 2}, {80, 2}, {99, 2}, {100, 4}, {160, 4},
+	} {
+		m := loaded()
+		m, _ = m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})
+		if got := len(headingsOn(m)); got != tc.want {
+			t.Errorf("width %d draws %d columns, want %d:\n%s",
+				tc.width, got, tc.want, ansi.Strip(m.View()))
+		}
+	}
+}
+
+// TestTwoColumnsPageByWholePages is why the tiers are one, two and four: the
+// four sections divide by each of them, so h and l move between pages that
+// are full rather than leaving a page with one column in it.
+func TestTwoColumnsPageByWholePages(t *testing.T) {
+	texts := headingTexts()
+	for col, want := range map[int][]string{
+		0: {texts[0], texts[1]},
+		1: {texts[0], texts[1]},
+		2: {texts[2], texts[3]},
+		3: {texts[2], texts[3]},
+	} {
+		m := loaded()
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+		m.col = col
+		got := headingsOn(m)
+		if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+			t.Errorf("column %d shows %q, want %q", col, got, want)
+		}
+	}
+}
+
+// TestAPagedBoardSaysWhichColumnTheCursorIsIn covers both paged tiers: the
+// count is out of four either way, because that is how many columns the user
+// can reach.
+func TestAPagedBoardSaysWhichColumnTheCursorIsIn(t *testing.T) {
+	for _, width := range []int{50, 80} {
+		m := loaded()
+		m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+		m.col = 2
+		want := i18n.Tf("work.column_position", map[string]any{"Index": 3, "Total": 4})
+		if !strings.Contains(m.View(), want) {
+			t.Errorf("width %d does not say which column the cursor is in:\n%s", width, m.View())
+		}
+	}
+}
+
 func TestLoadingBoardSaysSo(t *testing.T) {
 	m := New(&fakeSource{work: sampleWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -460,7 +660,7 @@ func alignedWork() domain.Work {
 }
 
 // TestEveryRowStartsItsColumnsAtTheSameOffset measures where each column
-// actually drew its own token and asks whether the four agree, rather than
+// actually drew its own token and asks whether the columns on screen agree, rather than
 // hard-coding an offset the drawing would have to be read to know. Japanese
 // takes two columns per character, so a column that measured its padding in
 // runes lines up in English and drifts in Japanese.
@@ -474,10 +674,10 @@ func TestEveryRowStartsItsColumnsAtTheSameOffset(t *testing.T) {
 			m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 			m = answeredAll(m, alignedWork())
 
-			colW := m.columnWidth(m.columns())
+			colW := m.columnWidth(m.columnsFor())
 			for _, token := range []string{"title-%d", "repo-%d"} {
 				indent := -1
-				for i := range m.columns() {
+				for i := range m.columnsFor() {
 					x, ok := offsetOf(m.board(m.boardHeight()), fmt.Sprintf(token, i))
 					if !ok {
 						t.Errorf("lang %s width %d: %q was never drawn", lang, width, token)

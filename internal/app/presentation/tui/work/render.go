@@ -21,11 +21,14 @@ const (
 	// side of it.
 	columnGap = 3
 
-	// drawerMinColumns is also cardBoxMinColumns: under a hundred columns a
-	// column is about seventeen wide, and a card's own box would eat two of
-	// them and leave the title with almost nothing. Both the drawer and the
-	// boxes go at the same width, so there is one number to remember.
-	drawerMinColumns  = 100
+	// drawerMinColumns is where the board stops fitting four columns: below it
+	// the board pages two at a time, and the drawer and the boxes go with the
+	// fourth column. A box costs two lines per card, and a terminal this
+	// narrow is usually short as well.
+	drawerMinColumns = 100
+
+	// singleColumnBelow is where two columns stop fitting and the board pages
+	// one at a time.
 	singleColumnBelow = 60
 
 	// footerHeight is the blank line and the key bar under the board.
@@ -109,13 +112,19 @@ func (m Model) drawerShown() bool { return m.width >= drawerMinColumns }
 // drawerMinColumns for why the two share a threshold.
 func (m Model) boxed() bool { return m.width >= drawerMinColumns }
 
-// cardHeight is how many lines one card occupies: a box adds its two borders
-// to the title and meta lines inside it.
+// titleLines is fixed rather than fitted to the title. visibleCards,
+// cardWindow and the mouse hit-test all divide by the card height, so a card
+// that shrank with a short title would put them out by however many short
+// titles sat above the pointer.
+const titleLines = 2
+
+// cardHeight is how many lines one card occupies: the title, the meta line
+// under it, and — when there is room for one — the box's two borders.
 func (m Model) cardHeight() int {
 	if m.boxed() {
-		return 4
+		return titleLines + 3
 	}
-	return 2
+	return titleLines + 1
 }
 
 // boardHeight is what is left for the columns once everything drawn below
@@ -262,31 +271,52 @@ func (m Model) cardWindow(s domain.WorkSection, height int) int {
 // gutter marks the selection instead.
 func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
 	if !m.boxed() {
-		return []string{
-			fit(m.cardTitle(it, w-len(gutter), selected, gutter), w),
-			fit(gutter+m.cardMeta(it, at, w-len(gutter)), w),
+		lines := m.cardTitle(it, w-len(gutter), selected, gutter)
+		lines = append(lines, gutter+m.cardMeta(it, at, w-len(gutter)))
+		for i, line := range lines {
+			lines[i] = fit(line, w)
 		}
+		return lines
 	}
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
-	body := m.cardTitle(it, inner, selected, "") + "\n" + m.cardMeta(it, at, inner)
-	return strings.Split(theme.Card(selected).Width(w).Render(body), "\n")
+	body := append(m.cardTitle(it, inner, selected, ""), m.cardMeta(it, at, inner))
+	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
 
-// cardTitle is the state marker, the number and the title. The pieces are
-// styled one at a time rather than as a whole line: a style applied over a
-// coloured marker would end at that marker's own reset.
-func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) string {
+// cardTitle is the state marker, the number and the title, over titleLines
+// lines. The pieces are styled one at a time rather than as a whole line: a
+// style applied over a coloured marker would end at that marker's own reset.
+//
+// The continuation is not indented under the title. Lining it up would read
+// better, but the columns it would cost are what the second line was added to
+// win back.
+func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) []string {
 	if selected && marker != "" {
 		marker = theme.Cursor().Render("▸ ")
 	}
 	head := marker + stateMarker(it) + " " + fmt.Sprintf("#%d ", it.Ref.Number)
-	title := clip(it.Title, max(w-ansi.StringWidth(head), 0))
+	indent := ansi.StringWidth(marker)
+
+	first, second := wrapTitle(it.Title,
+		max(w-ansi.StringWidth(head), 0), max(w-indent, 0))
 	if selected {
-		title = theme.Cursor().Render(title)
+		first, second = theme.Cursor().Render(first), theme.Cursor().Render(second)
 	}
-	return head + title
+	return []string{head + first, strings.Repeat(" ", indent) + second}
+}
+
+// wrapTitle folds a title over two lines of different widths: the first is
+// what is left beside the marker and the number, the second is the whole card.
+//
+// The second line is cut from the title itself rather than joined back up out
+// of the lines ansi.Wrap returned. A Japanese title has no spaces to break on
+// and comes back broken by column, and joining those pieces would put spaces
+// in the title that the author never wrote.
+func wrapTitle(title string, first, second int) (string, string) {
+	head := strings.Split(ansi.Wrap(title, max(first, 1), ""), "\n")[0]
+	return head, clip(strings.TrimSpace(strings.TrimPrefix(title, head)), second)
 }
 
 // cardMeta is the second line: where the item lives, how its checks are
@@ -374,13 +404,27 @@ func checksBar(c domain.Checks) string {
 	return theme.Check(c.State).Render(done) + theme.Dim().Render(rest)
 }
 
-// visibleSections is the width degradation: too narrow for four columns and
-// the board shows the current one alone, with h/l paging between them.
-func (m Model) visibleSections() []domain.WorkSection {
-	if m.width < singleColumnBelow {
-		return []domain.WorkSection{m.section()}
+// columnsFor is the width degradation: how many columns the board puts side
+// by side. The four sections divide by four, two and one, so each tier pages
+// by whole pages; three columns would leave a page with one column in it.
+func (m Model) columnsFor() int {
+	switch {
+	case m.width < singleColumnBelow:
+		return 1
+	case m.width < drawerMinColumns:
+		return 2
+	default:
+		return m.columns()
 	}
-	return domain.WorkSections()
+}
+
+// visibleSections is the page of columns on screen: the one the cursor's
+// column falls in. h/l move the cursor, and the page follows it.
+func (m Model) visibleSections() []domain.WorkSection {
+	n := m.columnsFor()
+	all := domain.WorkSections()
+	page := m.col / n
+	return all[page*n : min((page+1)*n, len(all))]
 }
 
 func (m Model) columnWidth(n int) int {

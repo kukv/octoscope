@@ -54,11 +54,17 @@ func TestClickingACardSelectsIt(t *testing.T) {
 			m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 			m = answeredAll(m, alignedWork())
 
+			// Narrow boards draw one page at a time, so every column is
+			// reached by putting the cursor on its page first. A page the
+			// cursor is not on has nothing drawn to click.
+			n := m.columnsFor()
 			for i := range m.columns() {
+				paged := m
+				paged.col = i / n * n
 				token := fmt.Sprintf("title-%d", i)
-				x, y := titleAt(t, m, token)
+				x, y := titleAt(t, paged, token)
 
-				clicked, _ := m.Update(click(x, y))
+				clicked, _ := paged.Update(click(x, y))
 				ref, ok := clicked.SelectedRef()
 				if !ok {
 					t.Fatalf("lang %s width %d: clicking %q selected nothing", lang, width, token)
@@ -69,6 +75,38 @@ func TestClickingACardSelectsIt(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestATwoColumnBoardHitTestsTheSecondPage is the case a board paged one
+// column at a time never reached: the column under the pointer is the second
+// of the page, and its number is not the position it was drawn at.
+func TestATwoColumnBoardHitTestsTheSecondPage(t *testing.T) {
+	m := New(&fakeSource{work: alignedWork()})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = answeredAll(m, alignedWork())
+	if m.columnsFor() != 2 {
+		t.Fatalf("the board draws %d columns at 80; this test covers nothing", m.columnsFor())
+	}
+	m.col = 2 // the second page: Assigned and Mentioned
+
+	for i, want := range map[int]string{2: "repo-2", 3: "repo-3"} {
+		x, y := titleAt(t, m, fmt.Sprintf("title-%d", i))
+		clicked, _ := m.Update(click(x, y))
+		ref, ok := clicked.SelectedRef()
+		if !ok {
+			t.Fatalf("clicking title-%d selected nothing", i)
+		}
+		if ref.Repo != want {
+			t.Errorf("clicking title-%d selected %s, want %s", i, ref.Repo, want)
+		}
+	}
+
+	// The wheel reads the same hit-test, so it lands in the same column.
+	x, y := titleAt(t, m, "title-3")
+	scrolled, _ := m.Update(wheel(x, y, false))
+	if got, _ := scrolled.SelectedRef(); got.Repo != "repo-3" {
+		t.Errorf("the wheel over the right column selected %s, want repo-3", got.Repo)
 	}
 }
 
