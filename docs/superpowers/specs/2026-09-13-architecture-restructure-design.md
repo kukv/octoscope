@@ -208,7 +208,7 @@ gateway が無かった時点では usecase が唯一の置き場所だったが
 | `WorkSection` → GitHub の検索文字列（`gql/search.go`） | gateway がクエリを組み、`gql` は文字列を受け取る | 2 |
 | `PullRequestID` `PendingID` | 不透明ハンドルへ改名。domain には残す | 3 |
 | `CheckRun.JobID` `RunID` | 不透明ハンドルへ | 3 |
-| `SplitRepo` | domain から外す。呼び出し元は tui 2 / infra 5 | 3 |
+| `SplitRepo` | domain には置かず `internal/github/gql` に残す | 2b（完了） |
 | `opener` port と `OpenWeb` | 削除。tui が `internal/browser` を直接呼ぶ | 3 |
 | `SavedQuery` | domain の型にする。YAML との変換は datasource | 2 |
 
@@ -304,10 +304,16 @@ golden テストの差分がゼロ。
 
 ### PR 3: ハンドルと port の形
 
-- `PullRequestID` `PendingID` `JobID` `RunID` を不透明ハンドルへ
-- `StartReview` / `SubmitNewReview` を畳み、pending の作成を gateway へ（§6）
-- `SplitRepo` を domain から外す
-- `opener` port を削除し、tui が `internal/browser` を直接呼ぶ
+- `opener` port と `usecase.OpenWeb` を削除し、tui が `browser.Open` を通じて
+  `internal/browser` を直接呼ぶ
+- `domain.PullRequestHandle` `domain.ReviewHandle` `domain.JobHandle` `domain.RunHandle`
+  を新設し、`PullRequestID` `PendingID` `CheckRun.JobID` `RunID` をこれに置き換える
+- `ReviewTarget` を domain に置き、`ReviewContext.PullRequest` / `.Pending`、
+  `MergeContext.PullRequest` をハンドル型に retype する
+- `reviewer` port を `AddReviewThread` / `SubmitReview` / `DiscardReview` の 3 つに畳み、
+  `StartReview` / `SubmitNewReview` の呼び分けは gateway が持つ（§6）。
+  合わせて `.claude/rules/architecture.md` の「複数の API 呼び出しは
+  `internal/app/usecase` に置く」節を、サービス固有の順序は gateway が持つ形に改訂する
 
 検証: `make check`。レビューの提出（pending あり / なし）と checks の再実行を
 実際に起動して確認する。
@@ -352,9 +358,9 @@ golden テストの差分がゼロ。
 
 ## 13. 完了条件
 
-1. §3.1 のツリーになっている
-2. §4 の 3 つの機械検査が CI で動いている
-3. §7 の表の項目がすべて指定された行き先にある
-4. `make check` が通る
+1. §3.1 のツリーになっている（達成）
+2. §4 の 3 つの機械検査が CI で動いている（達成）
+3. §7 の表の項目がすべて指定された行き先にある（達成）
+4. `make check` が通る（達成）
 5. `go run ./cmd/octoscope` と `--lang ja` を実際に起動し、画面が再構成前と変わらないこと
-6. §12 の規約と `.golangci.yml` が新しい構成を指している
+6. §12 の規約と `.golangci.yml` が新しい構成を指している（達成）

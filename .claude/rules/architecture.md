@@ -221,10 +221,10 @@ port の中立化は行う。ただし**名前**と**形**を分けて扱う。
 
 | 変えない | 変える |
 |---|---|
-| `AddPRComment` `ClosePR` `EditPRLabels` `ListPRs` `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → 不透明ハンドル |
-| `CheckRun.Workflow` `RunNumber`（Forgejo Actions は同型、GitLab の pipeline も対応物がある） | `RerunWorkflow(runID int64)` → 不透明ハンドル |
-| `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → 不透明ハンドル名へ改名 |
-| | `StartReview` / `SubmitNewReview` → `SubmitReview` 1 つに畳む。pending review の作成は gateway が持つ（本規約の部分的な反転。設計 §6） |
+| `AddPRComment` `ClosePR` `EditPRLabels` `ListPRs` `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → `JobLog(job domain.JobHandle)` |
+| `CheckRun.Workflow` `RunNumber`（Forgejo Actions は同型、GitLab の pipeline も対応物がある） | `RerunWorkflow(runID int64)` → `RerunWorkflow(run domain.RunHandle)` |
+| `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → `domain.PullRequestHandle` `domain.ReviewHandle`（`ReviewContext.PullRequest` / `ReviewTarget.Pending`） |
+| | `StartReview` / `SubmitNewReview` を `SubmitReview` 1 つに畳んだ。pending review の作成は gateway が持つ（本規約の部分的な反転。設計 §6） |
 
 ## 規約そのものを変える
 
