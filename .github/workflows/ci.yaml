@@ -37,15 +37,6 @@ jobs:
       checks: write
       pull-requests: write
     steps:
-      # サプライチェーン攻撃の検知に向けた計測(analyze モード)。
-      # syscall を capture して falco-analyze ジョブで通信先・プロセスを可視化する。
-      # 検知しても fail させない。
-      - name: Start Falco
-        uses: falcosecurity/falco-actions/start@558a3ceeee9403e1c875ffbeb704c34c93e24752 # main(タグ未発行のため commit を固定)
-        with:
-          mode: analyze
-          # sysdig 0.41.4 (renovate は digest 単体を追従できないため手動更新)
-          sysdig-version: sha256:740a122ba3ab923467c09a25725cdc5b530d93345f00cc1ced1b4a32bd9c52a9
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -71,30 +62,3 @@ jobs:
       - name: Report coverage
         uses: k1LoW/octocov-action@a167dc0dee441b7ffc45e1b862ab55ec0d87f278 # v1.5.2
         if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
-      - name: Stop Falco
-        if: always()
-        uses: falcosecurity/falco-actions/stop@558a3ceeee9403e1c875ffbeb704c34c93e24752 # main(タグ未発行のため commit を固定)
-        with:
-          mode: analyze
-
-  # capture を解析して、ジョブ中の通信先 / DNS / プロセスをジョブサマリに出す。
-  # 収集が目的のため、検知があっても fail させない。
-  falco-analyze:
-    needs: [test]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # 計測が目的のジョブなので、capture が無い等で失敗しても CI をブロックしない
-    continue-on-error: true
-    permissions:
-      contents: read
-      actions: read
-
-    steps:
-      - name: Analyze
-        uses: falcosecurity/falco-actions/analyze@558a3ceeee9403e1c875ffbeb704c34c93e24752 # main(タグ未発行のため commit を固定)
-        with:
-          # falco 0.39.2 (renovate は digest 単体を追従できないため手動更新)
-          falco-version: sha256:ba05dfb209cc1c2e912ce116d230b5f59c4542e7286f05b663c499066d5d6a42
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
