@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/kukv/octoscope/internal/config"
+	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/gh"
 )
 

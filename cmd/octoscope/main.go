@@ -11,7 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/config"
+	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/gh/api"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"

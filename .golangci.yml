@@ -36,7 +36,7 @@ linters:
               desc: views go through internal/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/gh/api
               desc: views go through internal/usecase; only cmd/octoscope names a backend
-            - pkg: github.com/kukv/octoscope/internal/config
+            - pkg: github.com/kukv/octoscope/internal/app/config
               desc: settings reach the views through app.Options; cmd/octoscope reads them
         # usecase sits below the UI: it decides which GitHub calls an
         # operation takes, and knows nothing of screens or messages.
@@ -52,18 +52,18 @@ linters:
         # nothing of the screens or of GitHub.
         config-layer:
           files:
-            - "**/internal/config/**"
+            - "**/internal/app/config/**"
           deny:
             - pkg: github.com/kukv/octoscope/internal/gh
-              desc: internal/config must not depend on other internal packages
+              desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/tui
-              desc: internal/config must not depend on other internal packages
+              desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/i18n
-              desc: internal/config must not depend on other internal packages
+              desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/usecase
-              desc: internal/config must not depend on other internal packages
+              desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/browser
-              desc: internal/config must not depend on other internal packages
+              desc: internal/app/config must not depend on other internal packages
         # Messages are a leaf: they depend on nothing of ours.
         i18n-layer:
           files:
@@ -73,7 +73,7 @@ linters:
               desc: internal/i18n must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: internal/i18n must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/config
+            - pkg: github.com/kukv/octoscope/internal/app/config
               desc: internal/i18n must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/usecase
               desc: internal/i18n must not depend on other internal packages
@@ -88,7 +88,7 @@ linters:
               desc: internal/browser must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: internal/browser must not depend on other internal packages
-            - pkg: github.com/kukv/octoscope/internal/config
+            - pkg: github.com/kukv/octoscope/internal/app/config
               desc: internal/browser must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/usecase
               desc: internal/browser must not depend on other internal packages
@@ -274,7 +274,7 @@ linters:
       # pass a t.TempDir() path); the real caller always passes Path()'s own
       # fixed result (os.UserConfigDir()/octoscope/config.yaml), never
       # attacker- or network-supplied input.
-      - path: internal/config/config\.go
+      - path: internal/app/config/config\.go
         linters:
           - gosec
         text: "G304"

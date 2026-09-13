@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/config"
+	"github.com/kukv/octoscope/internal/app/config"
 )
 
 // A missing file is the default, not a failure: octoscope must run for

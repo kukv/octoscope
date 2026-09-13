@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kukv/octoscope/internal/config"
+	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/gh"
 )
 
