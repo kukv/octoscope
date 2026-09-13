@@ -7,22 +7,26 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // pageSize is REST's maximum for one page, and the ceiling the cli backend
 // reads too. Asking for more is a 422.
 const pageSize = 100
 
-// labelJSON is one entry of the labels endpoint. The id approximates the
-// order gh shows: gh asks GraphQL for CREATED_AT ascending, while REST
-// answers by name and does not carry created_at at all, so id -- which
-// usually, but not always, rises with creation -- is the closest REST alone
-// can get.
-type labelJSON struct {
+// Label is one entry of the labels endpoint. The id approximates the order
+// gh shows: gh asks GraphQL for CREATED_AT ascending, while REST answers by
+// name and does not carry created_at at all, so id -- which usually, but
+// not always, rises with creation -- is the closest REST alone can get.
+type Label struct {
 	Name  string `json:"name"`
 	Color string `json:"color"`
 	ID    int64  `json:"id"`
+}
+
+// Author is the login GitHub attributes something to.
+type Author struct {
+	Login string `json:"login"`
 }
 
 // ListLabels names the repository's labels, oldest first by id. Nothing
@@ -35,15 +39,15 @@ type labelJSON struct {
 // the id sort and the 100 cut below pick the same 100 out of it. A repository
 // with at most a page of labels never sees a second request: nextLink comes
 // back empty.
-func (c *Client) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
+func (c *Client) ListLabels(ctx context.Context, repo string) ([]gql.Label, error) {
 	r, err := c.repoPath(repo)
 	if err != nil {
 		return nil, err
 	}
-	var found []labelJSON
+	var found []Label
 	path := fmt.Sprintf("repos/%s/labels?per_page=%d", r, pageSize)
 	err = c.walkPages(ctx, path, func(out []byte) error {
-		var page []labelJSON
+		var page []Label
 		if err := json.Unmarshal(out, &page); err != nil {
 			return fmt.Errorf("parse labels: %w", err)
 		}
@@ -53,15 +57,15 @@ func (c *Client) ListLabels(ctx context.Context, repo string) ([]domain.Label, e
 	if err != nil {
 		return nil, err
 	}
-	slices.SortFunc(found, func(a, b labelJSON) int {
+	slices.SortFunc(found, func(a, b Label) int {
 		return cmp.Compare(a.ID, b.ID)
 	})
 	if len(found) > pageSize {
 		found = found[:pageSize]
 	}
-	labels := make([]domain.Label, len(found))
+	labels := make([]gql.Label, len(found))
 	for i, f := range found {
-		labels[i] = domain.Label{Name: f.Name, Color: f.Color}
+		labels[i] = gql.Label{Name: f.Name, Color: f.Color}
 	}
 	return labels, nil
 }
@@ -79,7 +83,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	var users []domain.Author
+	var users []Author
 	if err := json.Unmarshal(out, &users); err != nil {
 		return nil, fmt.Errorf("parse assignees: %w", err)
 	}

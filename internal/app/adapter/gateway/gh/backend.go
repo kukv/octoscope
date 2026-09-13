@@ -11,11 +11,12 @@ import (
 	"context"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 type itemFetcher interface {
-	GetPR(ctx context.Context, repo string, number int) (domain.PR, error)
-	GetIssue(ctx context.Context, repo string, number int) (domain.Issue, error)
+	GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error)
+	GetIssue(ctx context.Context, repo string, number int) (gql.Issue, error)
 }
 
 type commenter interface {
@@ -41,10 +42,10 @@ type assigneeEditor interface {
 }
 
 type lister interface {
-	ListPRs(ctx context.Context, repo string) ([]domain.PR, error)
-	ListIssues(ctx context.Context, repo string) ([]domain.Issue, error)
+	ListPRs(ctx context.Context, repo string) ([]gql.PullRequest, error)
+	ListIssues(ctx context.Context, repo string) ([]gql.Issue, error)
 	RepoName(ctx context.Context) (string, error)
-	ListLabels(ctx context.Context, repo string) ([]domain.Label, error)
+	ListLabels(ctx context.Context, repo string) ([]gql.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 

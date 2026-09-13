@@ -177,13 +177,13 @@ func (c *Client) ReopenIssue(repo string, number int) error {
 	return err
 }
 
-func (c *Client) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
+func (c *Client) ListLabels(ctx context.Context, repo string) ([]gql.Label, error) {
 	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
 	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
 	}
-	var labels []domain.Label
+	var labels []gql.Label
 	if err := json.Unmarshal(out, &labels); err != nil {
 		return nil, fmt.Errorf("parse label list: %w", err)
 	}
@@ -206,7 +206,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	var users []domain.Author
+	var users []gql.Author
 	if err := json.Unmarshal(out, &users); err != nil {
 		return nil, fmt.Errorf("parse assignees: %w", err)
 	}

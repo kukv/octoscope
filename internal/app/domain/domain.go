@@ -36,18 +36,18 @@ func SplitRepo(repo string) (owner, name string, ok bool) {
 }
 
 type Author struct {
-	Login string `json:"login"`
+	Login string
 }
 
 type Label struct {
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	Name  string
+	Color string
 }
 
 type Comment struct {
-	Author    Author    `json:"author"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"createdAt"`
+	Author    Author
+	Body      string
+	CreatedAt time.Time
 }
 
 // ItemState is whether a pull request or an issue is still open, translated
