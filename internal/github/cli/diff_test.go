@@ -16,7 +16,7 @@ import (
 // be, not any particular content of it.
 func readSample(t *testing.T) []byte {
 	t.Helper()
-	b, err := os.ReadFile("../testdata/sample.diff")
+	b, err := os.ReadFile("../../gh/testdata/sample.diff")
 	if err != nil {
 		t.Fatal(err)
 	}

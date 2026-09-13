@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // remoteTimeout bounds the one local subprocess this package runs. gh's own

@@ -30,11 +30,11 @@ linters:
           files:
             - "**/internal/tui/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/gh/cli
+            - pkg: github.com/kukv/octoscope/internal/github/cli
               desc: views go through internal/app/usecase; only cmd/octoscope names a backend
-            - pkg: github.com/kukv/octoscope/internal/gh/gql
+            - pkg: github.com/kukv/octoscope/internal/github/gql
               desc: views go through internal/app/usecase; only cmd/octoscope names a backend
-            - pkg: github.com/kukv/octoscope/internal/gh/api
+            - pkg: github.com/kukv/octoscope/internal/github/api
               desc: views go through internal/app/usecase; only cmd/octoscope names a backend
             - pkg: github.com/kukv/octoscope/internal/app/config
               desc: settings reach the views through app.Options; cmd/octoscope reads them
@@ -244,20 +244,20 @@ linters:
         linters:
           - gosec
       # gosec G204 flags exec.Command whenever its args are not literal
-      # constants. internal/gh/cli exists specifically to run "gh" with a
+      # constants. internal/github/cli exists specifically to run "gh" with a
       # dynamic subcommand and flags built from typed values (see the
       # comment at the call site); there is exactly one call site, and no
       # amount of restructuring removes the "args are a variable" shape the
       # rule matches on. Excluding it here keeps the exception in one place
       # instead of a scattered //nolint.
-      - path: internal/gh/cli/cli\.go
+      - path: internal/github/cli/cli\.go
         linters:
           - gosec
         text: "G204"
-      # Same shape in internal/gh/api: the one subprocess it runs is "git
+      # Same shape in internal/github/api: the one subprocess it runs is "git
       # remote get-url origin", with arguments that are this package's own
       # literals, never external input (see the comment at the call site).
-      - path: internal/gh/api/repo\.go
+      - path: internal/github/api/repo\.go
         linters:
           - gosec
         text: "G204"

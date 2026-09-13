@@ -13,7 +13,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/config"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh/api"
+	"github.com/kukv/octoscope/internal/github/api"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/app"
 	"github.com/kukv/octoscope/internal/tui/icon"

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // recorded is what the stand-in GitHub was sent. The handler fills it while

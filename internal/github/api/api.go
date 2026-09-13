@@ -13,7 +13,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // responseTimeout bounds how long GitHub has to start answering: the time to

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // defaultBase is github.com's API root. GitHub Enterprise is out of scope for

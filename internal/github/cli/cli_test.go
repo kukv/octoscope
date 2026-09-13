@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // fakeRun records invocations and returns canned output.

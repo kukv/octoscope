@@ -13,7 +13,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/gql"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // listLimit is how many items gh label list is asked for. It fetches 30 by

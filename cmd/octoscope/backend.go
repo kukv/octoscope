@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/kukv/octoscope/internal/gh"
-	"github.com/kukv/octoscope/internal/gh/api"
-	"github.com/kukv/octoscope/internal/gh/cli"
+	"github.com/kukv/octoscope/internal/github/api"
+	"github.com/kukv/octoscope/internal/github/cli"
 )
 
 // chooseBackend picks which client talks to GitHub. gh comes first: it is
