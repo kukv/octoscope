@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -26,16 +27,17 @@ func readSample(t *testing.T) []byte {
 func TestPRDiffBuildsTheCommand(t *testing.T) {
 	c := New("/w", "kukv/koto")
 	var got []string
+	sample := readSample(t)
 	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		got = args
-		return readSample(t), nil
+		return sample, nil
 	}
-	files, err := c.PRDiff(context.Background(), "", 128)
+	diff, err := c.PRDiff(context.Background(), "", 128)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) == 0 {
-		t.Fatal("no files parsed from the sample diff")
+	if !bytes.Equal(diff.Raw, sample) || diff.Files != nil {
+		t.Fatal("PRDiff() did not return gh pr diff's raw output as Raw")
 	}
 	want := []string{"pr", "diff", "128", "--color", "never", "--repo", "kukv/koto"}
 	if len(got) != len(want) {
@@ -60,7 +62,7 @@ func TestPRDiffFallsBackToTheFilesAPI(t *testing.T) {
 		}
 		return []byte(`[{"filename":"a.go","status":"modified","additions":1,"deletions":1,"patch":"@@ -1,1 +1,1 @@\n-old\n+new"}]`), nil
 	}
-	files, err := c.PRDiff(context.Background(), "", 412)
+	diff, err := c.PRDiff(context.Background(), "", 412)
 	if err != nil {
 		t.Fatalf("PRDiff() error = %v, want nil", err)
 	}
@@ -83,11 +85,11 @@ func TestPRDiffFallsBackToTheFilesAPI(t *testing.T) {
 	if !strings.Contains(fallback[1], "per_page=100") {
 		t.Errorf("fallback path = %q, want per_page=100 (30 files a page is 14 requests for this pull request)", fallback[1])
 	}
-	if len(files) != 1 || files[0].Path != "a.go" || files[0].Additions != 1 || files[0].Deletions != 1 {
-		t.Errorf("files = %+v, want one parsed file", files)
+	if diff.Raw != nil {
+		t.Errorf("Raw = %v, want nil once the fallback answered", diff.Raw)
 	}
-	if len(files[0].Hunks) != 1 || len(files[0].Hunks[0].Lines) != 2 {
-		t.Fatalf("hunks = %+v, want one hunk of two lines", files[0].Hunks)
+	if len(diff.Files) != 1 || diff.Files[0].Filename != "a.go" || diff.Files[0].Additions != 1 || diff.Files[0].Deletions != 1 {
+		t.Errorf("files = %+v, want one parsed file", diff.Files)
 	}
 }
 
@@ -129,29 +131,8 @@ func TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail(t *testing.T) {
 	}
 }
 
-func TestDiffLineNamesTheSideToCommentOn(t *testing.T) {
-	tests := []struct {
-		name string
-		line domain.DiffLine
-		num  int
-		side domain.DiffSide
-	}{
-		{"removed lines quote the left", domain.DiffLine{Kind: domain.LineRemoved, OldLine: 14}, 14, domain.SideLeft},
-		{"added lines quote the right", domain.DiffLine{Kind: domain.LineAdded, NewLine: 15}, 15, domain.SideRight},
-		{"context quotes the right", domain.DiffLine{Kind: domain.LineContext, OldLine: 12, NewLine: 12}, 12, domain.SideRight},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			num, side := tt.line.Line()
-			if num != tt.num || side != tt.side {
-				t.Errorf("Line() = %d %v, want %d %v", num, side, tt.num, tt.side)
-			}
-		})
-	}
-}
-
 // prFiles is what PRDiff falls back to when `gh pr diff` fails; the recording
-// proves parseBarePatch is fed the shape GitHub actually sends there.
+// proves ParseFilesAPI is fed the shape GitHub actually sends there.
 func TestPRFilesParsesARecordedResponse(t *testing.T) {
 	c, _ := newTestClient(readTestdata(t, "pr_files.json"), nil)
 
@@ -163,8 +144,8 @@ func TestPRFilesParsesARecordedResponse(t *testing.T) {
 		t.Fatal("no files parsed out of the recording")
 	}
 	for _, f := range files {
-		if f.Path == "" {
-			t.Error("a file has no path")
+		if f.Filename == "" {
+			t.Error("a file has no filename")
 		}
 	}
 }

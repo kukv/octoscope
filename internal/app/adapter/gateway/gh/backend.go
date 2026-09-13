@@ -68,8 +68,8 @@ type repoFinder interface {
 }
 
 type reviewFetcher interface {
-	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
-	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
+	PRDiff(ctx context.Context, repo string, number int) (github.Diff, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (gql.ReviewContext, error)
 }
 
 type reviewer interface {

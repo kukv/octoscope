@@ -151,58 +151,9 @@ func TestBarePatchParserMatchesTheFullDiffParser(t *testing.T) {
 	if j < 0 {
 		t.Fatal("no hunk header found after the diff --git line")
 	}
-	bare := parseBarePatch(string(sample[i+j:]))
+	bare := ParseBarePatch(string(sample[i+j:]))
 
 	if !reflect.DeepEqual(bare, full[0].Hunks) {
 		t.Errorf("bare-patch hunks = %+v, want the same as the full-diff parser: %+v", bare, full[0].Hunks)
-	}
-}
-
-// TestFileStatusFromAPIMapsEveryValue guards the files API's status
-// spelling, including GitHub saying "removed" rather than "deleted".
-func TestFileStatusFromAPIMapsEveryValue(t *testing.T) {
-	tests := []struct {
-		api  string
-		want FileStatus
-	}{
-		{"added", FileAdded},
-		{"removed", FileDeleted},
-		{"modified", FileModified},
-		{"renamed", FileRenamed},
-		{"copied", FileCopied},
-		{"changed", FileChanged},
-		{"unchanged", FileUnchanged},
-	}
-	for _, tt := range tests {
-		t.Run(tt.api, func(t *testing.T) {
-			if got := fileStatusFromAPI(tt.api); got != tt.want {
-				t.Errorf("fileStatusFromAPI(%q) = %v, want %v", tt.api, got, tt.want)
-			}
-		})
-	}
-}
-
-// TestPRFileWithNoPatchIsMarkedOmitted covers a file too large or binary for
-// GitHub to send a patch for: absent, not empty, and different from Binary.
-func TestPRFileWithNoPatchIsMarkedOmitted(t *testing.T) {
-	e := prFileJSON{Filename: "huge.bin", Status: "modified"}
-	f := e.toDomain()
-	if !f.PatchOmitted {
-		t.Error("PatchOmitted = false, want true for a file with no patch field")
-	}
-	if len(f.Hunks) != 0 {
-		t.Errorf("hunks = %v, want none", f.Hunks)
-	}
-}
-
-// TestPRFileRenameCarriesBothPaths guards previous_filename -> OldPath.
-func TestPRFileRenameCarriesBothPaths(t *testing.T) {
-	e := prFileJSON{Filename: "b.md", PreviousFilename: "a.md", Status: "renamed"}
-	f := e.toDomain()
-	if f.Path != "b.md" || f.OldPath != "a.md" {
-		t.Errorf("path = %q, old = %q, want b.md / a.md", f.Path, f.OldPath)
-	}
-	if f.Status != FileRenamed {
-		t.Errorf("status = %v, want FileRenamed", f.Status)
 	}
 }

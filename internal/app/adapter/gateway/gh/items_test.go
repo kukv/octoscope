@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -16,8 +17,10 @@ import (
 // panics loudly if a test calls a method it did not mean to exercise.
 type fakeBackend struct {
 	backend
-	getPR    func(ctx context.Context, repo string, number int) (gql.PullRequest, error)
-	getIssue func(ctx context.Context, repo string, number int) (gql.Issue, error)
+	getPR           func(ctx context.Context, repo string, number int) (gql.PullRequest, error)
+	getIssue        func(ctx context.Context, repo string, number int) (gql.Issue, error)
+	prDiff          func(ctx context.Context, repo string, number int) (github.Diff, error)
+	prReviewContext func(ctx context.Context, repo string, number int) (gql.ReviewContext, error)
 }
 
 func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error) {

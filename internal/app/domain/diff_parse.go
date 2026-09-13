@@ -3,8 +3,6 @@ package domain
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -34,80 +32,12 @@ func ParseDiff(b []byte) []FileDiff {
 	return p.done()
 }
 
-// ParseFilesAPI decodes the files API's answer, which is what a diff falls
-// back to. Both backends read the same shape: the cli one through gh api, the
-// api one through the endpoint itself.
-func ParseFilesAPI(out []byte) ([]FileDiff, error) {
-	var entries []prFileJSON
-	if err := json.Unmarshal(out, &entries); err != nil {
-		return nil, fmt.Errorf("parse pr files: %w", err)
-	}
-	files := make([]FileDiff, len(entries))
-	for i, e := range entries {
-		files[i] = e.toDomain()
-	}
-	return files, nil
-}
-
-// prFileJSON is one entry of the files API's response.
-type prFileJSON struct {
-	Filename         string  `json:"filename"`
-	PreviousFilename string  `json:"previous_filename"`
-	Status           string  `json:"status"`
-	Additions        int     `json:"additions"`
-	Deletions        int     `json:"deletions"`
-	Patch            *string `json:"patch"`
-}
-
-// toDomain converts one files-API entry. Patch is a pointer because GitHub
-// omits the field entirely for a file it declines to send a diff for (too
-// large, or binary); that is PatchOmitted, not Binary, since the files API
-// gives no way to tell a binary file apart from any other reason GitHub left
-// the patch out.
-func (e prFileJSON) toDomain() FileDiff {
-	f := FileDiff{
-		Path:      e.Filename,
-		OldPath:   e.PreviousFilename,
-		Status:    fileStatusFromAPI(e.Status),
-		Additions: e.Additions,
-		Deletions: e.Deletions,
-	}
-	if e.Patch == nil {
-		f.PatchOmitted = true
-		return f
-	}
-	f.Hunks = parseBarePatch(*e.Patch)
-	return f
-}
-
-// fileStatusFromAPI translates the files API's status spelling. GitHub says
-// "removed", not "deleted"; anything unrecognised (including "modified")
-// falls back to FileModified.
-func fileStatusFromAPI(s string) FileStatus {
-	switch s {
-	case "added":
-		return FileAdded
-	case "removed":
-		return FileDeleted
-	case "renamed":
-		return FileRenamed
-	case "copied":
-		return FileCopied
-	case "changed":
-		return FileChanged
-	case "unchanged":
-		return FileUnchanged
-	default:
-		return FileModified
-	}
-}
-
-// parseBarePatch reads the hunks out of a files-API patch: unified diff
+// ParseBarePatch reads the hunks out of a files-API patch: unified diff
 // hunks with no "diff --git" header and no ---/+++ lines. It walks the same
 // diffParser used for a full gh pr diff, entering it already "inside" a
 // file, so the hunk-header parsing (hunkStarts, with its function-context
 // fix) is shared rather than duplicated.
-func parseBarePatch(patch string) []Hunk {
+func ParseBarePatch(patch string) []Hunk {
 	p := &diffParser{file: &FileDiff{}}
 	s := bufio.NewScanner(strings.NewReader(patch))
 	s.Buffer(make([]byte, 0, scanBufInit), scanBufMax)
