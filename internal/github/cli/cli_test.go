@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -519,7 +520,7 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 		"SubmitNewReview":    func(c *Client) error { return c.SubmitNewReview("id", gql.EventApprove, "") },
 		"DiscardReview":      func(c *Client) error { return c.DiscardReview("id") },
 		"RerunWorkflow": func(c *Client) error {
-			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), domain.RerunFailed)
+			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), github.RerunFailed)
 		},
 	}
 	for name, call := range writes {

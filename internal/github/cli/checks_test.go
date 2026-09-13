@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/github"
 )
 
 // fileRun returns a run function that answers every call with one recorded
@@ -66,7 +66,7 @@ func TestALineWithoutATimestampKeepsItsText(t *testing.T) {
 	}
 	// The recording has continuation lines: the osv-scanner step's scan-args
 	// wrap onto lines the runner did not stamp.
-	i := slices.IndexFunc(lines, func(l domain.LogLine) bool { return l.Time.IsZero() })
+	i := slices.IndexFunc(lines, func(l github.LogLine) bool { return l.Time.IsZero() })
 	if i < 0 {
 		t.Fatalf("no continuation line among %d lines; the recording has some", len(lines))
 	}
@@ -146,7 +146,7 @@ func TestRerunFailedNamesTheRunAndAsksOnlyForFailedJobs(t *testing.T) {
 		got = args
 		return nil, nil
 	}
-	if err := c.RerunWorkflow(context.Background(), "", 34087925535, domain.RerunFailed); err != nil {
+	if err := c.RerunWorkflow(context.Background(), "", 34087925535, github.RerunFailed); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
 	if len(got) < 3 || got[0] != "run" || got[1] != "rerun" || got[2] != "34087925535" {
@@ -169,7 +169,7 @@ func TestRerunOfTheWholeRunPassesNoFailedFlag(t *testing.T) {
 		got = args
 		return nil, nil
 	}
-	if err := c.RerunWorkflow(context.Background(), "", 34087925535, domain.RerunAll); err != nil {
+	if err := c.RerunWorkflow(context.Background(), "", 34087925535, github.RerunAll); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
 	if slices.Contains(got, "--failed") {

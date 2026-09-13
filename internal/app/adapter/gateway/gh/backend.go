@@ -85,9 +85,9 @@ type opener interface {
 }
 
 type checksFetcher interface {
-	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
+	PRChecks(ctx context.Context, repo string, number int) ([]gql.CheckRun, error)
+	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]github.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, runID int64, scope github.RerunScope) error
 }
 
 type merger interface {
