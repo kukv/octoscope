@@ -191,7 +191,7 @@ func TestABoxedCardIsSixLines(t *testing.T) {
 	it := sampleWork()[domain.SectionReviewRequested][0] // a PR with failing checks
 
 	lines := m.card(it, boardClock, w, false)
-	if len(lines) != m.cardHeight() || len(lines) != titleLines+4 {
+	if len(lines) != cardHeight() || len(lines) != titleLines+4 {
 		t.Fatalf("a boxed card is %d lines, want %d:\n%s",
 			len(lines), titleLines+4, strings.Join(lines, "\n"))
 	}
@@ -212,26 +212,32 @@ func TestABoxedCardIsSixLines(t *testing.T) {
 	}
 }
 
-// TestANarrowCardLosesItsBox is the degradation step the boxes forced: below
-// a hundred columns the drawer and the fourth column go, and a border would
-// cost two lines of every card on a screen that is usually short too.
-func TestANarrowCardLosesItsBox(t *testing.T) {
-	const w = 38
-	m := boardOf(80)
+// TestEveryCardHasABox is what replaced the narrow, borderless card: the
+// board gives up a column before a column gets narrow enough for a border to
+// matter, and the box is what marks the selection.
+func TestEveryCardHasABox(t *testing.T) {
 	it := sampleWork()[domain.SectionReviewRequested][0]
+	for _, width := range []int{50, 80, 110, 160} {
+		m := boardOf(width)
+		w := m.columnWidth(m.columnsFor())
 
-	lines := m.card(it, boardClock, w, false)
-	if len(lines) != m.cardHeight() || len(lines) != titleLines+2 {
-		t.Fatalf("an unboxed card is %d lines, want %d:\n%s",
-			len(lines), titleLines+2, strings.Join(lines, "\n"))
-	}
-	for i, line := range lines {
-		if got := ansi.StringWidth(line); got != w {
-			t.Errorf("line %d is %d columns, want %d: %q", i+1, got, w, ansi.Strip(line))
+		lines := m.card(it, boardClock, w, false)
+		if len(lines) != cardHeight() {
+			t.Errorf("width %d: a card is %d lines, want %d:\n%s",
+				width, len(lines), cardHeight(), strings.Join(lines, "\n"))
 		}
-	}
-	if strings.Contains(ansi.Strip(lines[0]), "╭") {
-		t.Error("the card still has a box below a hundred columns")
+		last := len(lines) - 1
+		if !strings.HasPrefix(ansi.Strip(lines[0]), "╭") ||
+			!strings.HasPrefix(ansi.Strip(lines[last]), "╰") {
+			t.Errorf("width %d: the card has no box:\n%s",
+				width, ansi.Strip(strings.Join(lines, "\n")))
+		}
+		for i, line := range lines {
+			if got := ansi.StringWidth(line); got != w {
+				t.Errorf("width %d line %d is %d columns, want %d: %q",
+					width, i+1, got, w, ansi.Strip(line))
+			}
+		}
 	}
 }
 
@@ -240,10 +246,9 @@ func TestANarrowCardLosesItsBox(t *testing.T) {
 // board gathers work from every repository the user touches, and half of them
 // are not theirs.
 func TestTheCardHeadNamesTheRepositoryInFull(t *testing.T) {
-	m := boardOf(80)
 	it := sampleWork()[domain.SectionReviewRequested][0] // kukv/octoscope#12
 
-	head := ansi.Strip(m.cardHead(it, 36, false, gutter))
+	head := ansi.Strip(cardHead(it, 36))
 	if !strings.Contains(head, "kukv/octoscope") {
 		t.Errorf("the owner is missing from the first line: %q", head)
 	}
@@ -256,7 +261,6 @@ func TestTheCardHeadNamesTheRepositoryInFull(t *testing.T) {
 // first. The number is what identifies the card; half a repository name is
 // still a hint, half a number is nothing.
 func TestANarrowCardHeadKeepsTheNumberWhole(t *testing.T) {
-	m := boardOf(120)
 	it := domain.WorkItem{
 		Ref: domain.ItemRef{
 			Kind: domain.ItemPR, Repo: "kukv/a-repository-with-a-name-nobody-would-choose", Number: 999,
@@ -264,10 +268,10 @@ func TestANarrowCardHeadKeepsTheNumberWhole(t *testing.T) {
 	}
 
 	const w = 20
-	if full := ansi.Strip(m.cardHead(it, 100, false, "")); ansi.StringWidth(full) <= w {
+	if full := ansi.Strip(cardHead(it, 100)); ansi.StringWidth(full) <= w {
 		t.Fatalf("the head fits in %d columns uncut; this test covers nothing: %q", w, full)
 	}
-	head := ansi.Strip(m.cardHead(it, w, false, ""))
+	head := ansi.Strip(cardHead(it, w))
 	if got := ansi.StringWidth(head); got > w {
 		t.Errorf("the head is %d columns, want at most %d: %q", got, w, head)
 	}
@@ -282,10 +286,9 @@ func TestANarrowCardHeadKeepsTheNumberWhole(t *testing.T) {
 // TestTheTitleLinesCarryOnlyTheTitle pins what moved to the head line: a
 // title line that still spelled the number would spend the columns twice.
 func TestTheTitleLinesCarryOnlyTheTitle(t *testing.T) {
-	m := boardOf(80)
 	it := sampleWork()[domain.SectionReviewRequested][0]
 
-	for i, line := range m.cardTitle(it, 36, false, gutter) {
+	for i, line := range cardTitle(it, 36, false) {
 		got := ansi.Strip(line)
 		if strings.Contains(got, "#12") || strings.Contains(got, "octoscope") {
 			t.Errorf("title line %d repeats the head: %q", i+1, got)
@@ -315,13 +318,12 @@ func TestTheCardMetaIsTheBarThenTheAgeThenTheLabels(t *testing.T) {
 // TestALongTitleRunsOntoTheSecondLine is why the card grew a line: a title
 // cut at the width of one narrow column says nothing about the pull request.
 func TestALongTitleRunsOntoTheSecondLine(t *testing.T) {
-	m := boardOf(80)
 	it := domain.WorkItem{
 		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
 		Title: "replace the whole rendering pipeline with something readable",
 	}
 
-	lines := m.cardTitle(it, 36, false, gutter)
+	lines := cardTitle(it, 36, false)
 	if len(lines) != titleLines {
 		t.Fatalf("the title is %d lines, want %d", len(lines), titleLines)
 	}
@@ -341,7 +343,6 @@ func TestALongTitleRunsOntoTheSecondLine(t *testing.T) {
 // make: a wrap that joined the pieces back with a space, or one whose second
 // line started from the top of the title again, still fits the column.
 func TestAWrappedTitleLosesNothing(t *testing.T) {
-	m := boardOf(80)
 	for name, tc := range map[string]struct{ title, sep string }{
 		// English wraps on a space, and that one space is consumed by the
 		// break. Japanese has no space to break on, so nothing is consumed
@@ -353,9 +354,12 @@ func TestAWrappedTitleLosesNothing(t *testing.T) {
 			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
 			Title: tc.title,
 		}
-		lines := m.cardTitle(it, 36, false, gutter)
-		first := strings.TrimPrefix(ansi.Strip(lines[0]), gutter)
-		second := strings.TrimPrefix(ansi.Strip(lines[1]), gutter)
+		const w = 28
+		if ansi.StringWidth(tc.title) <= w {
+			t.Fatalf("%s: the title fits on one line; this case covers nothing", name)
+		}
+		lines := cardTitle(it, w, false)
+		first, second := ansi.Strip(lines[0]), ansi.Strip(lines[1])
 		if got := first + tc.sep + second; got != tc.title {
 			t.Errorf("%s: the two lines read %q, want the whole title %q", name, got, tc.title)
 		}
@@ -368,13 +372,12 @@ func TestAWrappedTitleLosesNothing(t *testing.T) {
 // whose author wrote none, and only a title that overflows twice shows it.
 func TestAWrappedJapaneseTitleGainsNoSpaces(t *testing.T) {
 	const title = "レンダリングのパイプラインをまるごと置き換えるための大きな変更"
-	m := boardOf(80)
 	it := domain.WorkItem{
 		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
 		Title: title,
 	}
 
-	lines := m.cardTitle(it, 36, false, gutter)
+	lines := cardTitle(it, 36, false)
 	if n := len(strings.Split(ansi.Wrap(title, 28, ""), "\n")); n < 3 {
 		t.Fatalf("the title wraps to %d lines; this test covers nothing", n)
 	}
@@ -397,9 +400,9 @@ func TestAShortTitleStillFillsTheCard(t *testing.T) {
 	}
 	for width, w := range map[int]int{80: 38, 160: 34} {
 		m := boardOf(width)
-		if got := len(m.card(it, boardClock, w, false)); got != m.cardHeight() {
+		if got := len(m.card(it, boardClock, w, false)); got != cardHeight() {
 			t.Errorf("width %d: a short title makes a %d-line card, want %d",
-				width, got, m.cardHeight())
+				width, got, cardHeight())
 		}
 	}
 }
@@ -411,7 +414,7 @@ func TestAShortTitleStillFillsTheCard(t *testing.T) {
 func TestAShortBoardStillDrawsACard(t *testing.T) {
 	m := loaded()
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
-	if m.height-footerHeight-drawerHeight >= headingHeight+m.cardHeight() {
+	if m.height-footerHeight-drawerHeight >= headingHeight+cardHeight() {
 		t.Fatal("ten lines leave room for a card; this test covers nothing")
 	}
 
@@ -542,11 +545,33 @@ func TestEmptyColumnSaysSo(t *testing.T) {
 	}
 }
 
-func TestNarrowTerminalDropsTheDrawer(t *testing.T) {
-	m := loaded()
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
-	if strings.Contains(m.View(), "kukv/octoscope#12") {
-		t.Error("the drawer is still drawn at 80 columns")
+// TestTheDrawerHasItsOwnThreshold keeps the drawer off the column count. It
+// is two panes side by side and costs six lines, so it goes at a width of its
+// own — which leaves a band where the board pages two columns and still shows
+// it.
+func TestTheDrawerHasItsOwnThreshold(t *testing.T) {
+	for _, tc := range []struct {
+		width   int
+		want    bool
+		columns int
+	}{
+		{80, false, 2},
+		{99, false, 2},
+		{100, true, 2},
+		{110, true, 2},
+	} {
+		m := loaded()
+		m, _ = m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})
+		if got := len(headingsOn(m)); got != tc.columns {
+			t.Fatalf("width %d draws %d columns, want %d; this case covers something else",
+				tc.width, got, tc.columns)
+		}
+		// The size of the change is the drawer's alone; a card has no room
+		// for it, and the head line now spells the reference the same way.
+		if got := strings.Contains(ansi.Strip(m.View()), "+218"); got != tc.want {
+			t.Errorf("width %d: drawer drawn = %v, want %v:\n%s",
+				tc.width, got, tc.want, ansi.Strip(m.View()))
+		}
 	}
 }
 
@@ -599,12 +624,12 @@ func TestTheHeadingsAreAllDifferent(t *testing.T) {
 	}
 }
 
-// TestHowManyColumnsFitTheWidth pins the three tiers. Four columns at eighty
-// leave seven columns for a title, which says nothing about the pull request;
-// two columns leave twenty-eight.
+// TestHowManyColumnsFitTheWidth pins where the board gives up a column. Four
+// columns leave a card (W-9)/4-4 wide, which is eighteen columns at a hundred
+// — too narrow for the head line's "owner/name #12".
 func TestHowManyColumnsFitTheWidth(t *testing.T) {
 	for _, tc := range []struct{ width, want int }{
-		{50, 1}, {59, 1}, {60, 2}, {80, 2}, {99, 2}, {100, 4}, {160, 4},
+		{50, 1}, {79, 1}, {80, 2}, {110, 2}, {119, 2}, {120, 4}, {160, 4},
 	} {
 		m := loaded()
 		m, _ = m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})

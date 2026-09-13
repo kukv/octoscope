@@ -21,15 +21,17 @@ const (
 	// side of it.
 	columnGap = 3
 
-	// drawerMinColumns is where the board stops fitting four columns: below it
-	// the board pages two at a time, and the drawer and the boxes go with the
-	// fourth column. A box costs two lines per card, and a terminal this
-	// narrow is usually short as well.
-	drawerMinColumns = 100
+	// twoColumnsBelow and singleColumnBelow are where the board gives up a
+	// column. A card's head line — the marker, "owner/name" and the number —
+	// wants about twenty columns, and four columns leave a card (W-9)/4-4
+	// wide: eighteen at a hundred, twenty-three at a hundred and twenty.
+	twoColumnsBelow   = 120
+	singleColumnBelow = 80
 
-	// singleColumnBelow is where two columns stop fitting and the board pages
-	// one at a time.
-	singleColumnBelow = 60
+	// drawerMinColumns is the drawer's own threshold rather than the column
+	// count's: it is two panes side by side, and a hundred columns leaves
+	// them fifty-eight and thirty-nine.
+	drawerMinColumns = 100
 
 	// footerHeight is the blank line and the key bar under the board.
 	footerHeight = 2
@@ -39,9 +41,9 @@ const (
 	// changed height would move the key bar under the user's eyes.
 	drawerHeight = 6
 
-	// gutter is the column the cursor marker lives in on an unboxed card.
-	// Unselected cards keep it blank rather than closing it up, so card text
-	// does not jump sideways as the cursor moves.
+	// gutter indents what is drawn outside a card — the heading, the spinner,
+	// the empty-column note — by as much as a card's own border and padding,
+	// so a column reads as one edge rather than two.
 	gutter = "  "
 )
 
@@ -108,10 +110,6 @@ func (m Model) keyBar() string {
 
 func (m Model) drawerShown() bool { return m.width >= drawerMinColumns }
 
-// boxed reports whether cards are drawn in their own box. See
-// drawerMinColumns for why the two share a threshold.
-func (m Model) boxed() bool { return m.width >= drawerMinColumns }
-
 // titleLines is fixed rather than fitted to the title. visibleCards,
 // cardWindow and the mouse hit-test all divide by the card height, so a card
 // that shrank with a short title would put them out by however many short
@@ -119,14 +117,8 @@ func (m Model) boxed() bool { return m.width >= drawerMinColumns }
 const titleLines = 2
 
 // cardHeight is how many lines one card occupies: the head line, the title,
-// the meta line under it, and — when there is room for one — the box's two
-// borders.
-func (m Model) cardHeight() int {
-	if m.boxed() {
-		return titleLines + 4
-	}
-	return titleLines + 2
-}
+// the meta line under it, and the box's two borders.
+func cardHeight() int { return titleLines + 4 }
 
 // boardHeight is what is left for the columns once everything drawn below
 // them has been paid for. The whole screen has to fit: a board that grew with
@@ -142,7 +134,7 @@ func (m Model) boardHeight() int {
 	if m.hasNotice() {
 		h--
 	}
-	return max(h, headingHeight+m.cardHeight())
+	return max(h, headingHeight+cardHeight())
 }
 
 // boardTop is the line the board starts on. Paging between single columns
@@ -249,7 +241,7 @@ func (m Model) heading(s domain.WorkSection, n, w int) string {
 
 // visibleCards is how many whole cards fit under a heading.
 func (m Model) visibleCards(height int) int {
-	return max((height-headingHeight)/m.cardHeight(), 1)
+	return max((height-headingHeight)/cardHeight(), 1)
 }
 
 // cardWindow is the first card a column draws. Only the column the cursor is
@@ -266,26 +258,14 @@ func (m Model) cardWindow(s domain.WorkSection, height int) int {
 	return m.row - visible + 1
 }
 
-// card draws one card: what it is on the first line, where it lives and how
-// it is doing on the second. Wide enough, each card gets a box of its own and
-// the selection is the box's colour; narrow, the box is dropped and the cursor
-// gutter marks the selection instead.
+// card draws one card in a box of its own: where it lives on the first line,
+// its title on the next two, how it is doing on the last. The selection is
+// the box's colour and background.
 func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
-	if !m.boxed() {
-		inner := w - len(gutter)
-		lines := append([]string{m.cardHead(it, inner, selected, gutter)},
-			m.cardTitle(it, inner, selected, gutter)...)
-		lines = append(lines, gutter+m.cardMeta(it, at, inner))
-		for i, line := range lines {
-			lines[i] = fit(line, w)
-		}
-		return lines
-	}
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
-	body := append([]string{m.cardHead(it, inner, selected, "")},
-		m.cardTitle(it, inner, selected, "")...)
+	body := append([]string{cardHead(it, inner)}, cardTitle(it, inner, selected)...)
 	body = append(body, m.cardMeta(it, at, inner))
 	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
@@ -297,26 +277,20 @@ func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []st
 //
 // The pieces are styled one at a time rather than as a whole line: a style
 // applied over a coloured marker would end at that marker's own reset.
-func (m Model) cardHead(it domain.WorkItem, w int, selected bool, marker string) string {
-	if selected && marker != "" {
-		marker = theme.Cursor().Render("▸ ")
-	}
-	head := marker + stateMarker(it) + " "
+func cardHead(it domain.WorkItem, w int) string {
+	head := stateMarker(it) + " "
 	number := fmt.Sprintf(" #%d", it.Ref.Number)
 	repo := clip(it.Ref.Repo, max(w-ansi.StringWidth(head)-ansi.StringWidth(number), 0))
 	return head + theme.Dim().Render(repo) + number
 }
 
-// cardTitle is the title alone, over titleLines lines. It is not indented
-// under the head line: lining it up would read better, but the columns it
-// would cost are what the second line was added to win back.
-func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) []string {
-	indent := strings.Repeat(" ", ansi.StringWidth(marker))
-	first, second := wrapTitle(it.Title, max(w-len(indent), 0))
+// cardTitle is the title alone, over titleLines lines.
+func cardTitle(it domain.WorkItem, w int, selected bool) []string {
+	first, second := wrapTitle(it.Title, max(w, 0))
 	if selected {
 		first, second = theme.Cursor().Render(first), theme.Cursor().Render(second)
 	}
-	return []string{indent + first, indent + second}
+	return []string{first, second}
 }
 
 // wrapTitle folds a title over two lines of w columns each.
@@ -412,7 +386,7 @@ func (m Model) columnsFor() int {
 	switch {
 	case m.width < singleColumnBelow:
 		return 1
-	case m.width < drawerMinColumns:
+	case m.width < twoColumnsBelow:
 		return 2
 	default:
 		return m.columns()

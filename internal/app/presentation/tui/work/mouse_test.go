@@ -230,10 +230,6 @@ func TestClickingACardInAScrolledColumn(t *testing.T) {
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = answeredAll(m, w)
-	if !m.boxed() {
-		t.Fatal("the cards are not boxed at 120 columns; this test covers nothing")
-	}
-
 	// Walk the cursor past the last visible card, so the column is scrolled.
 	visible := m.visibleCards(m.boardHeight())
 	for range visible + 2 {

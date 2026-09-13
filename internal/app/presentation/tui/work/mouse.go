@@ -92,7 +92,7 @@ func (m Model) cardAt(x, y int) (col, row int, ok bool) {
 		return 0, 0, false
 	}
 	section := domain.WorkSections()[col]
-	row = m.cardWindow(section, height) + y/m.cardHeight()
+	row = m.cardWindow(section, height) + y/cardHeight()
 	if row >= len(m.work[section]) {
 		return 0, 0, false
 	}
