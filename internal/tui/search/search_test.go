@@ -8,31 +8,31 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type fakeSource struct {
 	query string
-	items []gh.WorkItem
+	items []domain.WorkItem
 	err   error
 
-	labels    []gh.Label
+	labels    []domain.Label
 	labelRepo string
 
 	users      []string
 	authorRepo string
 }
 
-func (f *fakeSource) SearchItems(_ context.Context, query string) ([]gh.WorkItem, error) {
+func (f *fakeSource) SearchItems(_ context.Context, query string) ([]domain.WorkItem, error) {
 	f.query = query
 	return f.items, f.err
 }
 
 func (f *fakeSource) OpenWeb(string) error { return nil }
 
-func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]gh.Label, error) {
+func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]domain.Label, error) {
 	f.labelRepo = repo
 	return f.labels, nil
 }
@@ -123,7 +123,7 @@ func TestTheFirstSearchAsksForWhatTheFormMeans(t *testing.T) {
 func TestTheResultsArriveOnTheModel(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{items: []gh.WorkItem{{Title: "fix the thing"}}}
+	src := &fakeSource{items: []domain.WorkItem{{Title: "fix the thing"}}}
 	m := New(src)
 	m = resolve(t, m, m.Init())
 
@@ -161,7 +161,7 @@ func TestAFatalFailureGoesToTheRoot(t *testing.T) {
 	t.Parallel()
 
 	m := New(&fakeSource{})
-	_, cmd := m.Update(errMsg{gen: m.gen, err: gh.ErrGhNotFound})
+	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrGhNotFound})
 	if cmd == nil {
 		t.Fatal("no message went to the root")
 	}
@@ -177,8 +177,8 @@ func TestAnOldAnswerIsDropped(t *testing.T) {
 	src := &fakeSource{}
 	m := New(src)
 	m.gen = 2
-	m.items = []gh.WorkItem{{Title: "current"}}
-	next, _ := m.Update(itemsMsg{gen: 1, items: []gh.WorkItem{{Title: "stale"}}})
+	m.items = []domain.WorkItem{{Title: "current"}}
+	next, _ := m.Update(itemsMsg{gen: 1, items: []domain.WorkItem{{Title: "stale"}}})
 	if next.items[0].Title != "current" {
 		t.Errorf("items = %v, want the stale answer dropped", next.items)
 	}
@@ -312,8 +312,8 @@ func TestEnterOnAPickedFilterDropsTheRawQuery(t *testing.T) {
 func TestEnterOnAResultOpensIt(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 120, []gh.WorkItem{{
-		Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 41},
+	m := sized(t, 120, []domain.WorkItem{{
+		Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 41},
 	}})
 	m, _ = press(m, "l")
 	_, cmd := press(m, "enter")
@@ -456,8 +456,8 @@ func TestTheNoticeShowsWhileThePickerIsOpen(t *testing.T) {
 func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 80, []gh.WorkItem{{
-		Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 1},
+	m := sized(t, 80, []domain.WorkItem{{
+		Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1},
 	}})
 	_, cmd := press(m, "enter")
 	if cmd == nil {
@@ -549,7 +549,7 @@ func resolveCandidates(t *testing.T, m Model) Model {
 func TestNoCandidatesUntilARepositoryIsNamed(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{labels: []gh.Label{{Name: "bug"}}}
+	src := &fakeSource{labels: []domain.Label{{Name: "bug"}}}
 	m := New(src)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())
@@ -566,7 +566,7 @@ func TestNoCandidatesUntilARepositoryIsNamed(t *testing.T) {
 func TestTheLabelsOfTheNamedRepositoryAreOffered(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{labels: []gh.Label{{Name: "bug"}, {Name: "enhancement"}}}
+	src := &fakeSource{labels: []domain.Label{{Name: "bug"}, {Name: "enhancement"}}}
 	m := New(src)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())
@@ -585,7 +585,7 @@ func TestTheLabelsOfTheNamedRepositoryAreOffered(t *testing.T) {
 func TestTheSameRepositoryIsNotAskedForTwice(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{labels: []gh.Label{{Name: "bug"}}}
+	src := &fakeSource{labels: []domain.Label{{Name: "bug"}}}
 	m := New(src)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())
@@ -785,7 +785,7 @@ func TestEscapeClosesThePopup(t *testing.T) {
 func TestClearingTheRepoHidesItsStaleCandidates(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{labels: []gh.Label{{Name: "bug"}}}
+	src := &fakeSource{labels: []domain.Label{{Name: "bug"}}}
 	m := New(src)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())

@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/browser"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -85,18 +85,18 @@ func classify(err error) error {
 	msg := err.Error()
 	for _, status := range []string{"HTTP 502", "HTTP 503", "HTTP 504"} {
 		if strings.Contains(msg, status) {
-			return gh.Classify(gh.ErrTransient, msg)
+			return domain.Classify(domain.ErrTransient, msg)
 		}
 	}
 	if strings.Contains(msg, "Bad credentials") || strings.Contains(msg, "gh auth login") {
-		return gh.Classify(gh.ErrUnauthenticated, msg)
+		return domain.Classify(domain.ErrUnauthenticated, msg)
 	}
 	return err
 }
 
 func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	if _, err := exec.LookPath("gh"); err != nil {
-		return nil, gh.ErrGhNotFound
+		return nil, domain.ErrGhNotFound
 	}
 	// gh subcommand args are built internally from typed values (subcommand,
 	// numbers, flags), never from untrusted external input.
@@ -119,7 +119,7 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 // back, not that nothing arrived, so a repeated write could apply twice.
 func (c *Client) read(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	out, err := c.run(ctx, dir, args...)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, gh.ErrTransient) {
+	if err == nil || ctx.Err() != nil || !errors.Is(err, domain.ErrTransient) {
 		return out, err
 	}
 	return c.run(ctx, dir, args...)
@@ -177,13 +177,13 @@ func (c *Client) ReopenIssue(repo string, number int) error {
 	return err
 }
 
-func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
+func (c *Client) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
 	out, err := c.read(ctx, c.dir, args...)
 	if err != nil {
 		return nil, err
 	}
-	var labels []gh.Label
+	var labels []domain.Label
 	if err := json.Unmarshal(out, &labels); err != nil {
 		return nil, fmt.Errorf("parse label list: %w", err)
 	}
@@ -206,7 +206,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	var users []gh.Author
+	var users []domain.Author
 	if err := json.Unmarshal(out, &users); err != nil {
 		return nil, fmt.Errorf("parse assignees: %w", err)
 	}

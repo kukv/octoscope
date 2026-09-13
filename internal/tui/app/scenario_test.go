@@ -10,8 +10,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -19,32 +19,32 @@ import (
 // next fetch sees it. app_test.go's fakeSource returns fixed values, which
 // cannot show a scenario reaching its end.
 type scenarioSource struct {
-	pr      gh.PR
-	files   []gh.FileDiff
-	labels  []gh.Label
-	threads []gh.ReviewThread
-	checks  gh.Checks
+	pr      domain.PR
+	files   []domain.FileDiff
+	labels  []domain.Label
+	threads []domain.ReviewThread
+	checks  domain.Checks
 
 	pendingID string
-	posted    []gh.PendingComment
+	posted    []domain.PendingComment
 
 	prRepos    []string
 	issueRepos []string
 
-	found []gh.RepoCandidate
-	seed  []gh.RepoCandidate
+	found []domain.RepoCandidate
+	seed  []domain.RepoCandidate
 	saved []string
 }
 
-func (f *scenarioSource) SearchRepos(context.Context, string, int) ([]gh.RepoCandidate, error) {
+func (f *scenarioSource) SearchRepos(context.Context, string, int) ([]domain.RepoCandidate, error) {
 	return f.found, nil
 }
 
-func (f *scenarioSource) SearchItems(context.Context, string) ([]gh.WorkItem, error) {
+func (f *scenarioSource) SearchItems(context.Context, string) ([]domain.WorkItem, error) {
 	return nil, nil
 }
 
-func (f *scenarioSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+func (f *scenarioSource) SeedCandidates(context.Context) ([]domain.RepoCandidate, error) {
 	return f.seed, nil
 }
 
@@ -55,38 +55,38 @@ func (f *scenarioSource) SaveRepositories(repos []string) error {
 
 func (f *scenarioSource) SaveQueries([]usecase.SavedQuery) error { return nil }
 
-func (f *scenarioSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
-	if s != gh.SectionReviewRequested {
+func (f *scenarioSource) ListWorkSection(_ context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
+	if s != domain.SectionReviewRequested {
 		return nil, nil
 	}
-	return []gh.WorkItem{{
-		Ref:       gh.ItemRef{Kind: gh.ItemPR, Number: f.pr.Number},
+	return []domain.WorkItem{{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: f.pr.Number},
 		Title:     f.pr.Title,
 		Author:    f.pr.Author.Login,
 		UpdatedAt: f.pr.UpdatedAt,
 	}}, nil
 }
 
-func (f *scenarioSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
+func (f *scenarioSource) ListPRs(_ context.Context, repo string) ([]domain.PR, error) {
 	f.prRepos = append(f.prRepos, repo)
-	return []gh.PR{f.pr}, nil
+	return []domain.PR{f.pr}, nil
 }
 
-func (f *scenarioSource) ListIssues(_ context.Context, repo string) ([]gh.Issue, error) {
+func (f *scenarioSource) ListIssues(_ context.Context, repo string) ([]domain.Issue, error) {
 	f.issueRepos = append(f.issueRepos, repo)
 	return nil, nil
 }
 
 func (f *scenarioSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
 
-func (f *scenarioSource) RepoCounts(context.Context, []string) ([]gh.RepoCount, error) {
+func (f *scenarioSource) RepoCounts(context.Context, []string) ([]domain.RepoCount, error) {
 	return nil, nil
 }
 
-func (f *scenarioSource) GetItem(context.Context, gh.ItemRef) (usecase.Item, error) {
+func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (usecase.Item, error) {
 	pr := f.pr
 	return usecase.Item{
-		Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
+		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
 		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
 		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
 		PR: &pr,
@@ -95,25 +95,25 @@ func (f *scenarioSource) GetItem(context.Context, gh.ItemRef) (usecase.Item, err
 
 func (f *scenarioSource) OpenWeb(string) error { return nil }
 
-func (f *scenarioSource) AddComment(_ gh.ItemRef, body string) error {
-	f.pr.Comments = append(f.pr.Comments, gh.Comment{
-		Author: gh.Author{Login: "kukv"}, Body: body, CreatedAt: scenarioAt,
+func (f *scenarioSource) AddComment(_ domain.ItemRef, body string) error {
+	f.pr.Comments = append(f.pr.Comments, domain.Comment{
+		Author: domain.Author{Login: "kukv"}, Body: body, CreatedAt: scenarioAt,
 	})
 	return nil
 }
 
-func (f *scenarioSource) SetState(_ gh.ItemRef, closing bool) error {
+func (f *scenarioSource) SetState(_ domain.ItemRef, closing bool) error {
 	if closing {
-		f.pr.State = gh.StateClosed
+		f.pr.State = domain.StateClosed
 	} else {
-		f.pr.State = gh.StateOpen
+		f.pr.State = domain.StateOpen
 	}
 	return nil
 }
 
-func (f *scenarioSource) EditLabels(_ gh.ItemRef, add, remove []string) error {
+func (f *scenarioSource) EditLabels(_ domain.ItemRef, add, remove []string) error {
 	for _, name := range add {
-		f.pr.Labels = append(f.pr.Labels, gh.Label{Name: name})
+		f.pr.Labels = append(f.pr.Labels, domain.Label{Name: name})
 	}
 	for _, name := range remove {
 		kept := f.pr.Labels[:0]
@@ -127,68 +127,68 @@ func (f *scenarioSource) EditLabels(_ gh.ItemRef, add, remove []string) error {
 	return nil
 }
 
-func (f *scenarioSource) EditAssignees(gh.ItemRef, []string, []string) error { return nil }
+func (f *scenarioSource) EditAssignees(domain.ItemRef, []string, []string) error { return nil }
 
-func (f *scenarioSource) ListLabels(context.Context, string) ([]gh.Label, error) {
+func (f *scenarioSource) ListLabels(context.Context, string) ([]domain.Label, error) {
 	return f.labels, nil
 }
 
 func (f *scenarioSource) ListAssignees(context.Context, string) ([]string, error) { return nil, nil }
 
-func (f *scenarioSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error) {
+func (f *scenarioSource) PRDiff(context.Context, string, int) ([]domain.FileDiff, error) {
 	return f.files, nil
 }
 
-func (f *scenarioSource) PRReviewContext(context.Context, string, int) (gh.ReviewContext, error) {
-	return gh.ReviewContext{
+func (f *scenarioSource) PRReviewContext(context.Context, string, int) (domain.ReviewContext, error) {
+	return domain.ReviewContext{
 		PullRequestID: "PR_1", PendingID: f.pendingID, Threads: f.threads,
 	}, nil
 }
 
 // PostLineComment starts the pending review the first time, the way the
 // usecase does.
-func (f *scenarioSource) PostLineComment(_ usecase.ReviewTarget, c gh.PendingComment) (string, error) {
+func (f *scenarioSource) PostLineComment(_ usecase.ReviewTarget, c domain.PendingComment) (string, error) {
 	f.posted = append(f.posted, c)
 	f.pendingID = "PRR_1"
-	f.threads = append(f.threads, gh.ReviewThread{
+	f.threads = append(f.threads, domain.ReviewThread{
 		Path: c.Path, Line: c.Line, Side: c.Side,
-		Comments: []gh.ThreadComment{{Author: gh.Author{Login: "kukv"}, Body: c.Body, Pending: true}},
+		Comments: []domain.ThreadComment{{Author: domain.Author{Login: "kukv"}, Body: c.Body, Pending: true}},
 	})
 	return f.pendingID, nil
 }
 
 func (f *scenarioSource) DiscardReview(string) error { return nil }
 
-func (f *scenarioSource) SubmitReview(usecase.ReviewTarget, gh.ReviewEvent, string) error {
+func (f *scenarioSource) SubmitReview(usecase.ReviewTarget, domain.ReviewEvent, string) error {
 	return nil
 }
 
-func (f *scenarioSource) PRChecks(context.Context, string, int) (gh.Checks, error) {
+func (f *scenarioSource) PRChecks(context.Context, string, int) (domain.Checks, error) {
 	return f.checks, nil
 }
 
-func (f *scenarioSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine, error) {
+func (f *scenarioSource) JobLog(context.Context, string, int64, bool) ([]domain.LogLine, error) {
 	return nil, nil
 }
 
-func (f *scenarioSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error {
+func (f *scenarioSource) RerunWorkflow(context.Context, string, int64, domain.RerunScope) error {
 	return nil
 }
 
-func (f *scenarioSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
-	return gh.MergeContext{}, nil
+func (f *scenarioSource) PRMergeContext(context.Context, string, int) (domain.MergeContext, error) {
+	return domain.MergeContext{}, nil
 }
 
-func (f *scenarioSource) MergePR(string, gh.MergeMethod) error         { return nil }
-func (f *scenarioSource) EnableAutoMerge(string, gh.MergeMethod) error { return nil }
-func (f *scenarioSource) DisableAutoMerge(string) error                { return nil }
+func (f *scenarioSource) MergePR(string, domain.MergeMethod) error         { return nil }
+func (f *scenarioSource) EnableAutoMerge(string, domain.MergeMethod) error { return nil }
+func (f *scenarioSource) DisableAutoMerge(string) error                    { return nil }
 
 var scenarioAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 
-func scenarioPR() gh.PR {
-	return gh.PR{
+func scenarioPR() domain.PR {
+	return domain.PR{
 		Number: 12, Title: "replace the renderer",
-		Author: gh.Author{Login: "kukv"}, State: gh.StateOpen,
+		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen,
 		UpdatedAt: scenarioAt, Body: "body",
 	}
 }
@@ -243,7 +243,7 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 
 	m = run(t, m, "x", "y")
 
-	if f.pr.State != gh.StateClosed {
+	if f.pr.State != domain.StateClosed {
 		t.Fatalf("state = %v, want closed", f.pr.State)
 	}
 	if got := content(m); !strings.Contains(got, "state: closed") {
@@ -252,7 +252,7 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 }
 
 func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
-	f := &scenarioSource{pr: scenarioPR(), labels: []gh.Label{{Name: "bug", Color: "d73a4a"}}}
+	f := &scenarioSource{pr: scenarioPR(), labels: []domain.Label{{Name: "bug", Color: "d73a4a"}}}
 	m := scenarioModel(t, f)
 
 	m = run(t, m, "2")
@@ -278,12 +278,12 @@ func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	f := &scenarioSource{
 		pr: scenarioPR(),
-		files: []gh.FileDiff{{
-			Path: "main.go", Status: gh.FileModified, Additions: 1,
-			Hunks: []gh.Hunk{{
+		files: []domain.FileDiff{{
+			Path: "main.go", Status: domain.FileModified, Additions: 1,
+			Hunks: []domain.Hunk{{
 				Header: "@@ -1,1 +1,1 @@",
-				Lines: []gh.DiffLine{
-					{Kind: gh.LineAdded, Text: "+package main", NewLine: 1},
+				Lines: []domain.DiffLine{
+					{Kind: domain.LineAdded, Text: "+package main", NewLine: 1},
 				},
 			}},
 		}},

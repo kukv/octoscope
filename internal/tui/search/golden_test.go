@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -33,16 +33,16 @@ var (
 
 // goldenItems mirrors repo's golden fixtures: a title long enough to clip at
 // eighty columns, and a repository name that exercises the column's width.
-func goldenItems() []gh.WorkItem {
-	return []gh.WorkItem{
+func goldenItems() []domain.WorkItem {
+	return []domain.WorkItem{
 		{
-			Ref:       gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 42},
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 42},
 			Title:     "レンダリングのパイプラインをまるごと置き換える refactor that nobody asked for",
-			Review:    gh.ReviewApproved,
+			Review:    domain.ReviewApproved,
 			UpdatedAt: goldenUpdatedAt,
 		},
 		{
-			Ref:       gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/a-repository-with-a-name-nobody-would-type-twice", Number: 7},
+			Ref:       domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/a-repository-with-a-name-nobody-would-type-twice", Number: 7},
 			Title:     "ラベルの一覧が横に伸びつづける問題",
 			UpdatedAt: goldenUpdatedAt,
 		},
@@ -51,7 +51,7 @@ func goldenItems() []gh.WorkItem {
 
 // goldenModel reaches the loaded state through Init and its own reply, not
 // by assigning fields the search never sets that way itself.
-func goldenModel(t *testing.T, width int, items []gh.WorkItem) Model {
+func goldenModel(t *testing.T, width int, items []domain.WorkItem) Model {
 	t.Helper()
 	m := New(&fakeSource{items: items})
 	m = resolve(t, m, m.Init())
@@ -61,8 +61,8 @@ func goldenModel(t *testing.T, width int, items []gh.WorkItem) Model {
 }
 
 // goldenLabels is what the candidates golden state's repository offers.
-func goldenLabels() []gh.Label {
-	return []gh.Label{
+func goldenLabels() []domain.Label {
+	return []domain.Label{
 		{Name: "bug", Color: "d73a4a"},
 		{Name: "enhancement", Color: "a2eeef"},
 		{Name: "documentation", Color: "0075ca"},

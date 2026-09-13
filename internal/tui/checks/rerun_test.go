@@ -7,7 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -16,11 +16,11 @@ import (
 type recordingSource struct {
 	fakeSource
 	reruns int
-	scope  gh.RerunScope
+	scope  domain.RerunScope
 	runID  int64
 }
 
-func (s *recordingSource) RerunWorkflow(_ context.Context, _ string, runID int64, scope gh.RerunScope) error {
+func (s *recordingSource) RerunWorkflow(_ context.Context, _ string, runID int64, scope domain.RerunScope) error {
 	s.reruns++
 	s.scope = scope
 	s.runID = runID
@@ -41,7 +41,7 @@ func TestChoosingAScopeSendsIt(t *testing.T) {
 	t.Parallel()
 
 	src := &recordingSource{fakeSource: fakeSource{checks: fixture()}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m = press(m, "R")
@@ -51,7 +51,7 @@ func TestChoosingAScopeSendsIt(t *testing.T) {
 		t.Fatal("enter sent nothing")
 	}
 	cmd()
-	if src.scope != gh.RerunAll {
+	if src.scope != domain.RerunAll {
 		t.Errorf("scope = %v, want RerunAll", src.scope)
 	}
 	// arrange puts the failing workflow first, so the cursor starts on sca,
@@ -65,7 +65,7 @@ func TestEscLeavesTheRerunPopupWithoutSending(t *testing.T) {
 	t.Parallel()
 
 	src := &recordingSource{fakeSource: fakeSource{checks: fixture()}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m = press(press(m, "R"), "esc")
@@ -81,7 +81,7 @@ func TestRerunOnACheckWithNoWorkflowRunSaysWhyItCannot(t *testing.T) {
 	t.Parallel()
 
 	src := &recordingSource{fakeSource: fakeSource{checks: appCheck()}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: appCheck()})
 	m = press(m, "R")

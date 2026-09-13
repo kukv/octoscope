@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
@@ -74,17 +74,17 @@ func TestPRReviewContextReadsTheAnswer(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		thread    gh.ReviewThread
+		thread    domain.ReviewThread
 		line      int
-		side      gh.DiffSide
+		side      domain.DiffSide
 		collapsed bool
 		pending   bool
 	}{
-		{"open thread", rc.Threads[0], 14, gh.SideRight, false, false},
-		{"resolved threads collapse", rc.Threads[1], 12, gh.SideLeft, true, false},
-		{"outdated threads keep the line they were written against", rc.Threads[2], 3, gh.SideRight, true, false},
-		{"the viewer's unsubmitted comment", rc.Threads[3], 16, gh.SideRight, false, true},
-		{"line override distinguishes current from original", rc.Threads[4], 20, gh.SideRight, false, false},
+		{"open thread", rc.Threads[0], 14, domain.SideRight, false, false},
+		{"resolved threads collapse", rc.Threads[1], 12, domain.SideLeft, true, false},
+		{"outdated threads keep the line they were written against", rc.Threads[2], 3, domain.SideRight, true, false},
+		{"the viewer's unsubmitted comment", rc.Threads[3], 16, domain.SideRight, false, true},
+		{"line override distinguishes current from original", rc.Threads[4], 20, domain.SideRight, false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -174,17 +174,17 @@ func TestStartReviewReturnsTheNewReviewID(t *testing.T) {
 func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 	tests := []struct {
 		name    string
-		comment gh.PendingComment
+		comment domain.PendingComment
 		side    Var
 	}{
 		{
 			name:    "a comment on the new file",
-			comment: gh.PendingComment{Path: "graph/walk.go", Line: 15, Side: gh.SideRight, Body: "why?"},
+			comment: domain.PendingComment{Path: "graph/walk.go", Line: 15, Side: domain.SideRight, Body: "why?"},
 			side:    S("side", "RIGHT"),
 		},
 		{
 			name:    "a comment on a removed line",
-			comment: gh.PendingComment{Path: "graph/walk.go", Line: 14, Side: gh.SideLeft, Body: "why?"},
+			comment: domain.PendingComment{Path: "graph/walk.go", Line: 14, Side: domain.SideLeft, Body: "why?"},
 			side:    S("side", "LEFT"),
 		},
 	}
@@ -213,12 +213,12 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 func TestSubmitReviewNamesTheEvent(t *testing.T) {
 	tests := []struct {
 		name  string
-		event gh.ReviewEvent
+		event domain.ReviewEvent
 		want  Var
 	}{
-		{"approve", gh.EventApprove, S("event", "APPROVE")},
-		{"request changes", gh.EventRequestChanges, S("event", "REQUEST_CHANGES")},
-		{"comment", gh.EventComment, S("event", "COMMENT")},
+		{"approve", domain.EventApprove, S("event", "APPROVE")},
+		{"request changes", domain.EventRequestChanges, S("event", "REQUEST_CHANGES")},
+		{"comment", domain.EventComment, S("event", "COMMENT")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -240,7 +240,7 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	if err := c.SubmitNewReview("PR_1", gh.EventApprove, ""); err != nil {
+	if err := c.SubmitNewReview("PR_1", domain.EventApprove, ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []Var{S("pullRequestId", "PR_1"), S("event", "APPROVE"), S("body", "")} {
@@ -264,7 +264,7 @@ func TestDiscardReviewNamesTheReview(t *testing.T) {
 func TestABodyThatStartsWithAtIsNotReadAsAFile(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"submitPullRequestReview":{"pullRequestReview":{"id":"PRR_9"}}}}`)}
 	c := f.client()
-	if err := c.SubmitReview("PRR_9", gh.EventComment, "@kukv please look"); err != nil {
+	if err := c.SubmitReview("PRR_9", domain.EventComment, "@kukv please look"); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(f.vars[0], S("body", "@kukv please look")) {
@@ -280,9 +280,9 @@ func TestASubmittedReviewIsNeverSentTwice(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, gh.Classify(gh.ErrTransient, "HTTP 502")
+		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
 	}}
-	if err := c.SubmitReview("R_1", gh.EventApprove, ""); err == nil {
+	if err := c.SubmitReview("R_1", domain.EventApprove, ""); err == nil {
 		t.Fatal("SubmitReview succeeded, want an error")
 	}
 	if calls != 1 {
@@ -307,7 +307,7 @@ func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
 	if rc.PendingID == "" {
 		t.Error("no pending review id, but the recording has an unsubmitted review")
 	}
-	sides := map[gh.DiffSide]bool{}
+	sides := map[domain.DiffSide]bool{}
 	for _, th := range rc.Threads {
 		if !th.Pending() {
 			t.Errorf("thread on %s:%d is not pending, but every thread in the recording is", th.Path, th.Line)
@@ -316,7 +316,7 @@ func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
 	}
 	// Both sides have to survive the parse: the side of a pending thread is
 	// the one thing the old query could not ask for.
-	if !sides[gh.SideLeft] || !sides[gh.SideRight] {
+	if !sides[domain.SideLeft] || !sides[domain.SideRight] {
 		t.Errorf("threads land on %v, want both sides", sides)
 	}
 }

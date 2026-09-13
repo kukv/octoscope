@@ -1,4 +1,4 @@
-package gh
+package domain
 
 import (
 	"bytes"

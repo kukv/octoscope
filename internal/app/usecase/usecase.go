@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/app/config"
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 type itemFetcher interface {
-	GetPR(ctx context.Context, repo string, number int) (gh.PR, error)
-	GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error)
+	GetPR(ctx context.Context, repo string, number int) (domain.PR, error)
+	GetIssue(ctx context.Context, repo string, number int) (domain.Issue, error)
 }
 
 type commenter interface {
@@ -39,10 +39,10 @@ type assigneeEditor interface {
 }
 
 type lister interface {
-	ListPRs(ctx context.Context, repo string) ([]gh.PR, error)
-	ListIssues(ctx context.Context, repo string) ([]gh.Issue, error)
+	ListPRs(ctx context.Context, repo string) ([]domain.PR, error)
+	ListIssues(ctx context.Context, repo string) ([]domain.Issue, error)
 	RepoName(ctx context.Context) (string, error)
-	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
+	ListLabels(ctx context.Context, repo string) ([]domain.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
@@ -50,16 +50,16 @@ type lister interface {
 // takes: unlike lister's operations, none of these are "the contents of one
 // named repository".
 type crossRepoLister interface {
-	ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)
-	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
-	SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error)
+	ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error)
+	RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error)
+	SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error)
 }
 
 // repoFinder is what the add dialog offers: candidates while it is typed
 // into, and the repositories a first run can be seeded from.
 type repoFinder interface {
-	SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error)
-	ListOwnRepos(ctx context.Context, owner string, limit int) ([]gh.RepoCandidate, error)
+	SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error)
+	ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error)
 	ListOrgs(ctx context.Context) ([]string, error)
 }
 
@@ -81,15 +81,15 @@ type settingsStore interface {
 }
 
 type reviewFetcher interface {
-	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
-	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
+	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
 }
 
 type reviewer interface {
 	StartReview(pullRequestID string) (string, error)
-	AddReviewThread(reviewID string, c gh.PendingComment) error
-	SubmitReview(reviewID string, event gh.ReviewEvent, body string) error
-	SubmitNewReview(pullRequestID string, event gh.ReviewEvent, body string) error
+	AddReviewThread(reviewID string, c domain.PendingComment) error
+	SubmitReview(reviewID string, event domain.ReviewEvent, body string) error
+	SubmitNewReview(pullRequestID string, event domain.ReviewEvent, body string) error
 	DiscardReview(reviewID string) error
 }
 
@@ -98,15 +98,15 @@ type opener interface {
 }
 
 type checksFetcher interface {
-	PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error
+	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
+	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
 }
 
 type merger interface {
-	PRMergeContext(ctx context.Context, repo string, number int) (gh.MergeContext, error)
-	MergePR(pullRequestID string, method gh.MergeMethod) error
-	EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error
+	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
+	MergePR(pullRequestID string, method domain.MergeMethod) error
+	EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error
 	DisableAutoMerge(pullRequestID string) error
 }
 
@@ -170,31 +170,31 @@ func New(src source, store settingsStore) *Usecase {
 // Item is where a pull request and an issue meet: the fields GitHub gives
 // both (.claude/rules/architecture.md).
 type Item struct {
-	Kind      gh.ItemKind
+	Kind      domain.ItemKind
 	Number    int
 	Title     string
-	Author    gh.Author
-	State     gh.ItemState
+	Author    domain.Author
+	State     domain.ItemState
 	Body      string
 	URL       string
-	Labels    []gh.Label
-	Assignees []gh.Author
-	Comments  []gh.Comment
+	Labels    []domain.Label
+	Assignees []domain.Author
+	Comments  []domain.Comment
 	UpdatedAt time.Time
 
 	// PR is set only when Kind is ItemPR.
-	PR *gh.PR
+	PR *domain.PR
 }
 
 // GetItem fetches whichever of the two the reference names.
-func (u *Usecase) GetItem(ctx context.Context, ref gh.ItemRef) (Item, error) {
-	if ref.Kind == gh.ItemPR {
+func (u *Usecase) GetItem(ctx context.Context, ref domain.ItemRef) (Item, error) {
+	if ref.Kind == domain.ItemPR {
 		pr, err := u.items.GetPR(ctx, ref.Repo, ref.Number)
 		if err != nil {
 			return Item{}, fmt.Errorf("get pr: %w", err)
 		}
 		return Item{
-			Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
+			Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
 			State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
 			Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
 			PR: &pr,
@@ -205,25 +205,25 @@ func (u *Usecase) GetItem(ctx context.Context, ref gh.ItemRef) (Item, error) {
 		return Item{}, fmt.Errorf("get issue: %w", err)
 	}
 	return Item{
-		Kind: gh.ItemIssue, Number: issue.Number, Title: issue.Title, Author: issue.Author,
+		Kind: domain.ItemIssue, Number: issue.Number, Title: issue.Title, Author: issue.Author,
 		State: issue.State, Body: issue.Body, URL: issue.URL, Labels: issue.Labels,
 		Assignees: issue.Assignees, Comments: issue.Comments, UpdatedAt: issue.UpdatedAt,
 	}, nil
 }
 
-func (u *Usecase) AddComment(ref gh.ItemRef, body string) error {
-	if ref.Kind == gh.ItemPR {
+func (u *Usecase) AddComment(ref domain.ItemRef, body string) error {
+	if ref.Kind == domain.ItemPR {
 		return u.comments.AddPRComment(ref.Repo, ref.Number, body)
 	}
 	return u.comments.AddIssueComment(ref.Repo, ref.Number, body)
 }
 
 // SetState closes the item when closing is true and reopens it otherwise.
-func (u *Usecase) SetState(ref gh.ItemRef, closing bool) error {
+func (u *Usecase) SetState(ref domain.ItemRef, closing bool) error {
 	switch {
-	case ref.Kind == gh.ItemPR && closing:
+	case ref.Kind == domain.ItemPR && closing:
 		return u.states.ClosePR(ref.Repo, ref.Number)
-	case ref.Kind == gh.ItemPR:
+	case ref.Kind == domain.ItemPR:
 		return u.states.ReopenPR(ref.Repo, ref.Number)
 	case closing:
 		return u.states.CloseIssue(ref.Repo, ref.Number)
@@ -232,39 +232,39 @@ func (u *Usecase) SetState(ref gh.ItemRef, closing bool) error {
 	}
 }
 
-func (u *Usecase) EditLabels(ref gh.ItemRef, add, remove []string) error {
-	if ref.Kind == gh.ItemPR {
+func (u *Usecase) EditLabels(ref domain.ItemRef, add, remove []string) error {
+	if ref.Kind == domain.ItemPR {
 		return u.labels.EditPRLabels(ref.Repo, ref.Number, add, remove)
 	}
 	return u.labels.EditIssueLabels(ref.Repo, ref.Number, add, remove)
 }
 
-func (u *Usecase) EditAssignees(ref gh.ItemRef, add, remove []string) error {
-	if ref.Kind == gh.ItemPR {
+func (u *Usecase) EditAssignees(ref domain.ItemRef, add, remove []string) error {
+	if ref.Kind == domain.ItemPR {
 		return u.assignees.EditPRAssignees(ref.Repo, ref.Number, add, remove)
 	}
 	return u.assignees.EditIssueAssignees(ref.Repo, ref.Number, add, remove)
 }
 
-func (u *Usecase) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+func (u *Usecase) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
 	return u.crossRepo.ListWorkSection(ctx, s)
 }
 
-func (u *Usecase) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
+func (u *Usecase) RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error) {
 	return u.crossRepo.RepoCounts(ctx, repos)
 }
 
-func (u *Usecase) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+func (u *Usecase) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
 	return u.lists.ListPRs(ctx, repo)
 }
 
-func (u *Usecase) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
+func (u *Usecase) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
 	return u.lists.ListIssues(ctx, repo)
 }
 
 func (u *Usecase) RepoName(ctx context.Context) (string, error) { return u.lists.RepoName(ctx) }
 
-func (u *Usecase) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
+func (u *Usecase) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	return u.lists.ListLabels(ctx, repo)
 }
 
@@ -272,11 +272,11 @@ func (u *Usecase) ListAssignees(ctx context.Context, repo string) ([]string, err
 	return u.lists.ListAssignees(ctx, repo)
 }
 
-func (u *Usecase) PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
+func (u *Usecase) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
 	return u.reviewInfo.PRDiff(ctx, repo, number)
 }
 
-func (u *Usecase) PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error) {
+func (u *Usecase) PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error) {
 	return u.reviewInfo.PRReviewContext(ctx, repo, number)
 }
 
@@ -286,27 +286,27 @@ func (u *Usecase) DiscardReview(reviewID string) error {
 
 func (u *Usecase) OpenWeb(url string) error { return u.web.OpenWeb(url) }
 
-func (u *Usecase) PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error) {
+func (u *Usecase) PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error) {
 	return u.checks.PRChecks(ctx, repo, number)
 }
 
-func (u *Usecase) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error) {
+func (u *Usecase) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
 	return u.checks.JobLog(ctx, repo, jobID, failedOnly)
 }
 
-func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error {
+func (u *Usecase) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
 	return u.checks.RerunWorkflow(ctx, repo, runID, scope)
 }
 
-func (u *Usecase) PRMergeContext(ctx context.Context, repo string, number int) (gh.MergeContext, error) {
+func (u *Usecase) PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error) {
 	return u.merges.PRMergeContext(ctx, repo, number)
 }
 
-func (u *Usecase) MergePR(pullRequestID string, method gh.MergeMethod) error {
+func (u *Usecase) MergePR(pullRequestID string, method domain.MergeMethod) error {
 	return u.merges.MergePR(pullRequestID, method)
 }
 
-func (u *Usecase) EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error {
+func (u *Usecase) EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error {
 	return u.merges.EnableAutoMerge(pullRequestID, method)
 }
 

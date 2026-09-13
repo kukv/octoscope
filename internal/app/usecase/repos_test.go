@@ -6,13 +6,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // fakeRepoFinder answers per owner, and records which owners were asked for.
 type fakeRepoFinder struct {
 	orgs    []string
-	byOwner map[string][]gh.RepoCandidate
+	byOwner map[string][]domain.RepoCandidate
 	owners  []string
 
 	ownErr  error
@@ -20,11 +20,11 @@ type fakeRepoFinder struct {
 	orgErr  map[string]error
 }
 
-func (f *fakeRepoFinder) SearchRepos(_ context.Context, query string, limit int) ([]gh.RepoCandidate, error) {
-	return []gh.RepoCandidate{{Name: "charmbracelet/" + query, Stars: limit}}, nil
+func (f *fakeRepoFinder) SearchRepos(_ context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
+	return []domain.RepoCandidate{{Name: "charmbracelet/" + query, Stars: limit}}, nil
 }
 
-func (f *fakeRepoFinder) ListOwnRepos(_ context.Context, owner string, _ int) ([]gh.RepoCandidate, error) {
+func (f *fakeRepoFinder) ListOwnRepos(_ context.Context, owner string, _ int) ([]domain.RepoCandidate, error) {
 	f.owners = append(f.owners, owner)
 	if owner == "" && f.ownErr != nil {
 		return nil, f.ownErr
@@ -49,7 +49,7 @@ func (f *fakeRepoStore) SaveRepositories(repos []string) error {
 	return f.err
 }
 
-func names(candidates []gh.RepoCandidate) []string {
+func names(candidates []domain.RepoCandidate) []string {
 	out := make([]string, len(candidates))
 	for i, c := range candidates {
 		out[i] = c.Name
@@ -65,7 +65,7 @@ func TestSeedCandidatesCoversTheUserAndEveryOrg(t *testing.T) {
 
 	f := &fakeRepoFinder{
 		orgs: []string{"charmbracelet", "kukv-org"},
-		byOwner: map[string][]gh.RepoCandidate{
+		byOwner: map[string][]domain.RepoCandidate{
 			"":              {{Name: "kukv/octoscope"}},
 			"charmbracelet": {{Name: "charmbracelet/lipgloss"}},
 			"kukv-org":      {{Name: "kukv-org/thing"}},
@@ -89,7 +89,7 @@ func TestSeedCandidatesStillAnswersWhenTheOrgsAreUnreadable(t *testing.T) {
 
 	f := &fakeRepoFinder{
 		orgsErr: errors.New("HTTP 403"),
-		byOwner: map[string][]gh.RepoCandidate{"": {{Name: "kukv/octoscope"}}},
+		byOwner: map[string][]domain.RepoCandidate{"": {{Name: "kukv/octoscope"}}},
 	}
 	got, err := (&Usecase{repos: f}).SeedCandidates(t.Context())
 	if err != nil {
@@ -107,7 +107,7 @@ func TestSeedCandidatesSkipsOnlyTheOrgThatFailed(t *testing.T) {
 	f := &fakeRepoFinder{
 		orgs:   []string{"closed-org", "kukv-org"},
 		orgErr: map[string]error{"closed-org": errors.New("HTTP 403")},
-		byOwner: map[string][]gh.RepoCandidate{
+		byOwner: map[string][]domain.RepoCandidate{
 			"":         {{Name: "kukv/octoscope"}},
 			"kukv-org": {{Name: "kukv-org/thing"}},
 		},
@@ -139,7 +139,7 @@ func TestSeedCandidatesDropsDuplicates(t *testing.T) {
 
 	f := &fakeRepoFinder{
 		orgs: []string{"kukv-org"},
-		byOwner: map[string][]gh.RepoCandidate{
+		byOwner: map[string][]domain.RepoCandidate{
 			"":         {{Name: "kukv-org/thing"}},
 			"kukv-org": {{Name: "kukv-org/thing"}},
 		},

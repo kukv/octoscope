@@ -14,7 +14,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // nextGen numbers every fetch the package sends. Two fetches for the same
@@ -25,9 +25,9 @@ var nextGen atomic.Int64
 
 // Source is what merging needs.
 type Source interface {
-	PRMergeContext(ctx context.Context, repo string, number int) (gh.MergeContext, error)
-	MergePR(pullRequestID string, method gh.MergeMethod) error
-	EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error
+	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
+	MergePR(pullRequestID string, method domain.MergeMethod) error
+	EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error
 	DisableAutoMerge(pullRequestID string) error
 }
 
@@ -45,7 +45,7 @@ type CancelledMsg struct{}
 // names what raised it so a popup that has moved on can drop it; the holder
 // asks Owns before it shows the message.
 type ErrorMsg struct {
-	Ref gh.ItemRef
+	Ref domain.ItemRef
 	Gen int64
 	Err error
 }
@@ -54,17 +54,17 @@ type ErrorMsg struct {
 // it was sent for; an older answer is dropped, the way the checks view drops
 // a log that arrives after the user has moved on.
 type contextMsg struct {
-	ref gh.ItemRef
+	ref domain.ItemRef
 	gen int64
-	ctx gh.MergeContext
+	ctx domain.MergeContext
 }
 
 type Model struct {
 	src Source
-	ref gh.ItemRef
+	ref domain.ItemRef
 	gen int64
 
-	ctx     gh.MergeContext
+	ctx     domain.MergeContext
 	loading bool
 	row     int
 	auto    bool
@@ -74,7 +74,7 @@ type Model struct {
 }
 
 // New builds the popup. Init is what starts the fetch.
-func New(src Source, ref gh.ItemRef) Model {
+func New(src Source, ref domain.ItemRef) Model {
 	return Model{src: src, ref: ref, gen: nextGen.Add(1), loading: true}
 }
 
@@ -88,7 +88,7 @@ func (m Model) Owns(msg ErrorMsg) bool { return msg.Ref == m.ref && msg.Gen == m
 
 func (m Model) Init() tea.Cmd { return fetch(m.src, m.ref, m.gen) }
 
-func fetch(src Source, ref gh.ItemRef, gen int64) tea.Cmd {
+func fetch(src Source, ref domain.ItemRef, gen int64) tea.Cmd {
 	return func() tea.Msg {
 		c, err := src.PRMergeContext(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
@@ -178,7 +178,7 @@ func (m Model) send() (Model, tea.Cmd) {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		return m.sendCmd(false, func() error { return m.src.DisableAutoMerge(m.ctx.PullRequestID) })
-	case m.ctx.Block() != gh.BlockNone:
+	case m.ctx.Block() != domain.BlockNone:
 		return m, nil
 	case m.auto:
 		method := m.method()
@@ -192,11 +192,11 @@ func (m Model) send() (Model, tea.Cmd) {
 // method is the one on the cursor. A repository with no method allowed at
 // all cannot happen -- GitHub refuses to turn the last one off -- so the
 // fallback is only there to keep the index safe.
-func (m Model) method() gh.MergeMethod {
+func (m Model) method() domain.MergeMethod {
 	if m.row < len(m.ctx.Methods) {
 		return m.ctx.Methods[m.row]
 	}
-	return gh.MergeSquash
+	return domain.MergeSquash
 }
 
 func (m Model) sendCmd(merged bool, do func() error) (Model, tea.Cmd) {

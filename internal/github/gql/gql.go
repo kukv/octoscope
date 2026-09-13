@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // VarKind is how a transport has to spell one variable.
@@ -68,7 +68,7 @@ type Client struct {
 // that nothing arrived, so a repeated write could apply twice.
 func (c *Client) Read(ctx context.Context, doc string, vars ...Var) ([]byte, error) {
 	out, err := c.Do(ctx, doc, vars)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, gh.ErrTransient) {
+	if err == nil || ctx.Err() != nil || !errors.Is(err, domain.ErrTransient) {
 		return out, err
 	}
 	return c.Do(ctx, doc, vars)
@@ -84,7 +84,7 @@ func (c *Client) Write(ctx context.Context, doc string, vars ...Var) ([]byte, er
 // repository() takes the two halves separately, unlike `gh pr`, which takes
 // the whole thing after --repo.
 func SplitRepoVars(repo string) ([]Var, error) {
-	owner, name, ok := gh.SplitRepo(repo)
+	owner, name, ok := domain.SplitRepo(repo)
 	if !ok {
 		return nil, fmt.Errorf("repo %q has no owner/name separator", repo)
 	}

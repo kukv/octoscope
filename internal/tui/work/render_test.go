@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -18,12 +18,12 @@ import (
 // terminal the width test uses, in both scripts. Without it the fixture's
 // longest line is 17 columns and every regime has room to spare, so the width
 // test would pass even with the truncation removed.
-func overlongWork() gh.Work {
+func overlongWork() domain.Work {
 	w := sampleWork()
-	long := w[gh.SectionReviewRequested][0]
-	long.Ref = gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/a-repository-with-a-name-nobody-would-choose", Number: 999}
+	long := w[domain.SectionReviewRequested][0]
+	long.Ref = domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/a-repository-with-a-name-nobody-would-choose", Number: 999}
 	long.Title = "レンダリングのパイプラインをまるごと置き換える refactor that nobody asked for"
-	w[gh.SectionReviewRequested] = append(w[gh.SectionReviewRequested], long)
+	w[domain.SectionReviewRequested] = append(w[domain.SectionReviewRequested], long)
 	return w
 }
 
@@ -104,14 +104,14 @@ func TestTheDrawerShowsTheBodyAndEachCheck(t *testing.T) {
 // to look at the list at all, and the budget cuts the tail off.
 func TestFailingChecksComeFirst(t *testing.T) {
 	m := loaded()
-	lines := m.checksPane(gh.WorkItem{
-		Ref: gh.ItemRef{Kind: gh.ItemPR},
-		Checks: gh.Checks{
-			Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
-			Runs: []gh.CheckRun{
-				{Name: "build", State: gh.CheckSuccess},
-				{Name: "lint", State: gh.CheckRunning},
-				{Name: "test", State: gh.CheckFailure},
+	lines := m.checksPane(domain.WorkItem{
+		Ref: domain.ItemRef{Kind: domain.ItemPR},
+		Checks: domain.Checks{
+			Total: 3, Passed: 1, Failed: 1, Running: 1, State: domain.CheckFailure,
+			Runs: []domain.CheckRun{
+				{Name: "build", State: domain.CheckSuccess},
+				{Name: "lint", State: domain.CheckRunning},
+				{Name: "test", State: domain.CheckFailure},
 			},
 		},
 	}, 40)
@@ -125,12 +125,12 @@ func TestFailingChecksComeFirst(t *testing.T) {
 // drawn under the board, and a repository with thirty checks must not push
 // the key bar off the screen.
 func TestALongChecksListIsCutWithACount(t *testing.T) {
-	c := gh.Checks{Total: 12, Passed: 12, State: gh.CheckSuccess}
+	c := domain.Checks{Total: 12, Passed: 12, State: domain.CheckSuccess}
 	for i := range 12 {
-		c.Runs = append(c.Runs, gh.CheckRun{Name: fmt.Sprintf("job-%d", i), State: gh.CheckSuccess})
+		c.Runs = append(c.Runs, domain.CheckRun{Name: fmt.Sprintf("job-%d", i), State: domain.CheckSuccess})
 	}
 
-	lines := loaded().checksPane(gh.WorkItem{Ref: gh.ItemRef{Kind: gh.ItemPR}, Checks: c}, 40)
+	lines := loaded().checksPane(domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR}, Checks: c}, 40)
 	if want := drawerChecks + 2; len(lines) != want { // the checks, the count, the summary
 		t.Errorf("the list is %d lines, want %d:\n%s", len(lines), want, strings.Join(lines, "\n"))
 	}
@@ -176,7 +176,7 @@ func boardOf(width int) Model {
 	m := New(&fakeSource{work: sampleWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	m = answeredAll(m, sampleWork())
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		m.fetchedAt[s] = boardClock
 	}
 	return m
@@ -187,7 +187,7 @@ func boardOf(width int) Model {
 func TestABoxedCardIsFourLines(t *testing.T) {
 	const w = 34
 	m := boardOf(160)
-	it := sampleWork()[gh.SectionReviewRequested][0] // a PR with failing checks
+	it := sampleWork()[domain.SectionReviewRequested][0] // a PR with failing checks
 
 	lines := m.card(it, boardClock, w, false)
 	if len(lines) != m.cardHeight() || len(lines) != 4 {
@@ -213,7 +213,7 @@ func TestABoxedCardIsFourLines(t *testing.T) {
 func TestANarrowCardLosesItsBox(t *testing.T) {
 	const w = 17
 	m := boardOf(80)
-	it := sampleWork()[gh.SectionReviewRequested][0]
+	it := sampleWork()[domain.SectionReviewRequested][0]
 
 	lines := m.card(it, boardClock, w, false)
 	if len(lines) != m.cardHeight() || len(lines) != 2 {
@@ -237,19 +237,19 @@ func TestACardIsDatedByItsOwnColumnsAnswer(t *testing.T) {
 	m := New(&fakeSource{work: sampleWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = answeredAll(m, sampleWork())
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		m.fetchedAt[s] = boardClock
 	}
-	m.fetchedAt[gh.SectionAssigned] = boardClock.Add(48 * time.Hour)
+	m.fetchedAt[domain.SectionAssigned] = boardClock.Add(48 * time.Hour)
 
-	it := sampleWork()[gh.SectionAssigned][0]
+	it := sampleWork()[domain.SectionAssigned][0]
 	own := i18n.RelTime(boardClock.Add(48*time.Hour), it.UpdatedAt)
 	other := i18n.RelTime(boardClock, it.UpdatedAt)
 	if own == other {
 		t.Fatal("the two clocks produce the same age; this test covers nothing")
 	}
 
-	column := ansi.Strip(strings.Join(m.columnLines(gh.SectionAssigned, 40, 0), "\n"))
+	column := ansi.Strip(strings.Join(m.columnLines(domain.SectionAssigned, 40, 0), "\n"))
 	if !strings.Contains(column, own) {
 		t.Errorf("the card is not dated %q:\n%s", own, column)
 	}
@@ -263,7 +263,7 @@ func TestACardIsDatedByItsOwnColumnsAnswer(t *testing.T) {
 // and the drawer gives the full reference anyway.
 func TestTheCardMetaNamesTheRepositoryWithoutItsOwner(t *testing.T) {
 	m := boardOf(160)
-	it := sampleWork()[gh.SectionReviewRequested][0] // kukv/octoscope
+	it := sampleWork()[domain.SectionReviewRequested][0] // kukv/octoscope
 
 	meta := ansi.Strip(m.cardMeta(it, boardClock, 60))
 	if !strings.Contains(meta, "octoscope") {
@@ -285,9 +285,9 @@ func TestTheCardMetaNamesTheRepositoryWithoutItsOwner(t *testing.T) {
 func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
 	m := boardOf(160)
 
-	approved := gh.WorkItem{
-		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 43},
-		Title: "docs", Review: gh.ReviewApproved,
+	approved := domain.WorkItem{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 43},
+		Title: "docs", Review: domain.ReviewApproved,
 	}
 	if got := ansi.Strip(m.cardMeta(approved, boardClock, 60)); !strings.Contains(got, i18n.T("review.approved")) {
 		t.Errorf("an approved PR with no checks says nothing: %q", got)
@@ -299,7 +299,7 @@ func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
 		t.Errorf("a draft does not say so: %q", got)
 	}
 
-	issue := gh.WorkItem{Ref: gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/koto", Number: 8}, Title: "an issue"}
+	issue := domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/koto", Number: 8}, Title: "an issue"}
 	got := ansi.Strip(m.cardMeta(issue, boardClock, 60))
 	if strings.Contains(got, i18n.T("review.approved")) || strings.Contains(got, i18n.T("work.draft")) {
 		t.Errorf("an issue was given a review word: %q", got)
@@ -311,7 +311,7 @@ func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
 // the meta line, beside the repository.
 func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
 	m := boardOf(160)
-	it := sampleWork()[gh.SectionReviewRequested][0] // carries "bug" and "ci"
+	it := sampleWork()[domain.SectionReviewRequested][0] // carries "bug" and "ci"
 
 	line := m.cardMeta(it, boardClock, 60)
 	for _, l := range it.Labels {
@@ -329,19 +329,19 @@ func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
 func TestTheColumnHeadingCountsWhatIsInIt(t *testing.T) {
 	m := boardOf(160)
 
-	head := ansi.Strip(m.heading(gh.SectionReviewRequested, 3, 30))
+	head := ansi.Strip(m.heading(domain.SectionReviewRequested, 3, 30))
 	if !strings.HasSuffix(strings.TrimRight(head, " "), "3") {
 		t.Errorf("the count is not at the end of the heading: %q", head)
 	}
-	if got := ansi.StringWidth(m.heading(gh.SectionReviewRequested, 3, 30)); got != 30 {
+	if got := ansi.StringWidth(m.heading(domain.SectionReviewRequested, 3, 30)); got != 30 {
 		t.Errorf("the heading is %d columns, want 30", got)
 	}
 	// A column with nothing in it shows no count rather than a zero.
-	if empty := ansi.Strip(m.heading(gh.SectionYourPRs, 0, 30)); strings.Contains(empty, "0") {
+	if empty := ansi.Strip(m.heading(domain.SectionYourPRs, 0, 30)); strings.Contains(empty, "0") {
 		t.Errorf("an empty column is counted: %q", empty)
 	}
 	// Review requested is the column that wants attention, and says so.
-	if m.heading(gh.SectionReviewRequested, 3, 30) == m.heading(gh.SectionAssigned, 3, 30) {
+	if m.heading(domain.SectionReviewRequested, 3, 30) == m.heading(domain.SectionAssigned, 3, 30) {
 		t.Error("a waiting review is coloured like anything else")
 	}
 }
@@ -350,12 +350,12 @@ func TestTheColumnHeadingCountsWhatIsInIt(t *testing.T) {
 // halves apart: a bar drawn in one colour says nothing about whether the
 // checks are passing.
 func TestTheChecksBarIsColouredByOutcome(t *testing.T) {
-	failing := checksBar(gh.Checks{Total: 4, Passed: 2, Failed: 2, State: gh.CheckFailure})
-	passing := checksBar(gh.Checks{Total: 4, Passed: 4, State: gh.CheckSuccess})
+	failing := checksBar(domain.Checks{Total: 4, Passed: 2, Failed: 2, State: domain.CheckFailure})
+	passing := checksBar(domain.Checks{Total: 4, Passed: 4, State: domain.CheckSuccess})
 	if failing == passing {
 		t.Errorf("a failing bar looks like a passing one: %q", failing)
 	}
-	if got := checksBar(gh.Checks{}); got != "" {
+	if got := checksBar(domain.Checks{}); got != "" {
 		t.Errorf("a card with no checks still draws a bar: %q", got)
 	}
 }
@@ -446,12 +446,12 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 // alignedWork gives every column one card carrying tokens that appear nowhere
 // else, so the alignment test can measure where each column actually starts
 // instead of trusting the padding that produced it.
-func alignedWork() gh.Work {
+func alignedWork() domain.Work {
 	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
-	var w gh.Work
-	for i, s := range gh.WorkSections() {
-		w[s] = []gh.WorkItem{{
-			Ref:       gh.ItemRef{Kind: gh.ItemPR, Repo: fmt.Sprintf("repo-%d", i), Number: i},
+	var w domain.Work
+	for i, s := range domain.WorkSections() {
+		w[s] = []domain.WorkItem{{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: fmt.Sprintf("repo-%d", i), Number: i},
 			Title:     fmt.Sprintf("title-%d", i),
 			UpdatedAt: now,
 		}}

@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -155,7 +155,7 @@ func TestTheWheelFollowsTheColumnUnderThePointer(t *testing.T) {
 	if !ok {
 		t.Fatal("the wheel left nothing selected")
 	}
-	if ref.Kind != gh.ItemIssue || ref.Number != 7 {
+	if ref.Kind != domain.ItemIssue || ref.Number != 7 {
 		t.Errorf("the wheel selected %+v, want the issue in the column under it", ref)
 	}
 }
@@ -182,10 +182,10 @@ func TestASingleColumnBoardStillHitTests(t *testing.T) {
 // nth card, and a hit-test that ignored the offset would select the wrong one
 // exactly when the board is worth scrolling.
 func TestClickingACardInAScrolledColumn(t *testing.T) {
-	var w gh.Work
+	var w domain.Work
 	for i := range 40 {
-		w[gh.SectionReviewRequested] = append(w[gh.SectionReviewRequested], gh.WorkItem{
-			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: i + 1},
+		w[domain.SectionReviewRequested] = append(w[domain.SectionReviewRequested], domain.WorkItem{
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: i + 1},
 			Title: fmt.Sprintf("card-%d", i),
 		})
 	}
@@ -201,7 +201,7 @@ func TestClickingACardInAScrolledColumn(t *testing.T) {
 	for range visible + 2 {
 		m, _ = m.Update(key("j"))
 	}
-	if m.cardWindow(gh.SectionReviewRequested, m.boardHeight()) == 0 {
+	if m.cardWindow(domain.SectionReviewRequested, m.boardHeight()) == 0 {
 		t.Fatal("the column did not scroll; this test covers nothing")
 	}
 

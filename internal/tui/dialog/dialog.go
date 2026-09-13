@@ -7,13 +7,13 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 type Model struct {
 	title, hint string
 	input       textinput.Model
-	candidates  []gh.RepoCandidate
+	candidates  []domain.RepoCandidate
 
 	// cursor is -1 while the field has the focus and indexes candidates
 	// otherwise. There is no third place to be, so it doubles as the focus.
@@ -43,9 +43,9 @@ func (m Model) Value() string {
 	return m.input.Value()
 }
 
-func (m Model) candidate() (gh.RepoCandidate, bool) {
+func (m Model) candidate() (domain.RepoCandidate, bool) {
 	if m.cursor < 0 || m.cursor >= len(m.candidates) {
-		return gh.RepoCandidate{}, false
+		return domain.RepoCandidate{}, false
 	}
 	return m.candidates[m.cursor], true
 }
@@ -53,7 +53,7 @@ func (m Model) candidate() (gh.RepoCandidate, bool) {
 // SetCandidates replaces the suggestions without moving the cursor onto
 // them: they arrive a second after the keystroke that asked for them, and
 // landing on one would change what enter takes mid-sentence.
-func (m Model) SetCandidates(c []gh.RepoCandidate) Model {
+func (m Model) SetCandidates(c []domain.RepoCandidate) Model {
 	m.candidates = c
 	m.searching = false
 	if m.cursor >= len(c) {

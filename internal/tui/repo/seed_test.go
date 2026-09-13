@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -23,7 +23,7 @@ func TestTheEmptySidebarOffersToSeedItself(t *testing.T) {
 // repositories, which would make the count query 45 aliases wide and leave x
 // as the only way back out of a list nobody asked for.
 func TestSeedingOpensTheDialogWithWhatWasFound(t *testing.T) {
-	f := &fakeSource{seed: []gh.RepoCandidate{
+	f := &fakeSource{seed: []domain.RepoCandidate{
 		{Name: "kukv/octoscope"}, {Name: "kukv/koto"},
 	}}
 	m := sized(New(f, Options{}), 120)
@@ -57,7 +57,7 @@ func TestSeedingSaysWhileItIsStillRunning(t *testing.T) {
 // Picking one of the seeded candidates is the same gesture as picking a
 // search result, and it has to end with the repository saved.
 func TestPickingASeededCandidateAddsIt(t *testing.T) {
-	f := &fakeSource{seed: []gh.RepoCandidate{{Name: "kukv/octoscope"}}}
+	f := &fakeSource{seed: []domain.RepoCandidate{{Name: "kukv/octoscope"}}}
 	m := sized(New(f, Options{}), 120)
 	m, _ = m.SetCurrent("")
 	m, cmd := m.Update(key("g"))

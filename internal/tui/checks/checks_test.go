@@ -10,36 +10,38 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type fakeSource struct {
-	checks gh.Checks
-	log    []gh.LogLine
+	checks domain.Checks
+	log    []domain.LogLine
 }
 
-func (f *fakeSource) PRChecks(context.Context, string, int) (gh.Checks, error) {
+func (f *fakeSource) PRChecks(context.Context, string, int) (domain.Checks, error) {
 	return f.checks, nil
 }
 
-func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine, error) {
+func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]domain.LogLine, error) {
 	return f.log, nil
 }
 
-func (f *fakeSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error { return nil }
+func (f *fakeSource) RerunWorkflow(context.Context, string, int64, domain.RerunScope) error {
+	return nil
+}
 
 func (f *fakeSource) OpenWeb(string) error { return nil }
 
 // fixture is two workflows, the failing one recorded second on purpose: the
 // view has to move it to the top.
-func fixture() gh.Checks {
-	return gh.Checks{
-		Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
-		Runs: []gh.CheckRun{
-			{Name: "lint", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
-			{Name: "sca", State: gh.CheckFailure, Kind: gh.CheckKindRun, Workflow: "security", JobID: 2, RunID: 20},
-			{Name: "ci/circleci", State: gh.CheckRunning, Kind: gh.CheckKindStatus, URL: "https://circleci.example/1"},
+func fixture() domain.Checks {
+	return domain.Checks{
+		Total: 3, Passed: 1, Failed: 1, Running: 1, State: domain.CheckFailure,
+		Runs: []domain.CheckRun{
+			{Name: "lint", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
+			{Name: "sca", State: domain.CheckFailure, Kind: domain.CheckKindRun, Workflow: "security", JobID: 2, RunID: 20},
+			{Name: "ci/circleci", State: domain.CheckRunning, Kind: domain.CheckKindStatus, URL: "https://circleci.example/1"},
 		},
 	}
 }
@@ -47,7 +49,7 @@ func fixture() gh.Checks {
 func open(t *testing.T, width int) Model {
 	t.Helper()
 
-	m := New(&fakeSource{checks: fixture()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{checks: fixture()}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	return m
@@ -95,14 +97,14 @@ func TestTheHeaderCountsWhatIsWrong(t *testing.T) {
 // interleaved is two green workflows whose checks GitHub listed alternately.
 // Ranking alone cannot separate them, so this is what catches a comparator
 // that only sorts by state.
-func interleaved() gh.Checks {
-	return gh.Checks{
-		Total: 4, Passed: 4, State: gh.CheckSuccess,
-		Runs: []gh.CheckRun{
-			{Name: "a", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
-			{Name: "b", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "release", JobID: 2, RunID: 20},
-			{Name: "c", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "CI", JobID: 3, RunID: 10},
-			{Name: "d", State: gh.CheckSuccess, Kind: gh.CheckKindRun, Workflow: "release", JobID: 4, RunID: 20},
+func interleaved() domain.Checks {
+	return domain.Checks{
+		Total: 4, Passed: 4, State: domain.CheckSuccess,
+		Runs: []domain.CheckRun{
+			{Name: "a", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", JobID: 1, RunID: 10},
+			{Name: "b", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "release", JobID: 2, RunID: 20},
+			{Name: "c", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", JobID: 3, RunID: 10},
+			{Name: "d", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "release", JobID: 4, RunID: 20},
 		},
 	}
 }
@@ -110,7 +112,7 @@ func interleaved() gh.Checks {
 func TestChecksOfOneWorkflowStayTogether(t *testing.T) {
 	t.Parallel()
 
-	m := New(&fakeSource{checks: interleaved()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{checks: interleaved()}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: interleaved()})
 	var got []string
@@ -150,15 +152,15 @@ func TestJMovesTheCursorDownTheList(t *testing.T) {
 
 // manyChecks is four workflows of eight checks each: enough that the
 // headings drawn between the groups push the cursor off a short screen.
-func manyChecks() gh.Checks {
-	var runs []gh.CheckRun
+func manyChecks() domain.Checks {
+	var runs []domain.CheckRun
 	id := int64(1)
 	for _, wf := range []string{"alpha", "beta", "gamma", "delta"} {
 		for i := range 8 {
-			runs = append(runs, gh.CheckRun{
+			runs = append(runs, domain.CheckRun{
 				Name:     fmt.Sprintf("%s-job%d", wf, i),
-				State:    gh.CheckSuccess,
-				Kind:     gh.CheckKindRun,
+				State:    domain.CheckSuccess,
+				Kind:     domain.CheckKindRun,
 				Workflow: wf,
 				JobID:    id,
 				RunID:    id,
@@ -166,7 +168,7 @@ func manyChecks() gh.Checks {
 			id++
 		}
 	}
-	return gh.Checks{Total: len(runs), Passed: len(runs), State: gh.CheckSuccess, Runs: runs}
+	return domain.Checks{Total: len(runs), Passed: len(runs), State: domain.CheckSuccess, Runs: runs}
 }
 
 // TestTheCursorStaysOnScreenPastTheWorkflowHeadings guards the one thing the
@@ -176,7 +178,7 @@ func manyChecks() gh.Checks {
 func TestTheCursorStaysOnScreenPastTheWorkflowHeadings(t *testing.T) {
 	t.Parallel()
 
-	m := New(&fakeSource{checks: manyChecks()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{checks: manyChecks()}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: manyChecks()})
 	for range 20 {
@@ -239,8 +241,8 @@ func moveTo(t *testing.T, m Model, name string) Model {
 func TestALogForACheckTheUserLeftIsDropped(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: "FAIL sca"}}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "s", Text: "FAIL sca"}}}
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	_, cmd := m.Update(keyPress("enter")) // asks for the log of the selected check
@@ -257,8 +259,8 @@ func TestALogForACheckTheUserLeftIsDropped(t *testing.T) {
 func TestMovingTheCursorClearsTheLogUnderIt(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: "FAIL sca"}}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "s", Text: "FAIL sca"}}}
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))
@@ -272,8 +274,8 @@ func TestMovingTheCursorClearsTheLogUnderIt(t *testing.T) {
 func TestEnterFetchesTheLogOfTheSelectedCheck(t *testing.T) {
 	t.Parallel()
 
-	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "Run tests", Text: "FAIL ./internal/gh"}}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "Run tests", Text: "FAIL ./internal/gh"}}}
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))
@@ -290,7 +292,7 @@ func TestASucceededJobSaysNoStepFailed(t *testing.T) {
 	t.Parallel()
 
 	src := &fakeSource{checks: fixture()} // JobLog answers with no lines
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))
@@ -307,7 +309,7 @@ func TestAnEmptyFullLogSaysSo(t *testing.T) {
 	t.Parallel()
 
 	src := &fakeSource{checks: fixture()} // JobLog answers with no lines
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("L"))
@@ -335,8 +337,8 @@ func TestTheLogPaneStopsScrollingAtItsWidestLine(t *testing.T) {
 	t.Parallel()
 
 	long := strings.Repeat("x", 400)
-	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: long}}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "s", Text: long}}}
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))
@@ -356,7 +358,7 @@ func TestTheLogPaneStopsScrollingAtItsWidestLine(t *testing.T) {
 func TestMovingDownOntoShorterLinesBringsTheLogBack(t *testing.T) {
 	t.Parallel()
 
-	log := []gh.LogLine{
+	log := []domain.LogLine{
 		{Step: "s", Text: strings.Repeat("x", 400)},
 		{Step: "s", Text: "alpha"},
 		{Step: "s", Text: "bravo"},
@@ -364,7 +366,7 @@ func TestMovingDownOntoShorterLinesBringsTheLogBack(t *testing.T) {
 		{Step: "s", Text: "delta"},
 	}
 	src := &fakeSource{checks: fixture(), log: log}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))
@@ -388,9 +390,9 @@ func TestAWiderTerminalBringsTheLogBack(t *testing.T) {
 
 	src := &fakeSource{
 		checks: fixture(),
-		log:    []gh.LogLine{{Step: "s", Text: "START" + strings.Repeat("x", 400)}},
+		log:    []domain.LogLine{{Step: "s", Text: "START" + strings.Repeat("x", 400)}},
 	}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))
@@ -407,7 +409,7 @@ func TestAWiderTerminalBringsTheLogBack(t *testing.T) {
 func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := openChecks(t, 120, 30, gh.Checks{})
+	m := openChecks(t, 120, 30, domain.Checks{})
 	m, _ = m.Update(keyPress("enter"))
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
@@ -418,7 +420,7 @@ func TestEnterOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 func TestRerunOnAPullRequestWithNoChecksSaysSo(t *testing.T) {
 	t.Parallel()
 
-	m := press(openChecks(t, 120, 30, gh.Checks{}), "R")
+	m := press(openChecks(t, 120, 30, domain.Checks{}), "R")
 	if m.declined != i18n.T("checks.none") {
 		t.Errorf("declined = %q, want %q: the fetch has landed, nothing is loading",
 			m.declined, i18n.T("checks.none"))
@@ -438,11 +440,11 @@ func TestOpenOnACheckWithNoPageOfItsOwnSaysWhy(t *testing.T) {
 // appCheck is one check run an App created: GitHub reports those with a null
 // checkSuite.workflowRun, so there is no workflow behind them to name or to
 // rerun (Codecov, Sonar and deploy checks are all this shape).
-func appCheck() gh.Checks {
-	return gh.Checks{
-		Total: 1, Passed: 1, State: gh.CheckSuccess,
-		Runs: []gh.CheckRun{
-			{Name: "codecov/patch", State: gh.CheckSuccess, Kind: gh.CheckKindRun, JobID: 7},
+func appCheck() domain.Checks {
+	return domain.Checks{
+		Total: 1, Passed: 1, State: domain.CheckSuccess,
+		Runs: []domain.CheckRun{
+			{Name: "codecov/patch", State: domain.CheckSuccess, Kind: domain.CheckKindRun, JobID: 7},
 		},
 	}
 }
@@ -450,10 +452,10 @@ func appCheck() gh.Checks {
 // openChecks opens the list on the given checks. The height is the caller's:
 // a tall screen draws every check at once, and a short one makes the list
 // scroll.
-func openChecks(t *testing.T, width, height int, c gh.Checks) Model {
+func openChecks(t *testing.T, width, height int, c domain.Checks) Model {
 	t.Helper()
 
-	m := New(&fakeSource{checks: c}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{checks: c}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: c})
 	return m
@@ -512,7 +514,7 @@ func TestTheCursorReachesTheLastCheckPastTheNewHeading(t *testing.T) {
 	}
 }
 
-func names(runs []gh.CheckRun) []string {
+func names(runs []domain.CheckRun) []string {
 	out := make([]string, len(runs))
 	for i, r := range runs {
 		out[i] = r.Name
@@ -529,12 +531,12 @@ func TestAnExternalCIsStateDoesNotMoveAnAppsCheck(t *testing.T) {
 	t.Parallel()
 
 	succeeded := mixed()
-	succeeded.Runs[8].State = gh.CheckSuccess // the StatusContext, and nothing else
+	succeeded.Runs[8].State = domain.CheckSuccess // the StatusContext, and nothing else
 
 	want := []string{"sca", "audit", "secrets", "deps", "build", "lint", "test", "codecov/patch", "ci/circleci"}
 	for _, tc := range []struct {
 		name   string
-		checks gh.Checks
+		checks domain.Checks
 	}{
 		{"external CI running", mixed()},
 		{"external CI succeeded", succeeded},
@@ -568,7 +570,7 @@ func listPane(m Model) []string {
 func TestScrollingBackToAGroupsFirstCheckBringsItsHeading(t *testing.T) {
 	t.Parallel()
 
-	m := New(&fakeSource{checks: manyChecks()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{checks: manyChecks()}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 12})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: manyChecks()})
 	for range 31 {
@@ -626,8 +628,8 @@ func TestTheLogDoesNotWrap(t *testing.T) {
 	t.Parallel()
 
 	long := strings.Repeat("x", 400)
-	src := &fakeSource{checks: fixture(), log: []gh.LogLine{{Step: "s", Text: long}}}
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "s", Text: long}}}
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	m, cmd := m.Update(keyPress("enter"))

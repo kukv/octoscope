@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // rowY finds the screen row a given diff row was actually drawn on, so the
@@ -111,15 +111,15 @@ func TestClicksOutsideThePanesDoNothing(t *testing.T) {
 // manyLineFixture is one file with more lines than a short terminal can show
 // at once, so moving the selection past the bottom exercises the diff
 // pane's own scroll (m.top).
-func manyLineFixture() []gh.FileDiff {
-	lines := make([]gh.DiffLine, 40)
+func manyLineFixture() []domain.FileDiff {
+	lines := make([]domain.DiffLine, 40)
 	for i := range lines {
-		lines[i] = gh.DiffLine{Kind: gh.LineAdded, NewLine: i + 1, Text: fmt.Sprintf("line-%02d", i)}
+		lines[i] = domain.DiffLine{Kind: domain.LineAdded, NewLine: i + 1, Text: fmt.Sprintf("line-%02d", i)}
 	}
-	return []gh.FileDiff{
+	return []domain.FileDiff{
 		{
-			Path: "big.go", Status: gh.FileModified, Additions: 40,
-			Hunks: []gh.Hunk{{Header: "@@ -0,0 +1,40 @@", Lines: lines}},
+			Path: "big.go", Status: domain.FileModified, Additions: 40,
+			Hunks: []domain.Hunk{{Header: "@@ -0,0 +1,40 @@", Lines: lines}},
 		},
 	}
 }
@@ -186,7 +186,7 @@ func TestClickingAPlainLineTwiceDoesNothing(t *testing.T) {
 // instead of the row actually drawn there.
 func TestClickingAScrolledDiffPaneSelectsTheRightRow(t *testing.T) {
 	files := manyLineFixture()
-	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m := New(&fakeSource{files: files}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 15})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
 	for range 30 {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -130,7 +130,7 @@ func TestADirectoryThatIsNoRepositoryIsAnOrdinaryFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	if gh.IsFatal(err) {
+	if domain.IsFatal(err) {
 		t.Fatal("a directory with no repository must not cost the user their screen")
 	}
 }

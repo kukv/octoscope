@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -31,14 +31,14 @@ func loadedApp(t *testing.T, src Source, opts Options) Model {
 func TestTheTabRowReportsOnTheBoard(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
-	failing := gh.WorkItem{
-		Ref:    gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1},
+	failing := domain.WorkItem{
+		Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1},
 		Title:  "a broken one",
-		Checks: gh.Checks{Total: 1, Failed: 1, State: gh.CheckFailure},
+		Checks: domain.Checks{Total: 1, Failed: 1, State: domain.CheckFailure},
 	}
-	src := &fakeSource{work: gh.Work{
-		gh.SectionReviewRequested: {failing, failing},
-		gh.SectionYourPRs:         {failing},
+	src := &fakeSource{work: domain.Work{
+		domain.SectionReviewRequested: {failing, failing},
+		domain.SectionYourPRs:         {failing},
 	}}
 
 	m := loadedApp(t, src, Options{})
@@ -133,9 +133,9 @@ func TestClickingTheGapBetweenTabsDoesNothing(t *testing.T) {
 // meet at: the root draws a tab row above the child, and a child that was
 // handed the screen's own row numbers would select the wrong card.
 func TestAClickReachesTheActiveTabAtItsOwnCoordinates(t *testing.T) {
-	src := &fakeSource{work: gh.Work{gh.SectionReviewRequested: {
-		{Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 1}, Title: "first card"},
-		{Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 2}, Title: "second card"},
+	src := &fakeSource{work: domain.Work{domain.SectionReviewRequested: {
+		{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, Title: "first card"},
+		{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 2}, Title: "second card"},
 	}}}
 	m := loadedApp(t, src, Options{})
 
@@ -154,11 +154,11 @@ func TestAClickReachesTheActiveTabAtItsOwnCoordinates(t *testing.T) {
 // board must not move the repository list's cursor as well.
 func TestAClickIsNotBroadcast(t *testing.T) {
 	src := &fakeSource{
-		work: gh.Work{gh.SectionReviewRequested: {
-			{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "a card"},
-			{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 2}, Title: "another card"},
+		work: domain.Work{domain.SectionReviewRequested: {
+			{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
+			{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
 		}},
-		prs: []gh.PR{{Number: 10, Title: "first pr"}, {Number: 11, Title: "second pr"}},
+		prs: []domain.PR{{Number: 10, Title: "first pr"}, {Number: 11, Title: "second pr"}},
 	}
 	m := press(loadedApp(t, src, Options{Repo: "kukv/demo"}), "1") // --repo lands on Repos
 
@@ -173,9 +173,9 @@ func TestAClickIsNotBroadcast(t *testing.T) {
 // TestTheWheelReachesTheActiveTab covers the other half of the translation:
 // the wheel is forwarded with the same row shift a click gets.
 func TestTheWheelReachesTheActiveTab(t *testing.T) {
-	src := &fakeSource{work: gh.Work{gh.SectionReviewRequested: {
-		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "a card"},
-		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 2}, Title: "another card"},
+	src := &fakeSource{work: domain.Work{domain.SectionReviewRequested: {
+		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
+		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
 	}}}
 	m := loadedApp(t, src, Options{})
 
@@ -189,9 +189,9 @@ func TestTheWheelReachesTheActiveTab(t *testing.T) {
 // TestADragOrAReleaseIsDropped keeps every child from carrying a case for a
 // message none of them acts on.
 func TestADragOrAReleaseIsDropped(t *testing.T) {
-	src := &fakeSource{work: gh.Work{gh.SectionReviewRequested: {
-		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "a card"},
-		{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 2}, Title: "another card"},
+	src := &fakeSource{work: domain.Work{domain.SectionReviewRequested: {
+		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
+		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
 	}}}
 	m := loadedApp(t, src, Options{})
 	x, y := tokenAt(t, m, "another card")

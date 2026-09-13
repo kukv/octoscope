@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed work.graphql
@@ -15,11 +15,11 @@ var workQuery string
 
 // workSearches is each column's GitHub search. The strings are fixed text,
 // not user input: they are the definition of what the column means.
-var workSearches = [gh.WorkSectionCount]string{
-	gh.SectionReviewRequested: "is:open is:pr review-requested:@me",
-	gh.SectionYourPRs:         "is:open is:pr author:@me",
-	gh.SectionAssigned:        "is:open assignee:@me",
-	gh.SectionMentioned:       "is:open mentions:@me",
+var workSearches = [domain.WorkSectionCount]string{
+	domain.SectionReviewRequested: "is:open is:pr review-requested:@me",
+	domain.SectionYourPRs:         "is:open is:pr author:@me",
+	domain.SectionAssigned:        "is:open assignee:@me",
+	domain.SectionMentioned:       "is:open mentions:@me",
 }
 
 type workResponse struct {
@@ -51,7 +51,7 @@ type searchNode struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
 	Labels struct {
-		Nodes []gh.Label `json:"nodes"`
+		Nodes []domain.Label `json:"nodes"`
 	} `json:"labels"`
 	Commits struct {
 		Nodes []struct {
@@ -90,7 +90,7 @@ func (n CheckContext) name() string {
 
 // ListWorkSection fetches one column of the Work board. Its search string is
 // fixed text embedded at build time, not anything the user typed.
-func (c *Client) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+func (c *Client) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
 	if s < 0 || int(s) >= len(workSearches) {
 		return nil, fmt.Errorf("unknown work section %d", s)
 	}
@@ -100,7 +100,7 @@ func (c *Client) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.Wo
 // SearchItems runs one GitHub issue search and returns what it found. The
 // query is the user's, so a rejected one is an ordinary failure to report
 // rather than a broken document.
-func (c *Client) SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error) {
+func (c *Client) SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error) {
 	return c.searchItems(ctx, query)
 }
 
@@ -111,7 +111,7 @@ func (c *Client) SearchItems(ctx context.Context, query string) ([]gh.WorkItem, 
 // Unlike RepoCounts there is no partial body worth salvaging: a search has
 // one result set, and half of one would be read as "that is all there is".
 // The error carries what GitHub said, which is what a user has to act on.
-func (c *Client) searchItems(ctx context.Context, search string) ([]gh.WorkItem, error) {
+func (c *Client) searchItems(ctx context.Context, search string) ([]domain.WorkItem, error) {
 	out, err := c.Read(ctx, workQuery, S("search", search))
 	if err != nil {
 		return nil, err
@@ -121,22 +121,22 @@ func (c *Client) searchItems(ctx context.Context, search string) ([]gh.WorkItem,
 		return nil, fmt.Errorf("parse search: %w", err)
 	}
 	nodes := resp.Data.Results.Nodes
-	items := make([]gh.WorkItem, 0, len(nodes))
+	items := make([]domain.WorkItem, 0, len(nodes))
 	for _, n := range nodes {
 		items = append(items, n.toWorkItem())
 	}
 	return items, nil
 }
 
-func (n searchNode) toWorkItem() gh.WorkItem {
-	item := gh.WorkItem{
-		Ref: gh.ItemRef{
-			Kind:   gh.ItemIssue,
+func (n searchNode) toWorkItem() domain.WorkItem {
+	item := domain.WorkItem{
+		Ref: domain.ItemRef{
+			Kind:   domain.ItemIssue,
 			Repo:   n.Repository.NameWithOwner,
 			Number: n.Number,
 		},
 		Title:     n.Title,
-		State:     gh.ParseItemState(n.State),
+		State:     domain.ParseItemState(n.State),
 		Body:      n.BodyText,
 		Author:    n.Author.Login,
 		Labels:    n.Labels.Nodes,
@@ -146,9 +146,9 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 	if n.Typename != "PullRequest" {
 		return item
 	}
-	item.Ref.Kind = gh.ItemPR
+	item.Ref.Kind = domain.ItemPR
 	item.IsDraft = n.IsDraft
-	item.Review = gh.ParseReviewDecision(n.ReviewDecision)
+	item.Review = domain.ParseReviewDecision(n.ReviewDecision)
 	item.Head = n.HeadRefName
 	item.Base = n.BaseRefName
 	item.Additions = n.Additions
@@ -158,7 +158,7 @@ func (n searchNode) toWorkItem() gh.WorkItem {
 }
 
 // checks reads the roll-up out of the commit the search returned.
-func (n searchNode) checks() gh.Checks {
+func (n searchNode) checks() domain.Checks {
 	var nodes []CheckContext
 	for _, commit := range n.Commits.Nodes {
 		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
@@ -171,20 +171,20 @@ func (n searchNode) checks() gh.Checks {
 // RollupContexts counts every check-run context once: each context
 // increments Total and exactly one of Passed, Failed, or Running, so
 // Passed+Failed+Running always equals Total.
-func RollupContexts(nodes []CheckContext) gh.Checks {
-	var c gh.Checks
+func RollupContexts(nodes []CheckContext) domain.Checks {
+	var c domain.Checks
 	for _, node := range nodes {
 		c.Total++
 		state := checkOutcome(node)
-		kind := gh.CheckKindRun
+		kind := domain.CheckKindRun
 		if node.Typename == "StatusContext" {
-			kind = gh.CheckKindStatus
+			kind = domain.CheckKindStatus
 		}
-		c.Runs = append(c.Runs, gh.CheckRun{Name: node.name(), State: state, Kind: kind})
+		c.Runs = append(c.Runs, domain.CheckRun{Name: node.name(), State: state, Kind: kind})
 		switch state {
-		case gh.CheckSuccess:
+		case domain.CheckSuccess:
 			c.Passed++
-		case gh.CheckFailure:
+		case domain.CheckFailure:
 			c.Failed++
 		default:
 			c.Running++
@@ -192,13 +192,13 @@ func RollupContexts(nodes []CheckContext) gh.Checks {
 	}
 	switch {
 	case c.Total == 0:
-		c.State = gh.CheckNone
+		c.State = domain.CheckNone
 	case c.Failed > 0:
-		c.State = gh.CheckFailure
+		c.State = domain.CheckFailure
 	case c.Running > 0:
-		c.State = gh.CheckRunning
+		c.State = domain.CheckRunning
 	default:
-		c.State = gh.CheckSuccess
+		c.State = domain.CheckSuccess
 	}
 	return c
 }
@@ -206,26 +206,26 @@ func RollupContexts(nodes []CheckContext) gh.Checks {
 // checkOutcome reads one context of the rollup. CheckRun reports status and
 // conclusion; the older StatusContext reports a single state, so the two
 // shapes have to be read differently.
-func checkOutcome(n CheckContext) gh.CheckState {
+func checkOutcome(n CheckContext) domain.CheckState {
 	if n.Typename == "StatusContext" {
 		switch n.State {
 		case "SUCCESS":
-			return gh.CheckSuccess
+			return domain.CheckSuccess
 		case "FAILURE", "ERROR":
-			return gh.CheckFailure
+			return domain.CheckFailure
 		default:
-			return gh.CheckPending
+			return domain.CheckPending
 		}
 	}
 	if n.Status != "COMPLETED" {
-		return gh.CheckRunning
+		return domain.CheckRunning
 	}
 	switch n.Conclusion {
 	case "SUCCESS", "NEUTRAL", "SKIPPED":
-		return gh.CheckSuccess
+		return domain.CheckSuccess
 	case "FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE":
-		return gh.CheckFailure
+		return domain.CheckFailure
 	default:
-		return gh.CheckPending
+		return domain.CheckPending
 	}
 }

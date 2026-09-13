@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -26,17 +26,17 @@ func TestARowShowsTheStateTheNumberAndTheAge(t *testing.T) {
 	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
 	cases := []struct {
 		name string
-		pr   gh.PR
+		pr   domain.PR
 		want []string
 	}{
-		{"draft", gh.PR{Number: 1, IsDraft: true, UpdatedAt: now.Add(-30 * time.Second)}, []string{"◌", "#1", "now"}},
-		{"approved", gh.PR{Number: 2, Review: gh.ReviewApproved, UpdatedAt: now.Add(-5 * time.Minute)}, []string{"✓", "#2", "5m ago"}},
-		{"changes requested", gh.PR{Number: 3, Review: gh.ReviewChangesRequested, UpdatedAt: now.Add(-3 * time.Hour)}, []string{"×", "#3", "3h ago"}},
-		{"review required", gh.PR{Number: 4, Review: gh.ReviewRequired, UpdatedAt: now.Add(-49 * time.Hour)}, []string{"•", "#4", "2d ago"}},
+		{"draft", domain.PR{Number: 1, IsDraft: true, UpdatedAt: now.Add(-30 * time.Second)}, []string{"◌", "#1", "now"}},
+		{"approved", domain.PR{Number: 2, Review: domain.ReviewApproved, UpdatedAt: now.Add(-5 * time.Minute)}, []string{"✓", "#2", "5m ago"}},
+		{"changes requested", domain.PR{Number: 3, Review: domain.ReviewChangesRequested, UpdatedAt: now.Add(-3 * time.Hour)}, []string{"×", "#3", "3h ago"}},
+		{"review required", domain.PR{Number: 4, Review: domain.ReviewRequired, UpdatedAt: now.Add(-49 * time.Hour)}, []string{"•", "#4", "2d ago"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			m := sized(loadedModel(&fakeSource{prs: []gh.PR{c.pr}}), 120)
+			m := sized(loadedModel(&fakeSource{prs: []domain.PR{c.pr}}), 120)
 			m.fetchedAt = [2]time.Time{now, now}
 			got := ansi.Strip(m.row(0))
 			for _, want := range c.want {
@@ -55,7 +55,7 @@ func TestTheColumnsLineUpDownThePage(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
 	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
-	prs := []gh.PR{
+	prs := []domain.PR{
 		{Number: 1, Title: "short", UpdatedAt: now.Add(-time.Hour)},
 		{Number: 22, Title: "レンダリングのパイプラインをまるごと置き換える", UpdatedAt: now.Add(-time.Hour)},
 		{Number: 333, Title: "a middling sort of title", UpdatedAt: now.Add(-time.Hour)},
@@ -85,14 +85,14 @@ func TestTheColumnsLineUpDownThePage(t *testing.T) {
 // drawn under it, and one that grew with the selection would move the key bar.
 func TestTheSummaryBlockIsAlwaysTheSameHeight(t *testing.T) {
 	f := &fakeSource{
-		prs: []gh.PR{
-			{Number: 1, Title: "with checks", Head: "a", Base: "main", Additions: 2, Deletions: 1, Checks: gh.Checks{
-				Total: 2, Passed: 2, State: gh.CheckSuccess,
-				Runs: []gh.CheckRun{{Name: "lint"}, {Name: "test"}},
+		prs: []domain.PR{
+			{Number: 1, Title: "with checks", Head: "a", Base: "main", Additions: 2, Deletions: 1, Checks: domain.Checks{
+				Total: 2, Passed: 2, State: domain.CheckSuccess,
+				Runs: []domain.CheckRun{{Name: "lint"}, {Name: "test"}},
 			}},
 			{Number: 2, Title: "without"},
 		},
-		issues: []gh.Issue{{Number: 9, Title: "an issue", Author: gh.Author{Login: "bob"}}},
+		issues: []domain.Issue{{Number: 9, Title: "an issue", Author: domain.Author{Login: "bob"}}},
 	}
 	m := sized(loadedModel(f), 120)
 	for name, model := range map[string]Model{
@@ -108,12 +108,12 @@ func TestTheSummaryBlockIsAlwaysTheSameHeight(t *testing.T) {
 // TestTheSummaryNamesTheBranchesAndTheSizeOfTheChange is the line the mockup
 // puts under the table.
 func TestTheSummaryNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
-	f := &fakeSource{prs: []gh.PR{{
-		Number: 1, Title: "a change", Author: gh.Author{Login: "kukv"},
+	f := &fakeSource{prs: []domain.PR{{
+		Number: 1, Title: "a change", Author: domain.Author{Login: "kukv"},
 		Head: "feat/graph", Base: "main", Additions: 218, Deletions: 31,
-		Checks: gh.Checks{
-			Total: 1, Passed: 1, State: gh.CheckSuccess,
-			Runs: []gh.CheckRun{{Name: "lint", State: gh.CheckSuccess}},
+		Checks: domain.Checks{
+			Total: 1, Passed: 1, State: domain.CheckSuccess,
+			Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
 		},
 	}}}
 	got := ansi.Strip(strings.Join(sized(loadedModel(f), 120).summary(), "\n"))
@@ -128,9 +128,9 @@ func TestTheSummaryNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
 // drawn has to be on screen, so a repository with a hundred pull requests
 // scrolls rather than pushing the key bar off the bottom.
 func TestTheListFitsTheTerminal(t *testing.T) {
-	var prs []gh.PR
+	var prs []domain.PR
 	for i := range 60 {
-		prs = append(prs, gh.PR{Number: i + 1, Title: "a pull request"})
+		prs = append(prs, domain.PR{Number: i + 1, Title: "a pull request"})
 	}
 	m := loadedModel(&fakeSource{prs: prs})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -115,17 +115,17 @@ func statusError(status int, body []byte) error {
 		if msg == "" {
 			msg = fmt.Sprintf("HTTP %d", status)
 		}
-		return gh.Classify(gh.ErrTransient, msg)
+		return domain.Classify(domain.ErrTransient, msg)
 	case status == http.StatusUnauthorized:
 		if msg == "" {
 			msg = "HTTP 401"
 		}
-		return gh.Classify(gh.ErrUnauthenticated, msg)
+		return domain.Classify(domain.ErrUnauthenticated, msg)
 	case status >= 400:
 		if msg == "" {
 			msg = fmt.Sprintf("HTTP %d", status)
 		}
-		return gh.Classify(nil, msg)
+		return domain.Classify(nil, msg)
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ func classify(status int, body []byte) error {
 	var b errorsBody
 	_ = json.Unmarshal(body, &b)
 	if msg := b.text(); msg != "" {
-		return gh.Classify(nil, msg)
+		return domain.Classify(nil, msg)
 	}
 	return nil
 }

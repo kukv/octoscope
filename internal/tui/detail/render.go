@@ -7,8 +7,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/layout"
 	"github.com/kukv/octoscope/internal/tui/theme"
@@ -61,7 +61,7 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.detail.move"),
 		i18n.T("footer.detail.comment"),
 	}
-	if m.ref.Kind == gh.ItemPR {
+	if m.ref.Kind == domain.ItemPR {
 		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"),
 			i18n.T("footer.detail.checks"))
 	}
@@ -140,9 +140,9 @@ func (m Model) confirmView() string {
 	closing, _ := m.stateAction()
 	var id string
 	switch {
-	case m.ref.Kind == gh.ItemPR && closing:
+	case m.ref.Kind == domain.ItemPR && closing:
 		id = "confirm.close_pr"
-	case m.ref.Kind == gh.ItemPR:
+	case m.ref.Kind == domain.ItemPR:
 		id = "confirm.reopen_pr"
 	case closing:
 		id = "confirm.close_issue"
@@ -183,7 +183,7 @@ func cursorPrefix(selected bool) string {
 	return "  "
 }
 
-func prMarkdown(pr gh.PR) string {
+func prMarkdown(pr domain.PR) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# #%d %s\n\n", pr.Number, pr.Title)
 	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), pr.Author.Login)
@@ -192,7 +192,7 @@ func prMarkdown(pr gh.PR) string {
 		state += i18n.T("md.draft_suffix")
 	}
 	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), state)
-	if pr.Review != gh.ReviewNone {
+	if pr.Review != domain.ReviewNone {
 		fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.review"), reviewText(pr.Review))
 	}
 	writeCommonMeta(&b, pr.Labels, pr.UpdatedAt)
@@ -215,31 +215,31 @@ func issueMarkdown(it usecase.Item) string {
 // stateText and reviewText name a state in the reader's language. GitHub's
 // own spelling stopped at the access layer (.claude/rules/architecture.md),
 // and a state word is ours to translate.
-func stateText(s gh.ItemState) string {
+func stateText(s domain.ItemState) string {
 	switch s {
-	case gh.StateOpen:
+	case domain.StateOpen:
 		return i18n.T("state.open")
-	case gh.StateMerged:
+	case domain.StateMerged:
 		return i18n.T("state.merged")
 	default:
 		return i18n.T("state.closed")
 	}
 }
 
-func reviewText(r gh.ReviewState) string {
+func reviewText(r domain.ReviewState) string {
 	switch r {
-	case gh.ReviewApproved:
+	case domain.ReviewApproved:
 		return i18n.T("review.approved")
-	case gh.ReviewChangesRequested:
+	case domain.ReviewChangesRequested:
 		return i18n.T("review.changes_requested")
-	case gh.ReviewRequired:
+	case domain.ReviewRequired:
 		return i18n.T("review.required")
 	default:
 		return i18n.T("review.none")
 	}
 }
 
-func writeCommonMeta(b *strings.Builder, labels []gh.Label, updatedAt time.Time) {
+func writeCommonMeta(b *strings.Builder, labels []domain.Label, updatedAt time.Time) {
 	if len(labels) > 0 {
 		names := make([]string, len(labels))
 		for i, l := range labels {
@@ -259,7 +259,7 @@ func writeBody(b *strings.Builder, body string) {
 	}
 }
 
-func writeComments(b *strings.Builder, comments []gh.Comment) {
+func writeComments(b *strings.Builder, comments []domain.Comment) {
 	for _, c := range comments {
 		fmt.Fprintf(b, "\n\n---\n\n**@%s** — %s\n\n%s",
 			c.Author.Login, i18n.DateTime(c.CreatedAt), c.Body)

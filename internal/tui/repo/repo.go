@@ -10,19 +10,19 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/browser"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/tui/dialog"
 )
 
 // prSource is the pull-request half of what the list needs.
 type prSource interface {
-	ListPRs(ctx context.Context, repo string) ([]gh.PR, error)
+	ListPRs(ctx context.Context, repo string) ([]domain.PR, error)
 }
 
 // issueSource mirrors prSource for issues.
 type issueSource interface {
-	ListIssues(ctx context.Context, repo string) ([]gh.Issue, error)
+	ListIssues(ctx context.Context, repo string) ([]domain.Issue, error)
 }
 
 // webOpener shows an item in a browser. It takes the URL GitHub gave the
@@ -36,15 +36,15 @@ type webOpener interface {
 // repository of the sidebar. It stands alone because it is the only call
 // that looks past the repository on screen.
 type repoCounter interface {
-	RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error)
+	RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error)
 }
 
 // repoEditor is how the sidebar's own list changes: what to offer while the
 // add dialog is typed into, what a first run can be seeded from, and where
 // the result survives a restart.
 type repoEditor interface {
-	SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error)
-	SeedCandidates(ctx context.Context) ([]gh.RepoCandidate, error)
+	SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error)
+	SeedCandidates(ctx context.Context) ([]domain.RepoCandidate, error)
 	SaveRepositories(repos []string) error
 }
 
@@ -60,30 +60,30 @@ type Source interface {
 }
 
 // OpenDetailMsg asks the parent to show the detail view for one item.
-type OpenDetailMsg struct{ Ref gh.ItemRef }
+type OpenDetailMsg struct{ Ref domain.ItemRef }
 
 // OpenDiffMsg asks the parent to show the diff of the selected pull request.
-type OpenDiffMsg struct{ Ref gh.ItemRef }
+type OpenDiffMsg struct{ Ref domain.ItemRef }
 
 // OpenChecksMsg asks the parent to show the checks of the selected pull
 // request.
-type OpenChecksMsg struct{ Ref gh.ItemRef }
+type OpenChecksMsg struct{ Ref domain.ItemRef }
 
 // FatalMsg carries a failure the parent shows on its error screen. Only what
 // the user has to act on travels this way; everything else stays on the list
-// as a notice (see gh.IsFatal).
+// as a notice (see domain.IsFatal).
 type FatalMsg struct{ Err error }
 
 type (
 	prListMsg struct {
 		gen int
-		prs []gh.PR
+		prs []domain.PR
 	}
 	issueListMsg struct {
 		gen    int
-		issues []gh.Issue
+		issues []domain.Issue
 	}
-	repoCountsMsg []gh.RepoCount
+	repoCountsMsg []domain.RepoCount
 
 	// searchTickMsg fires once the typing has paused, and candidatesMsg
 	// carries what the search it started found. Both name the generation of
@@ -92,7 +92,7 @@ type (
 	searchTickMsg struct{ gen int }
 	candidatesMsg struct {
 		gen        int
-		candidates []gh.RepoCandidate
+		candidates []domain.RepoCandidate
 	}
 
 	errMsg struct {
@@ -218,8 +218,8 @@ type Model struct {
 
 	tab     tabID
 	cursors [2]int
-	prs     []gh.PR
-	issues  []gh.Issue
+	prs     []domain.PR
+	issues  []domain.Issue
 	loaded  [2]bool
 	loading [2]bool
 
@@ -472,7 +472,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.kind == noticeFetch {
 			m.loading[msg.tab] = false
 		}
-		if gh.IsFatal(msg.err) {
+		if domain.IsFatal(msg.err) {
 			err := msg.err
 			return m, func() tea.Msg { return FatalMsg{err} }
 		}
@@ -550,14 +550,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ref, ok := m.SelectedRef()
 		// An issue has no diff. Opening an empty diff view would be a worse
 		// answer than doing nothing.
-		if !ok || ref.Kind != gh.ItemPR {
+		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "s":
 		ref, ok := m.SelectedRef()
 		// An issue has no checks.
-		if !ok || ref.Kind != gh.ItemPR {
+		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
@@ -590,15 +590,15 @@ func (m Model) selectedURL() (string, bool) {
 // SelectedRef names the item under the cursor. ok is false when the tab is
 // empty. The repository is the one this view is showing: the ref travels to
 // the detail, diff and checks views, which draw it in their titles.
-func (m Model) SelectedRef() (gh.ItemRef, bool) {
+func (m Model) SelectedRef() (domain.ItemRef, bool) {
 	if m.tab == tabPRs {
 		if len(m.prs) == 0 {
-			return gh.ItemRef{}, false
+			return domain.ItemRef{}, false
 		}
-		return gh.ItemRef{Kind: gh.ItemPR, Repo: m.selectedRepo(), Number: m.prs[m.cursors[tabPRs]].Number}, true
+		return domain.ItemRef{Kind: domain.ItemPR, Repo: m.selectedRepo(), Number: m.prs[m.cursors[tabPRs]].Number}, true
 	}
 	if len(m.issues) == 0 {
-		return gh.ItemRef{}, false
+		return domain.ItemRef{}, false
 	}
-	return gh.ItemRef{Kind: gh.ItemIssue, Repo: m.selectedRepo(), Number: m.issues[m.cursors[tabIssues]].Number}, true
+	return domain.ItemRef{Kind: domain.ItemIssue, Repo: m.selectedRepo(), Number: m.issues[m.cursors[tabIssues]].Number}, true
 }

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // Set is one family of glyphs.
@@ -112,15 +112,15 @@ func Resolve(flag, configured string) Set {
 }
 
 // Review returns the one-column marker for a pull request's review state.
-func Review(s gh.ReviewState, draft bool) string {
+func Review(s domain.ReviewState, draft bool) string {
 	g := active()
 	if draft {
 		return g.draft
 	}
 	switch s {
-	case gh.ReviewApproved:
+	case domain.ReviewApproved:
 		return g.approved
-	case gh.ReviewChangesRequested:
+	case domain.ReviewChangesRequested:
 		return g.changesRequested
 	default:
 		return g.reviewPending
@@ -133,14 +133,14 @@ func Review(s gh.ReviewState, draft bool) string {
 func Issue() string { return active().issue }
 
 // Check returns the one-column marker for a rolled-up check state.
-func Check(s gh.CheckState) string {
+func Check(s domain.CheckState) string {
 	g := active()
 	switch s {
-	case gh.CheckSuccess:
+	case domain.CheckSuccess:
 		return g.checkSuccess
-	case gh.CheckFailure:
+	case domain.CheckFailure:
 		return g.checkFailure
-	case gh.CheckRunning, gh.CheckPending:
+	case domain.CheckRunning, domain.CheckPending:
 		return g.checkRunning
 	default:
 		return " "
@@ -181,7 +181,7 @@ const BarWidth = 7
 // the two halves are coloured differently, and a caller cannot split a single
 // string back up once the glyphs are chosen. Both are empty when there are no
 // checks, so callers can leave the field out instead of drawing an empty bar.
-func ChecksBar(c gh.Checks) (done, rest string) {
+func ChecksBar(c domain.Checks) (done, rest string) {
 	if c.Total == 0 {
 		return "", ""
 	}

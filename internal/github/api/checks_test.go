@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // Rerunning everything and rerunning only what failed are two endpoints, not
@@ -22,11 +22,11 @@ func TestRerunScopePicksTheEndpoint(t *testing.T) {
 
 	for _, tc := range []struct {
 		name  string
-		scope gh.RerunScope
+		scope domain.RerunScope
 		want  string
 	}{
-		{"all", gh.RerunAll, "/repos/kukv/octoscope/actions/runs/61/rerun"},
-		{"failed", gh.RerunFailed, "/repos/kukv/octoscope/actions/runs/61/rerun-failed-jobs"},
+		{"all", domain.RerunAll, "/repos/kukv/octoscope/actions/runs/61/rerun"},
+		{"failed", domain.RerunFailed, "/repos/kukv/octoscope/actions/runs/61/rerun-failed-jobs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -60,7 +60,7 @@ func TestARerunIsNotRepeatedOnATransientFailure(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = io.WriteString(w, `{"message": "Server Error"}`)
 	})
-	if err := c.RerunWorkflow(context.Background(), "kukv/octoscope", 61, gh.RerunAll); err == nil {
+	if err := c.RerunWorkflow(context.Background(), "kukv/octoscope", 61, domain.RerunAll); err == nil {
 		t.Fatal("RerunWorkflow: want an error")
 	}
 	if len(*got) != 1 {

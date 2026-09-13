@@ -10,16 +10,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/merge"
 )
 
 // fakeSource implements Source and records calls.
 type fakeSource struct {
-	pr       gh.PR
-	issue    gh.Issue
+	pr       domain.PR
+	issue    domain.Issue
 	err      error
 	webCalls []string // the URLs handed to the browser
 
@@ -29,49 +29,49 @@ type fakeSource struct {
 	stateCalls []string // action:kind:repo:number, e.g. "close:pr::1"
 	stateErr   error
 
-	labels    []gh.Label
+	labels    []domain.Label
 	users     []string
 	editCalls []string // "pr:labels::1:add=bug:remove=wip"
 	labelsErr error
 	usersErr  error
 	editErr   error
 
-	reviewCtx gh.ReviewContext
+	reviewCtx domain.ReviewContext
 	reviewErr error
 
 	submitCalls []string // "<pending id>:<body>"
 	submitErr   error
 
-	mergeCtx gh.MergeContext
+	mergeCtx domain.MergeContext
 	mergeErr error
 }
 
-func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
-	if ref.Kind == gh.ItemPR {
+func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (usecase.Item, error) {
+	if ref.Kind == domain.ItemPR {
 		return prItem(f.pr), f.err
 	}
 	return issueItem(f.issue), f.err
 }
 
-func prItem(pr gh.PR) usecase.Item {
+func prItem(pr domain.PR) usecase.Item {
 	return usecase.Item{
-		Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
+		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
 		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
 		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
 		PR: &pr,
 	}
 }
 
-func issueItem(issue gh.Issue) usecase.Item {
+func issueItem(issue domain.Issue) usecase.Item {
 	return usecase.Item{
-		Kind: gh.ItemIssue, Number: issue.Number, Title: issue.Title, Author: issue.Author,
+		Kind: domain.ItemIssue, Number: issue.Number, Title: issue.Title, Author: issue.Author,
 		State: issue.State, Body: issue.Body, URL: issue.URL, Labels: issue.Labels,
 		Assignees: issue.Assignees, Comments: issue.Comments, UpdatedAt: issue.UpdatedAt,
 	}
 }
 
-func kindName(ref gh.ItemRef) string {
-	if ref.Kind == gh.ItemPR {
+func kindName(ref domain.ItemRef) string {
+	if ref.Kind == domain.ItemPR {
 		return "pr"
 	}
 	return "issue"
@@ -82,12 +82,12 @@ func (f *fakeSource) OpenWeb(url string) error {
 	return nil
 }
 
-func (f *fakeSource) AddComment(ref gh.ItemRef, body string) error {
+func (f *fakeSource) AddComment(ref domain.ItemRef, body string) error {
 	f.commentCalls = append(f.commentCalls, kindName(ref)+":"+ref.Repo+":"+itoa(ref.Number)+":"+body)
 	return f.commentErr
 }
 
-func (f *fakeSource) SetState(ref gh.ItemRef, closing bool) error {
+func (f *fakeSource) SetState(ref domain.ItemRef, closing bool) error {
 	action := "reopen"
 	if closing {
 		action = "close"
@@ -96,7 +96,7 @@ func (f *fakeSource) SetState(ref gh.ItemRef, closing bool) error {
 	return f.stateErr
 }
 
-func (f *fakeSource) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
+func (f *fakeSource) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	return f.labels, f.labelsErr
 }
 
@@ -104,32 +104,32 @@ func (f *fakeSource) ListAssignees(ctx context.Context, repo string) ([]string, 
 	return f.users, f.usersErr
 }
 
-func (f *fakeSource) EditLabels(ref gh.ItemRef, add, remove []string) error {
+func (f *fakeSource) EditLabels(ref domain.ItemRef, add, remove []string) error {
 	f.editCalls = append(f.editCalls, kindName(ref)+":labels:"+ref.Repo+":"+itoa(ref.Number)+editSuffix(add, remove))
 	return f.editErr
 }
 
-func (f *fakeSource) EditAssignees(ref gh.ItemRef, add, remove []string) error {
+func (f *fakeSource) EditAssignees(ref domain.ItemRef, add, remove []string) error {
 	f.editCalls = append(f.editCalls, kindName(ref)+":assignees:"+ref.Repo+":"+itoa(ref.Number)+editSuffix(add, remove))
 	return f.editErr
 }
 
-func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (gh.ReviewContext, error) {
+func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (domain.ReviewContext, error) {
 	return f.reviewCtx, f.reviewErr
 }
 
-func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error {
+func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event domain.ReviewEvent, body string) error {
 	f.submitCalls = append(f.submitCalls, t.PendingID+":"+body)
 	return f.submitErr
 }
 
-func (f *fakeSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
+func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeContext, error) {
 	return f.mergeCtx, f.mergeErr
 }
 
-func (f *fakeSource) MergePR(string, gh.MergeMethod) error         { return nil }
-func (f *fakeSource) EnableAutoMerge(string, gh.MergeMethod) error { return nil }
-func (f *fakeSource) DisableAutoMerge(string) error                { return nil }
+func (f *fakeSource) MergePR(string, domain.MergeMethod) error         { return nil }
+func (f *fakeSource) EnableAutoMerge(string, domain.MergeMethod) error { return nil }
+func (f *fakeSource) DisableAutoMerge(string) error                    { return nil }
 
 func editSuffix(add, remove []string) string {
 	return ":add=" + strings.Join(add, ",") + ":remove=" + strings.Join(remove, ",")
@@ -154,14 +154,14 @@ func key(s string) tea.KeyPressMsg {
 	}
 }
 
-func prRef() gh.ItemRef    { return gh.ItemRef{Kind: gh.ItemPR, Number: 1} }
-func issueRef() gh.ItemRef { return gh.ItemRef{Kind: gh.ItemIssue, Number: 5} }
+func prRef() domain.ItemRef    { return domain.ItemRef{Kind: domain.ItemPR, Number: 1} }
+func issueRef() domain.ItemRef { return domain.ItemRef{Kind: domain.ItemIssue, Number: 5} }
 
 // loaded returns a model whose item has already arrived. It runs the fetch
 // directly rather than through Init, whose batch also holds the spinner tick
 // (a command that sleeps a frame before it reports); TestInitStartsTheFetch
 // covers Init itself.
-func loaded(f *fakeSource, ref gh.ItemRef) Model {
+func loaded(f *fakeSource, ref domain.ItemRef) Model {
 	m := New(f, ref)
 	m, _ = m.Update(fetch(f, ref)())
 	return m
@@ -181,7 +181,7 @@ func initFetch(t *testing.T, m Model) tea.Cmd {
 }
 
 func TestInitStartsTheFetch(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := New(f, prRef())
 	if _, ok := initFetch(t, m)().(itemMsg); !ok {
 		t.Errorf("the batched fetch did not produce an itemMsg")
@@ -189,10 +189,10 @@ func TestInitStartsTheFetch(t *testing.T) {
 }
 
 func TestDetailRendersBodyAndComments(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{
-		Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
-		Body: "the body text", Comments: []gh.Comment{
-			{Author: gh.Author{Login: "bob"}, Body: "a comment"},
+	f := &fakeSource{pr: domain.PR{
+		Number: 1, Title: "first pr", Author: domain.Author{Login: "kukv"},
+		Body: "the body text", Comments: []domain.Comment{
+			{Author: domain.Author{Login: "bob"}, Body: "a comment"},
 		},
 	}}
 	m := loaded(f, prRef())
@@ -208,7 +208,7 @@ func TestDetailRendersBodyAndComments(t *testing.T) {
 func TestEscAndQCloseTheView(t *testing.T) {
 	for _, k := range []string{"esc", "q"} {
 		t.Run(k, func(t *testing.T) {
-			f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+			f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 			m := loaded(f, prRef())
 			_, cmd := m.Update(key(k))
 			if cmd == nil {
@@ -241,7 +241,7 @@ func TestFetchFailureBecomesErrorMsg(t *testing.T) {
 }
 
 func TestDAsksForTheDiff(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	_, cmd := m.Update(key("d"))
 	if cmd == nil {
@@ -259,7 +259,7 @@ func TestDAsksForTheDiff(t *testing.T) {
 // TestDDoesNothingOnAnIssue is what stops the diff view opening on something
 // that has no diff.
 func TestDDoesNothingOnAnIssue(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	f := &fakeSource{issue: domain.Issue{Number: 5, Title: "an issue"}}
 	m := loaded(f, issueRef())
 	if _, cmd := m.Update(key("d")); cmd != nil {
 		t.Errorf("d on an issue produced %T", cmd())
@@ -267,7 +267,7 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 }
 
 func TestSAsksForTheChecks(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	_, cmd := m.Update(key("s"))
 	if cmd == nil {
@@ -285,7 +285,7 @@ func TestSAsksForTheChecks(t *testing.T) {
 // TestSDoesNothingOnAnIssue is what stops the checks view opening on
 // something that has no checks.
 func TestSDoesNothingOnAnIssue(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	f := &fakeSource{issue: domain.Issue{Number: 5, Title: "an issue"}}
 	m := loaded(f, issueRef())
 	if _, cmd := m.Update(key("s")); cmd != nil {
 		t.Errorf("s on an issue produced %T", cmd())
@@ -296,12 +296,12 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 // no hint is a key nobody can find. It only shows on a pull request, the
 // same way d does.
 func TestKeyBarNamesTheChecksKey(t *testing.T) {
-	pr := loaded(&fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}, prRef())
+	pr := loaded(&fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}, prRef())
 	if got := pr.View(); !strings.Contains(got, "s:checks") {
 		t.Errorf("key bar = %q, want it to mention s:checks", got)
 	}
 
-	issue := loaded(&fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}, issueRef())
+	issue := loaded(&fakeSource{issue: domain.Issue{Number: 5, Title: "an issue"}}, issueRef())
 	if got := issue.View(); strings.Contains(got, "s:checks") {
 		t.Errorf("key bar = %q, an issue has no checks to hint at", got)
 	}
@@ -311,7 +311,7 @@ func TestKeyBarNamesTheChecksKey(t *testing.T) {
 // the item, rather than one octoscope spelled out itself.
 func TestOOpensTheShownItemsOwnURL(t *testing.T) {
 	const want = "https://github.com/kukv/demo/pull/1"
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", URL: want}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", URL: want}}
 	m := loaded(f, prRef())
 	_, cmd := m.Update(key("o"))
 	if cmd == nil {
@@ -334,7 +334,7 @@ func TestODoesNothingBeforeTheItemLands(t *testing.T) {
 }
 
 func TestDetailRefetchesOnR(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("r"))
 	if m.phase != phaseLoading || cmd == nil {
@@ -343,7 +343,7 @@ func TestDetailRefetchesOnR(t *testing.T) {
 }
 
 func TestCEntersCompose(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	if m.mode != modeCompose {
@@ -352,7 +352,7 @@ func TestCEntersCompose(t *testing.T) {
 }
 
 func TestComposeEmptyBodyNotSent(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	m, cmd := m.Update(key("ctrl+s")) // the textarea is empty
@@ -368,7 +368,7 @@ func TestComposeEmptyBodyNotSent(t *testing.T) {
 }
 
 func TestComposeSubmitPostsAndRefetches(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("looks good")
@@ -391,7 +391,7 @@ func TestComposeSubmitPostsAndRefetches(t *testing.T) {
 }
 
 func TestComposeEscCancels(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("draft")
@@ -406,7 +406,7 @@ func TestComposeEscCancels(t *testing.T) {
 
 func TestComposePostErrorKeepsDraft(t *testing.T) {
 	f := &fakeSource{
-		pr:         gh.PR{Number: 1, Title: "first pr"},
+		pr:         domain.PR{Number: 1, Title: "first pr"},
 		commentErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -427,7 +427,7 @@ func TestComposePostErrorKeepsDraft(t *testing.T) {
 }
 
 func TestComposeViewShowsTextareaAndHelp(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("my comment")
@@ -441,7 +441,7 @@ func TestComposeViewShowsTextareaAndHelp(t *testing.T) {
 
 func TestComposeViewShowsPostError(t *testing.T) {
 	f := &fakeSource{
-		pr:         gh.PR{Number: 1, Title: "first pr"},
+		pr:         domain.PR{Number: 1, Title: "first pr"},
 		commentErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -455,7 +455,7 @@ func TestComposeViewShowsPostError(t *testing.T) {
 }
 
 func TestComposeIgnoresKeysWhilePosting(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("c"))
 	m.textarea.SetValue("hello")
@@ -477,7 +477,7 @@ func TestComposeIgnoresKeysWhilePosting(t *testing.T) {
 }
 
 func TestXEntersConfirmWhenOpen(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	if m.mode != modeConfirm {
@@ -486,7 +486,7 @@ func TestXEntersConfirmWhenOpen(t *testing.T) {
 }
 
 func TestXIgnoredWhenMerged(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateMerged}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateMerged}}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("x"))
 	if m.mode != modeView {
@@ -498,7 +498,7 @@ func TestXIgnoredWhenMerged(t *testing.T) {
 }
 
 func TestConfirmYClosesAndRefetches(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("y"))
@@ -520,7 +520,7 @@ func TestConfirmYClosesAndRefetches(t *testing.T) {
 }
 
 func TestConfirmReopenRoutesToReopen(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateClosed}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateClosed}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	_, cmd := m.Update(key("y"))
@@ -536,7 +536,7 @@ func TestConfirmReopenRoutesToReopen(t *testing.T) {
 }
 
 func TestConfirmNCancels(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("n"))
@@ -552,7 +552,7 @@ func TestConfirmNCancels(t *testing.T) {
 }
 
 func TestConfirmEscCancels(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, cmd := m.Update(key("esc"))
@@ -566,7 +566,7 @@ func TestConfirmEscCancels(t *testing.T) {
 
 func TestStateErrorStaysOnDetail(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:       domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		stateErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -589,7 +589,7 @@ func TestStateErrorStaysOnDetail(t *testing.T) {
 }
 
 func TestConfirmViewShowsPrompt(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	view := m.View()
@@ -601,7 +601,7 @@ func TestConfirmViewShowsPrompt(t *testing.T) {
 }
 
 func TestConfirmViewReopenWording(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateClosed}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateClosed}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	if !strings.Contains(m.View(), "Reopen") {
@@ -614,8 +614,8 @@ func TestConfirmViewReopenWording(t *testing.T) {
 // first.
 func TestVFetchesReviewContextAndOpensThePopup(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
@@ -635,7 +635,7 @@ func TestVFetchesReviewContextAndOpensThePopup(t *testing.T) {
 
 // TestVDoesNothingOnAnIssue mirrors d's own guard: an issue has no review.
 func TestVDoesNothingOnAnIssue(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	f := &fakeSource{issue: domain.Issue{Number: 5, Title: "an issue"}}
 	m := loaded(f, issueRef())
 	if _, cmd := m.Update(key("v")); cmd != nil {
 		t.Errorf("v on an issue produced %T", cmd())
@@ -647,7 +647,7 @@ func TestVDoesNothingOnAnIssue(t *testing.T) {
 // parent's error screen.
 func TestReviewContextFailureStaysInline(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		reviewErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -668,8 +668,8 @@ func TestReviewContextFailureStaysInline(t *testing.T) {
 // away without closing the whole view.
 func TestSubmitEscCancelsThePopup(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
@@ -692,8 +692,8 @@ func TestSubmitEscCancelsThePopup(t *testing.T) {
 // shows up.
 func TestSubmitSuccessRefetches(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))
@@ -710,7 +710,7 @@ func TestSubmitSuccessRefetches(t *testing.T) {
 }
 
 func TestDetailFooterShowsStateAndPickerKeys(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	view := m.View()
 	for _, want := range []string{"x:close", "l:labels", "a:assign"} {
@@ -724,7 +724,7 @@ func TestDetailFooterShowsStateAndPickerKeys(t *testing.T) {
 // successful reload.
 func TestActionErrClearedOnReload(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:       domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		stateErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -753,7 +753,7 @@ func TestActionErrClearedOnReload(t *testing.T) {
 // rather than draw it inside the composer.
 func TestOpeningTheComposerTakesTheBodysErrorWithIt(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:       domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		stateErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -775,7 +775,7 @@ func TestOpeningTheComposerTakesTheBodysErrorWithIt(t *testing.T) {
 }
 
 func TestConfirmIgnoresKeysWhileWorking(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("x"))
 	m, _ = m.Update(key("y")) // the state cmd is deliberately not run
@@ -797,7 +797,7 @@ func TestConfirmIgnoresKeysWhileWorking(t *testing.T) {
 const spinnerFrame = "⣾"
 
 func TestLoadingShowsSpinnerAndText(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr"}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr"}}
 	m := New(f, prRef())
 	view := m.View()
 	if !strings.Contains(view, "loading...") {
@@ -814,8 +814,8 @@ func TestLoadingShowsSpinnerAndText(t *testing.T) {
 func TestBusyStatesShowTheSpinner(t *testing.T) {
 	newPR := func() *fakeSource {
 		return &fakeSource{
-			pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-			labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+			pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+			labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 		}
 	}
 	cases := map[string]func(t *testing.T) Model{
@@ -865,10 +865,10 @@ func TestSpinnerTickAdvancesTheFrame(t *testing.T) {
 // one item, leaves it and opens another quickly: the first request is still
 // running, and its answer must not put the wrong item on the screen.
 func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
-	other := gh.ItemRef{Kind: gh.ItemPR, Number: 99}
+	other := domain.ItemRef{Kind: domain.ItemPR, Number: 99}
 	m := New(&fakeSource{}, prRef())
 
-	next, _ := m.Update(itemMsg{other, prItem(gh.PR{Number: 99, Title: "the previous one"})})
+	next, _ := m.Update(itemMsg{other, prItem(domain.PR{Number: 99, Title: "the previous one"})})
 	if next.phase != phaseLoading {
 		t.Error("an answer for another item ended the wait for this one")
 	}
@@ -877,7 +877,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	}
 
 	issue := New(&fakeSource{}, issueRef())
-	next, _ = issue.Update(itemMsg{other, issueItem(gh.Issue{Number: 99, Title: "the previous one"})})
+	next, _ = issue.Update(itemMsg{other, issueItem(domain.Issue{Number: 99, Title: "the previous one"})})
 	if next.phase != phaseLoading || next.title != "" {
 		t.Errorf("an issue answer for another item was accepted: %q", next.title)
 	}
@@ -887,7 +887,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 // while the picker's candidates are in flight the view draws a spinner, not
 // the body, so the wheel has nothing to move.
 func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
-	f := &fakeSource{pr: longPR(), labels: []gh.Label{{Name: "bug"}}}
+	f := &fakeSource{pr: longPR(), labels: []domain.Label{{Name: "bug"}}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m, _ = m.Update(key("l")) // the candidates are now in flight
@@ -906,8 +906,8 @@ func TestTheWheelDoesNotScrollWhatTheSpinnerHides(t *testing.T) {
 // the item the user has left would pull that item's body onto the screen and
 // leave the reader looking at something they did not open.
 func TestAStaleCommentOrStateAnswerIsDropped(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 
 	t.Run("commentPostedMsg", func(t *testing.T) {
 		m := loaded(f, prRef())
@@ -953,7 +953,7 @@ func TestKeysDeclinedWhileLoadingSayWhy(t *testing.T) {
 	want := i18n.T("detail.decline_loading")
 	for _, k := range []string{"c", "x", "v", "l", "a"} {
 		t.Run(k, func(t *testing.T) {
-			f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+			f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 			m := New(f, prRef()) // the fetch is deliberately not run
 			m, _ = m.Update(key(k))
 			if got := ansi.Strip(m.View()); !strings.Contains(got, want) {
@@ -966,7 +966,7 @@ func TestKeysDeclinedWhileLoadingSayWhy(t *testing.T) {
 // TestTheDeclineGoesAwayWithTheWait is the other half: the note explains a
 // key that came too early, so it must not outlive the wait it was about.
 func TestTheDeclineGoesAwayWithTheWait(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := New(f, prRef())
 	m, _ = m.Update(key("c"))
 	if m.declined == "" {
@@ -998,7 +998,7 @@ func TestEveryStateNamesItself(t *testing.T) {
 // TestMOpensTheMergePopup covers the key that opens it. The size comes first
 // because the popup draws nothing until it has a width.
 func TestMOpensTheMergePopup(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, cmd := m.Update(key("m"))
@@ -1018,12 +1018,12 @@ func TestMOpensTheMergePopup(t *testing.T) {
 // popup would sit on "asking GitHub" forever.
 func TestTheMergePopupGetsItsOwnAnswer(t *testing.T) {
 	f := &fakeSource{
-		pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		mergeCtx: gh.MergeContext{
+		pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		mergeCtx: domain.MergeContext{
 			PullRequestID: "PR_1",
-			Mergeable:     gh.MergeableYes,
-			State:         gh.MergeStateUnstable,
-			Methods:       []gh.MergeMethod{gh.MergeSquash},
+			Mergeable:     domain.MergeableYes,
+			State:         domain.MergeStateUnstable,
+			Methods:       []domain.MergeMethod{domain.MergeSquash},
 		},
 	}
 	m := loaded(f, prRef())
@@ -1042,7 +1042,7 @@ func TestTheMergePopupGetsItsOwnAnswer(t *testing.T) {
 // TestMDoesNothingOnAnIssue mirrors v's and d's own guard: an issue has
 // nothing to merge.
 func TestMDoesNothingOnAnIssue(t *testing.T) {
-	f := &fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}
+	f := &fakeSource{issue: domain.Issue{Number: 5, Title: "an issue"}}
 	m := loaded(f, issueRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	before := m.View()
@@ -1059,7 +1059,7 @@ func TestMDoesNothingOnAnIssue(t *testing.T) {
 // the refetch of the board is the root's. The view must not send the merge
 // message on again, or the root would refresh twice.
 func TestAMergeClosesTheDetailView(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m.Update(key("m"))
@@ -1080,12 +1080,12 @@ func TestAMergeClosesTheDetailView(t *testing.T) {
 // the user was reading it.
 func TestAnAutoMergeChangeKeepsTheDetailViewOpen(t *testing.T) {
 	f := &fakeSource{
-		pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		mergeCtx: gh.MergeContext{
+		pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		mergeCtx: domain.MergeContext{
 			PullRequestID:            "PR_1",
-			Mergeable:                gh.MergeableYes,
-			State:                    gh.MergeStateUnstable,
-			Methods:                  []gh.MergeMethod{gh.MergeSquash},
+			Mergeable:                domain.MergeableYes,
+			State:                    domain.MergeStateUnstable,
+			Methods:                  []domain.MergeMethod{domain.MergeSquash},
 			AutoMergeAllowed:         true,
 			ViewerCanEnableAutoMerge: true,
 		},
@@ -1110,7 +1110,7 @@ func TestAnAutoMergeChangeKeepsTheDetailViewOpen(t *testing.T) {
 // TestEscFromTheMergePopupLeavesTheBody is the way back out, the same shape
 // TestSubmitEscCancelsThePopup pins for the review popup.
 func TestEscFromTheMergePopupLeavesTheBody(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, cmd := m.Update(key("m"))
@@ -1133,7 +1133,7 @@ func TestEscFromTheMergePopupLeavesTheBody(t *testing.T) {
 // up with what the user chose.
 func TestAFailedMergeStaysUnderThePopup(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:       domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		mergeErr: errors.New("gh: HTTP 405 not mergeable"),
 	}
 	m := loaded(f, prRef())
@@ -1153,7 +1153,7 @@ func TestAFailedMergeStaysUnderThePopup(t *testing.T) {
 // flag, nor put a message about a request nobody made under it.
 func TestAClosedPopupsFailureDoesNotReachTheFooter(t *testing.T) {
 	f := &fakeSource{
-		pr:       gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:       domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		mergeErr: errors.New("gh: HTTP 500"),
 	}
 	m := loaded(f, prRef())
@@ -1177,7 +1177,7 @@ func TestAClosedPopupsFailureDoesNotReachTheFooter(t *testing.T) {
 // pull request, so the popup would say it is still working the answer out and
 // r would never change it.
 func TestMDoesNothingOnAMergedPullRequest(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateMerged}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateMerged}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
 	before := m.View()
@@ -1199,14 +1199,14 @@ func TestMDoesNothingOnAMergedPullRequest(t *testing.T) {
 // TestTheMergeKeyIsInTheFooterOnAPullRequestOnly: an issue has no merge, so
 // its key bar must not offer one.
 func TestTheMergeKeyIsInTheFooterOnAPullRequestOnly(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
 	if !strings.Contains(m.View(), "m:merge") {
 		t.Errorf("detail footer missing m:merge:\n%s", m.View())
 	}
 
-	i := loaded(&fakeSource{issue: gh.Issue{Number: 5, Title: "an issue"}}, issueRef())
+	i := loaded(&fakeSource{issue: domain.Issue{Number: 5, Title: "an issue"}}, issueRef())
 	i, _ = i.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
 	if strings.Contains(i.View(), "m:merge") {
 		t.Errorf("an issue's footer offers a merge:\n%s", i.View())

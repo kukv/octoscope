@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // PRDiff returns the pull request's diff, one entry per file.
@@ -23,7 +23,7 @@ import (
 // joined rather than one discarding the other: this one still describes
 // what the user actually asked for, but a bug in the fallback itself must
 // not go unseen either.
-func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
+func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
 	args := appendRepo(
 		[]string{"pr", "diff", strconv.Itoa(number), "--color", "never"},
 		c.effectiveRepo(repo),
@@ -42,19 +42,19 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) ([]gh.File
 		// join.
 		return nil, errors.Join(err, ferr)
 	}
-	return gh.ParseDiff(out), nil
+	return domain.ParseDiff(out), nil
 }
 
 // prFiles is the files-API fallback for PRDiff. --paginate is required: the
 // endpoint's default page is 30 files, and the pull request this fallback
 // exists for had 418. per_page=100 cuts that down to 5 requests instead of
 // 14 (ListAssignees in cli.go does the same for its own listing).
-func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]gh.FileDiff, error) {
+func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
 	out, err := c.read(ctx, c.dir, "api", prFilesPath(c.effectiveRepo(repo), number), "--paginate")
 	if err != nil {
 		return nil, err
 	}
-	return gh.ParseFilesAPI(out)
+	return domain.ParseFilesAPI(out)
 }
 
 // prFilesPath builds the REST path for the files-API fallback. gh api

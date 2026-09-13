@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -137,8 +137,8 @@ func (m Model) rerunLines() []string {
 	lines := []string{
 		"",
 		clip(theme.Title().Render(title), m.width),
-		clip(m.rerunOption(gh.RerunFailed, i18n.T("checks.rerun_failed_only")), m.width),
-		clip(m.rerunOption(gh.RerunAll, i18n.T("checks.rerun_all")), m.width),
+		clip(m.rerunOption(domain.RerunFailed, i18n.T("checks.rerun_failed_only")), m.width),
+		clip(m.rerunOption(domain.RerunAll, i18n.T("checks.rerun_all")), m.width),
 	}
 	switch {
 	case m.errText != "":
@@ -149,7 +149,7 @@ func (m Model) rerunLines() []string {
 	return lines
 }
 
-func (m Model) rerunOption(scope gh.RerunScope, text string) string {
+func (m Model) rerunOption(scope domain.RerunScope, text string) string {
 	if scope == m.rerunScope {
 		return theme.Selected().Render(text)
 	}
@@ -257,7 +257,7 @@ func (m Model) cursorLine() int {
 
 // workflowTitle names the group a check belongs to. A check with no workflow
 // run behind it has no name to take, so they share one heading.
-func (m Model) workflowTitle(r gh.CheckRun) string {
+func (m Model) workflowTitle(r domain.CheckRun) string {
 	if !hasWorkflow(r) {
 		return i18n.T("checks.other")
 	}
@@ -271,7 +271,7 @@ func (m Model) workflowTitle(r gh.CheckRun) string {
 // long it took. It is highlighted only while the cursor acts on the list --
 // once the log pane has focus the row it points at stays plain, the same way
 // the diff view's file list does.
-func (m Model) checkLine(r gh.CheckRun, cursor bool) string {
+func (m Model) checkLine(r domain.CheckRun, cursor bool) string {
 	text := "  " + icon.Check(r.State) + " " + r.Name
 	// A cut duration reads as a shorter one rather than as a cut one, so a
 	// name that leaves no room for it is drawn without it.

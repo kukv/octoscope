@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -41,8 +41,8 @@ func sized(t *testing.T, f *fakeSource, width int) Model {
 // review has not been given yet.
 func mergeCleanModel(t *testing.T, width int) Model {
 	c := mergeable()
-	c.State = gh.MergeStateClean
-	c.Review = gh.ReviewRequired
+	c.State = domain.MergeStateClean
+	c.Review = domain.ReviewRequired
 	c.DeleteBranchOnMerge = true
 	c.AutoMergeAllowed = true
 	c.ViewerCanEnableAutoMerge = true
@@ -73,8 +73,8 @@ func mergeAutoOnModel(t *testing.T, width int) Model {
 // auto-merge turned off.
 func mergeBlockedModel(t *testing.T, width int) Model {
 	c := mergeable()
-	c.Mergeable = gh.MergeableConflicting
-	c.State = gh.MergeStateDirty
+	c.Mergeable = domain.MergeableConflicting
+	c.State = domain.MergeStateDirty
 	return sized(t, &fakeSource{ctx: c}, width)
 }
 
@@ -82,8 +82,8 @@ func mergeBlockedModel(t *testing.T, width int) Model {
 // for yet, which is the longest of the reasons in both languages.
 func mergeComputingModel(t *testing.T, width int) Model {
 	c := mergeable()
-	c.Mergeable = gh.MergeableUnknown
-	c.State = gh.MergeStateUnknown
+	c.Mergeable = domain.MergeableUnknown
+	c.State = domain.MergeStateUnknown
 	return sized(t, &fakeSource{ctx: c}, width)
 }
 

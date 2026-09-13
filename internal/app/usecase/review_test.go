@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 type fakeReviewer struct {
@@ -21,17 +21,17 @@ func (f *fakeReviewer) StartReview(_ string) (string, error) {
 	return f.newID, f.startErr
 }
 
-func (f *fakeReviewer) AddReviewThread(reviewID string, _ gh.PendingComment) error {
+func (f *fakeReviewer) AddReviewThread(reviewID string, _ domain.PendingComment) error {
 	f.calls = append(f.calls, "AddReviewThread("+reviewID+")")
 	return f.threadErr
 }
 
-func (f *fakeReviewer) SubmitReview(_ string, _ gh.ReviewEvent, _ string) error {
+func (f *fakeReviewer) SubmitReview(_ string, _ domain.ReviewEvent, _ string) error {
 	f.calls = append(f.calls, "SubmitReview")
 	return f.submitErr
 }
 
-func (f *fakeReviewer) SubmitNewReview(_ string, _ gh.ReviewEvent, _ string) error {
+func (f *fakeReviewer) SubmitNewReview(_ string, _ domain.ReviewEvent, _ string) error {
 	f.calls = append(f.calls, "SubmitNewReview")
 	return f.submitErr
 }
@@ -74,7 +74,7 @@ func TestPostLineCommentStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 
 			id, err := u.PostLineComment(
 				ReviewTarget{PullRequestID: "PR_1", PendingID: tc.pendingID},
-				gh.PendingComment{Path: "a.go", Line: 1, Body: "nit"},
+				domain.PendingComment{Path: "a.go", Line: 1, Body: "nit"},
 			)
 			if err != nil {
 				t.Fatalf("%s: PostLineComment: %v", tc.name, err)
@@ -100,7 +100,7 @@ func TestPostLineCommentStopsWhenTheReviewCannotBeStarted(t *testing.T) {
 	f := &fakeReviewer{startErr: boom}
 	u := &Usecase{reviews: f}
 
-	if _, err := u.PostLineComment(ReviewTarget{PullRequestID: "PR_1"}, gh.PendingComment{}); !errors.Is(err, boom) {
+	if _, err := u.PostLineComment(ReviewTarget{PullRequestID: "PR_1"}, domain.PendingComment{}); !errors.Is(err, boom) {
 		t.Errorf("err = %v, want it to wrap %v", err, boom)
 	}
 	if !slices.Equal(f.calls, []string{"StartReview"}) {
@@ -130,7 +130,7 @@ func TestSubmitReviewPicksTheOneCallThatFitsTheTarget(t *testing.T) {
 
 			err := u.SubmitReview(
 				ReviewTarget{PullRequestID: "PR_1", PendingID: tc.pendingID},
-				gh.EventApprove, "lgtm",
+				domain.EventApprove, "lgtm",
 			)
 			if err != nil {
 				t.Fatalf("%s: SubmitReview: %v", tc.name, err)

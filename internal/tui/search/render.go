@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -243,7 +243,7 @@ func (m Model) candidateChips() string {
 // them, the same "drop whatever does not fit" rule internal/tui/repo's
 // badges() uses for the same reason: a wrapped chip row would push the rest
 // of the pane down by an amount that depends on the repository.
-func labelChips(labels []gh.Label, room int) string {
+func labelChips(labels []domain.Label, room int) string {
 	var b strings.Builder
 	for _, l := range labels {
 		text := " " + l.Name + " "
@@ -360,10 +360,10 @@ func (m Model) resultRow(i int, width int) string {
 	item := m.items[i]
 
 	state := theme.Dim().Render(icon.Issue())
-	if item.Ref.Kind == gh.ItemPR {
+	if item.Ref.Kind == domain.ItemPR {
 		state = theme.Review(item.Review, item.IsDraft).Render(icon.Review(item.Review, item.IsDraft))
 	}
-	_, name, _ := gh.SplitRepo(item.Ref.Repo)
+	_, name, _ := domain.SplitRepo(item.Ref.Repo)
 	number := "#" + strconv.Itoa(item.Ref.Number)
 	age := i18n.RelTime(m.fetchedAt, item.UpdatedAt)
 

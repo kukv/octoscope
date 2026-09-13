@@ -8,7 +8,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed checks.graphql
@@ -86,10 +86,10 @@ type workflowRunNode struct {
 }
 
 // PRChecks fetches every check on the pull request's head commit.
-func (c *Client) PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error) {
+func (c *Client) PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error) {
 	repoFields, err := c.repoVars(repo)
 	if err != nil {
-		return gh.Checks{}, err
+		return domain.Checks{}, err
 	}
 	var nodes []checkDetailNode
 	cursor := ""
@@ -100,15 +100,15 @@ func (c *Client) PRChecks(ctx context.Context, repo string, number int) (gh.Chec
 		}
 		out, err := c.Read(ctx, checksQuery, vars...)
 		if err != nil {
-			return gh.Checks{}, err
+			return domain.Checks{}, err
 		}
 		var resp checksResponse
 		if err := json.Unmarshal(out, &resp); err != nil {
-			return gh.Checks{}, fmt.Errorf("parse checks: %w", err)
+			return domain.Checks{}, fmt.Errorf("parse checks: %w", err)
 		}
 		contexts, ok := resp.contexts()
 		if !ok {
-			return gh.Checks{}, nil
+			return domain.Checks{}, nil
 		}
 		nodes = append(nodes, contexts.Nodes...)
 		if !contexts.PageInfo.HasNextPage || contexts.PageInfo.EndCursor == "" {
@@ -121,7 +121,7 @@ func (c *Client) PRChecks(ctx context.Context, repo string, number int) (gh.Chec
 
 // detailRollup counts the contexts the same way RollupContexts does, and
 // keeps the ids the checks view needs alongside each one.
-func detailRollup(nodes []checkDetailNode) gh.Checks {
+func detailRollup(nodes []checkDetailNode) domain.Checks {
 	plain := make([]CheckContext, 0, len(nodes))
 	for _, n := range nodes {
 		plain = append(plain, n.CheckContext)
@@ -133,10 +133,10 @@ func detailRollup(nodes []checkDetailNode) gh.Checks {
 	return checks
 }
 
-func (n checkDetailNode) toRun(state gh.CheckState) gh.CheckRun {
-	run := gh.CheckRun{Name: n.name(), State: state, Kind: gh.CheckKindRun}
+func (n checkDetailNode) toRun(state domain.CheckState) domain.CheckRun {
+	run := domain.CheckRun{Name: n.name(), State: state, Kind: domain.CheckKindRun}
 	if n.Typename == "StatusContext" {
-		run.Kind = gh.CheckKindStatus
+		run.Kind = domain.CheckKindStatus
 		run.URL = n.TargetURL
 		run.StartedAt = n.CreatedAt
 		return run

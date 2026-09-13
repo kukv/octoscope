@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 const emptyColumnJSON = `{"data":{"results":{"nodes":[]}}}`
@@ -24,7 +24,7 @@ func TestListWorkSectionSendsOneSearch(t *testing.T) {
 		return []byte(emptyColumnJSON), nil
 	}
 
-	if _, err := c.ListWorkSection(context.Background(), gh.SectionAssigned); err != nil {
+	if _, err := c.ListWorkSection(context.Background(), domain.SectionAssigned); err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
 
@@ -114,7 +114,7 @@ func TestSearchItemsReportsWhatGitHubSaidAboutABadQuery(t *testing.T) {
 	}
 	// The Search tab shows this on its notice line. A fatal error would
 	// replace the whole screen over one mistyped query.
-	if gh.IsFatal(err) {
+	if domain.IsFatal(err) {
 		t.Errorf("err = %v, want it not to be fatal", err)
 	}
 }
@@ -130,17 +130,17 @@ func TestEverySectionHasItsOwnSearch(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		section gh.WorkSection
+		section domain.WorkSection
 		search  string
 	}{
-		{"review requested", gh.SectionReviewRequested, "is:open is:pr review-requested:@me"},
-		{"your PRs", gh.SectionYourPRs, "is:open is:pr author:@me"},
-		{"assigned", gh.SectionAssigned, "is:open assignee:@me"},
-		{"mentioned", gh.SectionMentioned, "is:open mentions:@me"},
+		{"review requested", domain.SectionReviewRequested, "is:open is:pr review-requested:@me"},
+		{"your PRs", domain.SectionYourPRs, "is:open is:pr author:@me"},
+		{"assigned", domain.SectionAssigned, "is:open assignee:@me"},
+		{"mentioned", domain.SectionMentioned, "is:open mentions:@me"},
 	}
 	// A column added without a line here would go untested rather than fail.
-	if len(tests) != gh.WorkSectionCount {
-		t.Fatalf("the table covers %d columns, the board has %d", len(tests), gh.WorkSectionCount)
+	if len(tests) != domain.WorkSectionCount {
+		t.Fatalf("the table covers %d columns, the board has %d", len(tests), domain.WorkSectionCount)
 	}
 
 	for _, tt := range tests {
@@ -178,12 +178,12 @@ func TestAWorkSectionIsAskedAgainAfterATransientFailure(t *testing.T) {
 	c.run = func(context.Context, string, ...string) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, gh.Classify(gh.ErrTransient, "gh api: gh: HTTP 502")
+			return nil, domain.Classify(domain.ErrTransient, "gh api: gh: HTTP 502")
 		}
 		return []byte(emptyColumnJSON), nil
 	}
 
-	if _, err := c.ListWorkSection(context.Background(), gh.SectionAssigned); err != nil {
+	if _, err := c.ListWorkSection(context.Background(), domain.SectionAssigned); err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
 	if calls != 2 {
@@ -201,7 +201,7 @@ func TestListWorkSectionRejectsASectionTheBoardDoesNotHave(t *testing.T) {
 		t.Error("an unknown section was sent to gh")
 		return []byte(emptyColumnJSON), nil
 	}
-	if _, err := c.ListWorkSection(context.Background(), gh.WorkSectionCount); err == nil {
+	if _, err := c.ListWorkSection(context.Background(), domain.WorkSectionCount); err == nil {
 		t.Error("ListWorkSection accepted a section the board does not have")
 	}
 }
@@ -262,7 +262,7 @@ func TestListWorkSectionPropagatesRunError(t *testing.T) {
 		return nil, wantErr
 	}
 
-	items, err := c.ListWorkSection(context.Background(), gh.SectionAssigned)
+	items, err := c.ListWorkSection(context.Background(), domain.SectionAssigned)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("err = %v, want %v", err, wantErr)
 	}

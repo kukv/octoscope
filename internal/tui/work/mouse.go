@@ -3,7 +3,7 @@ package work
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // The mouse handling below reads the same geometry View draws with —
@@ -90,7 +90,7 @@ func (m Model) cardAt(x, y int) (col, row int, ok bool) {
 	if y < 0 || y >= height-headingHeight {
 		return 0, 0, false
 	}
-	section := gh.WorkSections()[col]
+	section := domain.WorkSections()[col]
 	row = m.cardWindow(section, height) + y/m.cardHeight()
 	if row >= len(m.work[section]) {
 		return 0, 0, false

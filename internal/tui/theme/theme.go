@@ -18,7 +18,7 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 var (
@@ -125,16 +125,16 @@ func Removed() lipgloss.Style { return danger() }
 
 // Review styles the marker for a pull request's review state. A draft is
 // muted whatever its review says, because nobody is being asked to look yet.
-func Review(s gh.ReviewState, draft bool) lipgloss.Style {
+func Review(s domain.ReviewState, draft bool) lipgloss.Style {
 	if draft {
 		return muted()
 	}
 	switch s {
-	case gh.ReviewApproved:
+	case domain.ReviewApproved:
 		return success()
-	case gh.ReviewChangesRequested:
+	case domain.ReviewChangesRequested:
 		return danger()
-	case gh.ReviewRequired:
+	case domain.ReviewRequired:
 		return attention()
 	default:
 		return muted()
@@ -142,13 +142,13 @@ func Review(s gh.ReviewState, draft bool) lipgloss.Style {
 }
 
 // Check styles the marker for a rolled-up check state.
-func Check(s gh.CheckState) lipgloss.Style {
+func Check(s domain.CheckState) lipgloss.Style {
 	switch s {
-	case gh.CheckSuccess:
+	case domain.CheckSuccess:
 		return success()
-	case gh.CheckFailure:
+	case domain.CheckFailure:
 		return danger()
-	case gh.CheckRunning, gh.CheckPending:
+	case domain.CheckRunning, domain.CheckPending:
 		return attention()
 	default:
 		return muted()

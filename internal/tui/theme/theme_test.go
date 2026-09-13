@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
 
@@ -41,10 +41,10 @@ func TestEachReviewStateHasItsOwnColour(t *testing.T) {
 	dark(t)
 
 	seen := map[string]string{}
-	for name, s := range map[string]gh.ReviewState{
-		"approved":          gh.ReviewApproved,
-		"changes requested": gh.ReviewChangesRequested,
-		"review required":   gh.ReviewRequired,
+	for name, s := range map[string]domain.ReviewState{
+		"approved":          domain.ReviewApproved,
+		"changes requested": domain.ReviewChangesRequested,
+		"review required":   domain.ReviewRequired,
 	} {
 		got := theme.Review(s, false).Render("x")
 		if other, clash := seen[got]; clash {
@@ -53,7 +53,7 @@ func TestEachReviewStateHasItsOwnColour(t *testing.T) {
 		seen[got] = name
 	}
 
-	if theme.Review(gh.ReviewApproved, true).Render("x") == theme.Review(gh.ReviewApproved, false).Render("x") {
+	if theme.Review(domain.ReviewApproved, true).Render("x") == theme.Review(domain.ReviewApproved, false).Render("x") {
 		t.Error("a draft is coloured as though it were waiting on a review")
 	}
 }
@@ -62,11 +62,11 @@ func TestEachCheckStateHasItsOwnColour(t *testing.T) {
 	dark(t)
 
 	seen := map[string]string{}
-	for name, s := range map[string]gh.CheckState{
-		"success": gh.CheckSuccess,
-		"failure": gh.CheckFailure,
-		"running": gh.CheckRunning,
-		"none":    gh.CheckNone,
+	for name, s := range map[string]domain.CheckState{
+		"success": domain.CheckSuccess,
+		"failure": domain.CheckFailure,
+		"running": domain.CheckRunning,
+		"none":    domain.CheckNone,
 	} {
 		got := theme.Check(s).Render("x")
 		if other, clash := seen[got]; clash {

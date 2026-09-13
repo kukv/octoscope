@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // fixedTransport answers every document with one recorded body.
@@ -42,7 +42,7 @@ func TestListPRsReadsTheRecordedAnswer(t *testing.T) {
 	if first.Number == 0 || first.Title == "" || first.URL == "" {
 		t.Errorf("number/title/url not filled: %+v", first)
 	}
-	if first.State != gh.StateOpen {
+	if first.State != domain.StateOpen {
 		t.Errorf("state = %v, want open", first.State)
 	}
 	if first.Author.Login == "" {
@@ -70,7 +70,7 @@ func TestListPRsFillsTheFieldsRESTCannotAnswer(t *testing.T) {
 	}
 	var sawReview, sawChecks, sawSize bool
 	for _, pr := range prs {
-		if pr.Review != gh.ReviewNone {
+		if pr.Review != domain.ReviewNone {
 			sawReview = true
 		}
 		if pr.Checks.Total > 0 {

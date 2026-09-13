@@ -13,31 +13,31 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/merge"
 	"github.com/kukv/octoscope/internal/tui/review"
 )
 
 type itemSource interface {
-	GetItem(ctx context.Context, ref gh.ItemRef) (usecase.Item, error)
-	AddComment(ref gh.ItemRef, body string) error
-	SetState(ref gh.ItemRef, closing bool) error
-	EditLabels(ref gh.ItemRef, add, remove []string) error
-	EditAssignees(ref gh.ItemRef, add, remove []string) error
+	GetItem(ctx context.Context, ref domain.ItemRef) (usecase.Item, error)
+	AddComment(ref domain.ItemRef, body string) error
+	SetState(ref domain.ItemRef, closing bool) error
+	EditLabels(ref domain.ItemRef, add, remove []string) error
+	EditAssignees(ref domain.ItemRef, add, remove []string) error
 	OpenWeb(url string) error
 }
 
 // candidateSource lists what a picker offers. Labels and assignees belong to
 // the repository, not to a PR or an issue.
 type candidateSource interface {
-	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
+	ListLabels(ctx context.Context, repo string) ([]domain.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
 type reviewOpener interface {
-	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
 }
 
 // Source is what the detail view needs. repo is "owner/repo"; the empty
@@ -54,10 +54,10 @@ type Source interface {
 type ClosedMsg struct{}
 
 // OpenDiffMsg asks the parent to show the diff of the shown pull request.
-type OpenDiffMsg struct{ Ref gh.ItemRef }
+type OpenDiffMsg struct{ Ref domain.ItemRef }
 
 // OpenChecksMsg asks the parent to show the checks of the shown pull request.
-type OpenChecksMsg struct{ Ref gh.ItemRef }
+type OpenChecksMsg struct{ Ref domain.ItemRef }
 
 // ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
@@ -66,24 +66,24 @@ type (
 	// itemMsg carries the ref because the request for the item the user
 	// just left is still running, and its answer must not land here.
 	itemMsg struct {
-		ref  gh.ItemRef
+		ref  domain.ItemRef
 		item usecase.Item
 	}
 	errMsg struct {
-		ref gh.ItemRef
+		ref domain.ItemRef
 		err error
 	}
 	// The comment and state answers carry the ref for the same reason
 	// itemMsg does. Both end in a refetch of the item they were sent for,
 	// which on another item would replace what the user is reading.
-	commentPostedMsg struct{ ref gh.ItemRef }
+	commentPostedMsg struct{ ref domain.ItemRef }
 	commentErrorMsg  struct {
-		ref gh.ItemRef
+		ref domain.ItemRef
 		err error
 	}
-	stateChangedMsg struct{ ref gh.ItemRef }
+	stateChangedMsg struct{ ref domain.ItemRef }
 	stateErrorMsg   struct {
-		ref gh.ItemRef
+		ref domain.ItemRef
 		err error
 	}
 	// The three picker answers carry the ref for the same reason itemMsg
@@ -91,25 +91,25 @@ type (
 	// started on another item opens a picker nobody asked for, offering
 	// that repository's candidates.
 	pickerCandidatesMsg struct {
-		ref    gh.ItemRef
+		ref    domain.ItemRef
 		kind   pickerKind
-		labels []gh.Label
+		labels []domain.Label
 		users  []string
 	}
-	pickerAppliedMsg struct{ ref gh.ItemRef }
+	pickerAppliedMsg struct{ ref domain.ItemRef }
 	pickErrorMsg     struct {
-		ref gh.ItemRef
+		ref domain.ItemRef
 		err error
 	}
 
 	// reviewContextMsg and reviewContextErrMsg carry the ref for the same
 	// reason itemMsg does.
 	reviewContextMsg struct {
-		ref gh.ItemRef
-		ctx gh.ReviewContext
+		ref domain.ItemRef
+		ctx domain.ReviewContext
 	}
 	reviewContextErrMsg struct {
-		ref gh.ItemRef
+		ref domain.ItemRef
 		err error
 	}
 )
@@ -172,7 +172,7 @@ func (p phase) String() string {
 
 type Model struct {
 	src Source
-	ref gh.ItemRef
+	ref domain.ItemRef
 
 	width, height int
 
@@ -192,7 +192,7 @@ type Model struct {
 	spin  spinner.Model
 	body  viewport.Model
 	title string
-	state gh.ItemState
+	state domain.ItemState
 	url   string
 
 	textarea textarea.Model
@@ -205,7 +205,7 @@ type Model struct {
 	merge  merge.Model
 }
 
-func New(src Source, ref gh.ItemRef) Model {
+func New(src Source, ref domain.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	ta := textarea.New()
@@ -234,7 +234,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, fetch(m.src, m.ref))
 }
 
-func fetch(src Source, ref gh.ItemRef) tea.Cmd {
+func fetch(src Source, ref domain.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		item, err := src.GetItem(context.Background(), ref)
 		if err != nil {
@@ -246,7 +246,7 @@ func fetch(src Source, ref gh.ItemRef) tea.Cmd {
 
 // fetchReviewContext is what v runs before it can open the review popup: an
 // issue has no review, so this is only ever called on a pull request.
-func fetchReviewContext(src reviewOpener, ref gh.ItemRef) tea.Cmd {
+func fetchReviewContext(src reviewOpener, ref domain.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
@@ -256,7 +256,7 @@ func fetchReviewContext(src reviewOpener, ref gh.ItemRef) tea.Cmd {
 	}
 }
 
-func openWeb(src Source, ref gh.ItemRef, url string) tea.Cmd {
+func openWeb(src Source, ref domain.ItemRef, url string) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.OpenWeb(url); err != nil {
 			return errMsg{ref, err}
@@ -265,7 +265,7 @@ func openWeb(src Source, ref gh.ItemRef, url string) tea.Cmd {
 	}
 }
 
-func postComment(src Source, ref gh.ItemRef, body string) tea.Cmd {
+func postComment(src Source, ref domain.ItemRef, body string) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.AddComment(ref, body); err != nil {
 			return commentErrorMsg{ref: ref, err: err}
@@ -281,9 +281,9 @@ func (m Model) stateAction() (closing bool, ok bool) {
 		return false, false
 	}
 	switch m.state {
-	case gh.StateOpen:
+	case domain.StateOpen:
 		return true, true
-	case gh.StateClosed:
+	case domain.StateClosed:
 		return false, true
 	default:
 		return false, false // merged: neither closing nor reopening applies
@@ -294,10 +294,10 @@ func (m Model) stateAction() (closing bool, ok bool) {
 // can be merged, and until the item has arrived the state is not known.
 func (m Model) canMerge() bool {
 	closing, ok := m.stateAction()
-	return m.ref.Kind == gh.ItemPR && ok && closing
+	return m.ref.Kind == domain.ItemPR && ok && closing
 }
 
-func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
+func setState(src Source, ref domain.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SetState(ref, closing); err != nil {
 			return stateErrorMsg{ref: ref, err: err}
@@ -306,7 +306,7 @@ func setState(src Source, ref gh.ItemRef, closing bool) tea.Cmd {
 	}
 }
 
-func fetchLabelPicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
+func fetchLabelPicker(src candidateSource, ref domain.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		labels, err := src.ListLabels(context.Background(), ref.Repo)
 		if err != nil {
@@ -316,7 +316,7 @@ func fetchLabelPicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 	}
 }
 
-func fetchAssigneePicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
+func fetchAssigneePicker(src candidateSource, ref domain.ItemRef) tea.Cmd {
 	return func() tea.Msg {
 		users, err := src.ListAssignees(context.Background(), ref.Repo)
 		if err != nil {
@@ -326,7 +326,7 @@ func fetchAssigneePicker(src candidateSource, ref gh.ItemRef) tea.Cmd {
 	}
 }
 
-func applyPicker(src Source, ref gh.ItemRef, kind pickerKind, add, remove []string) tea.Cmd {
+func applyPicker(src Source, ref domain.ItemRef, kind pickerKind, add, remove []string) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if kind == pickLabels {
@@ -431,7 +431,7 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.labels = labelNames(it.Labels)
 	m.assignees = authorLogins(it.Assignees)
 	m.url = it.URL
-	if it.Kind == gh.ItemPR {
+	if it.Kind == domain.ItemPR {
 		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
 		m.setContent(prMarkdown(*it.PR))
 	} else {
@@ -673,21 +673,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, openWeb(m.src, m.ref, m.url)
 	case "d":
 		// An issue has no diff.
-		if m.ref.Kind != gh.ItemPR {
+		if m.ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		ref := m.ref
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "s":
 		// An issue has no checks.
-		if m.ref.Kind != gh.ItemPR {
+		if m.ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		ref := m.ref
 		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
 	case "m":
 		// An issue has nothing to merge.
-		if m.ref.Kind != gh.ItemPR {
+		if m.ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		if m.phase == phaseLoading {
@@ -733,7 +733,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if m.phase == phaseLoading {
 			return m.stillLoading(), nil
 		}
-		if m.ref.Kind != gh.ItemPR {
+		if m.ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		m.mode, m.phase = modeSubmit, phaseLoading
@@ -864,7 +864,7 @@ func (m *Model) setContent(md string) {
 	m.body.GotoTop()
 }
 
-func labelNames(labels []gh.Label) []string {
+func labelNames(labels []domain.Label) []string {
 	names := make([]string, len(labels))
 	for i, l := range labels {
 		names[i] = l.Name
@@ -872,7 +872,7 @@ func labelNames(labels []gh.Label) []string {
 	return names
 }
 
-func authorLogins(authors []gh.Author) []string {
+func authorLogins(authors []domain.Author) []string {
 	logins := make([]string, len(authors))
 	for i, a := range authors {
 		logins[i] = a.Login

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // commentsOnly is the answer pr_comments.graphql and issue_comments.graphql
@@ -125,7 +125,7 @@ func TestTheCommentPagingDocumentsSelectNothingButTheComments(t *testing.T) {
 }
 
 // logins names the authors of a conversation in order.
-func logins(comments []gh.Comment) []string {
+func logins(comments []domain.Comment) []string {
 	out := make([]string, len(comments))
 	for i, c := range comments {
 		out[i] = c.Author.Login

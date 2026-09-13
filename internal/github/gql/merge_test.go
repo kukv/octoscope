@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
@@ -23,7 +23,7 @@ func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
 	// on, deleteBranchOnMerge on, and autoMergeAllowed off. The recording
 	// is what says the three flags are read into the order the popup lists
 	// them in.
-	want := []gh.MergeMethod{gh.MergeSquash, gh.MergeCommit, gh.MergeRebase}
+	want := []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase}
 	if len(got.Methods) != len(want) {
 		t.Fatalf("Methods = %v, want %v", got.Methods, want)
 	}
@@ -44,17 +44,17 @@ func TestPRMergeContextTranslatesTheEnums(t *testing.T) {
 		name          string
 		mergeable     string
 		state         string
-		wantMergeable gh.Mergeable
-		wantState     gh.MergeState
+		wantMergeable domain.Mergeable
+		wantState     domain.MergeState
 	}{
-		{"clean", "MERGEABLE", "CLEAN", gh.MergeableYes, gh.MergeStateClean},
-		{"conflicting", "CONFLICTING", "DIRTY", gh.MergeableConflicting, gh.MergeStateDirty},
-		{"still computing", "UNKNOWN", "UNKNOWN", gh.MergeableUnknown, gh.MergeStateUnknown},
-		{"failing checks", "MERGEABLE", "UNSTABLE", gh.MergeableYes, gh.MergeStateUnstable},
-		{"protected", "MERGEABLE", "BLOCKED", gh.MergeableYes, gh.MergeStateBlocked},
-		{"behind", "MERGEABLE", "BEHIND", gh.MergeableYes, gh.MergeStateBehind},
-		{"hooks", "MERGEABLE", "HAS_HOOKS", gh.MergeableYes, gh.MergeStateHasHooks},
-		{"a word we do not know is not a failure", "WAT", "WAT", gh.MergeableUnknown, gh.MergeStateUnknown},
+		{"clean", "MERGEABLE", "CLEAN", domain.MergeableYes, domain.MergeStateClean},
+		{"conflicting", "CONFLICTING", "DIRTY", domain.MergeableConflicting, domain.MergeStateDirty},
+		{"still computing", "UNKNOWN", "UNKNOWN", domain.MergeableUnknown, domain.MergeStateUnknown},
+		{"failing checks", "MERGEABLE", "UNSTABLE", domain.MergeableYes, domain.MergeStateUnstable},
+		{"protected", "MERGEABLE", "BLOCKED", domain.MergeableYes, domain.MergeStateBlocked},
+		{"behind", "MERGEABLE", "BEHIND", domain.MergeableYes, domain.MergeStateBehind},
+		{"hooks", "MERGEABLE", "HAS_HOOKS", domain.MergeableYes, domain.MergeStateHasHooks},
+		{"a word we do not know is not a failure", "WAT", "WAT", domain.MergeableUnknown, domain.MergeStateUnknown},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestPRMergeContextTranslatesTheEnums(t *testing.T) {
 			if got.State != tt.wantState {
 				t.Errorf("State = %v, want %v", got.State, tt.wantState)
 			}
-			if got.Review != gh.ReviewApproved {
+			if got.Review != domain.ReviewApproved {
 				t.Errorf("Review = %v, want ReviewApproved", got.Review)
 			}
 			if !got.DeleteBranchOnMerge {
@@ -115,12 +115,12 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		method gh.MergeMethod
+		method domain.MergeMethod
 		want   Var
 	}{
-		{gh.MergeSquash, S("mergeMethod", "SQUASH")},
-		{gh.MergeCommit, S("mergeMethod", "MERGE")},
-		{gh.MergeRebase, S("mergeMethod", "REBASE")},
+		{domain.MergeSquash, S("mergeMethod", "SQUASH")},
+		{domain.MergeCommit, S("mergeMethod", "MERGE")},
+		{domain.MergeRebase, S("mergeMethod", "REBASE")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want.Str, func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 
 	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
 	c := &Client{Do: on.do}
-	if err := c.EnableAutoMerge("PR_1", gh.MergeRebase); err != nil {
+	if err := c.EnableAutoMerge("PR_1", domain.MergeRebase); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if !slices.Contains(on.calls[0], S("mergeMethod", "REBASE")) {

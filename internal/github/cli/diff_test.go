@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // readSample reads the one recording of sample.diff, kept in internal/gh
@@ -16,7 +16,7 @@ import (
 // be, not any particular content of it.
 func readSample(t *testing.T) []byte {
 	t.Helper()
-	b, err := os.ReadFile("../../gh/testdata/sample.diff")
+	b, err := os.ReadFile("../../app/domain/testdata/sample.diff")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,26 +119,26 @@ func TestPRDiffKeepsErrGhNotFoundWhenBothCallsFail(t *testing.T) {
 	c.run = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, gh.ErrGhNotFound
+			return nil, domain.ErrGhNotFound
 		}
 		return nil, errors.New("gh api: HTTP 404: not found")
 	}
 	_, err := c.PRDiff(context.Background(), "", 412)
-	if !errors.Is(err, gh.ErrGhNotFound) {
-		t.Errorf("PRDiff() error = %v, want errors.Is(err, gh.ErrGhNotFound)", err)
+	if !errors.Is(err, domain.ErrGhNotFound) {
+		t.Errorf("PRDiff() error = %v, want errors.Is(err, domain.ErrGhNotFound)", err)
 	}
 }
 
 func TestDiffLineNamesTheSideToCommentOn(t *testing.T) {
 	tests := []struct {
 		name string
-		line gh.DiffLine
+		line domain.DiffLine
 		num  int
-		side gh.DiffSide
+		side domain.DiffSide
 	}{
-		{"removed lines quote the left", gh.DiffLine{Kind: gh.LineRemoved, OldLine: 14}, 14, gh.SideLeft},
-		{"added lines quote the right", gh.DiffLine{Kind: gh.LineAdded, NewLine: 15}, 15, gh.SideRight},
-		{"context quotes the right", gh.DiffLine{Kind: gh.LineContext, OldLine: 12, NewLine: 12}, 12, gh.SideRight},
+		{"removed lines quote the left", domain.DiffLine{Kind: domain.LineRemoved, OldLine: 14}, 14, domain.SideLeft},
+		{"added lines quote the right", domain.DiffLine{Kind: domain.LineAdded, NewLine: 15}, 15, domain.SideRight},
+		{"context quotes the right", domain.DiffLine{Kind: domain.LineContext, OldLine: 12, NewLine: 12}, 12, domain.SideRight},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

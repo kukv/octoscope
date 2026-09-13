@@ -3,22 +3,22 @@ package diff
 import (
 	"strconv"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // threadKey names one thread by where it sits. It is the map key for which
 // settled threads the user has opened, and it has to survive a refetch, so it
 // is built from the position rather than from an id.
-func threadKey(path string, line int, side gh.DiffSide) string {
+func threadKey(path string, line int, side domain.DiffSide) string {
 	return path + ":" + strconv.Itoa(line) + ":" + strconv.Itoa(int(side))
 }
 
 // threadsFor returns the threads that belong under one line of the diff.
 // Path, line and side must all match: a comment on the old version of a line
 // is not a comment on the new one.
-func (m Model) threadsFor(path string, line int, side gh.DiffSide) []gh.ReviewThread {
-	var out []gh.ReviewThread
+func (m Model) threadsFor(path string, line int, side domain.DiffSide) []domain.ReviewThread {
+	var out []domain.ReviewThread
 	for _, t := range m.review.Threads {
 		if t.Path == path && t.Line == line && t.Side == side {
 			out = append(out, t)
@@ -30,7 +30,7 @@ func (m Model) threadsFor(path string, line int, side gh.DiffSide) []gh.ReviewTh
 // threadRows turns the threads under one line into drawable rows. Settled
 // ones collapse into a single count until the user opens them, so that
 // finished arguments do not push the code they were about off the screen.
-func (m Model) threadRows(hunk int, path string, line int, side gh.DiffSide) []row {
+func (m Model) threadRows(hunk int, path string, line int, side domain.DiffSide) []row {
 	threads := m.threadsFor(path, line, side)
 	if len(threads) == 0 {
 		return nil

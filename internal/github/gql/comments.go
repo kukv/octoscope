@@ -8,7 +8,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed pr_comments.graphql
@@ -26,7 +26,7 @@ type commentPage struct {
 }
 
 // commentNode is one comment. GraphQL nests the author under an object,
-// which gh.Comment already spells the same way.
+// which domain.Comment already spells the same way.
 type commentNode struct {
 	Author struct {
 		Login string `json:"login"`
@@ -35,14 +35,14 @@ type commentNode struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func toComments(in []commentNode) []gh.Comment {
+func toComments(in []commentNode) []domain.Comment {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make([]gh.Comment, len(in))
+	out := make([]domain.Comment, len(in))
 	for i, c := range in {
-		out[i] = gh.Comment{
-			Author:    gh.Author{Login: c.Author.Login},
+		out[i] = domain.Comment{
+			Author:    domain.Author{Login: c.Author.Login},
 			Body:      c.Body,
 			CreatedAt: c.CreatedAt,
 		}

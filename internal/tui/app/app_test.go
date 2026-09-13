@@ -13,9 +13,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/browser"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/checks"
 	"github.com/kukv/octoscope/internal/tui/detail"
@@ -30,20 +30,20 @@ import (
 // fakeSource satisfies Source. The child views have their own tests; here we
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
-	work      gh.Work
-	prs       []gh.PR
-	pr        gh.PR
+	work      domain.Work
+	prs       []domain.PR
+	pr        domain.PR
 	prErr     error
-	labels    []gh.Label
-	files     []gh.FileDiff
+	labels    []domain.Label
+	files     []domain.FileDiff
 	diffErr   error
-	checks    gh.Checks
+	checks    domain.Checks
 	checksErr error
 	// workSections is every board column that was asked for. The board makes
 	// one request per column now, so a refresh that dropped a column and one
 	// that did not are told apart by which columns were asked for, not by how
 	// many requests went out.
-	workSections []gh.WorkSection
+	workSections []domain.WorkSection
 	workErr      error
 	prCalls      int
 	prRepos      []string
@@ -51,20 +51,20 @@ type fakeSource struct {
 	countCalls   [][]string
 
 	searchedFor []string
-	found       []gh.RepoCandidate
-	seed        []gh.RepoCandidate
+	found       []domain.RepoCandidate
+	seed        []domain.RepoCandidate
 	saved       []string
 
-	searchItems []gh.WorkItem
+	searchItems []domain.WorkItem
 	searchCalls int
 }
 
-func (f *fakeSource) SearchItems(context.Context, string) ([]gh.WorkItem, error) {
+func (f *fakeSource) SearchItems(context.Context, string) ([]domain.WorkItem, error) {
 	f.searchCalls++
 	return f.searchItems, nil
 }
 
-func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+func (f *fakeSource) ListWorkSection(_ context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
 	f.workSections = append(f.workSections, s)
 	return f.work[s], f.workErr
 }
@@ -72,37 +72,37 @@ func (f *fakeSource) ListWorkSection(_ context.Context, s gh.WorkSection) ([]gh.
 // refreshedTheBoard reports whether every column was asked for. A column left
 // out stays on screen as it was, which is what a refresh is meant to undo.
 func (f *fakeSource) refreshedTheBoard() bool {
-	seen := map[gh.WorkSection]bool{}
+	seen := map[domain.WorkSection]bool{}
 	for _, s := range f.workSections {
 		seen[s] = true
 	}
-	return len(seen) == gh.WorkSectionCount
+	return len(seen) == domain.WorkSectionCount
 }
 
-func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]gh.PR, error) {
+func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]domain.PR, error) {
 	f.prCalls++
 	f.prRepos = append(f.prRepos, repo)
 	return f.prs, nil
 }
 
-func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]gh.Issue, error) {
+func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]domain.Issue, error) {
 	f.issueRepos = append(f.issueRepos, repo)
 	return nil, nil
 }
 
 func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
 
-func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]gh.RepoCount, error) {
+func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]domain.RepoCount, error) {
 	f.countCalls = append(f.countCalls, repos)
 	return nil, nil
 }
 
-func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]gh.RepoCandidate, error) {
+func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]domain.RepoCandidate, error) {
 	f.searchedFor = append(f.searchedFor, query)
 	return f.found, nil
 }
 
-func (f *fakeSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+func (f *fakeSource) SeedCandidates(context.Context) ([]domain.RepoCandidate, error) {
 	return f.seed, nil
 }
 
@@ -113,70 +113,70 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 
 func (f *fakeSource) SaveQueries([]usecase.SavedQuery) error { return nil }
 
-func (f *fakeSource) GetItem(_ context.Context, ref gh.ItemRef) (usecase.Item, error) {
-	if ref.Kind == gh.ItemIssue {
-		return usecase.Item{Kind: gh.ItemIssue}, nil
+func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (usecase.Item, error) {
+	if ref.Kind == domain.ItemIssue {
+		return usecase.Item{Kind: domain.ItemIssue}, nil
 	}
 	pr := f.pr
 	return usecase.Item{
-		Kind: gh.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
+		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
 		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
 		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
 		PR: &pr,
 	}, f.prErr
 }
 
-func (f *fakeSource) OpenWeb(string) error                { return nil }
-func (f *fakeSource) AddComment(gh.ItemRef, string) error { return nil }
-func (f *fakeSource) SetState(gh.ItemRef, bool) error     { return nil }
-func (f *fakeSource) EditLabels(gh.ItemRef, []string, []string) error {
+func (f *fakeSource) OpenWeb(string) error                    { return nil }
+func (f *fakeSource) AddComment(domain.ItemRef, string) error { return nil }
+func (f *fakeSource) SetState(domain.ItemRef, bool) error     { return nil }
+func (f *fakeSource) EditLabels(domain.ItemRef, []string, []string) error {
 	return nil
 }
 
-func (f *fakeSource) EditAssignees(gh.ItemRef, []string, []string) error {
+func (f *fakeSource) EditAssignees(domain.ItemRef, []string, []string) error {
 	return nil
 }
 
-func (f *fakeSource) ListLabels(context.Context, string) ([]gh.Label, error) {
+func (f *fakeSource) ListLabels(context.Context, string) ([]domain.Label, error) {
 	return f.labels, nil
 }
 func (f *fakeSource) ListAssignees(context.Context, string) ([]string, error) { return nil, nil }
 
-func (f *fakeSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error) {
+func (f *fakeSource) PRDiff(context.Context, string, int) ([]domain.FileDiff, error) {
 	return f.files, f.diffErr
 }
 
-func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewContext, error) {
-	return gh.ReviewContext{}, nil
+func (f *fakeSource) PRReviewContext(context.Context, string, int) (domain.ReviewContext, error) {
+	return domain.ReviewContext{}, nil
 }
 
-func (f *fakeSource) PostLineComment(usecase.ReviewTarget, gh.PendingComment) (string, error) {
+func (f *fakeSource) PostLineComment(usecase.ReviewTarget, domain.PendingComment) (string, error) {
 	return "", nil
 }
 
 func (f *fakeSource) DiscardReview(string) error { return nil }
 
-func (f *fakeSource) SubmitReview(usecase.ReviewTarget, gh.ReviewEvent, string) error { return nil }
+func (f *fakeSource) SubmitReview(usecase.ReviewTarget, domain.ReviewEvent, string) error { return nil }
 
-func (f *fakeSource) PRChecks(context.Context, string, int) (gh.Checks, error) {
+func (f *fakeSource) PRChecks(context.Context, string, int) (domain.Checks, error) {
 	return f.checks, f.checksErr
 }
 
-func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]gh.LogLine, error) {
+func (f *fakeSource) JobLog(context.Context, string, int64, bool) ([]domain.LogLine, error) {
 	return nil, nil
 }
 
-func (f *fakeSource) RerunWorkflow(context.Context, string, int64, gh.RerunScope) error {
+func (f *fakeSource) RerunWorkflow(context.Context, string, int64, domain.RerunScope) error {
 	return nil
 }
 
-func (f *fakeSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
-	return gh.MergeContext{}, nil
+func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeContext, error) {
+	return domain.MergeContext{}, nil
 }
 
-func (f *fakeSource) MergePR(string, gh.MergeMethod) error         { return nil }
-func (f *fakeSource) EnableAutoMerge(string, gh.MergeMethod) error { return nil }
-func (f *fakeSource) DisableAutoMerge(string) error                { return nil }
+func (f *fakeSource) MergePR(string, domain.MergeMethod) error         { return nil }
+func (f *fakeSource) EnableAutoMerge(string, domain.MergeMethod) error { return nil }
+func (f *fakeSource) DisableAutoMerge(string) error                    { return nil }
 
 func newTestModelWith(src Source, opts Options) Model {
 	m := New(src, opts)
@@ -192,8 +192,8 @@ func newTestModel(opts Options) Model {
 // through app's own key routing without a t.Helper() at every call site.
 func started(t *testing.T) Model {
 	t.Helper()
-	src := &fakeSource{searchItems: []gh.WorkItem{{
-		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
+	src := &fakeSource{searchItems: []domain.WorkItem{{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/demo", Number: 1},
 		Title: "a result",
 	}}}
 	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -475,11 +475,11 @@ func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 // would.
 func TestALateRepositoryStillGetsTheTerminalWidth(t *testing.T) {
 	const width = 120
-	src := &fakeSource{prs: []gh.PR{{
+	src := &fakeSource{prs: []domain.PR{{
 		Number: 1,
 		Title: "レンダリングのパイプラインをまるごと置き換える " +
 			"refactor with an English clause long enough to run off any screen",
-		Author: gh.Author{Login: "a-contributor-with-a-very-long-handle"},
+		Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},
 	}}}
 
 	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
@@ -520,7 +520,7 @@ func TestTheFirstSizeAsksWhichRepositoryThisIs(t *testing.T) {
 func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
 	next, _ := m.Update(work.OpenDetailMsg{
-		Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3},
+		Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3},
 	})
 	m = next.(Model)
 	if !m.has(overlayDetail) {
@@ -534,14 +534,14 @@ func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 
 func TestRepoOpenDetailMsgShowsTheDetailView(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).Update(repo.OpenDetailMsg{
-		Ref: gh.ItemRef{Kind: gh.ItemIssue, Number: 7},
+		Ref: domain.ItemRef{Kind: domain.ItemIssue, Number: 7},
 	})
 	if !next.(Model).has(overlayDetail) {
 		t.Error("the detail view did not open")
 	}
 }
 
-var someRef = gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3}
+var someRef = domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3}
 
 func TestDFromTheBoardOpensTheDiffOnItsOwn(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
@@ -670,8 +670,8 @@ func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
 // detail view must re-run Search's own query too, not only the board and
 // the Repos list.
 func TestAMergeRefreshesSearchToo(t *testing.T) {
-	f := &fakeSource{searchItems: []gh.WorkItem{{
-		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/demo", Number: 1},
+	f := &fakeSource{searchItems: []domain.WorkItem{{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/demo", Number: 1},
 		Title: "a result",
 	}}}
 	next, cmd := New(f, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -700,7 +700,7 @@ func TestAMergeRefreshesSearchToo(t *testing.T) {
 // after the WindowSizeMsg has already been seen: without handing it the stored
 // size, its viewport would wrap at its own 80-column default forever.
 func TestTheDetailViewGetsTheCurrentSize(t *testing.T) {
-	src := &fakeSource{pr: gh.PR{Number: 3, Title: "wide", Body: strings.Repeat("word ", 200)}}
+	src := &fakeSource{pr: domain.PR{Number: 3, Title: "wide", Body: strings.Repeat("word ", 200)}}
 	// Not 80: that is the viewport's own default, so a detail view that never
 	// heard the size would look right there by accident. Not narrower either,
 	// because the detail footer is 73 columns of key bindings and does not
@@ -711,7 +711,7 @@ func TestTheDetailViewGetsTheCurrentSize(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 24})
 	m = next.(Model)
 
-	next, cmd := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 3}})
+	next, cmd := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 3}})
 	m = resolve(t, next.(Model), cmd)
 
 	for _, line := range strings.Split(content(m), "\n") {
@@ -735,7 +735,7 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := newTestModel(Options{Repo: "kukv/demo"})
 			if tc.open {
-				opened, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+				opened, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 				m = opened.(Model)
 			}
 			next, _ := m.Update(tc.msg)
@@ -752,7 +752,7 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 
 func TestGhNotFoundIsTranslated(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.FatalMsg{Err: gh.ErrGhNotFound})
+		Update(work.FatalMsg{Err: domain.ErrGhNotFound})
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.gh_not_found")) {
 		t.Errorf("gh_not_found was not translated:\n%s", view)
@@ -762,7 +762,7 @@ func TestGhNotFoundIsTranslated(t *testing.T) {
 // Credentials are the user's to fix, and gh's own wording does not say how.
 func TestUnauthenticatedIsTranslated(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.FatalMsg{Err: fmt.Errorf("gh pr list: %w", gh.ErrUnauthenticated)})
+		Update(work.FatalMsg{Err: fmt.Errorf("gh pr list: %w", domain.ErrUnauthenticated)})
 	view := content(next.(Model))
 	if !strings.Contains(view, i18n.T("error.unauthenticated")) {
 		t.Errorf("unauthenticated was not translated:\n%s", view)
@@ -854,7 +854,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
-	next, _ = m.Update(work.FatalMsg{Err: gh.ErrGhNotFound})
+	next, _ = m.Update(work.FatalMsg{Err: domain.ErrGhNotFound})
 	m = next.(Model)
 	if m.errText == "" {
 		t.Fatal("the error screen did not show")
@@ -875,7 +875,7 @@ func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 // back to, so it must keep quitting like q does.
 func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 	next, _ := newTestModel(Options{Repo: "kukv/demo"}).
-		Update(work.FatalMsg{Err: gh.ErrGhNotFound})
+		Update(work.FatalMsg{Err: domain.ErrGhNotFound})
 	m := next.(Model)
 	if len(m.stack) != 0 {
 		t.Fatalf("stack = %v, want empty for this case", m.stack)
@@ -922,7 +922,7 @@ func TestQGoesBackInTheDetailView(t *testing.T) {
 	for _, k := range []string{"q", "esc"} {
 		t.Run(k, func(t *testing.T) {
 			m := newTestModel(Options{Repo: "kukv/demo"})
-			next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+			next, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 			m, cmd := pressCmd(next.(Model), k)
 			if isQuit(cmd) {
 				t.Fatalf("%s quit the app instead of leaving the detail view", k)
@@ -975,11 +975,11 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 	for name, busy := range tests {
 		t.Run(name, func(t *testing.T) {
 			src := &fakeSource{
-				pr:     gh.PR{Number: 1, Title: "a pr", State: gh.StateOpen},
-				labels: []gh.Label{{Name: "bug", Color: "d73a4a"}},
+				pr:     domain.PR{Number: 1, Title: "a pr", State: domain.StateOpen},
+				labels: []domain.Label{{Name: "bug", Color: "d73a4a"}},
 			}
 			m := newTestModelWith(src, Options{Repo: "kukv/demo"})
-			next, cmd := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+			next, cmd := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 			m = resolve(t, next.(Model), cmd)
 
 			m = busy(t, m)
@@ -1002,7 +1002,7 @@ func TestALateRepoMessageIsNotDropped(t *testing.T) {
 		t.Fatal("r did not refresh the list")
 	}
 
-	next, _ := m.Update(repo.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+	next, _ := m.Update(repo.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	m = next.(Model)
 
 	m = resolve(t, m, refresh) // the list arrives while the detail view is front
@@ -1024,8 +1024,8 @@ func TestALateRepoMessageIsNotDropped(t *testing.T) {
 }
 
 func TestKeysReachTheTabUnderneath(t *testing.T) {
-	src := &fakeSource{work: gh.Work{
-		gh.SectionReviewRequested: {{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}, Title: "first"}},
+	src := &fakeSource{work: domain.Work{
+		domain.SectionReviewRequested: {{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "first"}},
 	}}
 	m := New(src, Options{}) // no --repo: the board is the first tab
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -1046,13 +1046,13 @@ func TestKeysReachTheTabUnderneath(t *testing.T) {
 // puts it on screen.
 func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 	src := &fakeSource{
-		work: gh.Work{
-			gh.SectionReviewRequested: {{
-				Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 41},
+		work: domain.Work{
+			domain.SectionReviewRequested: {{
+				Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 41},
 				Title: "add the work board",
 			}},
 		},
-		pr: gh.PR{Number: 41, Title: "add the work board", State: gh.StateOpen},
+		pr: domain.PR{Number: 41, Title: "add the work board", State: domain.StateOpen},
 	}
 	m := New(src, Options{}) // no --repo: the board is the first tab
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -1103,7 +1103,7 @@ func TestTheTabRowIsQuietWhenTheSettingsFileIsFine(t *testing.T) {
 
 func TestTheDetailViewHasNoTabRow(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	if strings.Contains(content(next.(Model)), i18n.T("tab.repos")) {
 		t.Error("the detail view is drawn under the tab row")
 	}
@@ -1118,17 +1118,17 @@ const overlongTitle = "レンダリングのパイプラインをまるごと置
 // overlongSource fills every tab with content that overflows on its own.
 func overlongSource() *fakeSource {
 	return &fakeSource{
-		work: gh.Work{
-			gh.SectionReviewRequested: {{
-				Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/a-repository-nobody-would-name-this-way", Number: 1},
+		work: domain.Work{
+			domain.SectionReviewRequested: {{
+				Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/a-repository-nobody-would-name-this-way", Number: 1},
 				Title: overlongTitle,
 			}},
 		},
-		prs: []gh.PR{{
+		prs: []domain.PR{{
 			Number: 1, Title: overlongTitle,
-			Author: gh.Author{Login: "a-contributor-with-a-very-long-handle"},
+			Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},
 		}},
-		pr: gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen},
+		pr: domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen},
 	}
 }
 
@@ -1154,7 +1154,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 	// just q:quit) from the board/Repos-list case above, and that bar's IDs
 	// (footer.error.esc in particular) are only ever exercised through this
 	// state — nothing else in this function opens an overlay and fails it.
-	overlayFailed, cmd := board.Update(work.OpenDiffMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1}})
+	overlayFailed, cmd := board.Update(work.OpenDiffMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1}})
 	overlayFailed = resolve(t, overlayFailed.(Model), cmd)
 	overlayFailed, _ = overlayFailed.(Model).Update(diff.ErrorMsg{Err: errors.New(overlongTitle)})
 
@@ -1197,7 +1197,7 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 // failure has nowhere to go but away.
 func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+	next, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
 	m = resolve(t, m, cmd)
 	if m.has(overlayDetail) {
@@ -1217,11 +1217,11 @@ func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
 func TestAStaleDetailErrorDoesNotReplaceTheOpenOne(t *testing.T) {
 	m := newTestModelWith(&fakeSource{prErr: errors.New("boom")}, Options{Repo: "kukv/demo"})
 
-	next, first := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 1}})
+	next, first := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
 	m = resolve(t, m, cmd)
 
-	next, second := m.Update(work.OpenDetailMsg{Ref: gh.ItemRef{Kind: gh.ItemPR, Number: 2}})
+	next, second := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}})
 	m = next.(Model)
 
 	m = resolve(t, m, first) // the first item's failure lands on the second

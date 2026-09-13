@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/browser"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -31,22 +31,22 @@ var (
 	goldenFetchedAt = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
 )
 
-func goldenPRs() []gh.PR {
-	return []gh.PR{
+func goldenPRs() []domain.PR {
+	return []domain.PR{
 		{
-			Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
-			UpdatedAt: goldenUpdatedAt, Review: gh.ReviewApproved,
+			Number: 1, Title: "first pr", Author: domain.Author{Login: "kukv"},
+			UpdatedAt: goldenUpdatedAt, Review: domain.ReviewApproved,
 		},
 		{
-			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},
+			Number: 2, Title: "second pr", Author: domain.Author{Login: "bob"},
 			UpdatedAt: goldenUpdatedAt, IsDraft: true,
-			Labels: []gh.Label{{Name: "bug", Color: "d73a4a"}},
+			Labels: []domain.Label{{Name: "bug", Color: "d73a4a"}},
 			Head:   "fix/thing", Base: "main", Additions: 12, Deletions: 3,
-			Checks: gh.Checks{
-				Total: 2, Passed: 1, Failed: 1, State: gh.CheckFailure,
-				Runs: []gh.CheckRun{
-					{Name: "lint", State: gh.CheckSuccess},
-					{Name: "test", State: gh.CheckFailure},
+			Checks: domain.Checks{
+				Total: 2, Passed: 1, Failed: 1, State: domain.CheckFailure,
+				Runs: []domain.CheckRun{
+					{Name: "lint", State: domain.CheckSuccess},
+					{Name: "test", State: domain.CheckFailure},
 				},
 			},
 		},
@@ -54,18 +54,18 @@ func goldenPRs() []gh.PR {
 			Number: 9,
 			Title: "レンダリングのパイプラインをまるごと置き換える " +
 				"refactor that nobody asked for",
-			Author:    gh.Author{Login: "a-contributor-with-a-very-long-handle"},
+			Author:    domain.Author{Login: "a-contributor-with-a-very-long-handle"},
 			UpdatedAt: goldenUpdatedAt,
 		},
 	}
 }
 
-func goldenIssues() []gh.Issue {
-	return []gh.Issue{{
+func goldenIssues() []domain.Issue {
+	return []domain.Issue{{
 		Number: 7,
 		Title: "ラベルの一覧が横に伸びつづける問題 " +
 			"and an English clause long enough to run off the screen",
-		Author:    gh.Author{Login: "another-contributor-with-a-long-handle"},
+		Author:    domain.Author{Login: "another-contributor-with-a-long-handle"},
 		UpdatedAt: goldenUpdatedAt,
 	}}
 }
@@ -73,8 +73,8 @@ func goldenIssues() []gh.Issue {
 // goldenCandidates are suggestions of the shape the search really returns:
 // one name long enough to need clipping at eighty columns, and star counts
 // of different widths so the column's alignment shows.
-func goldenCandidates() []gh.RepoCandidate {
-	return []gh.RepoCandidate{
+func goldenCandidates() []domain.RepoCandidate {
+	return []domain.RepoCandidate{
 		{Name: "charmbracelet/lipgloss", Stars: 11812},
 		{Name: "marcoroth/lipgloss-ruby", Stars: 58},
 		{Name: "kukv/a-repository-with-a-name-nobody-would-type-twice"},
@@ -88,7 +88,7 @@ func goldenModel(width int) Model {
 		Current:      "kukv/octoscope",
 	}), width)
 	m, _ = m.Update(prListMsg{prs: f.prs})
-	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{
+	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{
 		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
 		{Repo: "kukv/koto", Unavailable: true},
 	}))
@@ -112,7 +112,7 @@ func TestGolden(t *testing.T) {
 				// The list the user is left with when a refetch fails: the
 				// rows it already had, and a line saying what GitHub said.
 				failed := goldenModel(w)
-				failed, _ = failed.Update(errMsg{gen: failed.gen, err: gh.Classify(gh.ErrTransient, goldenFailure)})
+				failed, _ = failed.Update(errMsg{gen: failed.gen, err: domain.Classify(domain.ErrTransient, goldenFailure)})
 				golden.Assert(t, fmt.Sprintf("repo_failed_%s_%d", lang.name, w), failed.View())
 
 				// The other failure that reaches the same line, which must

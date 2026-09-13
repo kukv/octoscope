@@ -3,8 +3,8 @@ package diff
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -16,11 +16,11 @@ type (
 	// empty and start a second review, leaving two pending reviews open on
 	// the pull request.
 	commentPostedMsg struct {
-		ref      gh.ItemRef
+		ref      domain.ItemRef
 		reviewID string
 	}
 	commentErrorMsg struct {
-		ref gh.ItemRef
+		ref domain.ItemRef
 		err error
 	}
 )
@@ -44,7 +44,7 @@ type (
 // The target line and side are captured here, not read again at send time.
 // A refetch that lands mid-composition rebuilds m.rows and can insert thread
 // rows under the very line being commented on, shifting m.row to a different
-// row -- one whose zero gh.DiffLine would otherwise read as line 0. The
+// row -- one whose zero domain.DiffLine would otherwise read as line 0. The
 // cursor is guaranteed to be on a real line only right now, when the guard
 // above has just confirmed it.
 func (m Model) startComposing() Model {
@@ -61,7 +61,7 @@ func (m Model) startComposing() Model {
 	}
 	m.declined = ""
 	line, side := r.line.Line()
-	m.target = gh.PendingComment{Path: m.files[m.file].Path, Line: line, Side: side}
+	m.target = domain.PendingComment{Path: m.files[m.file].Path, Line: line, Side: side}
 	m.mode, m.phase = modeCompose, phaseIdle
 	m.errText = ""
 	m.textarea.Reset()
@@ -106,7 +106,7 @@ func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "esc":
 		m.mode, m.phase = modeView, phaseIdle
 		m.errText = ""
-		m.target = gh.PendingComment{}
+		m.target = domain.PendingComment{}
 		m.textarea.Reset()
 		return m, nil
 	case "ctrl+s":

@@ -3,7 +3,7 @@ package diff
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
 )
@@ -12,7 +12,7 @@ import (
 // sent for, dropped if it lands after the user has left this pull request --
 // the same guard every other async answer in this package uses.
 type discardedMsg struct {
-	ref gh.ItemRef
+	ref domain.ItemRef
 	err error
 }
 

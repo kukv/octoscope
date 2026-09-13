@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 type ownRepoJSON struct {
@@ -17,7 +17,7 @@ type ownRepoJSON struct {
 // ListOwnRepos lists the repositories of owner, or of the authenticated user
 // when owner is empty. It carries no star count: gh repo list offers none,
 // and this list is read by name.
-func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]gh.RepoCandidate, error) {
+func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error) {
 	args := []string{"repo", "list"}
 	if owner != "" {
 		args = append(args, owner)
@@ -31,9 +31,9 @@ func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]g
 	if err := json.Unmarshal(out, &found); err != nil {
 		return nil, fmt.Errorf("parse repo list: %w", err)
 	}
-	repos := make([]gh.RepoCandidate, len(found))
+	repos := make([]domain.RepoCandidate, len(found))
 	for i, f := range found {
-		repos[i] = gh.RepoCandidate{Name: f.NameWithOwner, Private: f.IsPrivate}
+		repos[i] = domain.RepoCandidate{Name: f.NameWithOwner, Private: f.IsPrivate}
 	}
 	return repos, nil
 }

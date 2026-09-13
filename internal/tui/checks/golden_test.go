@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -29,8 +29,8 @@ var goldenLanguages = []struct {
 // goldenLog is the failing check's log, one line Japanese: a recording is
 // the only thing that catches column drift in the log pane, and all-ASCII
 // source would hide it.
-func goldenLog() []gh.LogLine {
-	return []gh.LogLine{
+func goldenLog() []domain.LogLine {
+	return []domain.LogLine{
 		{Step: "Run tests", Time: time.Date(2026, 9, 7, 10, 15, 30, 0, time.UTC), Text: "FAIL ./internal/gh (TestWalk)"},
 		{Text: "深さの上限に達したら探索を打ち切る"},
 	}
@@ -40,7 +40,7 @@ func goldenLog() []gh.LogLine {
 // cursor opens on row 0, which arrange puts on the failing check ("sca").
 func goldenModel(width int) Model {
 	m := New(&fakeSource{checks: fixture(), log: goldenLog()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: fixture()})
 	return m
@@ -63,7 +63,7 @@ func checksRerunModel(width int) Model {
 // checksLoadingModel is the view before its fetch has landed.
 func checksLoadingModel(width int) Model {
 	m := New(&fakeSource{checks: fixture(), log: goldenLog()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	return m
 }
@@ -71,32 +71,32 @@ func checksLoadingModel(width int) Model {
 // mixed is one of each kind of check GitHub reports, in a list long enough to
 // scroll: a failing workflow, a green one, a check run an App created (those
 // come back with no workflow run behind them), and a StatusContext.
-func mixed() gh.Checks {
+func mixed() domain.Checks {
 	start := time.Date(2026, 9, 7, 10, 12, 0, 0, time.UTC)
-	ran := func(r gh.CheckRun, took time.Duration) gh.CheckRun {
-		r.Kind = gh.CheckKindRun
+	ran := func(r domain.CheckRun, took time.Duration) domain.CheckRun {
+		r.Kind = domain.CheckKindRun
 		r.URL = "https://github.example/job"
 		r.StartedAt, r.CompletedAt = start, start.Add(took)
 		return r
 	}
-	return gh.Checks{
-		Total: 9, Passed: 7, Failed: 1, Running: 1, State: gh.CheckFailure,
-		Runs: []gh.CheckRun{
-			ran(gh.CheckRun{Name: "build", State: gh.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 1, RunID: 10}, 3*time.Minute+7*time.Second),
-			ran(gh.CheckRun{Name: "lint", State: gh.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 2, RunID: 10}, 62*time.Second),
-			ran(gh.CheckRun{Name: "test", State: gh.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 3, RunID: 10}, 2*time.Minute+14*time.Second),
-			ran(gh.CheckRun{Name: "sca", State: gh.CheckFailure, Workflow: "security", RunNumber: 116, JobID: 4, RunID: 20}, 48*time.Second),
-			ran(gh.CheckRun{Name: "audit", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 5, RunID: 20}, 31*time.Second),
-			ran(gh.CheckRun{Name: "secrets", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 6, RunID: 20}, 9*time.Second),
-			ran(gh.CheckRun{Name: "deps", State: gh.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 7, RunID: 20}, 12*time.Second),
+	return domain.Checks{
+		Total: 9, Passed: 7, Failed: 1, Running: 1, State: domain.CheckFailure,
+		Runs: []domain.CheckRun{
+			ran(domain.CheckRun{Name: "build", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 1, RunID: 10}, 3*time.Minute+7*time.Second),
+			ran(domain.CheckRun{Name: "lint", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 2, RunID: 10}, 62*time.Second),
+			ran(domain.CheckRun{Name: "test", State: domain.CheckSuccess, Workflow: "CI", RunNumber: 88, JobID: 3, RunID: 10}, 2*time.Minute+14*time.Second),
+			ran(domain.CheckRun{Name: "sca", State: domain.CheckFailure, Workflow: "security", RunNumber: 116, JobID: 4, RunID: 20}, 48*time.Second),
+			ran(domain.CheckRun{Name: "audit", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 5, RunID: 20}, 31*time.Second),
+			ran(domain.CheckRun{Name: "secrets", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 6, RunID: 20}, 9*time.Second),
+			ran(domain.CheckRun{Name: "deps", State: domain.CheckSuccess, Workflow: "security", RunNumber: 116, JobID: 7, RunID: 20}, 12*time.Second),
 			// An App's own check run: no workflow, no run id, so it joins the
 			// "Other" group and has nothing for R to rerun.
 			{
-				Name: "codecov/patch", State: gh.CheckSuccess, Kind: gh.CheckKindRun,
+				Name: "codecov/patch", State: domain.CheckSuccess, Kind: domain.CheckKindRun,
 				JobID: 8, URL: "https://codecov.example/1",
 				StartedAt: start, CompletedAt: start.Add(6 * time.Second),
 			},
-			{Name: "ci/circleci", State: gh.CheckRunning, Kind: gh.CheckKindStatus, URL: "https://circleci.example/1"},
+			{Name: "ci/circleci", State: domain.CheckRunning, Kind: domain.CheckKindStatus, URL: "https://circleci.example/1"},
 		},
 	}
 }
@@ -105,7 +105,7 @@ func mixed() gh.Checks {
 // a scrolled list that the first workflow's heading is off the top: j to the
 // bottom, then one k, which leaves the window where it is.
 func checksMixedModel(width int) Model {
-	m := New(&fakeSource{checks: mixed()}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{checks: mixed()}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 12})
 	m, _ = m.Update(checksMsg{ref: m.ref, checks: mixed()})
 	for range 8 {
@@ -116,9 +116,9 @@ func checksMixedModel(width int) Model {
 
 // checksNoneModel is a pull request whose checks came back empty.
 func checksNoneModel(width int) Model {
-	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
-	m, _ = m.Update(checksMsg{ref: m.ref, checks: gh.Checks{}})
+	m, _ = m.Update(checksMsg{ref: m.ref, checks: domain.Checks{}})
 	return m
 }
 

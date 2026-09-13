@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed repo_prs.graphql
@@ -42,10 +42,10 @@ type prNode struct {
 		Login string `json:"login"`
 	} `json:"author"`
 	Labels struct {
-		Nodes []gh.Label `json:"nodes"`
+		Nodes []domain.Label `json:"nodes"`
 	} `json:"labels"`
 	Assignees struct {
-		Nodes []gh.Author `json:"nodes"`
+		Nodes []domain.Author `json:"nodes"`
 	} `json:"assignees"`
 	Comments commentPage `json:"comments"`
 	Commits  struct {
@@ -61,15 +61,15 @@ type prNode struct {
 	} `json:"commits"`
 }
 
-func (n prNode) toPR() gh.PR {
-	return gh.PR{
+func (n prNode) toPR() domain.PR {
+	return domain.PR{
 		Number:    n.Number,
 		Title:     n.Title,
-		Author:    gh.Author{Login: n.Author.Login},
-		State:     gh.ParseItemState(n.State),
+		Author:    domain.Author{Login: n.Author.Login},
+		State:     domain.ParseItemState(n.State),
 		IsDraft:   n.IsDraft,
 		UpdatedAt: n.UpdatedAt,
-		Review:    gh.ParseReviewDecision(n.ReviewDecision),
+		Review:    domain.ParseReviewDecision(n.ReviewDecision),
 		URL:       n.URL,
 		Body:      n.Body,
 		Comments:  toComments(n.Comments.Nodes),
@@ -85,7 +85,7 @@ func (n prNode) toPR() gh.PR {
 
 // checks reads the roll-up off the last commit, which is where GitHub hangs
 // it: a pull request has no roll-up of its own.
-func (n prNode) checks() gh.Checks {
+func (n prNode) checks() domain.Checks {
 	var nodes []CheckContext
 	for _, commit := range n.Commits.Nodes {
 		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
@@ -106,20 +106,20 @@ type issueNode struct {
 		Login string `json:"login"`
 	} `json:"author"`
 	Labels struct {
-		Nodes []gh.Label `json:"nodes"`
+		Nodes []domain.Label `json:"nodes"`
 	} `json:"labels"`
 	Assignees struct {
-		Nodes []gh.Author `json:"nodes"`
+		Nodes []domain.Author `json:"nodes"`
 	} `json:"assignees"`
 	Comments commentPage `json:"comments"`
 }
 
-func (n issueNode) toIssue() gh.Issue {
-	return gh.Issue{
+func (n issueNode) toIssue() domain.Issue {
+	return domain.Issue{
 		Number:    n.Number,
 		Title:     n.Title,
-		Author:    gh.Author{Login: n.Author.Login},
-		State:     gh.ParseItemState(n.State),
+		Author:    domain.Author{Login: n.Author.Login},
+		State:     domain.ParseItemState(n.State),
 		UpdatedAt: n.UpdatedAt,
 		URL:       n.URL,
 		Body:      n.Body,
@@ -168,7 +168,7 @@ type issueListResponse struct {
 // ListPRs returns the open pull requests of one repository. An empty repo
 // means "wherever we are", which only a transport that can answer that
 // accepts.
-func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+func (c *Client) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
 		return nil, fmt.Errorf("parse pull request list: %w", err)
 	}
 	nodes := resp.Data.Repository.PullRequests.Nodes
-	prs := make([]gh.PR, len(nodes))
+	prs := make([]domain.PR, len(nodes))
 	for i, n := range nodes {
 		prs[i] = n.toPR()
 	}
@@ -190,7 +190,7 @@ func (c *Client) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
 }
 
 // ListIssues returns the open issues of one repository.
-func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
+func (c *Client) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {
 		return nil, err
@@ -204,7 +204,7 @@ func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error
 		return nil, fmt.Errorf("parse issue list: %w", err)
 	}
 	nodes := resp.Data.Repository.Issues.Nodes
-	issues := make([]gh.Issue, len(nodes))
+	issues := make([]domain.Issue, len(nodes))
 	for i, n := range nodes {
 		issues[i] = n.toIssue()
 	}
@@ -212,45 +212,45 @@ func (c *Client) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error
 }
 
 // GetPR returns one pull request with its body and conversation.
-func (c *Client) GetPR(ctx context.Context, repo string, number int) (gh.PR, error) {
+func (c *Client) GetPR(ctx context.Context, repo string, number int) (domain.PR, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {
-		return gh.PR{}, err
+		return domain.PR{}, err
 	}
 	out, err := c.Read(ctx, prQuery, append(vars, N("number", number))...)
 	if err != nil {
-		return gh.PR{}, err
+		return domain.PR{}, err
 	}
 	var resp prResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
-		return gh.PR{}, fmt.Errorf("parse pull request: %w", err)
+		return domain.PR{}, fmt.Errorf("parse pull request: %w", err)
 	}
 	node := resp.Data.Repository.PullRequest
 	node.Comments.Nodes, err = c.restOfConversation(ctx, prCommentsQuery, vars, number, node.Comments, decodePRComments)
 	if err != nil {
-		return gh.PR{}, err
+		return domain.PR{}, err
 	}
 	return node.toPR(), nil
 }
 
 // GetIssue returns one issue with its body and conversation.
-func (c *Client) GetIssue(ctx context.Context, repo string, number int) (gh.Issue, error) {
+func (c *Client) GetIssue(ctx context.Context, repo string, number int) (domain.Issue, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {
-		return gh.Issue{}, err
+		return domain.Issue{}, err
 	}
 	out, err := c.Read(ctx, issueQuery, append(vars, N("number", number))...)
 	if err != nil {
-		return gh.Issue{}, err
+		return domain.Issue{}, err
 	}
 	var resp issueResponse
 	if err := json.Unmarshal(out, &resp); err != nil {
-		return gh.Issue{}, fmt.Errorf("parse issue: %w", err)
+		return domain.Issue{}, fmt.Errorf("parse issue: %w", err)
 	}
 	node := resp.Data.Repository.Issue
 	node.Comments.Nodes, err = c.restOfConversation(ctx, issueCommentsQuery, vars, number, node.Comments, decodeIssueComments)
 	if err != nil {
-		return gh.Issue{}, err
+		return domain.Issue{}, err
 	}
 	return node.toIssue(), nil
 }

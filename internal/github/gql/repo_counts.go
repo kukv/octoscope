@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 //go:embed repo_counts.graphql
@@ -49,13 +49,13 @@ type repoCountsResponse struct {
 // repository, in one request. A repository whose name does not split into
 // owner/name, or that GitHub could not resolve, comes back Unavailable
 // instead of failing the rest.
-func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
-	counts := make([]gh.RepoCount, len(repos))
+func (c *Client) RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error) {
+	counts := make([]domain.RepoCount, len(repos))
 	var vars []Var
 	indices := []int{}
 	for i, repo := range repos {
 		counts[i].Repo = repo
-		owner, name, ok := gh.SplitRepo(repo)
+		owner, name, ok := domain.SplitRepo(repo)
 		if !ok {
 			counts[i].Unavailable = true
 			continue

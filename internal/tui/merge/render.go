@@ -3,7 +3,7 @@ package merge
 import (
 	"strings"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -57,11 +57,11 @@ func (m Model) body() string {
 	return b.String()
 }
 
-func methodText(method gh.MergeMethod) string {
+func methodText(method domain.MergeMethod) string {
 	switch method {
-	case gh.MergeCommit:
+	case domain.MergeCommit:
 		return i18n.T("merge.method_commit")
-	case gh.MergeRebase:
+	case domain.MergeRebase:
 		return i18n.T("merge.method_rebase")
 	default:
 		return i18n.T("merge.method_squash")
@@ -110,28 +110,28 @@ func (m Model) reason() string {
 		return theme.Error().Render(icon.Warning() + " " + text)
 	}
 	switch m.ctx.Review {
-	case gh.ReviewRequired:
-		return theme.Review(gh.ReviewRequired, false).Render(icon.Warning() + " " + i18n.T("merge.review_required"))
-	case gh.ReviewChangesRequested:
-		return theme.Review(gh.ReviewChangesRequested, false).Render(icon.Warning() + " " + i18n.T("merge.review_changes"))
+	case domain.ReviewRequired:
+		return theme.Review(domain.ReviewRequired, false).Render(icon.Warning() + " " + i18n.T("merge.review_required"))
+	case domain.ReviewChangesRequested:
+		return theme.Review(domain.ReviewChangesRequested, false).Render(icon.Warning() + " " + i18n.T("merge.review_changes"))
 	default:
 		return ""
 	}
 }
 
-func blockText(b gh.MergeBlock) string {
+func blockText(b domain.MergeBlock) string {
 	switch b {
-	case gh.BlockDraft:
+	case domain.BlockDraft:
 		return i18n.T("merge.block_draft")
-	case gh.BlockConflicting:
+	case domain.BlockConflicting:
 		return i18n.T("merge.block_conflicting")
-	case gh.BlockComputing:
+	case domain.BlockComputing:
 		return i18n.T("merge.block_computing")
-	case gh.BlockProtected:
+	case domain.BlockProtected:
 		return i18n.T("merge.block_protected")
-	case gh.BlockBehind:
+	case domain.BlockBehind:
 		return i18n.T("merge.block_behind")
-	case gh.BlockDirty:
+	case domain.BlockDirty:
 		return i18n.T("merge.block_dirty")
 	default:
 		return ""
@@ -161,7 +161,7 @@ func (m Model) hints() []string {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		hints = append(hints, i18n.T("merge.key_auto_off"))
-	case !m.answered() || m.ctx.Block() != gh.BlockNone:
+	case !m.answered() || m.ctx.Block() != domain.BlockNone:
 		// enter sends nothing: there is no answer, or something refuses it
 	case m.auto:
 		hints = append(hints, i18n.T("merge.key_queue"))

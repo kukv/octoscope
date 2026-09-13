@@ -9,7 +9,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -43,11 +43,11 @@ const (
 )
 
 // sectionTitleIDs maps a column to its heading in the catalog.
-var sectionTitleIDs = map[gh.WorkSection]string{
-	gh.SectionReviewRequested: "work.review_requested",
-	gh.SectionYourPRs:         "work.your_prs",
-	gh.SectionAssigned:        "work.assigned",
-	gh.SectionMentioned:       "work.mentioned",
+var sectionTitleIDs = map[domain.WorkSection]string{
+	domain.SectionReviewRequested: "work.review_requested",
+	domain.SectionYourPRs:         "work.your_prs",
+	domain.SectionAssigned:        "work.assigned",
+	domain.SectionMentioned:       "work.mentioned",
 }
 
 func (m Model) View() string {
@@ -82,7 +82,7 @@ func (m Model) View() string {
 // other choice would be one the user cannot follow. Which column failed is
 // told by the column itself (see columnLines).
 func (m Model) noticeLine() string {
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		if m.notice[s] == "" {
 			continue
 		}
@@ -192,7 +192,7 @@ func (m Model) board(height int) []string {
 // allows, starting from the offset that keeps the cursor in view. A column
 // still waiting on its own request shows a spinner in the space its cards
 // will take, so the columns that have answered stay readable.
-func (m Model) columnLines(s gh.WorkSection, w, height int) []string {
+func (m Model) columnLines(s domain.WorkSection, w, height int) []string {
 	items := m.work[s]
 	lines := []string{m.heading(s, len(items), w)}
 	if m.state[s] == colLoading {
@@ -224,7 +224,7 @@ func (m Model) columnLines(s gh.WorkSection, w, height int) []string {
 // heading names the column and counts what is in it. The count is the point
 // of the board: the length of a column is how much has piled up, and the
 // number says so even when the column is scrolled.
-func (m Model) heading(s gh.WorkSection, n, w int) string {
+func (m Model) heading(s domain.WorkSection, n, w int) string {
 	name := i18n.T(sectionTitleIDs[s])
 	count := ""
 	if n > 0 {
@@ -234,7 +234,7 @@ func (m Model) heading(s gh.WorkSection, n, w int) string {
 	name = theme.Heading().Render(clip(name, max(room, 0)))
 	pad := w - len(gutter) - ansi.StringWidth(name) - ansi.StringWidth(count)
 	return gutter + name + strings.Repeat(" ", max(pad, 0)) +
-		theme.Count(s == gh.SectionReviewRequested && n > 0).Render(count)
+		theme.Count(s == domain.SectionReviewRequested && n > 0).Render(count)
 }
 
 // visibleCards is how many whole cards fit under a heading.
@@ -245,7 +245,7 @@ func (m Model) visibleCards(height int) int {
 // cardWindow is the first card a column draws. Only the column the cursor is
 // in scrolls; the others start at the top, because their own position is not
 // something the user is steering.
-func (m Model) cardWindow(s gh.WorkSection, height int) int {
+func (m Model) cardWindow(s domain.WorkSection, height int) int {
 	if s != m.section() {
 		return 0
 	}
@@ -260,7 +260,7 @@ func (m Model) cardWindow(s gh.WorkSection, height int) int {
 // it is doing on the second. Wide enough, each card gets a box of its own and
 // the selection is the box's colour; narrow, the box is dropped and the cursor
 // gutter marks the selection instead.
-func (m Model) card(it gh.WorkItem, at time.Time, w int, selected bool) []string {
+func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
 	if !m.boxed() {
 		return []string{
 			fit(m.cardTitle(it, w-len(gutter), selected, gutter), w),
@@ -277,7 +277,7 @@ func (m Model) card(it gh.WorkItem, at time.Time, w int, selected bool) []string
 // cardTitle is the state marker, the number and the title. The pieces are
 // styled one at a time rather than as a whole line: a style applied over a
 // coloured marker would end at that marker's own reset.
-func (m Model) cardTitle(it gh.WorkItem, w int, selected bool, marker string) string {
+func (m Model) cardTitle(it domain.WorkItem, w int, selected bool, marker string) string {
 	if selected && marker != "" {
 		marker = theme.Cursor().Render("▸ ")
 	}
@@ -293,7 +293,7 @@ func (m Model) cardTitle(it gh.WorkItem, w int, selected bool, marker string) st
 // doing, and how long it has sat there. The repository is named without its
 // owner — a column is too narrow for "owner/name", and the drawer gives the
 // full reference.
-func (m Model) cardMeta(it gh.WorkItem, at time.Time, w int) string {
+func (m Model) cardMeta(it domain.WorkItem, at time.Time, w int) string {
 	parts := []string{theme.Dim().Render(shortRepo(it.Ref.Repo))}
 	if bar := checksBar(it.Checks); bar != "" {
 		parts = append(parts, bar)
@@ -315,17 +315,17 @@ func (m Model) cardMeta(it gh.WorkItem, at time.Time, w int) string {
 
 // reviewWord is what a pull request with no checks says instead of a bar.
 // Issues say nothing: they have neither checks nor a review.
-func reviewWord(it gh.WorkItem) string {
-	if it.Ref.Kind != gh.ItemPR {
+func reviewWord(it domain.WorkItem) string {
+	if it.Ref.Kind != domain.ItemPR {
 		return ""
 	}
 	style := theme.Review(it.Review, it.IsDraft)
 	switch {
 	case it.IsDraft:
 		return style.Render(i18n.T("work.draft"))
-	case it.Review == gh.ReviewApproved:
+	case it.Review == domain.ReviewApproved:
 		return style.Render(i18n.T("review.approved"))
-	case it.Review == gh.ReviewChangesRequested:
+	case it.Review == domain.ReviewChangesRequested:
 		return style.Render(i18n.T("review.changes_requested"))
 	default:
 		return ""
@@ -343,7 +343,7 @@ func shortRepo(repo string) string {
 // badges draws the labels that fit in room columns, in the colours GitHub
 // gave them. A label that would be cut in half is left out altogether rather
 // than shown as a coloured fragment.
-func badges(labels []gh.Label, room int) string {
+func badges(labels []domain.Label, room int) string {
 	var b strings.Builder
 	for _, l := range labels {
 		text := " " + l.Name + " "
@@ -357,8 +357,8 @@ func badges(labels []gh.Label, room int) string {
 	return b.String()
 }
 
-func stateMarker(it gh.WorkItem) string {
-	if it.Ref.Kind == gh.ItemIssue {
+func stateMarker(it domain.WorkItem) string {
+	if it.Ref.Kind == domain.ItemIssue {
 		return theme.Dim().Render(icon.Issue())
 	}
 	return theme.Review(it.Review, it.IsDraft).Render(icon.Review(it.Review, it.IsDraft))
@@ -366,7 +366,7 @@ func stateMarker(it gh.WorkItem) string {
 
 // checksBar colours the two halves of the bar apart: what has passed takes the
 // colour of the roll-up, what has not stays muted.
-func checksBar(c gh.Checks) string {
+func checksBar(c domain.Checks) string {
 	done, rest := icon.ChecksBar(c)
 	if done == "" && rest == "" {
 		return ""
@@ -376,11 +376,11 @@ func checksBar(c gh.Checks) string {
 
 // visibleSections is the width degradation: too narrow for four columns and
 // the board shows the current one alone, with h/l paging between them.
-func (m Model) visibleSections() []gh.WorkSection {
+func (m Model) visibleSections() []domain.WorkSection {
 	if m.width < singleColumnBelow {
-		return []gh.WorkSection{m.section()}
+		return []domain.WorkSection{m.section()}
 	}
-	return gh.WorkSections()
+	return domain.WorkSections()
 }
 
 func (m Model) columnWidth(n int) int {

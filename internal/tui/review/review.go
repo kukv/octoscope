@@ -10,14 +10,14 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // Source is what submitting needs.
 type Source interface {
-	SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error
+	SubmitReview(t usecase.ReviewTarget, event domain.ReviewEvent, body string) error
 }
 
 // Target names what the popup submits against: the pull request it belongs
@@ -52,7 +52,7 @@ const boxWidth = 50
 type Model struct {
 	src    Source
 	target Target
-	event  gh.ReviewEvent
+	event  domain.ReviewEvent
 
 	textarea textarea.Model
 	sending  bool
@@ -115,14 +115,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // nextEvent walks tab through comment, approve and request changes, in that
 // order, back to comment.
-func nextEvent(e gh.ReviewEvent) gh.ReviewEvent {
+func nextEvent(e domain.ReviewEvent) domain.ReviewEvent {
 	switch e {
-	case gh.EventComment:
-		return gh.EventApprove
-	case gh.EventApprove:
-		return gh.EventRequestChanges
+	case domain.EventComment:
+		return domain.EventApprove
+	case domain.EventApprove:
+		return domain.EventRequestChanges
 	default:
-		return gh.EventComment
+		return domain.EventComment
 	}
 }
 

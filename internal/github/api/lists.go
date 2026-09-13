@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // pageSize is REST's maximum for one page, and the ceiling the cli backend
@@ -35,7 +35,7 @@ type labelJSON struct {
 // the id sort and the 100 cut below pick the same 100 out of it. A repository
 // with at most a page of labels never sees a second request: nextLink comes
 // back empty.
-func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error) {
+func (c *Client) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	r, err := c.repoPath(repo)
 	if err != nil {
 		return nil, err
@@ -59,9 +59,9 @@ func (c *Client) ListLabels(ctx context.Context, repo string) ([]gh.Label, error
 	if len(found) > pageSize {
 		found = found[:pageSize]
 	}
-	labels := make([]gh.Label, len(found))
+	labels := make([]domain.Label, len(found))
 	for i, f := range found {
-		labels[i] = gh.Label{Name: f.Name, Color: f.Color}
+		labels[i] = domain.Label{Name: f.Name, Color: f.Color}
 	}
 	return labels, nil
 }
@@ -79,7 +79,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	var users []gh.Author
+	var users []domain.Author
 	if err := json.Unmarshal(out, &users); err != nil {
 		return nil, fmt.Errorf("parse assignees: %w", err)
 	}

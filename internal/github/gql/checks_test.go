@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // rollupPage wraps contexts nodes in the shape the query selects them in.
@@ -66,12 +66,12 @@ func TestPRChecksReadsTheIdsTheViewActsOn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PRChecks: %v", err)
 	}
-	i := slices.IndexFunc(checks.Runs, func(r gh.CheckRun) bool { return r.Name == "lint" })
+	i := slices.IndexFunc(checks.Runs, func(r domain.CheckRun) bool { return r.Name == "lint" })
 	if i < 0 {
 		t.Fatalf("no check named lint in %v", checks.Runs)
 	}
 	got := checks.Runs[i]
-	if got.Kind != gh.CheckKindRun {
+	if got.Kind != domain.CheckKindRun {
 		t.Errorf("Kind = %v, want CheckKindRun", got.Kind)
 	}
 	if got.JobID != 101635448466 {

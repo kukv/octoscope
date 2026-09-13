@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 func TestTokenPrefersGHTokenOverGitHubToken(t *testing.T) {
@@ -34,17 +34,17 @@ func TestTokenFallsBackToGitHubToken(t *testing.T) {
 }
 
 // Without a token the user has to act, and the UI tells them so by asking
-// gh.IsFatal. A plain error would be reported above the key bar and retried
+// domain.IsFatal. A plain error would be reported above the key bar and retried
 // forever.
 func TestTokenWithoutOneIsUnauthenticated(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
 
 	_, err := Token()
-	if !errors.Is(err, gh.ErrUnauthenticated) {
+	if !errors.Is(err, domain.ErrUnauthenticated) {
 		t.Fatalf("err = %v, want ErrUnauthenticated", err)
 	}
-	if !gh.IsFatal(err) {
+	if !domain.IsFatal(err) {
 		t.Error("the UI would not show the error screen for this")
 	}
 }

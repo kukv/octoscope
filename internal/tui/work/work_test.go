@@ -11,21 +11,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type fakeSource struct {
-	work gh.Work
+	work domain.Work
 	err  error
 
 	// sections is every column that was asked for, in the order the requests
 	// were made. Each column is its own request now, so "which columns were
 	// asked for" is a thing a test has to be able to say.
-	sections []gh.WorkSection
+	sections []domain.WorkSection
 }
 
-func (f *fakeSource) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error) {
+func (f *fakeSource) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
 	f.sections = append(f.sections, s)
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -33,35 +33,35 @@ func (f *fakeSource) ListWorkSection(ctx context.Context, s gh.WorkSection) ([]g
 	return f.work[s], f.err
 }
 
-func sampleWork() gh.Work {
+func sampleWork() domain.Work {
 	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
-	var w gh.Work
-	w[gh.SectionReviewRequested] = []gh.WorkItem{
+	var w domain.Work
+	w[domain.SectionReviewRequested] = []domain.WorkItem{
 		{
-			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 12},
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
 			Title: "fix the thing", UpdatedAt: now,
 			// CRLF on purpose: GitHub returns whatever line endings the author
 			// used, and a carriage return left in a drawn line shifts it.
 			Body:   "The renderer dropped every escape.\r\n\r\nThis puts them back.",
-			Labels: []gh.Label{{Name: "bug", Color: "d73a4a"}, {Name: "ci", Color: "d4c5f9"}},
+			Labels: []domain.Label{{Name: "bug", Color: "d73a4a"}, {Name: "ci", Color: "d4c5f9"}},
 			Head:   "feat/graph", Base: "main", Additions: 218, Deletions: 31,
-			Checks: gh.Checks{
-				Total: 3, Passed: 1, Failed: 1, Running: 1, State: gh.CheckFailure,
-				Runs: []gh.CheckRun{
-					{Name: "build", State: gh.CheckSuccess},
-					{Name: "lint", State: gh.CheckRunning},
-					{Name: "test", State: gh.CheckFailure},
+			Checks: domain.Checks{
+				Total: 3, Passed: 1, Failed: 1, Running: 1, State: domain.CheckFailure,
+				Runs: []domain.CheckRun{
+					{Name: "build", State: domain.CheckSuccess},
+					{Name: "lint", State: domain.CheckRunning},
+					{Name: "test", State: domain.CheckFailure},
 				},
 			},
 		},
 		{
-			Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 3},
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3},
 			Title: "bump deps", UpdatedAt: now,
 		},
 	}
-	w[gh.SectionAssigned] = []gh.WorkItem{
+	w[domain.SectionAssigned] = []domain.WorkItem{
 		{
-			Ref:   gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/octoscope", Number: 7},
+			Ref:   domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7},
 			Title: "an issue", UpdatedAt: now,
 		},
 	}
@@ -69,7 +69,7 @@ func sampleWork() gh.Work {
 }
 
 // sampleItems is the column sampleWork fills with cards.
-func sampleItems() []gh.WorkItem { return sampleWork()[gh.SectionReviewRequested] }
+func sampleItems() []domain.WorkItem { return sampleWork()[domain.SectionReviewRequested] }
 
 // loaded returns a model that already received its data.
 func loaded() Model {
@@ -85,8 +85,8 @@ func sized(m Model) Model {
 
 // answered hands the board every column of w, one answer at a time, the way
 // four separate requests arrive.
-func answeredAll(m Model, w gh.Work) Model {
-	for _, s := range gh.WorkSections() {
+func answeredAll(m Model, w domain.Work) Model {
+	for _, s := range domain.WorkSections() {
 		m, _ = m.Update(workMsg{section: s, items: w[s]})
 	}
 	return m
@@ -237,7 +237,7 @@ func TestDDoesNothingOnAnIssue(t *testing.T) {
 	m := loaded()
 	m = press(m, "l") // column 1 (your PRs) is empty
 	m = press(m, "l") // column 2 (assigned) holds the issue
-	if ref, ok := m.SelectedRef(); !ok || ref.Kind != gh.ItemIssue {
+	if ref, ok := m.SelectedRef(); !ok || ref.Kind != domain.ItemIssue {
 		t.Fatalf("selection = %+v, ok=%v, want the issue", ref, ok)
 	}
 	if _, cmd := m.Update(key("d")); cmd != nil {
@@ -267,7 +267,7 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 	m := loaded()
 	m = press(m, "l") // column 1 (your PRs) is empty
 	m = press(m, "l") // column 2 (assigned) holds the issue
-	if ref, ok := m.SelectedRef(); !ok || ref.Kind != gh.ItemIssue {
+	if ref, ok := m.SelectedRef(); !ok || ref.Kind != domain.ItemIssue {
 		t.Fatalf("selection = %+v, ok=%v, want the issue", ref, ok)
 	}
 	if _, cmd := m.Update(key("s")); cmd != nil {
@@ -279,10 +279,10 @@ func TestSDoesNothingOnAnIssue(t *testing.T) {
 // already have. It says what happened above the key bar and r asks again.
 func TestATransientFailureKeepsTheBoard(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	m, _ = m.Update(workMsg{section: gh.SectionAssigned, items: sampleItems()})
+	m, _ = m.Update(workMsg{section: domain.SectionAssigned, items: sampleItems()})
 	m, cmd := m.Update(errMsg{
-		section: gh.SectionYourPRs,
-		err:     gh.Classify(gh.ErrTransient, "gh api: gh: HTTP 502"),
+		section: domain.SectionYourPRs,
+		err:     domain.Classify(domain.ErrTransient, "gh api: gh: HTTP 502"),
 	})
 	if cmd != nil {
 		if _, fatal := cmd().(FatalMsg); fatal {
@@ -298,7 +298,7 @@ func TestATransientFailureKeepsTheBoard(t *testing.T) {
 	}
 	// The sentinel's own words are a sentence octoscope wrote in English, and
 	// this line is drawn in whatever language the user asked for.
-	if strings.Contains(view, gh.ErrTransient.Error()) {
+	if strings.Contains(view, domain.ErrTransient.Error()) {
 		t.Errorf("the notice carries octoscope's own English:\n%s", view)
 	}
 }
@@ -306,7 +306,7 @@ func TestATransientFailureKeepsTheBoard(t *testing.T) {
 // Only what the user must act on takes the whole screen.
 func TestAMissingGhIsFatal(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	_, cmd := m.Update(errMsg{section: gh.SectionYourPRs, err: gh.ErrGhNotFound})
+	_, cmd := m.Update(errMsg{section: domain.SectionYourPRs, err: domain.ErrGhNotFound})
 	if cmd == nil {
 		t.Fatal("a missing gh produced no message")
 	}
@@ -318,8 +318,8 @@ func TestAMissingGhIsFatal(t *testing.T) {
 // A complaint that outlives what it described is a lie.
 func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
-	m, _ = m.Update(workMsg{section: gh.SectionYourPRs, items: sampleItems()})
+	m, _ = m.Update(errMsg{section: domain.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(workMsg{section: domain.SectionYourPRs, items: sampleItems()})
 	if strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
 		t.Errorf("the notice outlived the failure:\n%s", ansi.Strip(m.View()))
 	}
@@ -331,15 +331,15 @@ func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
 func TestAFailedColumnDoesNotReadAsAnEmptyOne(t *testing.T) {
 	board := func(msg tea.Msg) string {
 		m := sized(New(&fakeSource{}))
-		for _, s := range []gh.WorkSection{gh.SectionReviewRequested, gh.SectionAssigned, gh.SectionMentioned} {
+		for _, s := range []domain.WorkSection{domain.SectionReviewRequested, domain.SectionAssigned, domain.SectionMentioned} {
 			m, _ = m.Update(workMsg{section: s, items: sampleItems()})
 		}
 		m, _ = m.Update(msg)
 		return ansi.Strip(m.View())
 	}
 
-	empty := board(workMsg{section: gh.SectionYourPRs})
-	failed := board(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+	empty := board(workMsg{section: domain.SectionYourPRs})
+	failed := board(errMsg{section: domain.SectionYourPRs, err: errors.New("gh: HTTP 502")})
 
 	if !strings.Contains(empty, i18n.T("work.empty_column")) {
 		t.Fatalf("an empty column does not say it is empty:\n%s", empty)
@@ -357,8 +357,8 @@ func TestAFetchThatFailsOnItsOwnStillReports(t *testing.T) {
 		t.Fatal("Refresh returned no command")
 	}
 	msgs := fetchMsgs(t, cmd)
-	if len(msgs) != gh.WorkSectionCount {
-		t.Fatalf("%d columns reported, want %d", len(msgs), gh.WorkSectionCount)
+	if len(msgs) != domain.WorkSectionCount {
+		t.Fatalf("%d columns reported, want %d", len(msgs), domain.WorkSectionCount)
 	}
 	for _, msg := range msgs {
 		got, ok := msg.(errMsg)
@@ -378,14 +378,14 @@ func TestRefreshAsksForEveryColumn(t *testing.T) {
 	t.Cleanup(m.Cancel)
 	fetchMsgs(t, cmd)
 
-	if len(f.sections) != gh.WorkSectionCount {
-		t.Fatalf("asked for %d columns, want %d", len(f.sections), gh.WorkSectionCount)
+	if len(f.sections) != domain.WorkSectionCount {
+		t.Fatalf("asked for %d columns, want %d", len(f.sections), domain.WorkSectionCount)
 	}
-	seen := map[gh.WorkSection]bool{}
+	seen := map[domain.WorkSection]bool{}
 	for _, s := range f.sections {
 		seen[s] = true
 	}
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		if !seen[s] {
 			t.Errorf("column %d was never asked for", s)
 		}
@@ -416,21 +416,21 @@ func TestRefreshCancelsThePreviousFetch(t *testing.T) {
 			t.Errorf("second fetch: got %T, want workMsg", msg)
 		}
 	}
-	if want := 2 * gh.WorkSectionCount; len(f.sections) != want {
+	if want := 2 * domain.WorkSectionCount; len(f.sections) != want {
 		t.Errorf("ListWorkSection calls: got %d, want %d", len(f.sections), want)
 	}
 }
 
 func TestRefreshMarksEveryColumnLoading(t *testing.T) {
 	m := New(&fakeSource{work: sampleWork()})
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		if m.state[s] != colUnfetched {
 			t.Errorf("New returned column %d already in state %d; the parent starts the first fetch", s, m.state[s])
 		}
 	}
 	m, _ = m.Refresh()
 	t.Cleanup(m.Cancel)
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		if m.state[s] != colLoading {
 			t.Errorf("Refresh left column %d in state %d, want colLoading", s, m.state[s])
 		}
@@ -438,12 +438,12 @@ func TestRefreshMarksEveryColumnLoading(t *testing.T) {
 
 	// The columns share one context, so it is only safe to let go of once the
 	// last of them has answered.
-	m, _ = m.Update(workMsg{section: gh.SectionReviewRequested, items: sampleItems()})
+	m, _ = m.Update(workMsg{section: domain.SectionReviewRequested, items: sampleItems()})
 	if m.cancel == nil {
 		t.Error("the context was released while three columns were still running")
 	}
 	m = answeredAll(m, sampleWork())
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		if m.state[s] != colLoaded {
 			t.Errorf("column %d is in state %d after its data arrived, want colLoaded", s, m.state[s])
 		}
@@ -462,7 +462,7 @@ func TestRKeyRefetchesTheBoard(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("r produced no command")
 	}
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		if m.state[s] != colLoading {
 			t.Errorf("r left column %d in state %d, want colLoading", s, m.state[s])
 		}
@@ -472,8 +472,8 @@ func TestRKeyRefetchesTheBoard(t *testing.T) {
 			t.Errorf("got %T, want workMsg", msg)
 		}
 	}
-	if len(f.sections) != gh.WorkSectionCount {
-		t.Errorf("ListWorkSection calls: got %d, want %d", len(f.sections), gh.WorkSectionCount)
+	if len(f.sections) != domain.WorkSectionCount {
+		t.Errorf("ListWorkSection calls: got %d, want %d", len(f.sections), domain.WorkSectionCount)
 	}
 }
 
@@ -484,7 +484,7 @@ func TestAColumnIsDrawnBeforeTheOthersArrive(t *testing.T) {
 	m, _ = m.Refresh()
 	t.Cleanup(m.Cancel)
 
-	m, _ = m.Update(workMsg{section: gh.SectionAssigned, items: sampleItems()})
+	m, _ = m.Update(workMsg{section: domain.SectionAssigned, items: sampleItems()})
 	view := ansi.Strip(m.View())
 	if !strings.Contains(view, sampleItems()[0].Title) {
 		t.Errorf("the column that answered is not on screen:\n%s", view)
@@ -505,21 +505,21 @@ func TestAFailedColumnLeavesTheOthersAlone(t *testing.T) {
 	m := sized(New(&fakeSource{}))
 	m, _ = m.Refresh()
 	t.Cleanup(m.Cancel)
-	m, _ = m.Update(workMsg{section: gh.SectionAssigned, items: sampleItems()})
-	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(workMsg{section: domain.SectionAssigned, items: sampleItems()})
+	m, _ = m.Update(errMsg{section: domain.SectionYourPRs, err: errors.New("gh: HTTP 502")})
 
 	view := ansi.Strip(m.View())
 	if !strings.Contains(view, sampleItems()[0].Title) {
 		t.Errorf("a failure in one column emptied another:\n%s", view)
 	}
-	if m.state[gh.SectionAssigned] != colLoaded {
-		t.Errorf("the column that answered is in state %d, want colLoaded", m.state[gh.SectionAssigned])
+	if m.state[domain.SectionAssigned] != colLoaded {
+		t.Errorf("the column that answered is in state %d, want colLoaded", m.state[domain.SectionAssigned])
 	}
-	if m.fetchedAt[gh.SectionAssigned].IsZero() {
+	if m.fetchedAt[domain.SectionAssigned].IsZero() {
 		t.Error("the column that answered lost the clock its cards are dated by")
 	}
 	// Only the two columns that have not answered yet are still waiting.
-	if got, want := strings.Count(view, i18n.T("common.loading")), gh.WorkSectionCount-2; got != want {
+	if got, want := strings.Count(view, i18n.T("common.loading")), domain.WorkSectionCount-2; got != want {
 		t.Errorf("%d columns are waiting, want %d:\n%s", got, want, view)
 	}
 }
@@ -528,13 +528,13 @@ func TestAFailedColumnLeavesTheOthersAlone(t *testing.T) {
 // number would describe part of a board, so it is not shown at all.
 func TestTheSummaryWaitsForEveryColumn(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	for _, s := range gh.WorkSections()[:gh.WorkSectionCount-1] {
+	for _, s := range domain.WorkSections()[:domain.WorkSectionCount-1] {
 		m, _ = m.Update(workMsg{section: s, items: nil})
 	}
 	if m.Summary().Ready {
 		t.Error("the summary was ready before the last column answered")
 	}
-	m, _ = m.Update(workMsg{section: gh.WorkSections()[gh.WorkSectionCount-1], items: nil})
+	m, _ = m.Update(workMsg{section: domain.WorkSections()[domain.WorkSectionCount-1], items: nil})
 	if !m.Summary().Ready {
 		t.Error("the summary never became ready")
 	}
@@ -566,10 +566,10 @@ func TestARefreshMakesTheSummaryUnready(t *testing.T) {
 // columns that did arrive, for the rest of the session.
 func TestAFailedColumnStillCountsAsAnAnswer(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	for _, s := range gh.WorkSections()[:gh.WorkSectionCount-1] {
+	for _, s := range domain.WorkSections()[:domain.WorkSectionCount-1] {
 		m, _ = m.Update(workMsg{section: s, items: nil})
 	}
-	last := gh.WorkSections()[gh.WorkSectionCount-1]
+	last := domain.WorkSections()[domain.WorkSectionCount-1]
 	m, _ = m.Update(errMsg{section: last, err: errors.New("gh: HTTP 502")})
 
 	s := m.Summary()
@@ -586,14 +586,14 @@ func TestAFailedColumnStillCountsAsAnAnswer(t *testing.T) {
 // The age on screen is the age of the oldest thing on screen.
 func TestTheSummaryReportsTheOldestColumn(t *testing.T) {
 	m := sized(New(&fakeSource{}))
-	m = answeredAll(m, gh.Work{})
+	m = answeredAll(m, domain.Work{})
 
 	// The oldest column sits in the middle on purpose: returning the first
 	// column's time, the last one's, or the newest are all shapes a wrong
 	// Summary takes, and each has to be told apart from the right answer.
 	base := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
 	want := base.Add(-time.Hour)
-	m.fetchedAt = [gh.WorkSectionCount]time.Time{
+	m.fetchedAt = [domain.WorkSectionCount]time.Time{
 		base, base.Add(time.Minute), want, base.Add(time.Hour),
 	}
 	if got := m.Summary().FetchedAt; !got.Equal(want) {
@@ -603,7 +603,7 @@ func TestTheSummaryReportsTheOldestColumn(t *testing.T) {
 
 func TestNewDataClampsTheCursor(t *testing.T) {
 	m := press(loaded(), "j")
-	m, _ = m.Update(workMsg{section: gh.SectionReviewRequested})
+	m, _ = m.Update(workMsg{section: domain.SectionReviewRequested})
 	if m.row != 0 {
 		t.Errorf("row after the data was replaced: got %d, want 0", m.row)
 	}

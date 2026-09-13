@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
@@ -96,7 +96,7 @@ func parseRemote(url string) (string, error) {
 		s = rest
 	}
 	s = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(s), "/"), ".git")
-	if _, _, ok := gh.SplitRepo(s); !ok {
+	if _, _, ok := domain.SplitRepo(s); !ok {
 		return "", fmt.Errorf("remote %q has no owner/name", url)
 	}
 	return s, nil

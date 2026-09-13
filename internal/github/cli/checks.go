@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // JobLog reads one job's log. With failedOnly it asks for the failed steps
@@ -14,7 +14,7 @@ import (
 //
 // gh exits zero with no output at all when a successful job is asked for its
 // failed steps, so an empty result is an answer, not an error.
-func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error) {
+func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
 	args := []string{"run", "view", "--job", strconv.FormatInt(jobID, 10)}
 	if failedOnly {
 		args = append(args, "--log-failed")
@@ -30,27 +30,27 @@ func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnl
 
 // parseJobLog reads the format gh prints: three tab-separated fields, the
 // job's name, the step's name, and the line the runner wrote.
-func parseJobLog(out string) []gh.LogLine {
-	var lines []gh.LogLine
+func parseJobLog(out string) []domain.LogLine {
+	var lines []domain.LogLine
 	for _, raw := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
 		if raw == "" {
 			continue
 		}
 		fields := strings.SplitN(raw, "\t", 3)
 		if len(fields) < 3 {
-			lines = append(lines, gh.LogLine{Text: fields[len(fields)-1]})
+			lines = append(lines, domain.LogLine{Text: fields[len(fields)-1]})
 			continue
 		}
-		lines = append(lines, gh.NewLogLine(fields[1], fields[2]))
+		lines = append(lines, domain.NewLogLine(fields[1], fields[2]))
 	}
 	return lines
 }
 
 // RerunWorkflow starts a workflow run again. GraphQL has no mutation for
 // this, which is why it goes through the subcommand.
-func (c *Client) RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error {
+func (c *Client) RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error {
 	args := []string{"run", "rerun", strconv.FormatInt(runID, 10)}
-	if scope == gh.RerunFailed {
+	if scope == domain.RerunFailed {
 		args = append(args, "--failed")
 	}
 	_, err := c.run(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)

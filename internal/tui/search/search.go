@@ -10,15 +10,15 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // searcher runs one GitHub search. The query is built here and means
 // nothing to the layer below, which only sends it.
 type searcher interface {
-	SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error)
+	SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error)
 }
 
 // webOpener shows an item in a browser.
@@ -30,7 +30,7 @@ type webOpener interface {
 // GitHub's own listings for one repository. There is no cross-repository
 // listing, so these are only asked for once repo: names one.
 type candidateSource interface {
-	ListLabels(ctx context.Context, repo string) ([]gh.Label, error)
+	ListLabels(ctx context.Context, repo string) ([]domain.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
@@ -43,19 +43,19 @@ type Source interface {
 }
 
 // OpenDetailMsg asks the parent to show the detail view for one item.
-type OpenDetailMsg struct{ Ref gh.ItemRef }
+type OpenDetailMsg struct{ Ref domain.ItemRef }
 
 // OpenDiffMsg asks the parent to show the diff of the selected pull request.
-type OpenDiffMsg struct{ Ref gh.ItemRef }
+type OpenDiffMsg struct{ Ref domain.ItemRef }
 
 // FatalMsg carries a failure the parent shows on its error screen. Only what
 // the user has to act on travels this way; a rejected query stays here as a
-// notice (see gh.IsFatal).
+// notice (see domain.IsFatal).
 type FatalMsg struct{ Err error }
 
 type itemsMsg struct {
 	gen   int
-	items []gh.WorkItem
+	items []domain.WorkItem
 }
 
 type errMsg struct {
@@ -73,7 +73,7 @@ type webErrMsg struct{ err error }
 // user may have typed a different repo: by the time it arrives.
 type labelCandidatesMsg struct {
 	repo   string
-	labels []gh.Label
+	labels []domain.Label
 }
 
 type authorCandidatesMsg struct {
@@ -113,7 +113,7 @@ type Model struct {
 	// cursor is the filter pane's own cursor, drawn as its selected row.
 	cursor FilterID
 
-	items []gh.WorkItem
+	items []domain.WorkItem
 	// sel is the cursor into items, drawn by the result pane.
 	sel int
 
@@ -138,7 +138,7 @@ type Model struct {
 	// labelCandidates and authorCandidates are what the named repository
 	// offers for the chips under the filter pane, kept with the repo they
 	// were fetched for so the same repository is not asked for twice.
-	labelCandidates      []gh.Label
+	labelCandidates      []domain.Label
 	labelCandidatesRepo  string
 	authorCandidates     []string
 	authorCandidatesRepo string
@@ -292,7 +292,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = false
-		if gh.IsFatal(msg.err) {
+		if domain.IsFatal(msg.err) {
 			return m, func() tea.Msg { return FatalMsg{Err: msg.err} }
 		}
 		m.notice = msg.err.Error()
@@ -457,7 +457,7 @@ func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ref, ok := m.selectedRef()
 		// An issue has no diff. Opening an empty diff view would be a worse
 		// answer than doing nothing.
-		if !ok || ref.Kind != gh.ItemPR {
+		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
@@ -478,9 +478,9 @@ func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // selectedRef names the item under the result cursor. ok is false when
 // there is nothing to select.
-func (m Model) selectedRef() (gh.ItemRef, bool) {
+func (m Model) selectedRef() (domain.ItemRef, bool) {
 	if m.sel < 0 || m.sel >= len(m.items) {
-		return gh.ItemRef{}, false
+		return domain.ItemRef{}, false
 	}
 	return m.items[m.sel].Ref, true
 }

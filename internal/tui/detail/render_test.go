@@ -10,19 +10,19 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
-	pr := gh.PR{
-		Number: 12, Title: "feat: pane", Author: gh.Author{Login: "kukv"},
-		State: gh.StateOpen, IsDraft: true, Review: gh.ReviewRequired,
-		Labels: []gh.Label{{Name: "Kind: Feature"}},
+	pr := domain.PR{
+		Number: 12, Title: "feat: pane", Author: domain.Author{Login: "kukv"},
+		State: domain.StateOpen, IsDraft: true, Review: domain.ReviewRequired,
+		Labels: []domain.Label{{Name: "Kind: Feature"}},
 		Body:   "body text",
-		Comments: []gh.Comment{
+		Comments: []domain.Comment{
 			{
-				Author: gh.Author{Login: "bob"}, Body: "comment text",
+				Author: domain.Author{Login: "bob"}, Body: "comment text",
 				CreatedAt: time.Date(2026, 7, 11, 11, 0, 0, 0, time.UTC),
 			},
 		},
@@ -42,7 +42,7 @@ func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
 }
 
 func TestIssueMarkdownEmptyBody(t *testing.T) {
-	md := issueMarkdown(issueItem(gh.Issue{Number: 3, Title: "an issue"}))
+	md := issueMarkdown(issueItem(domain.Issue{Number: 3, Title: "an issue"}))
 	if !strings.Contains(md, "_no description_") {
 		t.Errorf("markdown missing empty-body placeholder:\n%s", md)
 	}
@@ -90,11 +90,11 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	t.Helper()
 	size := tea.WindowSizeMsg{Width: width, Height: 40}
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen, Body: overlongBody},
-		labels:    []gh.Label{{Name: overlongLabel, Color: "ff0000"}},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		pr:        domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen, Body: overlongBody},
+		labels:    []domain.Label{{Name: overlongLabel, Color: "ff0000"}},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 	}
-	closed := &fakeSource{pr: gh.PR{Number: 2, Title: overlongTitle, State: gh.StateClosed}}
+	closed := &fakeSource{pr: domain.PR{Number: 2, Title: overlongTitle, State: domain.StateClosed}}
 
 	sized := func(m Model) Model {
 		m, _ = m.Update(size)
@@ -108,7 +108,7 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	submit, _ := opening.Update(cmd())
 
 	reviewErrSrc := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: overlongTitle, State: gh.StateOpen},
+		pr:        domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen},
 		reviewErr: errors.New(overlongTitle),
 	}
 	reviewErrDetail := sized(loaded(reviewErrSrc, prRef()))
@@ -126,7 +126,7 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	return map[string]string{
 		"loading":         sized(New(f, prRef())).View(),
 		"detail":          detail.View(),
-		"detail_closed":   sized(loaded(closed, gh.ItemRef{Kind: gh.ItemPR, Number: 2})).View(),
+		"detail_closed":   sized(loaded(closed, domain.ItemRef{Kind: domain.ItemPR, Number: 2})).View(),
 		"compose":         compose.View(),
 		"confirm":         confirm.View(),
 		"submit":          submit.View(),

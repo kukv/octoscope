@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
@@ -81,7 +81,7 @@ func TestOpeningAnOverlayLeavesAFailedSubmitBehind(t *testing.T) {
 				t.Fatalf("esc did not close the popup: mode = %v", m.mode)
 			}
 
-			m = cursorOnLine(t, m, gh.LineAdded, 13)
+			m = cursorOnLine(t, m, domain.LineAdded, 13)
 			m = press(m, tc.key)
 			if m.mode != tc.want {
 				t.Fatalf("%s did not open: mode = %v", tc.key, m.mode)

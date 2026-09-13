@@ -1,7 +1,8 @@
-// Package gh holds the domain types the GitHub access layer returns.
-// It has no behaviour: the backends live in subpackages (cli, and api in a
-// later phase) and both speak these types.
-package gh
+// Package domain holds the types the application is written in terms of.
+// It has no behaviour beyond the rules those types carry, and it depends on
+// nothing: the clients that fetch this data live under internal/github, and
+// they translate their own service's spelling into these values.
+package domain
 
 import (
 	"errors"

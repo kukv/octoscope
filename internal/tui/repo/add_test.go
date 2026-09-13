@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -159,7 +159,7 @@ func TestAKeystrokeOnlyStartsTheTimer(t *testing.T) {
 // Once the pause has elapsed, exactly one search runs, for everything typed
 // into the field rather than for the letter that happened to start the timer.
 func TestTheTimerRunsTheSearch(t *testing.T) {
-	f := &fakeSource{found: []gh.RepoCandidate{{Name: "charmbracelet/lipgloss", Stars: 9}}}
+	f := &fakeSource{found: []domain.RepoCandidate{{Name: "charmbracelet/lipgloss", Stars: 9}}}
 	m := sized(New(f, Options{}), 120)
 	m, _ = m.Update(key("a"))
 	m = typeInto(m, "lipgloss")
@@ -196,7 +196,7 @@ func TestAStaleTimerSearchesForNothing(t *testing.T) {
 // scheduled. Saying "searching" until the next keystroke would hide the
 // field behind a request that is never coming.
 func TestClearingTheFieldStopsSayingItIsSearching(t *testing.T) {
-	f := &fakeSource{found: []gh.RepoCandidate{{Name: "charmbracelet/lipgloss"}}}
+	f := &fakeSource{found: []domain.RepoCandidate{{Name: "charmbracelet/lipgloss"}}}
 	m := sized(New(f, Options{}), 120)
 	m, _ = m.Update(key("a"))
 	m = typeInto(m, "l")

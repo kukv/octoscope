@@ -10,8 +10,8 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
 )
@@ -19,9 +19,9 @@ import (
 // Source is what the diff view needs. repo is "owner/repo"; the empty string
 // targets the workspace repository.
 type Source interface {
-	PRDiff(ctx context.Context, repo string, number int) ([]gh.FileDiff, error)
-	PRReviewContext(ctx context.Context, repo string, number int) (gh.ReviewContext, error)
-	PostLineComment(t usecase.ReviewTarget, c gh.PendingComment) (string, error)
+	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
+	PostLineComment(t usecase.ReviewTarget, c domain.PendingComment) (string, error)
 	DiscardReview(reviewID string) error
 	review.Source
 }
@@ -33,19 +33,19 @@ type ClosedMsg struct{}
 type ErrorMsg struct{ Err error }
 
 type diffMsg struct {
-	ref   gh.ItemRef
-	files []gh.FileDiff
+	ref   domain.ItemRef
+	files []domain.FileDiff
 }
 
 type reviewMsg struct {
-	ref gh.ItemRef
-	ctx gh.ReviewContext
+	ref domain.ItemRef
+	ctx domain.ReviewContext
 }
 
 // errMsg is the diff fetch's own failure: with no diff there is nothing to
 // show, so it escalates to the parent's whole-screen error view (ErrorMsg).
 type errMsg struct {
-	ref gh.ItemRef
+	ref domain.ItemRef
 	err error
 }
 
@@ -53,7 +53,7 @@ type errMsg struct {
 // still be readable, so this is shown on one line above the key bar instead
 // of escalating (.claude/rules/errors.md's Bubble Tea section).
 type reviewErrMsg struct {
-	ref gh.ItemRef
+	ref domain.ItemRef
 	err error
 }
 
@@ -76,10 +76,10 @@ const (
 type row struct {
 	kind    rowKind
 	hunk    int
-	line    gh.DiffLine
+	line    domain.DiffLine
 	text    string
-	thread  gh.ReviewThread
-	comment gh.ThreadComment
+	thread  domain.ReviewThread
+	comment domain.ThreadComment
 	key     string
 }
 
@@ -133,21 +133,21 @@ func (p phase) String() string {
 
 type Model struct {
 	src Source
-	ref gh.ItemRef
+	ref domain.ItemRef
 
 	width, height int
 
 	loading bool
 	spin    spinner.Model
 
-	files   []gh.FileDiff
+	files   []domain.FileDiff
 	file    int
 	fileTop int // the first file drawn in the sidebar
 
 	// review is the review context: the header's title and branches, and the
 	// threads already on the diff. It arrives separately from files (fetch),
 	// and either may land first.
-	review gh.ReviewContext
+	review domain.ReviewContext
 
 	// reviewErr is set when the review context fails to fetch. The diff may
 	// still be readable, so this is drawn on its own footer line rather than
@@ -183,7 +183,7 @@ type Model struct {
 	// target is the line and side the open (or in-flight) comment was
 	// started against, captured by startComposing at c-time rather than read
 	// again from the cursor at send time (see comment.go).
-	target gh.PendingComment
+	target domain.PendingComment
 
 	// declined says why the last c, v or X did nothing: the cursor is on a
 	// row with no line, the review context has not arrived yet, or (X only)
@@ -203,7 +203,7 @@ type Model struct {
 // with the review context, because a Work card and a Repos row know different
 // amounts about a pull request and neither knows all of it. It also keeps the
 // argument list to two (.claude/rules/go-style.md).
-func New(src Source, ref gh.ItemRef) Model {
+func New(src Source, ref domain.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	ta := textarea.New()
@@ -351,7 +351,7 @@ func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
 	m.mode, m.phase = modeView, phaseIdle
 	m.errText = ""
 	m.textarea.Reset()
-	m.target = gh.PendingComment{}
+	m.target = domain.PendingComment{}
 	m.review.PendingID = msg.reviewID
 	return m, m.fetchReview()
 }

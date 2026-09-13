@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/theme"
@@ -57,7 +57,7 @@ func (m Model) drawer() []string {
 
 // summaryPane is the left half: the title, one line of where the item came
 // from and what it changes, and the beginning of its body.
-func (m Model) summaryPane(ref gh.ItemRef, it gh.WorkItem, w int) []string {
+func (m Model) summaryPane(ref domain.ItemRef, it domain.WorkItem, w int) []string {
 	lines := []string{
 		clip(theme.Title().Render(it.Title), w),
 		clip(m.metaLine(ref, it), w),
@@ -68,7 +68,7 @@ func (m Model) summaryPane(ref gh.ItemRef, it gh.WorkItem, w int) []string {
 // metaLine is the reference, the branches, the size of the change and the
 // labels, in the order the mockup puts them. A part with nothing to say is
 // left out rather than drawn empty.
-func (m Model) metaLine(ref gh.ItemRef, it gh.WorkItem) string {
+func (m Model) metaLine(ref domain.ItemRef, it domain.WorkItem) string {
 	parts := []string{theme.Dim().Render(fmt.Sprintf("%s #%d", ref.Repo, ref.Number))}
 	if it.Head != "" && it.Base != "" {
 		parts = append(parts, theme.Accent().Render(it.Head)+
@@ -113,9 +113,9 @@ func bodyLines(body string, w, budget int) []string {
 // checksPane is the right half: every check by name, then the same ratio as a
 // bar. The card only has room for the bar, which says how many passed but not
 // which.
-func (m Model) checksPane(it gh.WorkItem, w int) []string {
+func (m Model) checksPane(it domain.WorkItem, w int) []string {
 	// Issues have no checks at all, so they get no pane.
-	if it.Ref.Kind == gh.ItemIssue {
+	if it.Ref.Kind == domain.ItemIssue {
 		return nil
 	}
 	c := it.Checks
@@ -124,7 +124,7 @@ func (m Model) checksPane(it gh.WorkItem, w int) []string {
 	}
 
 	// A failure is the reason to look at this list, so failures come first.
-	runs := slices.SortedStableFunc(slices.Values(c.Runs), func(a, b gh.CheckRun) int {
+	runs := slices.SortedStableFunc(slices.Values(c.Runs), func(a, b domain.CheckRun) int {
 		return checkOrder(a.State) - checkOrder(b.State)
 	})
 	var lines []string
@@ -143,11 +143,11 @@ func (m Model) checksPane(it gh.WorkItem, w int) []string {
 }
 
 // checkOrder ranks a check by how much it wants attention.
-func checkOrder(s gh.CheckState) int {
+func checkOrder(s domain.CheckState) int {
 	switch s {
-	case gh.CheckFailure:
+	case domain.CheckFailure:
 		return 0
-	case gh.CheckRunning, gh.CheckPending:
+	case domain.CheckRunning, domain.CheckPending:
 		return 1
 	default:
 		return 2

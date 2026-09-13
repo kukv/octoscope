@@ -1,4 +1,4 @@
-package gh
+package domain
 
 // MergeMethod is how the pull request's commits land on the base branch.
 type MergeMethod int

@@ -7,30 +7,30 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-func threadFixture() gh.ReviewContext {
+func threadFixture() domain.ReviewContext {
 	at := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
-	return gh.ReviewContext{
+	return domain.ReviewContext{
 		PullRequestID: "PR_1",
-		Threads: []gh.ReviewThread{
+		Threads: []domain.ReviewThread{
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "kukv"}, Body: "is 2 not the default?", CreatedAt: at},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "kukv"}, Body: "is 2 not the default?", CreatedAt: at},
 				},
 			},
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideLeft, Resolved: true,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "someone"}, Body: "settled long ago", CreatedAt: at},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideLeft, Resolved: true,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "someone"}, Body: "settled long ago", CreatedAt: at},
 				},
 			},
 			{
-				Path: "graph/walk.go", Line: 900, Side: gh.SideRight,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "someone"}, Body: "on a line not in this diff", CreatedAt: at},
+				Path: "graph/walk.go", Line: 900, Side: domain.SideRight,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "someone"}, Body: "on a line not in this diff", CreatedAt: at},
 				},
 			},
 		},
@@ -50,14 +50,14 @@ func withThreads(t *testing.T, width, height int) Model {
 // pendingFixture is one comment the viewer has written but not submitted, so
 // the "not sent yet" marker and the header's pending count have something to
 // draw.
-func pendingFixture() gh.ReviewContext {
-	return gh.ReviewContext{
+func pendingFixture() domain.ReviewContext {
+	return domain.ReviewContext{
 		PullRequestID: "PR_1",
-		Threads: []gh.ReviewThread{
+		Threads: []domain.ReviewThread{
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "kukv"}, Body: "draft reply", Pending: true},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "kukv"}, Body: "draft reply", Pending: true},
 				},
 			},
 		},
@@ -115,15 +115,15 @@ func TestASettledThreadIsACountUntilItIsOpened(t *testing.T) {
 
 // settledThreadWithTwoComments is one resolved thread with two comments, so
 // opening it draws two rowThread rows sharing the same key.
-func settledThreadWithTwoComments() gh.ReviewContext {
-	return gh.ReviewContext{
+func settledThreadWithTwoComments() domain.ReviewContext {
+	return domain.ReviewContext{
 		PullRequestID: "PR_1",
-		Threads: []gh.ReviewThread{
+		Threads: []domain.ReviewThread{
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideRight, Resolved: true,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "kukv"}, Body: "first"},
-					{Author: gh.Author{Login: "someone"}, Body: "second"},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideRight, Resolved: true,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "kukv"}, Body: "first"},
+					{Author: domain.Author{Login: "someone"}, Body: "second"},
 				},
 			},
 		},
@@ -215,7 +215,7 @@ func TestSidebarShowsAThreadCountBadge(t *testing.T) {
 // user just left must not overwrite this one's.
 func TestAnswersForAnotherPullRequestAreDroppedForReview(t *testing.T) {
 	m := loaded(t, 120, 30)
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 	m, _ = m.Update(reviewMsg{ref: other, ctx: threadFixture()})
 	if len(m.review.Threads) != 0 {
 		t.Errorf("a review context for %v landed on this view's model", other)
@@ -224,14 +224,14 @@ func TestAnswersForAnotherPullRequestAreDroppedForReview(t *testing.T) {
 
 // multiLineReview builds a review context with one comment whose body is the
 // given multi-line text.
-func multiLineReview(body string) gh.ReviewContext {
-	return gh.ReviewContext{
+func multiLineReview(body string) domain.ReviewContext {
+	return domain.ReviewContext{
 		PullRequestID: "PR_1",
-		Threads: []gh.ReviewThread{
+		Threads: []domain.ReviewThread{
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "kukv"}, Body: body},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "kukv"}, Body: body},
 				},
 			},
 		},
@@ -281,8 +281,8 @@ func TestAMultiLineJapaneseCommentStaysOnOneRow(t *testing.T) {
 // of a line being drawn under the new one.
 func TestSidesAreNotMixedUp(t *testing.T) {
 	m := withThreads(t, 120, 40)
-	left := m.threadsFor("graph/walk.go", 13, gh.SideLeft)
-	right := m.threadsFor("graph/walk.go", 13, gh.SideRight)
+	left := m.threadsFor("graph/walk.go", 13, domain.SideLeft)
+	right := m.threadsFor("graph/walk.go", 13, domain.SideRight)
 	if len(left) != 1 || !left[0].Resolved {
 		t.Errorf("the left side of line 13 has %+v, want the resolved thread", left)
 	}

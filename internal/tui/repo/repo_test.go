@@ -12,20 +12,20 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/browser"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // fakeSource implements Source and records calls.
 type fakeSource struct {
-	prs      []gh.PR
-	issues   []gh.Issue
+	prs      []domain.PR
+	issues   []domain.Issue
 	err      error
 	webCalls []string // the URLs handed to the browser
 	webErr   error
 
-	counts     []gh.RepoCount
+	counts     []domain.RepoCount
 	countErr   error
 	countCalls [][]string
 
@@ -36,9 +36,9 @@ type fakeSource struct {
 	saveErr   error
 	searches  int
 	lastQuery string
-	found     []gh.RepoCandidate
+	found     []domain.RepoCandidate
 	searchErr error
-	seed      []gh.RepoCandidate
+	seed      []domain.RepoCandidate
 	seedErr   error
 }
 
@@ -47,13 +47,13 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 	return f.saveErr
 }
 
-func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]gh.RepoCandidate, error) {
+func (f *fakeSource) SearchRepos(_ context.Context, query string, _ int) ([]domain.RepoCandidate, error) {
 	f.searches++
 	f.lastQuery = query
 	return f.found, f.searchErr
 }
 
-func (f *fakeSource) SeedCandidates(context.Context) ([]gh.RepoCandidate, error) {
+func (f *fakeSource) SeedCandidates(context.Context) ([]domain.RepoCandidate, error) {
 	return f.seed, f.seedErr
 }
 
@@ -66,12 +66,12 @@ func typeInto(m Model, s string) Model {
 	return m
 }
 
-func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]gh.PR, error) {
+func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
 	f.prRepos = append(f.prRepos, repo)
 	return f.prs, f.err
 }
 
-func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]gh.Issue, error) {
+func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
 	f.issueRepos = append(f.issueRepos, repo)
 	return f.issues, f.err
 }
@@ -81,20 +81,20 @@ func (f *fakeSource) OpenWeb(url string) error {
 	return f.webErr
 }
 
-func (f *fakeSource) RepoCounts(ctx context.Context, repos []string) ([]gh.RepoCount, error) {
+func (f *fakeSource) RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error) {
 	f.countCalls = append(f.countCalls, repos)
 	return f.counts, f.countErr
 }
 
-func samplePRs() []gh.PR {
-	return []gh.PR{
+func samplePRs() []domain.PR {
+	return []domain.PR{
 		{
-			Number: 1, Title: "first pr", Author: gh.Author{Login: "kukv"},
-			UpdatedAt: time.Now(), Review: gh.ReviewApproved,
+			Number: 1, Title: "first pr", Author: domain.Author{Login: "kukv"},
+			UpdatedAt: time.Now(), Review: domain.ReviewApproved,
 			URL: "https://github.com/kukv/demo/pull/1",
 		},
 		{
-			Number: 2, Title: "second pr", Author: gh.Author{Login: "bob"},
+			Number: 2, Title: "second pr", Author: domain.Author{Login: "bob"},
 			UpdatedAt: time.Now(),
 		},
 	}
@@ -263,7 +263,7 @@ func TestCursorMovesAndClamps(t *testing.T) {
 }
 
 func TestTabSwitchLoadsIssues(t *testing.T) {
-	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	if m.tab != tabIssues || cmd == nil {
@@ -298,7 +298,7 @@ func TestATransientFailureKeepsTheList(t *testing.T) {
 // Only what the user must act on takes the whole screen.
 func TestAMissingGhIsFatal(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{}), 120)
-	_, cmd := m.Update(errMsg{gen: m.gen, err: gh.ErrGhNotFound})
+	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrGhNotFound})
 	if cmd == nil {
 		t.Fatal("a missing gh produced no message")
 	}
@@ -359,7 +359,7 @@ func TestAFailureToOpenTheBrowserIsNotFatal(t *testing.T) {
 // the other: the Issues tab is still broken while the user is reading the
 // pull requests.
 func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
-	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab")) // to Issues, which fetches
 	m, _ = m.Update(cmd())         // the fetch answers; drop it and fail instead
@@ -382,7 +382,7 @@ func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
 // starts no fetch -- which is the case where nothing else would clear the
 // notice on the way.
 func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
-	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, _ = m.Update(issueListMsg{gen: m.gen, issues: f.issues})
 	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
@@ -407,7 +407,7 @@ func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 // pull requests are still loading when the user moves to Issues, and their
 // fetch then fails.
 func TestAFailureLandsOnTheTabItsFetchWasStartedFor(t *testing.T) {
-	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
 	if !m.loading[tabPRs] {
 		t.Fatal("setup: the pull requests are not being fetched")
@@ -461,9 +461,9 @@ func TestAFetchDoesNotClearTheBrowsersNotice(t *testing.T) {
 // the day something fails.
 func TestAListWithANoticeStillFitsTheTerminal(t *testing.T) {
 	const height = 24
-	prs := make([]gh.PR, 50)
+	prs := make([]domain.PR, 50)
 	for i := range prs {
-		prs[i] = gh.PR{Number: i + 1, Title: fmt.Sprintf("pr number %d", i), UpdatedAt: time.Now()}
+		prs[i] = domain.PR{Number: i + 1, Title: fmt.Sprintf("pr number %d", i), UpdatedAt: time.Now()}
 	}
 	f := &fakeSource{prs: prs}
 	m := New(f, Options{Current: "kukv/octoscope"})
@@ -527,13 +527,13 @@ func TestEnterAsksTheParentForTheDetail(t *testing.T) {
 	if !ok {
 		t.Fatalf("msg = %T, want OpenDetailMsg", cmd())
 	}
-	if msg.Ref != (gh.ItemRef{Kind: gh.ItemPR, Number: 2}) {
+	if msg.Ref != (domain.ItemRef{Kind: domain.ItemPR, Number: 2}) {
 		t.Errorf("Ref = %+v, want the PR under the cursor", msg.Ref)
 	}
 }
 
 func TestEnterOnAnIssueCarriesTheIssueKind(t *testing.T) {
-	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	m, _ = m.Update(cmd())
@@ -545,7 +545,7 @@ func TestEnterOnAnIssueCarriesTheIssueKind(t *testing.T) {
 	if !ok {
 		t.Fatalf("msg = %T, want OpenDetailMsg", cmd())
 	}
-	if msg.Ref != (gh.ItemRef{Kind: gh.ItemIssue, Repo: "kukv/octoscope", Number: 3}) {
+	if msg.Ref != (domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 3}) {
 		t.Errorf("Ref = %+v, want the issue under the cursor", msg.Ref)
 	}
 }
@@ -579,7 +579,7 @@ func TestDAsksForTheDiff(t *testing.T) {
 // TestDDoesNothingOnAnIssue is what stops the diff view opening on something
 // that has no diff.
 func TestDDoesNothingOnAnIssue(t *testing.T) {
-	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	m, _ = m.Update(cmd())
@@ -609,7 +609,7 @@ func TestSAsksForTheChecks(t *testing.T) {
 // TestSDoesNothingOnAnIssue is what stops the checks view opening on
 // something that has no checks.
 func TestSDoesNothingOnAnIssue(t *testing.T) {
-	f := &fakeSource{issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab"))
 	m, _ = m.Update(cmd())
@@ -625,14 +625,14 @@ func TestTheSelectedRefCarriesTheRepositoryName(t *testing.T) {
 	tests := []struct {
 		name     string
 		toIssues bool
-		wantKind gh.ItemKind
+		wantKind domain.ItemKind
 	}{
-		{name: "the PRs tab", wantKind: gh.ItemPR},
-		{name: "the Issues tab", toIssues: true, wantKind: gh.ItemIssue},
+		{name: "the PRs tab", wantKind: domain.ItemPR},
+		{name: "the Issues tab", toIssues: true, wantKind: domain.ItemIssue},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+			f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 			m := sized(New(f, Options{Current: "kukv/demo"}), 120)
 			m, _ = m.Update(prListMsg{prs: f.prs})
 			if tt.toIssues {
@@ -721,7 +721,7 @@ func TestRefreshWithNoRowsFetchesNothing(t *testing.T) {
 // before the PR fetch returns, must not leave Issues stuck on "loading..."
 // when the late prListMsg finally arrives.
 func TestRefreshThenTabSwitchClearsCorrectLoading(t *testing.T) {
-	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
 	m, _ = m.Update(issueListMsg{issues: f.issues}) // Issues tab already loaded once before
 
@@ -768,22 +768,22 @@ func TestCursorClampsWhenTheListShrinks(t *testing.T) {
 // any terminal the width test uses, in both scripts. Without it the fixture's
 // longest line is well inside 50 columns and the test would pass even with the
 // truncation removed.
-func overlongPRs() []gh.PR {
-	return append(samplePRs(), gh.PR{
+func overlongPRs() []domain.PR {
+	return append(samplePRs(), domain.PR{
 		Number: 9,
 		Title: "レンダリングのパイプラインをまるごと置き換える " +
 			"refactor that nobody asked for",
-		Author:    gh.Author{Login: "a-contributor-with-a-very-long-handle"},
+		Author:    domain.Author{Login: "a-contributor-with-a-very-long-handle"},
 		UpdatedAt: time.Now(),
 	})
 }
 
-func overlongIssues() []gh.Issue {
-	return []gh.Issue{{
+func overlongIssues() []domain.Issue {
+	return []domain.Issue{{
 		Number: 9,
 		Title: "ラベルの一覧が横に伸びつづける問題 " +
 			"and an English clause long enough to run off the screen",
-		Author:    gh.Author{Login: "another-contributor-with-a-long-handle"},
+		Author:    domain.Author{Login: "another-contributor-with-a-long-handle"},
 		UpdatedAt: time.Now(),
 	}}
 }
@@ -844,7 +844,7 @@ func drain(t *testing.T, cmd tea.Cmd) []tea.Msg {
 }
 
 func TestBadgesShowTheCounts(t *testing.T) {
-	f := &fakeSource{prs: samplePRs(), counts: []gh.RepoCount{
+	f := &fakeSource{prs: samplePRs(), counts: []domain.RepoCount{
 		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
 		{Repo: "kukv/koto", Unavailable: true},
 	}}
@@ -865,7 +865,7 @@ func TestBadgesShowTheCounts(t *testing.T) {
 func TestCountsMatchByPositionAndTakeTheResolvedName(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := sized(New(f, Options{Repositories: []string{"KUKV/Octoscope"}}), 120)
-	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
+	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
 	if m.rows[0].name != "kukv/octoscope" {
 		t.Errorf("row name = %q, want the spelling GitHub resolved", m.rows[0].name)
 	}
@@ -879,7 +879,7 @@ func TestCountsMatchByPositionAndTakeTheResolvedName(t *testing.T) {
 func TestRenamedRowDoesNotStrandAPendingFetch(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := New(f, Options{Repositories: []string{"KUKV/Octoscope"}})
-	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
+	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
 	if m.rows[0].name != "kukv/octoscope" {
 		t.Fatalf("setup: row name = %q, want the resolved spelling", m.rows[0].name)
 	}
@@ -894,7 +894,7 @@ func TestCountsOfADifferentLengthAreIgnored(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := sidebarModel(f, 120)
 	before := m.rows
-	m, _ = m.Update(repoCountsMsg([]gh.RepoCount{{Repo: "kukv/octoscope"}}))
+	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{{Repo: "kukv/octoscope"}}))
 	if m.rows[0].counted != before[0].counted {
 		t.Error("a mismatched answer was taken")
 	}
@@ -1119,7 +1119,7 @@ func TestNoUnresolvedIDsInRenderedViews(t *testing.T) {
 }
 
 func renderEveryScreen() map[string]string {
-	f := &fakeSource{prs: samplePRs(), issues: []gh.Issue{{Number: 3, Title: "an issue"}}}
+	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	list := currentModel(f, 120)
 	issues, cmd := list.Update(key("tab"))
 	issues, _ = issues.Update(cmd())

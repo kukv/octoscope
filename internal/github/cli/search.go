@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 const searchRepoFields = "fullName,stargazersCount,isPrivate"
@@ -20,7 +20,7 @@ type searchRepoJSON struct {
 // SearchRepos looks for repositories matching query. The query goes after
 // "--" so that a word the user typed starting with a dash reaches gh as a
 // search term rather than as a flag.
-func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error) {
+func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
 	args := []string{
 		"search", "repos",
 		"--json", searchRepoFields,
@@ -35,9 +35,9 @@ func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]gh
 	if err := json.Unmarshal(out, &found); err != nil {
 		return nil, fmt.Errorf("parse repo search: %w", err)
 	}
-	candidates := make([]gh.RepoCandidate, len(found))
+	candidates := make([]domain.RepoCandidate, len(found))
 	for i, f := range found {
-		candidates[i] = gh.RepoCandidate{
+		candidates[i] = domain.RepoCandidate{
 			Name:    f.FullName,
 			Stars:   f.StargazersCount,
 			Private: f.IsPrivate,

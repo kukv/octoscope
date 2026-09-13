@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -51,12 +51,12 @@ func (p rerunPhase) String() string {
 // was sent for, dropped the same way logMsg/logErrMsg are if the user has
 // since left this pull request or started a rerun on another check.
 type rerunDoneMsg struct {
-	ref   gh.ItemRef
+	ref   domain.ItemRef
 	runID int64
 }
 
 type rerunErrMsg struct {
-	ref   gh.ItemRef
+	ref   domain.ItemRef
 	runID int64
 	err   error
 }
@@ -85,7 +85,7 @@ func (m Model) startRerun() Model {
 	m.errText = ""
 	m.mode = modeRerun
 	m.rerunPhase = rerunIdle
-	m.rerunScope = gh.RerunFailed
+	m.rerunScope = domain.RerunFailed
 	m.rerunRunID = r.RunID
 	m.rerunWorkflow = m.workflowTitle(r)
 	return m
@@ -100,10 +100,10 @@ func (m Model) handleRerunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 	switch msg.String() {
 	case "j", "down":
-		m.rerunScope = gh.RerunAll
+		m.rerunScope = domain.RerunAll
 		return m, nil
 	case "k", "up":
-		m.rerunScope = gh.RerunFailed
+		m.rerunScope = domain.RerunFailed
 		return m, nil
 	case "enter":
 		return m.sendRerun()

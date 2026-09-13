@@ -8,19 +8,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 )
 
 type fakeSource struct {
 	target usecase.ReviewTarget
-	event  gh.ReviewEvent
+	event  domain.ReviewEvent
 	body   string
 	calls  int
 	err    error
 }
 
-func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event gh.ReviewEvent, body string) error {
+func (f *fakeSource) SubmitReview(t usecase.ReviewTarget, event domain.ReviewEvent, body string) error {
 	f.calls++
 	f.target, f.event, f.body = t, event, body
 	return f.err
@@ -34,7 +34,7 @@ func open(src Source) Model {
 
 func TestTabWalksTheThreeEvents(t *testing.T) {
 	m := open(&fakeSource{})
-	want := []gh.ReviewEvent{gh.EventComment, gh.EventApprove, gh.EventRequestChanges, gh.EventComment}
+	want := []domain.ReviewEvent{domain.EventComment, domain.EventApprove, domain.EventRequestChanges, domain.EventComment}
 	if m.event != want[0] {
 		t.Fatalf("the popup opens on %v, want comment", m.event)
 	}
@@ -57,7 +57,7 @@ func TestSubmitSendsTheTargetItWasOpenedOn(t *testing.T) {
 	if src.calls != 1 {
 		t.Fatalf("%d submissions, want 1", src.calls)
 	}
-	if src.event != gh.EventApprove {
+	if src.event != domain.EventApprove {
 		t.Errorf("event = %v, want approve", src.event)
 	}
 	if src.body != "looks good" {

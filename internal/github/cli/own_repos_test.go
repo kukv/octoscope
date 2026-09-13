@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // gh repo list fetches 30 by default and says nothing about the rest, so an
@@ -78,7 +78,7 @@ func TestListOwnReposParsesWhatGitHubReturns(t *testing.T) {
 		t.Fatal("no repositories parsed from the recording")
 	}
 	for _, r := range got {
-		if _, _, ok := gh.SplitRepo(r.Name); !ok {
+		if _, _, ok := domain.SplitRepo(r.Name); !ok {
 			t.Errorf("%q is not owner/name", r.Name)
 		}
 	}

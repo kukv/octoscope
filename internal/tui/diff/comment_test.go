@@ -9,8 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -20,11 +20,11 @@ type recordingSource struct {
 	fakeSource
 	mu           sync.Mutex
 	targets      []usecase.ReviewTarget
-	comments     []gh.PendingComment
+	comments     []domain.PendingComment
 	discardCalls int
 }
 
-func (s *recordingSource) PostLineComment(t usecase.ReviewTarget, c gh.PendingComment) (string, error) {
+func (s *recordingSource) PostLineComment(t usecase.ReviewTarget, c domain.PendingComment) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.targets = append(s.targets, t)
@@ -52,10 +52,10 @@ func loadedWith(t *testing.T, src Source) Model {
 
 func loadedWithAt(t *testing.T, src Source, width, height int) Model {
 	t.Helper()
-	m := New(src, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: gh.ReviewContext{PullRequestID: "PR_1"}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequestID: "PR_1"}})
 	return m
 }
 
@@ -65,7 +65,7 @@ func loadedWithAt(t *testing.T, src Source, width, height int) Model {
 // asks for the left gets the removed line. It fails the test outright rather
 // than leaving the cursor where it was, so a typo in the fixture cannot pass
 // silently.
-func cursorOnLine(t *testing.T, m Model, kind gh.DiffLineKind, num int) Model {
+func cursorOnLine(t *testing.T, m Model, kind domain.DiffLineKind, num int) Model {
 	t.Helper()
 	for i, r := range m.rows {
 		if r.kind != rowLine || r.line.Kind != kind {
@@ -107,7 +107,7 @@ func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 	m := loadedWith(t, src)
 
 	// Put the cursor on the added line "if depth <= 0 {".
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	if m.mode != modeCompose {
 		t.Fatal("c did not open the composer")
@@ -120,7 +120,7 @@ func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 		t.Fatalf("%d comments sent, want 1", len(src.comments))
 	}
 	got := src.comments[0]
-	want := gh.PendingComment{Path: "graph/walk.go", Line: 13, Side: gh.SideRight, Body: "why not 2?"}
+	want := domain.PendingComment{Path: "graph/walk.go", Line: 13, Side: domain.SideRight, Body: "why not 2?"}
 	if got != want {
 		t.Errorf("sent %+v, want %+v", got, want)
 	}
@@ -129,7 +129,7 @@ func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 func TestCommentingOnARemovedLineQuotesTheLeftSide(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
-	m = cursorOnLine(t, m, gh.LineRemoved, 13)
+	m = cursorOnLine(t, m, domain.LineRemoved, 13)
 	m = press(m, "c")
 	m = typeInto(m, "why?")
 	_, cmd := m.Update(keyPress("ctrl+s"))
@@ -138,7 +138,7 @@ func TestCommentingOnARemovedLineQuotesTheLeftSide(t *testing.T) {
 	if len(src.comments) != 1 {
 		t.Fatalf("%d comments sent, want 1", len(src.comments))
 	}
-	if got := src.comments[0].Side; got != gh.SideLeft {
+	if got := src.comments[0].Side; got != domain.SideLeft {
 		t.Errorf("side = %v, want the left: the line was removed", got)
 	}
 }
@@ -150,7 +150,7 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
 
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	m = typeInto(m, "first")
 	m, cmd := m.Update(keyPress("ctrl+s"))
@@ -159,7 +159,7 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	// posted's own fetchReview command is deliberately never run: the
 	// refetch's answer must not be what makes PendingID available.
 
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	m = typeInto(m, "second")
 	_, cmd = m.Update(keyPress("ctrl+s"))
@@ -178,7 +178,7 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 // request node id.
 func TestCDoesNothingBeforeTheContextArrives(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	if m.mode == modeCompose {
 		t.Error("c opened the composer before the pull request's id was known")
@@ -247,7 +247,7 @@ func TestCOnAHunkHeaderSaysWhyNothingHappened(t *testing.T) {
 // rather than broken.
 func TestCBeforeTheContextArrivesSaysItIsLoading(t *testing.T) {
 	m := loaded(t, 120, 40) // the diff only
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	if m.mode == modeCompose {
 		t.Fatal("c opened the composer before the pull request's id was known")
@@ -280,7 +280,7 @@ func TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived(t *test
 		t.Run(tt.name, func(t *testing.T) {
 			m := loaded(t, 120, 30)
 			if tt.needsLine {
-				m = cursorOnLine(t, m, gh.LineAdded, 13)
+				m = cursorOnLine(t, m, domain.LineAdded, 13)
 			}
 			m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
 			m = press(m, tt.key)
@@ -305,7 +305,7 @@ func TestDecliningKeysAddNoSecondMessageWhenTheReviewContextNeverArrived(t *test
 func TestCStillWorksAfterASecondReviewContextFetchFails(t *testing.T) {
 	m := withThreads(t, 120, 40) // a real PullRequestID from threadFixture
 	m, _ = m.Update(reviewErrMsg{ref: m.ref, err: errors.New("boom from github")})
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	if m.mode != modeCompose {
 		t.Fatal("c is dead after a review-context refetch failure, though the pull request id is known")
@@ -335,7 +335,7 @@ func TestEscThrowsTheDraftAway(t *testing.T) {
 	m := loadedWith(t, src)
 	// Any added line does for this test; line 14 rather than 13 shows the
 	// composer does not care which one the cursor was on.
-	m = cursorOnLine(t, m, gh.LineAdded, 14)
+	m = cursorOnLine(t, m, domain.LineAdded, 14)
 	m = press(m, "c")
 	m = typeInto(m, "never mind")
 	m, _ = m.Update(keyPress("esc"))
@@ -358,7 +358,7 @@ func TestTheComposerFitsTheTerminal(t *testing.T) {
 	for _, width := range []int{80, 120} {
 		for _, height := range []int{24, 40} {
 			m := loadedWithAt(t, src, width, height)
-			m = cursorOnLine(t, m, gh.LineAdded, 13)
+			m = cursorOnLine(t, m, domain.LineAdded, 13)
 			m = press(m, "c")
 			out := m.View()
 			if got := len(strings.Split(out, "\n")); got > height {
@@ -376,7 +376,7 @@ func TestTheComposerFitsTheTerminal(t *testing.T) {
 func TestTheComposerShowsItsOwnPlaceholderAndFooter(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	out := ansi.Strip(m.View())
 	if !strings.Contains(out, i18n.T("diff.comment_placeholder")) {
@@ -393,7 +393,7 @@ func TestTheComposerShowsItsOwnPlaceholderAndFooter(t *testing.T) {
 func TestAFailedPostKeepsTheDraftAndShowsTheError(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	m = typeInto(m, "why not 2?")
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
@@ -449,24 +449,24 @@ func isReviewErrMsg(msg tea.Msg) bool {
 // that inserts one thread row directly under line 13 -- above the cursor,
 // pushing it down by exactly one row. Without a captured target, post() would
 // read whatever row the cursor's raw index now names, which is the inserted
-// thread row: its zero gh.DiffLine reads as line 0, and the comment goes
+// thread row: its zero domain.DiffLine reads as line 0, and the comment goes
 // there instead of line 14.
 func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
-	m = cursorOnLine(t, m, gh.LineAdded, 14)
+	m = cursorOnLine(t, m, domain.LineAdded, 14)
 	m = press(m, "c")
 	if m.mode != modeCompose {
 		t.Fatal("c did not open the composer")
 	}
 	m = typeInto(m, "still about line 14")
 
-	shifted := gh.ReviewContext{
+	shifted := domain.ReviewContext{
 		PullRequestID: "PR_1",
-		Threads: []gh.ReviewThread{
+		Threads: []domain.ReviewThread{
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
-				Comments: []gh.ThreadComment{{Author: gh.Author{Login: "kukv"}, Body: "shifts the row below"}},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
+				Comments: []domain.ThreadComment{{Author: domain.Author{Login: "kukv"}, Body: "shifts the row below"}},
 			},
 		},
 	}
@@ -482,7 +482,7 @@ func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 	if len(src.comments) != 1 {
 		t.Fatalf("%d comments sent, want 1", len(src.comments))
 	}
-	want := gh.PendingComment{Path: "graph/walk.go", Line: 14, Side: gh.SideRight, Body: "still about line 14"}
+	want := domain.PendingComment{Path: "graph/walk.go", Line: 14, Side: domain.SideRight, Body: "still about line 14"}
 	if got := src.comments[0]; got != want {
 		t.Errorf("sent %+v, want %+v", got, want)
 	}
@@ -496,7 +496,7 @@ func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 func TestARetryAfterAFailedPostStillTargetsTheCapturedLine(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	m = typeInto(m, "retry me")
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
@@ -512,7 +512,7 @@ func TestARetryAfterAFailedPostStillTargetsTheCapturedLine(t *testing.T) {
 	if len(src.comments) != 1 {
 		t.Fatalf("%d comments sent, want 1", len(src.comments))
 	}
-	want := gh.PendingComment{Path: "graph/walk.go", Line: 13, Side: gh.SideRight, Body: "retry me"}
+	want := domain.PendingComment{Path: "graph/walk.go", Line: 13, Side: domain.SideRight, Body: "retry me"}
 	if got := src.comments[0]; got != want {
 		t.Errorf("sent %+v, want %+v", got, want)
 	}
@@ -527,7 +527,7 @@ func TestARefetchReclampsTheCursorIntoRange(t *testing.T) {
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: threadFixture()})
 	m.row = len(m.rows) - 1 // parked at the end of the widened row set
 
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: gh.ReviewContext{PullRequestID: "PR_1"}}) // threads gone
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequestID: "PR_1"}}) // threads gone
 	if m.row >= len(m.rows) {
 		t.Fatalf("row = %d out of range for %d rows", m.row, len(m.rows))
 	}
@@ -688,12 +688,12 @@ func TestTheDiscardConfirmationFitsTheTerminal(t *testing.T) {
 func TestACommentErrorForAnotherPullRequestIsDropped(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
-	m = cursorOnLine(t, m, gh.LineAdded, 13)
+	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
 	m = typeInto(m, "why not 2?")
 	m, _ = m.Update(keyPress("ctrl+s")) // the post cmd is deliberately not run
 
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 	m, _ = m.Update(commentErrorMsg{ref: other, err: errors.New("boom")})
 	if m.phase != phaseWorking {
 		t.Error("the send was cut short by an error for another pull request")

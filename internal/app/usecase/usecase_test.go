@@ -8,71 +8,71 @@ import (
 	"time"
 
 	"github.com/kukv/octoscope/internal/app/config"
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 type fakeSource struct {
-	pr     gh.PR
-	issue  gh.Issue
+	pr     domain.PR
+	issue  domain.Issue
 	err    error
 	called []string
 
-	checks       gh.Checks
+	checks       domain.Checks
 	checksRepo   string
 	checksNumber int
 
-	logLines  []gh.LogLine
+	logLines  []domain.LogLine
 	logRepo   string
 	logJobID  int64
 	logFailed bool
 
 	rerunRepo  string
 	rerunRunID int64
-	rerunScope gh.RerunScope
+	rerunScope domain.RerunScope
 
-	mergeContext        gh.MergeContext
+	mergeContext        domain.MergeContext
 	mergedID            string
-	mergedMethod        gh.MergeMethod
+	mergedMethod        domain.MergeMethod
 	autoMergeID         string
-	autoMergeMethod     gh.MergeMethod
+	autoMergeMethod     domain.MergeMethod
 	disabledAutoMergeID string
 }
 
-func (f *fakeSource) GetPR(_ context.Context, _ string, _ int) (gh.PR, error) {
+func (f *fakeSource) GetPR(_ context.Context, _ string, _ int) (domain.PR, error) {
 	f.called = append(f.called, "GetPR")
 	return f.pr, f.err
 }
 
-func (f *fakeSource) GetIssue(_ context.Context, _ string, _ int) (gh.Issue, error) {
+func (f *fakeSource) GetIssue(_ context.Context, _ string, _ int) (domain.Issue, error) {
 	f.called = append(f.called, "GetIssue")
 	return f.issue, f.err
 }
 
-func (f *fakeSource) PRChecks(_ context.Context, repo string, number int) (gh.Checks, error) {
+func (f *fakeSource) PRChecks(_ context.Context, repo string, number int) (domain.Checks, error) {
 	f.checksRepo, f.checksNumber = repo, number
 	return f.checks, f.err
 }
 
-func (f *fakeSource) JobLog(_ context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error) {
+func (f *fakeSource) JobLog(_ context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error) {
 	f.logRepo, f.logJobID, f.logFailed = repo, jobID, failedOnly
 	return f.logLines, f.err
 }
 
-func (f *fakeSource) RerunWorkflow(_ context.Context, repo string, runID int64, scope gh.RerunScope) error {
+func (f *fakeSource) RerunWorkflow(_ context.Context, repo string, runID int64, scope domain.RerunScope) error {
 	f.rerunRepo, f.rerunRunID, f.rerunScope = repo, runID, scope
 	return f.err
 }
 
-func (f *fakeSource) PRMergeContext(_ context.Context, _ string, _ int) (gh.MergeContext, error) {
+func (f *fakeSource) PRMergeContext(_ context.Context, _ string, _ int) (domain.MergeContext, error) {
 	return f.mergeContext, f.err
 }
 
-func (f *fakeSource) MergePR(pullRequestID string, method gh.MergeMethod) error {
+func (f *fakeSource) MergePR(pullRequestID string, method domain.MergeMethod) error {
 	f.mergedID, f.mergedMethod = pullRequestID, method
 	return f.err
 }
 
-func (f *fakeSource) EnableAutoMerge(pullRequestID string, method gh.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(pullRequestID string, method domain.MergeMethod) error {
 	f.autoMergeID, f.autoMergeMethod = pullRequestID, method
 	return f.err
 }
@@ -85,21 +85,21 @@ func (f *fakeSource) DisableAutoMerge(pullRequestID string) error {
 func TestGetItemFetchesAPullRequestForAPRRef(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{pr: gh.PR{
-		Number: 55, Title: "feat: x", State: gh.StateOpen,
+	f := &fakeSource{pr: domain.PR{
+		Number: 55, Title: "feat: x", State: domain.StateOpen,
 		Body: "body", URL: "https://example.test/pull/55",
 		UpdatedAt: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC),
 	}}
 	u := &Usecase{items: f}
 
-	item, err := u.GetItem(t.Context(), gh.ItemRef{Kind: gh.ItemPR, Number: 55})
+	item, err := u.GetItem(t.Context(), domain.ItemRef{Kind: domain.ItemPR, Number: 55})
 	if err != nil {
 		t.Fatalf("GetItem: %v", err)
 	}
 	if len(f.called) != 1 || f.called[0] != "GetPR" {
 		t.Fatalf("calls = %v, want exactly [GetPR]", f.called)
 	}
-	if item.Kind != gh.ItemPR || item.Number != 55 || item.Title != "feat: x" {
+	if item.Kind != domain.ItemPR || item.Number != 55 || item.Title != "feat: x" {
 		t.Errorf("item = %+v, want the pull request's own fields", item)
 	}
 	if item.URL != "https://example.test/pull/55" {
@@ -116,20 +116,20 @@ func TestGetItemFetchesAPullRequestForAPRRef(t *testing.T) {
 func TestGetItemFetchesAnIssueForAnIssueRef(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{issue: gh.Issue{
-		Number: 50, Title: "bug: y", State: gh.StateClosed,
+	f := &fakeSource{issue: domain.Issue{
+		Number: 50, Title: "bug: y", State: domain.StateClosed,
 		Body: "body", URL: "https://example.test/issues/50",
 	}}
 	u := &Usecase{items: f}
 
-	item, err := u.GetItem(t.Context(), gh.ItemRef{Kind: gh.ItemIssue, Number: 50})
+	item, err := u.GetItem(t.Context(), domain.ItemRef{Kind: domain.ItemIssue, Number: 50})
 	if err != nil {
 		t.Fatalf("GetItem: %v", err)
 	}
 	if len(f.called) != 1 || f.called[0] != "GetIssue" {
 		t.Fatalf("calls = %v, want exactly [GetIssue]", f.called)
 	}
-	if item.Kind != gh.ItemIssue || item.Number != 50 || item.State != gh.StateClosed {
+	if item.Kind != domain.ItemIssue || item.Number != 50 || item.State != domain.StateClosed {
 		t.Errorf("item = %+v, want the issue's own fields", item)
 	}
 	if item.PR != nil {
@@ -143,27 +143,27 @@ func TestGetItemPassesTheFetchFailureThrough(t *testing.T) {
 	want := errors.New("boom")
 	u := &Usecase{items: &fakeSource{err: want}}
 
-	if _, err := u.GetItem(t.Context(), gh.ItemRef{Kind: gh.ItemPR}); !errors.Is(err, want) {
+	if _, err := u.GetItem(t.Context(), domain.ItemRef{Kind: domain.ItemPR}); !errors.Is(err, want) {
 		t.Errorf("err = %v, want it to wrap %v", err, want)
 	}
 }
 
 // .claude/rules/architecture.md requires Item to carry every field common to
-// gh.PR and gh.Issue; a copy that silently drops one is what this catches.
+// domain.PR and domain.Issue; a copy that silently drops one is what this catches.
 func TestGetItemCopiesEveryFieldAGhIssueHas(t *testing.T) {
 	t.Parallel()
 
 	updated := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
-	labels := []gh.Label{{Name: "bug", Color: "ff0000"}}
-	assignees := []gh.Author{{Login: "reviewer"}}
-	comments := []gh.Comment{{Author: gh.Author{Login: "commenter"}, Body: "hi"}}
+	labels := []domain.Label{{Name: "bug", Color: "ff0000"}}
+	assignees := []domain.Author{{Login: "reviewer"}}
+	comments := []domain.Comment{{Author: domain.Author{Login: "commenter"}, Body: "hi"}}
 
-	pr := gh.PR{
-		Number: 55, Title: "feat: x", Author: gh.Author{Login: "author"},
-		State: gh.StateOpen, Body: "pr body", URL: "https://example.test/pull/55",
+	pr := domain.PR{
+		Number: 55, Title: "feat: x", Author: domain.Author{Login: "author"},
+		State: domain.StateOpen, Body: "pr body", URL: "https://example.test/pull/55",
 		Labels: labels, Assignees: assignees, Comments: comments, UpdatedAt: updated,
 	}
-	item, err := (&Usecase{items: &fakeSource{pr: pr}}).GetItem(t.Context(), gh.ItemRef{Kind: gh.ItemPR})
+	item, err := (&Usecase{items: &fakeSource{pr: pr}}).GetItem(t.Context(), domain.ItemRef{Kind: domain.ItemPR})
 	if err != nil {
 		t.Fatalf("GetItem(PR): %v", err)
 	}
@@ -172,12 +172,12 @@ func TestGetItemCopiesEveryFieldAGhIssueHas(t *testing.T) {
 		t.Error("PR is nil on a pull request")
 	}
 
-	issue := gh.Issue{
-		Number: 50, Title: "bug: y", Author: gh.Author{Login: "author2"},
-		State: gh.StateClosed, Body: "issue body", URL: "https://example.test/issues/50",
+	issue := domain.Issue{
+		Number: 50, Title: "bug: y", Author: domain.Author{Login: "author2"},
+		State: domain.StateClosed, Body: "issue body", URL: "https://example.test/issues/50",
 		Labels: labels, Assignees: assignees, Comments: comments, UpdatedAt: updated,
 	}
-	item, err = (&Usecase{items: &fakeSource{issue: issue}}).GetItem(t.Context(), gh.ItemRef{Kind: gh.ItemIssue})
+	item, err = (&Usecase{items: &fakeSource{issue: issue}}).GetItem(t.Context(), domain.ItemRef{Kind: domain.ItemIssue})
 	if err != nil {
 		t.Fatalf("GetItem(Issue): %v", err)
 	}
@@ -189,8 +189,8 @@ func TestGetItemCopiesEveryFieldAGhIssueHas(t *testing.T) {
 
 func assertItemMatchesCommonFields(
 	t *testing.T, kind string, item Item,
-	number int, title string, author gh.Author, state gh.ItemState, body, url string,
-	labels []gh.Label, assignees []gh.Author, comments []gh.Comment, updatedAt time.Time,
+	number int, title string, author domain.Author, state domain.ItemState, body, url string,
+	labels []domain.Label, assignees []domain.Author, comments []domain.Comment, updatedAt time.Time,
 ) {
 	t.Helper()
 	if item.Number != number {
@@ -284,16 +284,16 @@ func TestAddCommentPicksTheCallByKind(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		kind gh.ItemKind
+		kind domain.ItemKind
 		want string
 	}{
-		{gh.ItemPR, "AddPRComment"},
-		{gh.ItemIssue, "AddIssueComment"},
+		{domain.ItemPR, "AddPRComment"},
+		{domain.ItemIssue, "AddIssueComment"},
 	}
 	for _, tc := range tests {
 		f := &fakeWriter{}
 		u := &Usecase{comments: f}
-		if err := u.AddComment(gh.ItemRef{Kind: tc.kind}, "hi"); err != nil {
+		if err := u.AddComment(domain.ItemRef{Kind: tc.kind}, "hi"); err != nil {
 			t.Fatalf("AddComment: %v", err)
 		}
 		if !slices.Equal(f.calls, []string{tc.want}) {
@@ -307,19 +307,19 @@ func TestSetStatePicksTheCallByKindAndDirection(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		kind    gh.ItemKind
+		kind    domain.ItemKind
 		closing bool
 		want    string
 	}{
-		{"PR closing", gh.ItemPR, true, "ClosePR"},
-		{"PR reopening", gh.ItemPR, false, "ReopenPR"},
-		{"Issue closing", gh.ItemIssue, true, "CloseIssue"},
-		{"Issue reopening", gh.ItemIssue, false, "ReopenIssue"},
+		{"PR closing", domain.ItemPR, true, "ClosePR"},
+		{"PR reopening", domain.ItemPR, false, "ReopenPR"},
+		{"Issue closing", domain.ItemIssue, true, "CloseIssue"},
+		{"Issue reopening", domain.ItemIssue, false, "ReopenIssue"},
 	}
 	for _, tc := range tests {
 		f := &fakeWriter{}
 		u := &Usecase{states: f}
-		if err := u.SetState(gh.ItemRef{Kind: tc.kind}, tc.closing); err != nil {
+		if err := u.SetState(domain.ItemRef{Kind: tc.kind}, tc.closing); err != nil {
 			t.Fatalf("%s: SetState: %v", tc.name, err)
 		}
 		if !slices.Equal(f.calls, []string{tc.want}) {
@@ -332,16 +332,16 @@ func TestEditLabelsPicksTheCallByKind(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		kind gh.ItemKind
+		kind domain.ItemKind
 		want string
 	}{
-		{gh.ItemPR, "EditPRLabels"},
-		{gh.ItemIssue, "EditIssueLabels"},
+		{domain.ItemPR, "EditPRLabels"},
+		{domain.ItemIssue, "EditIssueLabels"},
 	}
 	for _, tc := range tests {
 		f := &fakeWriter{}
 		u := &Usecase{labels: f}
-		if err := u.EditLabels(gh.ItemRef{Kind: tc.kind}, []string{"a"}, []string{"b"}); err != nil {
+		if err := u.EditLabels(domain.ItemRef{Kind: tc.kind}, []string{"a"}, []string{"b"}); err != nil {
 			t.Fatalf("EditLabels: %v", err)
 		}
 		if !slices.Equal(f.calls, []string{tc.want}) {
@@ -355,18 +355,18 @@ func TestMergePRPassesTheMethodThrough(t *testing.T) {
 
 	f := &fakeSource{}
 	u := &Usecase{merges: f}
-	if err := u.MergePR("PR_1", gh.MergeRebase); err != nil {
+	if err := u.MergePR("PR_1", domain.MergeRebase); err != nil {
 		t.Fatalf("MergePR: %v", err)
 	}
-	if f.mergedID != "PR_1" || f.mergedMethod != gh.MergeRebase {
-		t.Errorf("merged (%q, %v), want (%q, %v)", f.mergedID, f.mergedMethod, "PR_1", gh.MergeRebase)
+	if f.mergedID != "PR_1" || f.mergedMethod != domain.MergeRebase {
+		t.Errorf("merged (%q, %v), want (%q, %v)", f.mergedID, f.mergedMethod, "PR_1", domain.MergeRebase)
 	}
 }
 
 func TestPRChecksReachesTheBackend(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{checks: gh.Checks{Total: 3}}
+	f := &fakeSource{checks: domain.Checks{Total: 3}}
 	u := &Usecase{checks: f}
 
 	got, err := u.PRChecks(t.Context(), "kukv/octoscope", 61)
@@ -384,7 +384,7 @@ func TestPRChecksReachesTheBackend(t *testing.T) {
 func TestJobLogReachesTheBackend(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{logLines: []gh.LogLine{{Text: "hi"}}}
+	f := &fakeSource{logLines: []domain.LogLine{{Text: "hi"}}}
 	u := &Usecase{checks: f}
 
 	got, err := u.JobLog(t.Context(), "kukv/octoscope", 61, true)
@@ -406,10 +406,10 @@ func TestRerunWorkflowReachesTheBackend(t *testing.T) {
 	f := &fakeSource{}
 	u := &Usecase{checks: f}
 
-	if err := u.RerunWorkflow(t.Context(), "kukv/octoscope", 61, gh.RerunAll); err != nil {
+	if err := u.RerunWorkflow(t.Context(), "kukv/octoscope", 61, domain.RerunAll); err != nil {
 		t.Fatalf("RerunWorkflow: %v", err)
 	}
-	if f.rerunRepo != "kukv/octoscope" || f.rerunRunID != 61 || f.rerunScope != gh.RerunAll {
+	if f.rerunRepo != "kukv/octoscope" || f.rerunRunID != 61 || f.rerunScope != domain.RerunAll {
 		t.Errorf("backend was asked to rerun %s run %d scope=%v, want kukv/octoscope run 61 scope=RerunAll",
 			f.rerunRepo, f.rerunRunID, f.rerunScope)
 	}
@@ -421,15 +421,15 @@ type fakeCrossRepo struct {
 	err         error
 }
 
-func (f *fakeCrossRepo) ListWorkSection(_ context.Context, _ gh.WorkSection) ([]gh.WorkItem, error) {
+func (f *fakeCrossRepo) ListWorkSection(_ context.Context, _ domain.WorkSection) ([]domain.WorkItem, error) {
 	return nil, f.err
 }
 
-func (f *fakeCrossRepo) RepoCounts(_ context.Context, _ []string) ([]gh.RepoCount, error) {
+func (f *fakeCrossRepo) RepoCounts(_ context.Context, _ []string) ([]domain.RepoCount, error) {
 	return nil, f.err
 }
 
-func (f *fakeCrossRepo) SearchItems(_ context.Context, query string) ([]gh.WorkItem, error) {
+func (f *fakeCrossRepo) SearchItems(_ context.Context, query string) ([]domain.WorkItem, error) {
 	f.searchQuery = query
 	return nil, f.err
 }
@@ -490,16 +490,16 @@ func TestEditAssigneesPicksTheCallByKind(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		kind gh.ItemKind
+		kind domain.ItemKind
 		want string
 	}{
-		{gh.ItemPR, "EditPRAssignees"},
-		{gh.ItemIssue, "EditIssueAssignees"},
+		{domain.ItemPR, "EditPRAssignees"},
+		{domain.ItemIssue, "EditIssueAssignees"},
 	}
 	for _, tc := range tests {
 		f := &fakeWriter{}
 		u := &Usecase{assignees: f}
-		if err := u.EditAssignees(gh.ItemRef{Kind: tc.kind}, []string{"a"}, []string{"b"}); err != nil {
+		if err := u.EditAssignees(domain.ItemRef{Kind: tc.kind}, []string{"a"}, []string{"b"}); err != nil {
 			t.Fatalf("EditAssignees: %v", err)
 		}
 		if !slices.Equal(f.calls, []string{tc.want}) {

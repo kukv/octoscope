@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/dialog"
 )
@@ -80,7 +80,7 @@ func (m Model) handleAddKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // at someone who has not finished.
 func (m Model) addSelected() (Model, tea.Cmd) {
 	name := m.dlg.Value()
-	if _, _, ok := gh.SplitRepo(name); !ok {
+	if _, _, ok := domain.SplitRepo(name); !ok {
 		m.dlg = m.dlg.SetError(i18n.T("dialog.invalid_name") + name)
 		return m, nil
 	}

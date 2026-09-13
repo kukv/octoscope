@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/tui/icon"
 )
 
@@ -30,19 +30,19 @@ func use(t *testing.T, s icon.Set) {
 func markers() []string {
 	var got []string
 	for _, draft := range []bool{false, true} {
-		for _, s := range []gh.ReviewState{
-			gh.ReviewNone, gh.ReviewRequired, gh.ReviewApproved, gh.ReviewChangesRequested,
+		for _, s := range []domain.ReviewState{
+			domain.ReviewNone, domain.ReviewRequired, domain.ReviewApproved, domain.ReviewChangesRequested,
 		} {
 			got = append(got, icon.Review(s, draft))
 		}
 	}
 	got = append(got, icon.Issue())
-	for _, s := range []gh.CheckState{
-		gh.CheckPending, gh.CheckRunning, gh.CheckSuccess, gh.CheckFailure,
+	for _, s := range []domain.CheckState{
+		domain.CheckPending, domain.CheckRunning, domain.CheckSuccess, domain.CheckFailure,
 	} {
 		got = append(got, icon.Check(s))
 	}
-	done, rest := icon.ChecksBar(gh.Checks{Total: 2, Passed: 1})
+	done, rest := icon.ChecksBar(domain.Checks{Total: 2, Passed: 1})
 	got = append(got, done, rest)
 	got = append(got, icon.Collapsed(), icon.CommentBar(), icon.ThreadBadge())
 	got = append(got, icon.Radio(true), icon.Radio(false), icon.Warning())
@@ -147,16 +147,16 @@ func TestResolveFallsBackWhenTheSettingsFileNamesNoSet(t *testing.T) {
 func TestReview(t *testing.T) {
 	tests := []struct {
 		name  string
-		state gh.ReviewState
+		state domain.ReviewState
 		draft bool
 		want  string
 	}{
-		{"draft wins over approved", gh.ReviewApproved, true, "◌"},
-		{"draft wins over changes requested", gh.ReviewChangesRequested, true, "◌"},
-		{"none", gh.ReviewNone, false, "•"},
-		{"required", gh.ReviewRequired, false, "•"},
-		{"approved", gh.ReviewApproved, false, "✓"},
-		{"changes requested", gh.ReviewChangesRequested, false, "×"},
+		{"draft wins over approved", domain.ReviewApproved, true, "◌"},
+		{"draft wins over changes requested", domain.ReviewChangesRequested, true, "◌"},
+		{"none", domain.ReviewNone, false, "•"},
+		{"required", domain.ReviewRequired, false, "•"},
+		{"approved", domain.ReviewApproved, false, "✓"},
+		{"changes requested", domain.ReviewChangesRequested, false, "×"},
 	}
 	for _, tt := range tests {
 		if got := icon.Review(tt.state, tt.draft); got != tt.want {
@@ -168,14 +168,14 @@ func TestReview(t *testing.T) {
 func TestCheck(t *testing.T) {
 	tests := []struct {
 		name  string
-		state gh.CheckState
+		state domain.CheckState
 		want  string
 	}{
-		{"none", gh.CheckNone, " "},
-		{"pending", gh.CheckPending, "◍"},
-		{"running", gh.CheckRunning, "◍"},
-		{"success", gh.CheckSuccess, "✓"},
-		{"failure", gh.CheckFailure, "×"},
+		{"none", domain.CheckNone, " "},
+		{"pending", domain.CheckPending, "◍"},
+		{"running", domain.CheckRunning, "◍"},
+		{"success", domain.CheckSuccess, "✓"},
+		{"failure", domain.CheckFailure, "×"},
 	}
 	for _, tt := range tests {
 		if got := icon.Check(tt.state); got != tt.want {
@@ -187,15 +187,15 @@ func TestCheck(t *testing.T) {
 func TestChecksBar(t *testing.T) {
 	tests := []struct {
 		name      string
-		checks    gh.Checks
+		checks    domain.Checks
 		wantEmpty bool
 		wantFill  int // -1 means "don't check the exact count"
 	}{
-		{"no checks is empty", gh.Checks{Total: 0}, true, -1},
-		{"none passed has no filled cells", gh.Checks{Total: 10, Passed: 0}, false, 0},
-		{"tiny ratio still shows one filled cell", gh.Checks{Total: 100, Passed: 1}, false, 1},
-		{"all passed", gh.Checks{Total: 7, Passed: 7}, false, 7},
-		{"partial", gh.Checks{Total: 4, Passed: 2}, false, -1},
+		{"no checks is empty", domain.Checks{Total: 0}, true, -1},
+		{"none passed has no filled cells", domain.Checks{Total: 10, Passed: 0}, false, 0},
+		{"tiny ratio still shows one filled cell", domain.Checks{Total: 100, Passed: 1}, false, 1},
+		{"all passed", domain.Checks{Total: 7, Passed: 7}, false, 7},
+		{"partial", domain.Checks{Total: 4, Passed: 2}, false, -1},
 	}
 	for _, tt := range tests {
 		done, rest := icon.ChecksBar(tt.checks)

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 func TestNewPickerPrechecksCurrent(t *testing.T) {
@@ -106,7 +106,7 @@ func TestPickerListViewShowsItems(t *testing.T) {
 }
 
 // openPicker loads the detail, presses k and settles the candidate fetch.
-func openPicker(t *testing.T, f *fakeSource, ref gh.ItemRef, k string) Model {
+func openPicker(t *testing.T, f *fakeSource, ref domain.ItemRef, k string) Model {
 	t.Helper()
 	m := loaded(f, ref)
 	m, cmd := m.Update(key(k))
@@ -119,8 +119,8 @@ func openPicker(t *testing.T, f *fakeSource, ref gh.ItemRef, k string) Model {
 
 func TestLOpensLabelPickerPrechecked(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("l"))
@@ -142,7 +142,7 @@ func TestLOpensLabelPickerPrechecked(t *testing.T) {
 
 func TestAOpensAssigneePicker(t *testing.T) {
 	f := &fakeSource{
-		pr:    gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:    domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		users: []string{"alice", "bob"},
 	}
 	m := openPicker(t, f, prRef(), "a")
@@ -153,8 +153,8 @@ func TestAOpensAssigneePicker(t *testing.T) {
 
 func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
 	// toggle bug off (cursor 0), move to wip, toggle on
@@ -181,8 +181,8 @@ func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 
 func TestPickerNoChangeClosesWithoutEdit(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
 	m, cmd := m.Update(key("enter")) // no toggle
@@ -199,8 +199,8 @@ func TestPickerNoChangeClosesWithoutEdit(t *testing.T) {
 
 func TestPickerEscCancels(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
 	m, _ = m.Update(key("space")) // change something
@@ -218,8 +218,8 @@ func TestPickerEscCancels(t *testing.T) {
 
 func TestPickerApplyErrorKeepsPicker(t *testing.T) {
 	f := &fakeSource{
-		pr:      gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels:  []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:      domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels:  []domain.Label{{Name: "bug"}, {Name: "wip"}},
 		editErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := openPicker(t, f, prRef(), "l")
@@ -240,7 +240,7 @@ func TestPickerApplyErrorKeepsPicker(t *testing.T) {
 
 func TestPickerFetchErrorInlineOnDetail(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		labelsErr: errors.New("gh label: HTTP 403 forbidden"),
 	}
 	m := loaded(f, prRef())
@@ -260,7 +260,7 @@ func TestPickerFetchErrorInlineOnDetail(t *testing.T) {
 
 func TestPickerApplyOnAssigneesEditsAssignees(t *testing.T) {
 	f := &fakeSource{
-		pr:    gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
+		pr:    domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
 		users: []string{"alice"},
 	}
 	m := openPicker(t, f, prRef(), "a")
@@ -277,8 +277,8 @@ func TestPickerApplyOnAssigneesEditsAssignees(t *testing.T) {
 
 func TestPickerLoadingIgnoresKeys(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := loaded(f, prRef())
 	m, _ = m.Update(key("l"))
@@ -297,8 +297,8 @@ func TestPickerLoadingIgnoresKeys(t *testing.T) {
 
 func TestPickerIgnoresKeysWhileApplying(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
 	m, _ = m.Update(key("space"))
@@ -318,8 +318,8 @@ func TestPickerIgnoresKeysWhileApplying(t *testing.T) {
 
 func TestPickerViewShowsItemsAndHelp(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
 	view := m.View()
@@ -338,8 +338,8 @@ func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
 	failedApply := func(t *testing.T) Model {
 		t.Helper()
 		f := &fakeSource{
-			pr:      gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-			labels:  []gh.Label{{Name: "bug"}, {Name: "wip"}},
+			pr:      domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+			labels:  []domain.Label{{Name: "bug"}, {Name: "wip"}},
 			editErr: errors.New("gh pr: HTTP 403 forbidden"),
 		}
 		m := openPicker(t, f, prRef(), "l")
@@ -373,15 +373,15 @@ func TestLeavingThePickerTakesItsErrorWithIt(t *testing.T) {
 // the other repository's labels or assignees.
 func TestAStalePickerAnswerIsDropped(t *testing.T) {
 	f := &fakeSource{
-		pr:     gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen, Labels: []gh.Label{{Name: "bug"}}},
-		labels: []gh.Label{{Name: "bug"}, {Name: "wip"}},
+		pr:     domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen, Labels: []domain.Label{{Name: "bug"}}},
+		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 
 	t.Run("pickerCandidatesMsg", func(t *testing.T) {
 		m := loaded(f, prRef())
 		m, _ = m.Update(pickerCandidatesMsg{
-			ref: other, kind: pickLabels, labels: []gh.Label{{Name: "other"}},
+			ref: other, kind: pickLabels, labels: []domain.Label{{Name: "other"}},
 		})
 		if m.mode != modeView {
 			t.Errorf("mode = %v, want the picker to stay closed on a stale answer", m.mode)

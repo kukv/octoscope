@@ -18,7 +18,7 @@ linters:
         # layer that orchestrates it.
         gh-layer:
           files:
-            - "**/internal/gh/**"
+            - "**/internal/app/domain/**"
           deny:
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: the GitHub layer must not depend on the UI
@@ -54,7 +54,7 @@ linters:
           files:
             - "**/internal/app/config/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/gh
+            - pkg: github.com/kukv/octoscope/internal/app/domain
               desc: internal/app/config must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: internal/app/config must not depend on other internal packages
@@ -69,7 +69,7 @@ linters:
           files:
             - "**/internal/i18n/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/gh
+            - pkg: github.com/kukv/octoscope/internal/app/domain
               desc: internal/i18n must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: internal/i18n must not depend on other internal packages
@@ -82,7 +82,7 @@ linters:
           files:
             - "**/internal/browser/**"
           deny:
-            - pkg: github.com/kukv/octoscope/internal/gh
+            - pkg: github.com/kukv/octoscope/internal/app/domain
               desc: internal/browser must not depend on other internal packages
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: internal/browser must not depend on other internal packages
@@ -231,7 +231,7 @@ linters:
           deny:
             - pkg: github.com/kukv/octoscope/internal/tui
               desc: the golden recorder compares strings and knows nothing of ours
-            - pkg: github.com/kukv/octoscope/internal/gh
+            - pkg: github.com/kukv/octoscope/internal/app/domain
               desc: the golden recorder compares strings and knows nothing of ours
             - pkg: github.com/kukv/octoscope/internal/i18n
               desc: the golden recorder compares strings and knows nothing of ours

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // fake records what was sent and answers with what it was given. The body is
@@ -48,7 +48,7 @@ func TestAReadAsksAgainWhenGitHubDidNotAnswer(t *testing.T) {
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return nil, gh.Classify(gh.ErrTransient, "HTTP 502")
+			return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
 		}
 		return []byte(`{"data":{}}`), nil
 	}}
@@ -67,9 +67,9 @@ func TestAWriteIsNeverSentTwice(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, gh.Classify(gh.ErrTransient, "HTTP 502")
+		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
 	}}
-	if _, err := c.Write(context.Background(), "mutation {}"); !errors.Is(err, gh.ErrTransient) {
+	if _, err := c.Write(context.Background(), "mutation {}"); !errors.Is(err, domain.ErrTransient) {
 		t.Fatalf("Write err = %v, want ErrTransient", err)
 	}
 	if calls != 1 {
@@ -86,7 +86,7 @@ func TestACancelledReadStops(t *testing.T) {
 	calls := 0
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
 		calls++
-		return nil, gh.Classify(gh.ErrTransient, "HTTP 502")
+		return nil, domain.Classify(domain.ErrTransient, "HTTP 502")
 	}}
 	if _, err := c.Read(ctx, "query {}"); err == nil {
 		t.Fatal("Read succeeded, want an error")

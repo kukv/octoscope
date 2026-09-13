@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -61,7 +61,7 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("app_error_%s_%d", lang.name, w), next.(Model).View().Content)
 
 				missing := goldenModel(w, Options{})
-				next, _ = missing.fail(gh.ErrGhNotFound)
+				next, _ = missing.fail(domain.ErrGhNotFound)
 				golden.Assert(t, fmt.Sprintf("app_gh_missing_%s_%d", lang.name, w), next.(Model).View().Content)
 
 				badConfig := goldenModel(w, Options{Repo: "kukv/demo", ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})

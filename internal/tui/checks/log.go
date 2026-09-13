@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -16,13 +16,13 @@ import (
 // flight, and an answer for the check the user left must not land under the
 // one they moved to (d44b7fe, e1f8a99).
 type logMsg struct {
-	ref   gh.ItemRef
+	ref   domain.ItemRef
 	jobID int64
-	lines []gh.LogLine
+	lines []domain.LogLine
 }
 
 type logErrMsg struct {
-	ref   gh.ItemRef
+	ref   domain.ItemRef
 	jobID int64
 	err   error
 }

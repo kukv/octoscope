@@ -10,38 +10,38 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // Source is what the Work board needs from the GitHub layer.
 type Source interface {
-	ListWorkSection(ctx context.Context, s gh.WorkSection) ([]gh.WorkItem, error)
+	ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error)
 }
 
 type (
 	workMsg struct {
-		section gh.WorkSection
-		items   []gh.WorkItem
+		section domain.WorkSection
+		items   []domain.WorkItem
 	}
 	errMsg struct {
-		section gh.WorkSection
+		section domain.WorkSection
 		err     error
 	}
 )
 
 // OpenDetailMsg asks the parent to show the detail view for the selected card.
-type OpenDetailMsg struct{ Ref gh.ItemRef }
+type OpenDetailMsg struct{ Ref domain.ItemRef }
 
 // OpenDiffMsg asks the parent to show the diff of the selected pull request.
-type OpenDiffMsg struct{ Ref gh.ItemRef }
+type OpenDiffMsg struct{ Ref domain.ItemRef }
 
 // OpenChecksMsg asks the parent to show the checks of the selected pull
 // request.
-type OpenChecksMsg struct{ Ref gh.ItemRef }
+type OpenChecksMsg struct{ Ref domain.ItemRef }
 
 // FatalMsg carries a failure the parent shows on its error screen. Only what
 // the user has to act on travels this way; everything else stays on the board
-// as a notice (see gh.IsFatal).
+// as a notice (see domain.IsFatal).
 type FatalMsg struct{ Err error }
 
 // colState is where one column stands. It is one value rather than a bool
@@ -66,23 +66,23 @@ type Model struct {
 
 	width, height int
 	spin          spinner.Model
-	work          gh.Work
+	work          domain.Work
 	col, row      int
 
 	// state is where each column stands. Each column is its own request and
 	// they answer at very different speeds, so the board is almost never in
 	// one state as a whole.
-	state [gh.WorkSectionCount]colState
+	state [domain.WorkSectionCount]colState
 
 	// notice is what GitHub said about a column the board carries on without:
 	// the previous answer is still on screen and r asks again. A successful
 	// fetch clears it, so a stale complaint never outlives what it described.
-	notice [gh.WorkSectionCount]string
+	notice [domain.WorkSectionCount]string
 
 	// fetchedAt is when each column's data arrived. The cards show relative
 	// times, and View must render the same string from the same state, so the
 	// clock is read once in Update rather than on every draw.
-	fetchedAt [gh.WorkSectionCount]time.Time
+	fetchedAt [domain.WorkSectionCount]time.Time
 
 	// cancel stops the in-flight fetch. The board is the one place where a
 	// request outlives the user's interest in it: they can switch tabs or ask
@@ -108,8 +108,8 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.spin.Tick}
 	// The notices go with the answers they described: a column that is being
 	// asked again has no failure to report until the new request answers.
-	m.notice = [gh.WorkSectionCount]string{}
-	for _, s := range gh.WorkSections() {
+	m.notice = [domain.WorkSectionCount]string{}
+	for _, s := range domain.WorkSections() {
 		m.state[s] = colLoading
 		cmds = append(cmds, fetchSection(ctx, m.src, s))
 	}
@@ -119,7 +119,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 // fetchSection asks for one column. The four columns share a context so one
 // Cancel still stops all of them, but they travel as four requests: asking
 // for all four in one is what made GitHub's front end stop answering.
-func fetchSection(ctx context.Context, src Source, s gh.WorkSection) tea.Cmd {
+func fetchSection(ctx context.Context, src Source, s domain.WorkSection) tea.Cmd {
 	return func() tea.Msg {
 		items, err := src.ListWorkSection(ctx, s)
 		// A cancelled fetch is not a failure: the user refreshed, left the tab
@@ -173,7 +173,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case errMsg:
 		m.state[msg.section] = colFailed
 		m.releaseFetch()
-		if gh.IsFatal(msg.err) {
+		if domain.IsFatal(msg.err) {
 			err := msg.err
 			return m, func() tea.Msg { return FatalMsg{err} }
 		}
@@ -214,14 +214,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ref, ok := m.SelectedRef()
 		// An issue has no diff. Opening an empty diff view would be a worse
 		// answer than doing nothing.
-		if !ok || ref.Kind != gh.ItemPR {
+		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "s":
 		ref, ok := m.SelectedRef()
 		// An issue has no checks.
-		if !ok || ref.Kind != gh.ItemPR {
+		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
@@ -229,9 +229,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) columns() int { return len(gh.WorkSections()) }
+func (m Model) columns() int { return len(domain.WorkSections()) }
 
-func (m Model) section() gh.WorkSection { return gh.WorkSections()[m.col] }
+func (m Model) section() domain.WorkSection { return domain.WorkSections()[m.col] }
 
 func wrapColumn(i, n int) int {
 	switch {
@@ -269,10 +269,10 @@ type Summary struct {
 // Failing is every pull request whose checks are red, wherever it sits.
 func (m Model) Summary() Summary {
 	s := Summary{FetchedAt: m.oldestFetch(), Ready: m.ready()}
-	s.Attention = len(m.work[gh.SectionReviewRequested])
+	s.Attention = len(m.work[domain.SectionReviewRequested])
 	for _, items := range m.work {
 		for _, it := range items {
-			if it.Checks.State == gh.CheckFailure {
+			if it.Checks.State == domain.CheckFailure {
 				s.Failing++
 			}
 		}
@@ -311,10 +311,10 @@ func (m Model) oldestFetch() time.Time {
 
 // SelectedRef names the card under the cursor. ok is false when the column is
 // empty.
-func (m Model) SelectedRef() (gh.ItemRef, bool) {
+func (m Model) SelectedRef() (domain.ItemRef, bool) {
 	items := m.work[m.section()]
 	if m.row >= len(items) {
-		return gh.ItemRef{}, false
+		return domain.ItemRef{}, false
 	}
 	return items[m.row].Ref, true
 }

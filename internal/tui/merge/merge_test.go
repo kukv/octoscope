@@ -7,23 +7,23 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 type fakeSource struct {
-	ctx gh.MergeContext
+	ctx domain.MergeContext
 	// seq is one answer per fetch, in the order the fetches are run. It is
 	// what tells a stale answer from a fresh one; without it every fetch
 	// answers the same and the two are indistinguishable.
-	seq     []gh.MergeContext
+	seq     []domain.MergeContext
 	fetches int
 	err     error
-	merged  []gh.MergeMethod
-	enabled []gh.MergeMethod
+	merged  []domain.MergeMethod
+	enabled []domain.MergeMethod
 	offCall int
 }
 
-func (f *fakeSource) PRMergeContext(context.Context, string, int) (gh.MergeContext, error) {
+func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeContext, error) {
 	i := f.fetches
 	f.fetches++
 	if i < len(f.seq) {
@@ -32,12 +32,12 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (gh.MergeConte
 	return f.ctx, f.err
 }
 
-func (f *fakeSource) MergePR(_ string, m gh.MergeMethod) error {
+func (f *fakeSource) MergePR(_ string, m domain.MergeMethod) error {
 	f.merged = append(f.merged, m)
 	return nil
 }
 
-func (f *fakeSource) EnableAutoMerge(_ string, m gh.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(_ string, m domain.MergeMethod) error {
 	f.enabled = append(f.enabled, m)
 	return nil
 }
@@ -47,8 +47,8 @@ func (f *fakeSource) DisableAutoMerge(string) error {
 	return nil
 }
 
-func ref() gh.ItemRef {
-	return gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 61}
+func ref() domain.ItemRef {
+	return domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61}
 }
 
 // loaded runs New's fetch and hands the answer back, the way Bubble Tea
@@ -78,19 +78,19 @@ func escape(m Model) (Model, tea.Cmd) {
 	return m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 }
 
-func autoMergeable() gh.MergeContext {
+func autoMergeable() domain.MergeContext {
 	c := mergeable()
 	c.AutoMergeAllowed = true
 	c.ViewerCanEnableAutoMerge = true
 	return c
 }
 
-func mergeable() gh.MergeContext {
-	return gh.MergeContext{
+func mergeable() domain.MergeContext {
+	return domain.MergeContext{
 		PullRequestID: "PR_1",
-		Mergeable:     gh.MergeableYes,
-		State:         gh.MergeStateUnstable,
-		Methods:       []gh.MergeMethod{gh.MergeSquash, gh.MergeCommit, gh.MergeRebase},
+		Mergeable:     domain.MergeableYes,
+		State:         domain.MergeStateUnstable,
+		Methods:       []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase},
 	}
 }
 
@@ -107,7 +107,7 @@ func TestEnterMergesWithTheMethodOnTheCursor(t *testing.T) {
 	if msg := cmd(); msg != (MergedMsg{Merged: true}) {
 		t.Fatalf("cmd() = %#v, want MergedMsg{Merged: true}", msg)
 	}
-	if len(f.merged) != 1 || f.merged[0] != gh.MergeCommit {
+	if len(f.merged) != 1 || f.merged[0] != domain.MergeCommit {
 		t.Errorf("merged = %v, want one MergeCommit (j moved off squash)", f.merged)
 	}
 }
@@ -116,14 +116,14 @@ func TestTheCursorStaysInsideWhatTheRepositoryAllows(t *testing.T) {
 	t.Parallel()
 
 	only := mergeable()
-	only.Methods = []gh.MergeMethod{gh.MergeRebase}
+	only.Methods = []domain.MergeMethod{domain.MergeRebase}
 	f := &fakeSource{ctx: only}
 	m := loaded(t, f)
 	m, _ = press(m, "j")
 	m, _ = press(m, "j")
 	_, cmd := enter(m)
 	_ = cmd()
-	if len(f.merged) != 1 || f.merged[0] != gh.MergeRebase {
+	if len(f.merged) != 1 || f.merged[0] != domain.MergeRebase {
 		t.Errorf("merged = %v, want one MergeRebase: j must not walk past the only method", f.merged)
 	}
 }
@@ -132,8 +132,8 @@ func TestEnterIsRefusedWhileGitHubIsStillWorkingItOut(t *testing.T) {
 	t.Parallel()
 
 	computing := mergeable()
-	computing.Mergeable = gh.MergeableUnknown
-	computing.State = gh.MergeStateUnknown
+	computing.Mergeable = domain.MergeableUnknown
+	computing.State = domain.MergeStateUnknown
 	f := &fakeSource{ctx: computing}
 	m := loaded(t, f)
 	_, cmd := enter(m)
@@ -170,7 +170,7 @@ func TestAutoMergeCannotBeChosenOnAPullRequestWithNothingToWaitFor(t *testing.T)
 	t.Parallel()
 
 	clean := mergeable()
-	clean.State = gh.MergeStateClean
+	clean.State = domain.MergeStateClean
 	clean.AutoMergeAllowed = true
 	clean.ViewerCanEnableAutoMerge = true
 	f := &fakeSource{ctx: clean}
@@ -211,7 +211,7 @@ func TestAQueuedMergeCanBeCancelledEvenWhenMergingIsBlocked(t *testing.T) {
 	t.Parallel()
 
 	stuck := mergeable()
-	stuck.Mergeable = gh.MergeableConflicting
+	stuck.Mergeable = domain.MergeableConflicting
 	stuck.AutoMergeAllowed = true
 	stuck.ViewerCanEnableAutoMerge = true
 	stuck.AutoMergeEnabled = true
@@ -322,10 +322,10 @@ func TestAnAnswerForAnotherPullRequestIsDropped(t *testing.T) {
 	t.Parallel()
 
 	m := loaded(t, &fakeSource{ctx: mergeable()})
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 62}
-	m, _ = m.Update(contextMsg{ref: other, gen: m.gen, ctx: gh.MergeContext{
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 62}
+	m, _ = m.Update(contextMsg{ref: other, gen: m.gen, ctx: domain.MergeContext{
 		PullRequestID: "PR_2",
-		Methods:       []gh.MergeMethod{gh.MergeRebase},
+		Methods:       []domain.MergeMethod{domain.MergeRebase},
 	}})
 	if m.ctx.PullRequestID != "PR_1" {
 		t.Errorf("PullRequestID = %q, want PR_1: the popup took another pull request's answer",
@@ -341,8 +341,8 @@ func TestTheAnswerToAReplacedFetchIsDropped(t *testing.T) {
 	t.Parallel()
 
 	only := mergeable()
-	only.Methods = []gh.MergeMethod{gh.MergeRebase}
-	f := &fakeSource{seq: []gh.MergeContext{mergeable(), mergeable(), only}}
+	only.Methods = []domain.MergeMethod{domain.MergeRebase}
+	f := &fakeSource{seq: []domain.MergeContext{mergeable(), mergeable(), only}}
 	m := loaded(t, f)
 
 	m, first := press(m, "r")
@@ -356,7 +356,7 @@ func TestTheAnswerToAReplacedFetchIsDropped(t *testing.T) {
 		t.Fatal("enter sent nothing")
 	}
 	_ = cmd()
-	if len(f.merged) != 1 || f.merged[0] != gh.MergeCommit {
+	if len(f.merged) != 1 || f.merged[0] != domain.MergeCommit {
 		t.Errorf("merged = %v, want one MergeCommit: a stale answer moved the cursor", f.merged)
 	}
 }
@@ -375,7 +375,7 @@ func TestRKeepsWhatTheUserChose(t *testing.T) {
 
 	_, cmd = enter(m)
 	_ = cmd()
-	if len(f.enabled) != 1 || f.enabled[0] != gh.MergeCommit {
+	if len(f.enabled) != 1 || f.enabled[0] != domain.MergeCommit {
 		t.Errorf("enabled = %v, want one MergeCommit: r threw away the method and the box", f.enabled)
 	}
 	if len(f.merged) != 0 {

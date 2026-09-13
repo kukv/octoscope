@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
@@ -38,11 +38,11 @@ var goldenFetchedAt = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
 // shows a card that has to be truncated as well as ones that fit.
 func goldenModel(width int) Model { return goldenBoard(overlongWork(), width, 40) }
 
-func goldenBoard(w gh.Work, width, height int) Model {
+func goldenBoard(w domain.Work, width, height int) Model {
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m = answeredAll(m, w)
-	for _, s := range gh.WorkSections() {
+	for _, s := range domain.WorkSections() {
 		m.fetchedAt[s] = goldenFetchedAt
 	}
 	return m
@@ -51,15 +51,15 @@ func goldenBoard(w gh.Work, width, height int) Model {
 // tallWork is a column with more cards than any terminal can show at once.
 // Without it every recording fits, and the recordings would say nothing about
 // what happens when a column overflows — which is the ordinary case.
-func tallWork() gh.Work {
+func tallWork() domain.Work {
 	w := overlongWork()
-	base := w[gh.SectionReviewRequested][0]
+	base := w[domain.SectionReviewRequested][0]
 	for i := range 20 {
 		card := base
-		card.Ref = gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 100 + i}
+		card.Ref = domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 100 + i}
 		card.Title = fmt.Sprintf("chore(deps): bump dependency number %d", i)
 		card.Labels = nil
-		w[gh.SectionReviewRequested] = append(w[gh.SectionReviewRequested], card)
+		w[domain.SectionReviewRequested] = append(w[domain.SectionReviewRequested], card)
 	}
 	return w
 }
@@ -90,7 +90,7 @@ func TestGoldenFitsTheTerminal(t *testing.T) {
 func TestScrollingFollowsTheCursorDownALongColumn(t *testing.T) {
 	m := goldenBoard(tallWork(), 120, 24)
 	visible := m.visibleCards(m.boardHeight())
-	if visible >= len(m.work[gh.SectionReviewRequested]) {
+	if visible >= len(m.work[domain.SectionReviewRequested]) {
 		t.Fatal("the fixture fits on screen; this test covers nothing")
 	}
 
@@ -135,10 +135,10 @@ func TestGoldenAPartiallyFilledBoard(t *testing.T) {
 			t.Cleanup(m.Cancel)
 
 			m, _ = m.Update(workMsg{
-				section: gh.SectionReviewRequested,
-				items:   overlongWork()[gh.SectionReviewRequested],
+				section: domain.SectionReviewRequested,
+				items:   overlongWork()[domain.SectionReviewRequested],
 			})
-			m.fetchedAt[gh.SectionReviewRequested] = goldenFetchedAt
+			m.fetchedAt[domain.SectionReviewRequested] = goldenFetchedAt
 			golden.Assert(t, "work_partial_"+lang.name+"_120", m.View())
 		})
 	}
@@ -156,14 +156,14 @@ const goldenFailure = "gh api: HTTP 502: Bad gateway (https://api.github.com/gra
 func failedBoard(width, height int) Model {
 	m := New(&fakeSource{work: overlongWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
-	for _, s := range gh.WorkSections() {
-		if s == gh.SectionYourPRs {
+	for _, s := range domain.WorkSections() {
+		if s == domain.SectionYourPRs {
 			continue
 		}
 		m, _ = m.Update(workMsg{section: s, items: overlongWork()[s]})
 		m.fetchedAt[s] = goldenFetchedAt
 	}
-	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: gh.Classify(gh.ErrTransient, goldenFailure)})
+	m, _ = m.Update(errMsg{section: domain.SectionYourPRs, err: domain.Classify(domain.ErrTransient, goldenFailure)})
 	return m
 }
 
@@ -191,7 +191,7 @@ func TestAFailedBoardStillFitsTheTerminal(t *testing.T) {
 	m := New(&fakeSource{work: tallWork()})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
 	m = answeredAll(m, tallWork())
-	m, _ = m.Update(errMsg{section: gh.SectionYourPRs, err: gh.Classify(gh.ErrTransient, goldenFailure)})
+	m, _ = m.Update(errMsg{section: domain.SectionYourPRs, err: domain.Classify(domain.ErrTransient, goldenFailure)})
 
 	out := m.View()
 	if got := len(strings.Split(out, "\n")); got > height {

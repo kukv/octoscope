@@ -1,11 +1,11 @@
-package gh_test
+package domain_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // What the user must act on takes the whole screen; everything else costs
@@ -19,13 +19,13 @@ func TestIsFatalOnlyForWhatTheUserMustActOn(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"gh is missing", gh.ErrGhNotFound, true},
-		{"not signed in", fmt.Errorf("gh pr list: %w", gh.ErrUnauthenticated), true},
-		{"GitHub did not answer", fmt.Errorf("gh pr list: %w", gh.ErrTransient), false},
+		{"gh is missing", domain.ErrGhNotFound, true},
+		{"not signed in", fmt.Errorf("gh pr list: %w", domain.ErrUnauthenticated), true},
+		{"GitHub did not answer", fmt.Errorf("gh pr list: %w", domain.ErrTransient), false},
 		{"anything else", errors.New("gh: HTTP 404"), false},
 	}
 	for _, tt := range tests {
-		if got := gh.IsFatal(tt.err); got != tt.want {
+		if got := domain.IsFatal(tt.err); got != tt.want {
 			t.Errorf("%s: IsFatal = %v, want %v", tt.name, got, tt.want)
 		}
 	}
@@ -34,12 +34,12 @@ func TestIsFatalOnlyForWhatTheUserMustActOn(t *testing.T) {
 func TestWorkSectionsCoversEveryColumn(t *testing.T) {
 	t.Parallel()
 
-	got := gh.WorkSections()
-	want := []gh.WorkSection{
-		gh.SectionReviewRequested,
-		gh.SectionYourPRs,
-		gh.SectionAssigned,
-		gh.SectionMentioned,
+	got := domain.WorkSections()
+	want := []domain.WorkSection{
+		domain.SectionReviewRequested,
+		domain.SectionYourPRs,
+		domain.SectionAssigned,
+		domain.SectionMentioned,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d sections, want %d", len(got), len(want))
@@ -54,13 +54,13 @@ func TestWorkSectionsCoversEveryColumn(t *testing.T) {
 func TestWorkIndexesBySection(t *testing.T) {
 	t.Parallel()
 
-	var w gh.Work
-	w[gh.SectionAssigned] = []gh.WorkItem{{Ref: gh.ItemRef{Number: 7}}}
+	var w domain.Work
+	w[domain.SectionAssigned] = []domain.WorkItem{{Ref: domain.ItemRef{Number: 7}}}
 
-	if n := len(w[gh.SectionAssigned]); n != 1 {
+	if n := len(w[domain.SectionAssigned]); n != 1 {
 		t.Fatalf("assigned column holds %d items, want 1", n)
 	}
-	if got := w[gh.SectionAssigned][0].Ref.Number; got != 7 {
+	if got := w[domain.SectionAssigned][0].Ref.Number; got != 7 {
 		t.Errorf("got #%d, want #7", got)
 	}
 }
@@ -70,20 +70,20 @@ func TestParseItemState(t *testing.T) {
 
 	tests := []struct {
 		state string
-		want  gh.ItemState
+		want  domain.ItemState
 	}{
-		{"OPEN", gh.StateOpen},
-		{"CLOSED", gh.StateClosed},
-		{"MERGED", gh.StateMerged},
+		{"OPEN", domain.StateOpen},
+		{"CLOSED", domain.StateClosed},
+		{"MERGED", domain.StateMerged},
 		// gh's REST output lower-cases what GraphQL sends in capitals.
-		{"open", gh.StateOpen},
-		{"merged", gh.StateMerged},
-		{"", gh.StateClosed},
-		{"SOMETHING_NEW", gh.StateClosed},
+		{"open", domain.StateOpen},
+		{"merged", domain.StateMerged},
+		{"", domain.StateClosed},
+		{"SOMETHING_NEW", domain.StateClosed},
 	}
 
 	for _, tt := range tests {
-		if got := gh.ParseItemState(tt.state); got != tt.want {
+		if got := domain.ParseItemState(tt.state); got != tt.want {
 			t.Errorf("%q: got %v, want %v", tt.state, got, tt.want)
 		}
 	}
@@ -94,17 +94,17 @@ func TestParseReviewDecision(t *testing.T) {
 
 	tests := []struct {
 		decision string
-		want     gh.ReviewState
+		want     domain.ReviewState
 	}{
-		{"APPROVED", gh.ReviewApproved},
-		{"CHANGES_REQUESTED", gh.ReviewChangesRequested},
-		{"REVIEW_REQUIRED", gh.ReviewRequired},
-		{"", gh.ReviewNone},
-		{"SOMETHING_NEW", gh.ReviewNone},
+		{"APPROVED", domain.ReviewApproved},
+		{"CHANGES_REQUESTED", domain.ReviewChangesRequested},
+		{"REVIEW_REQUIRED", domain.ReviewRequired},
+		{"", domain.ReviewNone},
+		{"SOMETHING_NEW", domain.ReviewNone},
 	}
 
 	for _, tt := range tests {
-		if got := gh.ParseReviewDecision(tt.decision); got != tt.want {
+		if got := domain.ParseReviewDecision(tt.decision); got != tt.want {
 			t.Errorf("%q: got %v, want %v", tt.decision, got, tt.want)
 		}
 	}
@@ -115,18 +115,18 @@ func TestParseReviewDecision(t *testing.T) {
 func TestEverySectionConstantIsASlotInWork(t *testing.T) {
 	t.Parallel()
 
-	sections := []gh.WorkSection{
-		gh.SectionReviewRequested,
-		gh.SectionYourPRs,
-		gh.SectionAssigned,
-		gh.SectionMentioned,
+	sections := []domain.WorkSection{
+		domain.SectionReviewRequested,
+		domain.SectionYourPRs,
+		domain.SectionAssigned,
+		domain.SectionMentioned,
 	}
 
-	var w gh.Work
+	var w domain.Work
 	if len(w) != len(sections) {
 		t.Fatalf("Work has %d slots, %d sections are declared", len(w), len(sections))
 	}
-	if got := len(gh.WorkSections()); got != len(sections) {
+	if got := len(domain.WorkSections()); got != len(sections) {
 		t.Errorf("WorkSections() returns %d, %d sections are declared", got, len(sections))
 	}
 	for _, s := range sections {
@@ -156,7 +156,7 @@ func TestSplitRepo(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			owner, name, ok := gh.SplitRepo(c.in)
+			owner, name, ok := domain.SplitRepo(c.in)
 			if owner != c.wantOwner || name != c.wantName || ok != c.wantOK {
 				t.Errorf("SplitRepo(%q) = (%q, %q, %v), want (%q, %q, %v)",
 					c.in, owner, name, ok, c.wantOwner, c.wantName, c.wantOK)

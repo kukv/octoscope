@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/tui/dialog"
 )
 
@@ -46,7 +46,7 @@ func TestValueIsWhatWasTypedUntilACandidateIsPicked(t *testing.T) {
 	t.Parallel()
 
 	m := typeInto(dialog.New("t", "h"), "koto")
-	m = m.SetCandidates([]gh.RepoCandidate{{Name: "kukv/koto", Stars: 3}})
+	m = m.SetCandidates([]domain.RepoCandidate{{Name: "kukv/koto", Stars: 3}})
 	if m.Value() != "koto" {
 		t.Errorf("Value() = %q before tab, want what was typed", m.Value())
 	}
@@ -60,7 +60,7 @@ func TestMovingBackOffTheCandidatesRestoresWhatWasTyped(t *testing.T) {
 	t.Parallel()
 
 	m := typeInto(dialog.New("t", "h"), "koto")
-	m = m.SetCandidates([]gh.RepoCandidate{{Name: "kukv/koto"}})
+	m = m.SetCandidates([]domain.RepoCandidate{{Name: "kukv/koto"}})
 	m, _ = m.Update(key("tab"))
 	m, _ = m.Update(key("up"))
 	if m.Value() != "koto" {
@@ -75,7 +75,7 @@ func TestNewCandidatesDoNotMoveTheCursorOffTheField(t *testing.T) {
 	t.Parallel()
 
 	m := typeInto(dialog.New("t", "h"), "koto")
-	m = m.SetCandidates([]gh.RepoCandidate{{Name: "kukv/koto"}})
+	m = m.SetCandidates([]domain.RepoCandidate{{Name: "kukv/koto"}})
 	if m.Value() != "koto" {
 		t.Errorf("Value() = %q, want the field to keep the cursor", m.Value())
 	}
@@ -88,7 +88,7 @@ func TestViewDrawsTheTitleHintAndCandidates(t *testing.T) {
 	t.Parallel()
 
 	m := dialog.New("Add a repository", "Type owner/name").SetWidth(60)
-	m = m.SetCandidates([]gh.RepoCandidate{{Name: "kukv/koto", Stars: 12}})
+	m = m.SetCandidates([]domain.RepoCandidate{{Name: "kukv/koto", Stars: 12}})
 	view := m.View()
 	for _, want := range []string{"Add a repository", "Type owner/name", "kukv/koto", "12"} {
 		if !strings.Contains(view, want) {
@@ -106,7 +106,7 @@ func TestASuggestionStaysOnOneLine(t *testing.T) {
 
 	for _, width := range []int{80, 120, 160} {
 		m := dialog.New("Add a repository", "Type owner/name").SetWidth(width)
-		m = m.SetCandidates([]gh.RepoCandidate{
+		m = m.SetCandidates([]domain.RepoCandidate{
 			{Name: "charmbracelet/lipgloss", Stars: 11812},
 			{Name: "marcoroth/lipgloss-ruby", Stars: 58},
 		})
@@ -129,7 +129,7 @@ func TestTheBoxFitsAnEightyColumnTerminal(t *testing.T) {
 	t.Parallel()
 
 	m := typeInto(dialog.New("Add a repository", "Type owner/name").SetWidth(80), "charmbracelet/lip")
-	m = m.SetCandidates([]gh.RepoCandidate{{Name: "charmbracelet/lipgloss", Stars: 11812}})
+	m = m.SetCandidates([]domain.RepoCandidate{{Name: "charmbracelet/lipgloss", Stars: 11812}})
 	for _, line := range strings.Split(m.View(), "\n") {
 		if w := ansi.StringWidth(line); w > 80 {
 			t.Errorf("a line is %d columns wide: %q", w, line)

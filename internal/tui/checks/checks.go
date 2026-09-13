@@ -9,16 +9,16 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 // Source is what the checks view needs. repo is "owner/repo"; the empty
 // string targets the workspace repository.
 type Source interface {
-	PRChecks(ctx context.Context, repo string, number int) (gh.Checks, error)
-	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]gh.LogLine, error)
-	RerunWorkflow(ctx context.Context, repo string, runID int64, scope gh.RerunScope) error
+	PRChecks(ctx context.Context, repo string, number int) (domain.Checks, error)
+	JobLog(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]domain.LogLine, error)
+	RerunWorkflow(ctx context.Context, repo string, runID int64, scope domain.RerunScope) error
 	OpenWeb(url string) error
 }
 
@@ -29,12 +29,12 @@ type ClosedMsg struct{}
 type ErrorMsg struct{ Err error }
 
 type checksMsg struct {
-	ref    gh.ItemRef
-	checks gh.Checks
+	ref    domain.ItemRef
+	checks domain.Checks
 }
 
 type errMsg struct {
-	ref gh.ItemRef
+	ref domain.ItemRef
 	err error
 }
 
@@ -48,18 +48,18 @@ const (
 
 type Model struct {
 	src Source
-	ref gh.ItemRef
+	ref domain.ItemRef
 
 	width, height int
 
 	loading bool
 	spin    spinner.Model
 
-	checks gh.Checks
+	checks domain.Checks
 	// order is the checks as drawn: failing workflows first, and the checks
 	// of one workflow together. It is rebuilt when the checks arrive rather
 	// than on every draw, because View may do no work of its own.
-	order []gh.CheckRun
+	order []domain.CheckRun
 	row   int
 	top   int
 
@@ -72,7 +72,7 @@ type Model struct {
 	// see startRerun), which scope is picked, and whether a send is in
 	// flight.
 	rerunPhase    rerunPhase
-	rerunScope    gh.RerunScope
+	rerunScope    domain.RerunScope
 	rerunRunID    int64
 	rerunWorkflow string
 
@@ -80,7 +80,7 @@ type Model struct {
 	// failedOnly was toggled off. logJob is the id of the check that log
 	// belongs to (or is being fetched for); an answer is kept only while the
 	// cursor is still on the job it was asked for.
-	log        []gh.LogLine
+	log        []domain.LogLine
 	logJob     int64
 	logRow     int
 	hscroll    int
@@ -95,7 +95,7 @@ type Model struct {
 }
 
 // New builds the view for one pull request's checks.
-func New(src Source, ref gh.ItemRef) Model {
+func New(src Source, ref domain.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	return Model{src: src, ref: ref, loading: true, spin: s, failedOnly: true}
@@ -283,7 +283,7 @@ func (m Model) follow() Model {
 // checks together. A check with no workflow behind it belongs to no group and
 // sorts after all of them, the StatusContext last of those: it is the one the
 // view can do the least with.
-func arrange(runs []gh.CheckRun) []gh.CheckRun {
+func arrange(runs []domain.CheckRun) []domain.CheckRun {
 	worst := map[string]int{}
 	first := map[string]int{}
 	for i, r := range runs {
@@ -295,11 +295,11 @@ func arrange(runs []gh.CheckRun) []gh.CheckRun {
 			first[r.Workflow] = i
 		}
 	}
-	out := append([]gh.CheckRun(nil), runs...)
+	out := append([]domain.CheckRun(nil), runs...)
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i], out[j]
-		if (a.Kind == gh.CheckKindStatus) != (b.Kind == gh.CheckKindStatus) {
-			return b.Kind == gh.CheckKindStatus
+		if (a.Kind == domain.CheckKindStatus) != (b.Kind == domain.CheckKindStatus) {
+			return b.Kind == domain.CheckKindStatus
 		}
 		// Ranking a check with no workflow against the workflows would let
 		// one such check's state carry every other one along with it: they
@@ -324,15 +324,15 @@ func arrange(runs []gh.CheckRun) []gh.CheckRun {
 // grouped under. A StatusContext never does, and neither does a check run an
 // App created: GitHub reports those with a null checkSuite.workflowRun,
 // leaving RunID zero and the workflow's name empty.
-func hasWorkflow(r gh.CheckRun) bool {
-	return r.Kind == gh.CheckKindRun && r.RunID != 0
+func hasWorkflow(r domain.CheckRun) bool {
+	return r.Kind == domain.CheckKindRun && r.RunID != 0
 }
 
-func rank(s gh.CheckState) int {
+func rank(s domain.CheckState) int {
 	switch s {
-	case gh.CheckFailure:
+	case domain.CheckFailure:
 		return 3
-	case gh.CheckRunning, gh.CheckPending:
+	case domain.CheckRunning, domain.CheckPending:
 		return 2
 	default:
 		return 1

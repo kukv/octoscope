@@ -10,60 +10,60 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type fakeSource struct {
-	files  []gh.FileDiff
+	files  []domain.FileDiff
 	err    error
-	review gh.ReviewContext
+	review domain.ReviewContext
 }
 
-func (f *fakeSource) PRDiff(context.Context, string, int) ([]gh.FileDiff, error) {
+func (f *fakeSource) PRDiff(context.Context, string, int) ([]domain.FileDiff, error) {
 	return f.files, f.err
 }
 
-func (f *fakeSource) PRReviewContext(context.Context, string, int) (gh.ReviewContext, error) {
+func (f *fakeSource) PRReviewContext(context.Context, string, int) (domain.ReviewContext, error) {
 	return f.review, nil
 }
 
-func (f *fakeSource) PostLineComment(usecase.ReviewTarget, gh.PendingComment) (string, error) {
+func (f *fakeSource) PostLineComment(usecase.ReviewTarget, domain.PendingComment) (string, error) {
 	return "", nil
 }
 
 func (f *fakeSource) DiscardReview(string) error { return nil }
 
-func (f *fakeSource) SubmitReview(usecase.ReviewTarget, gh.ReviewEvent, string) error { return nil }
+func (f *fakeSource) SubmitReview(usecase.ReviewTarget, domain.ReviewEvent, string) error { return nil }
 
 // fixture is two files, so that moving between files is testable, with a
 // second hunk in the first so that hunk movement is too.
-func fixture() []gh.FileDiff {
-	return []gh.FileDiff{
+func fixture() []domain.FileDiff {
+	return []domain.FileDiff{
 		{
-			Path: "graph/walk.go", Status: gh.FileModified, Additions: 4, Deletions: 1,
-			Hunks: []gh.Hunk{
+			Path: "graph/walk.go", Status: domain.FileModified, Additions: 4, Deletions: 1,
+			Hunks: []domain.Hunk{
 				{
 					Header: "@@ -12,7 +12,9 @@ func Walk(ctx context.Context, q string) error {",
-					Lines: []gh.DiffLine{
-						{Kind: gh.LineContext, OldLine: 12, NewLine: 12, Text: "\tctx, cancel := context.WithTimeout(ctx, d)"},
-						{Kind: gh.LineRemoved, OldLine: 13, Text: "\tif depth == 0 {"},
-						{Kind: gh.LineAdded, NewLine: 13, Text: "\tif depth <= 0 {"},
-						{Kind: gh.LineAdded, NewLine: 14, Text: "\t\tdepth = defaultDepth"},
+					Lines: []domain.DiffLine{
+						{Kind: domain.LineContext, OldLine: 12, NewLine: 12, Text: "\tctx, cancel := context.WithTimeout(ctx, d)"},
+						{Kind: domain.LineRemoved, OldLine: 13, Text: "\tif depth == 0 {"},
+						{Kind: domain.LineAdded, NewLine: 13, Text: "\tif depth <= 0 {"},
+						{Kind: domain.LineAdded, NewLine: 14, Text: "\t\tdepth = defaultDepth"},
 					},
 				},
 				{
 					Header: "@@ -40,3 +42,4 @@ func helper() {",
-					Lines: []gh.DiffLine{
-						{Kind: gh.LineContext, OldLine: 40, NewLine: 42, Text: "\t_ = q"},
-						{Kind: gh.LineAdded, NewLine: 43, Text: "\t_ = depth"},
+					Lines: []domain.DiffLine{
+						{Kind: domain.LineContext, OldLine: 40, NewLine: 42, Text: "\t_ = q"},
+						{Kind: domain.LineAdded, NewLine: 43, Text: "\t_ = depth"},
 					},
 				},
 			},
 		},
 		{
-			Path: "logo.png", Status: gh.FileModified, Binary: true,
+			Path: "logo.png", Status: domain.FileModified, Binary: true,
 		},
 	}
 }
@@ -71,7 +71,7 @@ func fixture() []gh.FileDiff {
 func loaded(t *testing.T, width, height int) Model {
 	t.Helper()
 	m := New(&fakeSource{files: fixture()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
 	// The header's title and branches arrive with the review context, not
@@ -85,7 +85,7 @@ func loaded(t *testing.T, width, height int) Model {
 // no-changes note is what draws.
 func emptyDiff(t *testing.T, width, height int) Model {
 	t.Helper()
-	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 129})
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 129})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: nil})
 	return m
@@ -96,8 +96,8 @@ func emptyDiff(t *testing.T, width, height int) Model {
 // patch-omitted note is what draws instead of the binary one.
 func noPatchDiff(t *testing.T, width, height int) Model {
 	t.Helper()
-	files := []gh.FileDiff{{Path: "vendor/bundle.js", Status: gh.FileModified, PatchOmitted: true}}
-	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 130})
+	files := []domain.FileDiff{{Path: "vendor/bundle.js", Status: domain.FileModified, PatchOmitted: true}}
+	m := New(&fakeSource{files: files}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 130})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
 	return m
@@ -208,7 +208,7 @@ func TestOpeningADiffParksOnTheFirstLine(t *testing.T) {
 // line there too, not on the new file's own hunk header.
 func TestChangingFileParksOnTheFirstLine(t *testing.T) {
 	files := manyFilesFixture()
-	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m := New(&fakeSource{files: files}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
 	if got := m.rows[0].kind; got != rowHunkHeader {
@@ -254,7 +254,7 @@ func TestEscAsksTheParentToClose(t *testing.T) {
 // opens, and its answer must not land here.
 func TestAnswersForAnotherPullRequestAreDropped(t *testing.T) {
 	m := loaded(t, 120, 30)
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 	before := len(m.files)
 	m, _ = m.Update(diffMsg{ref: other, files: nil})
 	if len(m.files) != before {
@@ -278,7 +278,7 @@ func TestTheDiffFitsTheTerminal(t *testing.T) {
 }
 
 func TestCurrentRowIsZeroBeforeAnythingLoads(t *testing.T) {
-	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1})
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1})
 	if got := m.currentRow(); got.kind != rowHunkHeader || got.hunk != 0 || got.text != "" {
 		t.Errorf("currentRow on an empty model = %+v, want the zero row", got)
 	}
@@ -295,7 +295,7 @@ func TestCurrentRowFollowsTheCursor(t *testing.T) {
 // failure, which leaves nothing to show: it still becomes ErrorMsg for the
 // parent's whole-screen error view.
 func TestADiffFailureGoesToTheParentsErrorScreen(t *testing.T) {
-	m := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, cmd := m.Update(errMsg{ref: m.ref, err: errors.New("boom")})
 	if cmd == nil {
 		t.Fatal("a diff failure produced no command")
@@ -354,7 +354,7 @@ func TestReviewMsgClearsTheDeclineMessage(t *testing.T) {
 	if m.declined == "" {
 		t.Fatal("no decline message to begin with; this test proves nothing")
 	}
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: gh.ReviewContext{PullRequestID: "PR_1"}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequestID: "PR_1"}})
 	if m.declined != "" {
 		t.Errorf("declined = %q after the review context landed, want cleared", m.declined)
 	}
@@ -399,7 +399,7 @@ func TestAReviewFailureLeavesTheDiffReadable(t *testing.T) {
 // user just left is still in flight, and its failure must not land here.
 func TestAReviewFailureForAnotherPullRequestIsDropped(t *testing.T) {
 	m := loaded(t, 120, 30)
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 	m, _ = m.Update(reviewErrMsg{ref: other, err: errors.New("boom")})
 	if strings.Contains(ansi.Strip(m.View()), "boom") {
 		t.Errorf("a review failure for %v was shown in this view's footer", other)
@@ -503,15 +503,15 @@ func TestNarrowingTheTerminalLeavesTheSidebar(t *testing.T) {
 // manyFilesFixture is more files than a typical terminal's sidebar has room
 // for, so moving the selection past the bottom exercises the sidebar's own
 // scroll.
-func manyFilesFixture() []gh.FileDiff {
-	files := make([]gh.FileDiff, 20)
+func manyFilesFixture() []domain.FileDiff {
+	files := make([]domain.FileDiff, 20)
 	for i := range files {
-		files[i] = gh.FileDiff{
-			Path: fmt.Sprintf("pkg/file%02d.go", i), Status: gh.FileModified,
+		files[i] = domain.FileDiff{
+			Path: fmt.Sprintf("pkg/file%02d.go", i), Status: domain.FileModified,
 			Additions: 1,
-			Hunks: []gh.Hunk{{
+			Hunks: []domain.Hunk{{
 				Header: "@@ -1,1 +1,1 @@",
-				Lines:  []gh.DiffLine{{Kind: gh.LineAdded, NewLine: 1, Text: "x"}},
+				Lines:  []domain.DiffLine{{Kind: domain.LineAdded, NewLine: 1, Text: "x"}},
 			}},
 		}
 	}
@@ -523,7 +523,7 @@ func manyFilesFixture() []gh.FileDiff {
 // fit, moving the selection past the bottom must not run it off screen.
 func TestTheSidebarScrollsToKeepTheSelectionVisible(t *testing.T) {
 	files := manyFilesFixture()
-	m := New(&fakeSource{files: files}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+	m := New(&fakeSource{files: files}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 15})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: files})
 	m.sidebar = true

@@ -9,9 +9,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/browser"
-	"github.com/kukv/octoscope/internal/gh"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/checks"
 	"github.com/kukv/octoscope/internal/tui/detail"
@@ -448,7 +448,7 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) openDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) openDetail(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.detail = detail.New(m.src, ref)
 	m.stack = []overlay{overlayDetail}
 	// The view is built after the terminal size is known, so it never sees the
@@ -459,19 +459,19 @@ func (m Model) openDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 
 // openDiff shows the diff on its own, with the tabs underneath: the Work
 // board and a Repos row have no detail view open when they ask for it.
-func (m Model) openDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) openDiff(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.stack = []overlay{overlayDiff}
 	return m.startDiff(ref)
 }
 
 // openDiffOverDetail puts the diff on top of the detail view, so esc goes
 // back to it rather than to the tabs.
-func (m Model) openDiffOverDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) openDiffOverDetail(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.stack = append(m.stack, overlayDiff)
 	return m.startDiff(ref)
 }
 
-func (m Model) startDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) startDiff(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.diff = diff.New(m.src, ref)
 	// The view is built after the terminal size is known, so it never sees the
 	// WindowSizeMsg that told the others how wide they are.
@@ -481,19 +481,19 @@ func (m Model) startDiff(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 
 // openChecks shows the checks on their own, with the tabs underneath: the
 // Work board and a Repos row have no detail view open when they ask for it.
-func (m Model) openChecks(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) openChecks(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.stack = []overlay{overlayChecks}
 	return m.startChecks(ref)
 }
 
 // openChecksOverDetail puts checks on top of the detail view, so esc goes
 // back to it rather than to the tabs.
-func (m Model) openChecksOverDetail(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) openChecksOverDetail(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.stack = append(m.stack, overlayChecks)
 	return m.startChecks(ref)
 }
 
-func (m Model) startChecks(ref gh.ItemRef) (tea.Model, tea.Cmd) {
+func (m Model) startChecks(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.checks = checks.New(m.src, ref)
 	// The view is built after the terminal size is known, so it never sees the
 	// WindowSizeMsg that told the others how wide they are.
@@ -503,7 +503,7 @@ func (m Model) startChecks(ref gh.ItemRef) (tea.Model, tea.Cmd) {
 
 // fail moves to the error screen for a failure that is not tied to any one
 // overlay: a tab has found that the user must act before anything can work
-// (gh.IsFatal), everything else being a line on the tab itself. esc on this
+// (domain.IsFatal), everything else being a line on the tab itself. esc on this
 // error must never pop the stack: whatever overlay is on top of it, if any,
 // did not fail.
 func (m Model) fail(err error) (tea.Model, tea.Cmd) {
@@ -528,9 +528,9 @@ func (m Model) failOverlay(err error, o overlay) (tea.Model, tea.Cmd) {
 func (m Model) showError(err error) (tea.Model, tea.Cmd) {
 	var noBrowser *browser.NoneError
 	switch {
-	case errors.Is(err, gh.ErrGhNotFound):
+	case errors.Is(err, domain.ErrGhNotFound):
 		m.errText = i18n.T("error.gh_not_found")
-	case errors.Is(err, gh.ErrUnauthenticated):
+	case errors.Is(err, domain.ErrUnauthenticated):
 		m.errText = i18n.T("error.unauthenticated")
 	case errors.As(err, &noBrowser):
 		m.errText = i18n.Tf("error.no_browser", map[string]any{"URL": noBrowser.URL})

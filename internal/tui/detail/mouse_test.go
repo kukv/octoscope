@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 func wheelDown() tea.MouseWheelMsg {
@@ -15,9 +15,9 @@ func wheelDown() tea.MouseWheelMsg {
 
 // longPR has a body taller than the viewport: a wheel test against a body
 // that already fits proves nothing.
-func longPR() gh.PR {
-	return gh.PR{
-		Number: 1, Title: "a long one", State: gh.StateOpen,
+func longPR() domain.PR {
+	return domain.PR{
+		Number: 1, Title: "a long one", State: domain.StateOpen,
 		Body: strings.Repeat("a paragraph of the description\n\n", 40),
 	}
 }
@@ -40,8 +40,8 @@ func TestTheWheelIsIgnoredUnderAnOverlay(t *testing.T) {
 		t.Helper()
 		f := &fakeSource{
 			pr:        longPR(),
-			labels:    []gh.Label{{Name: "bug"}},
-			reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+			labels:    []domain.Label{{Name: "bug"}},
+			reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 		}
 		m := loaded(f, prRef())
 		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})

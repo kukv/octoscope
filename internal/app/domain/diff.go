@@ -1,4 +1,4 @@
-package gh
+package domain
 
 // FileStatus is what happened to one file in a diff.
 type FileStatus int

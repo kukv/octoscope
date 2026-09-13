@@ -8,12 +8,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
-	"github.com/kukv/octoscope/internal/gh"
 )
 
 // sized is a model with results in it, at the width the test cares about.
-func sized(t *testing.T, width int, items []gh.WorkItem) Model {
+func sized(t *testing.T, width int, items []domain.WorkItem) Model {
 	t.Helper()
 
 	m := New(&fakeSource{items: items})
@@ -35,8 +35,8 @@ func TestTheQueryIsOnShowAboveTheFilters(t *testing.T) {
 func TestAResultRowShowsItsRepositoryAndNumber(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 120, []gh.WorkItem{{
-		Ref:   gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/octoscope", Number: 41},
+	m := sized(t, 120, []domain.WorkItem{{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 41},
 		Title: "chore(deps): golangci-lint",
 	}})
 	view := m.View()
@@ -52,10 +52,10 @@ func TestAResultRowShowsItsRepositoryAndNumber(t *testing.T) {
 func TestEveryLineFitsTheTerminal(t *testing.T) {
 	t.Parallel()
 
-	items := make([]gh.WorkItem, 60)
+	items := make([]domain.WorkItem, 60)
 	for i := range items {
-		items[i] = gh.WorkItem{
-			Ref:   gh.ItemRef{Repo: "kukv/a-repository-with-a-long-name", Number: i},
+		items[i] = domain.WorkItem{
+			Ref:   domain.ItemRef{Repo: "kukv/a-repository-with-a-long-name", Number: i},
 			Title: strings.Repeat("long title ", 20),
 		}
 	}
@@ -73,7 +73,7 @@ func TestEveryLineFitsTheTerminal(t *testing.T) {
 func TestTheViewFitsTheHeight(t *testing.T) {
 	t.Parallel()
 
-	items := make([]gh.WorkItem, 60)
+	items := make([]domain.WorkItem, 60)
 	m := sized(t, 120, items)
 	if got := len(strings.Split(m.View(), "\n")); got > 40 {
 		t.Errorf("the view is %d rows, want at most 40", got)
@@ -85,7 +85,7 @@ func TestTheViewFitsTheHeight(t *testing.T) {
 func TestAFullPageSaysItMayHaveBeenCutShort(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 120, make([]gh.WorkItem, 50))
+	m := sized(t, 120, make([]domain.WorkItem, 50))
 	if !strings.Contains(m.View(), "50+") {
 		t.Errorf("a full page does not say it may be cut short:\n%s", m.View())
 	}
@@ -97,7 +97,7 @@ func TestAFullPageSaysItMayHaveBeenCutShort(t *testing.T) {
 func TestTheCappedCountComesFromOneString(t *testing.T) {
 	t.Parallel()
 
-	m := sized(t, 120, make([]gh.WorkItem, searchCap))
+	m := sized(t, 120, make([]domain.WorkItem, searchCap))
 	view := m.View()
 	if !strings.Contains(view, "50+") {
 		t.Errorf("the capped count is missing:\n%s", view)

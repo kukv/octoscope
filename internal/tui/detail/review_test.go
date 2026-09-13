@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/review"
 	"github.com/kukv/octoscope/internal/tui/theme"
@@ -28,8 +28,8 @@ func typeInto(m Model, s string) Model {
 // the reviewer what they already wrote (.claude/rules/errors.md).
 func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -67,12 +67,12 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 // shows a different one -- the worst failure in this phase, since the
 // review would go to the wrong pull request.
 func TestAStaleReviewContextIsDropped(t *testing.T) {
-	f := &fakeSource{pr: gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen}}
-	other := gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 999}
+	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
+	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 
 	t.Run("reviewContextMsg", func(t *testing.T) {
 		m := loaded(f, prRef())
-		m, _ = m.Update(reviewContextMsg{ref: other, ctx: gh.ReviewContext{PullRequestID: "PR_OTHER"}})
+		m, _ = m.Update(reviewContextMsg{ref: other, ctx: domain.ReviewContext{PullRequestID: "PR_OTHER"}})
 		if m.mode == modeSubmit {
 			t.Error("the popup opened on a stale reviewContextMsg, want it to stay closed")
 		}
@@ -99,8 +99,8 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 // review popup: esc must not leave the failure printed under the body.
 func TestLeavingTheSubmitPopupTakesItsErrorWithIt(t *testing.T) {
 	f := &fakeSource{
-		pr:        gh.PR{Number: 1, Title: "first pr", State: gh.StateOpen},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_1"},
+		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_1"},
 	}
 	m := loaded(f, prRef())
 	m, cmd := m.Update(key("v"))

@@ -3,7 +3,7 @@ package usecase
 import (
 	"fmt"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // ReviewTarget names the pull request a review acts on, and the unsubmitted
@@ -17,7 +17,7 @@ type ReviewTarget struct {
 // PostLineComment attaches one line comment to the pull request's unsubmitted
 // review, starting that review first if there is none: on GitHub a line
 // comment has to hang off a review.
-func (u *Usecase) PostLineComment(t ReviewTarget, c gh.PendingComment) (string, error) {
+func (u *Usecase) PostLineComment(t ReviewTarget, c domain.PendingComment) (string, error) {
 	reviewID := t.PendingID
 	if reviewID == "" {
 		id, err := u.reviews.StartReview(t.PullRequestID)
@@ -35,7 +35,7 @@ func (u *Usecase) PostLineComment(t ReviewTarget, c gh.PendingComment) (string, 
 // SubmitReview sends the review out. With nothing waiting it creates and
 // submits in one call: starting a review first would leave an empty pending
 // review behind if the submission then failed.
-func (u *Usecase) SubmitReview(t ReviewTarget, event gh.ReviewEvent, body string) error {
+func (u *Usecase) SubmitReview(t ReviewTarget, event domain.ReviewEvent, body string) error {
 	if t.PendingID != "" {
 		if err := u.reviews.SubmitReview(t.PendingID, event, body); err != nil {
 			return fmt.Errorf("submit review: %w", err)

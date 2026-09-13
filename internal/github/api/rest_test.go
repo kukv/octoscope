@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // serveREST stands in for GitHub's REST API. It records every request, since
@@ -98,7 +98,7 @@ func TestAWriteIsNotRepeated(t *testing.T) {
 		_, err := c.write(context.Background(), http.MethodPost, "repos/kukv/octoscope/issues/1/comments", map[string]string{"body": "hi"})
 		return err
 	}()
-	if !errors.Is(err, gh.ErrTransient) {
+	if !errors.Is(err, domain.ErrTransient) {
 		t.Fatalf("err = %v, want ErrTransient", err)
 	}
 	if calls != 1 {

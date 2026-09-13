@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -98,7 +98,7 @@ func TestClickingASubTabSwitchesToIt(t *testing.T) {
 }
 
 func TestClickingOutsideTheRowsChangesNothing(t *testing.T) {
-	m := sized(loadedModel(&fakeSource{prs: samplePRs(), issues: []gh.Issue{}}), 120)
+	m := sized(loadedModel(&fakeSource{prs: samplePRs(), issues: []domain.Issue{}}), 120)
 	before, _ := m.SelectedRef()
 
 	for name, point := range map[string][2]int{
@@ -242,9 +242,9 @@ func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
 // and a hit-test that ignored the offset would select the wrong one exactly
 // when the list is long enough to be worth scrolling.
 func TestClickingARowInAScrolledList(t *testing.T) {
-	var prs []gh.PR
+	var prs []domain.PR
 	for i := range 60 {
-		prs = append(prs, gh.PR{Number: i + 1, Title: fmt.Sprintf("pr-%d", i)})
+		prs = append(prs, domain.PR{Number: i + 1, Title: fmt.Sprintf("pr-%d", i)})
 	}
 	m := loadedModel(&fakeSource{prs: prs})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})

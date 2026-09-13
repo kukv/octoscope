@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -472,7 +472,7 @@ func (m Model) threadText(r row) string {
 
 // diffTextLine draws the gutter (two line numbers and the +/- marker) and
 // the line's own text, syntax-highlighted.
-func (m Model) diffTextLine(l gh.DiffLine, width int) string {
+func (m Model) diffTextLine(l domain.DiffLine, width int) string {
 	old, _, num := lineNumbers(l)
 	fw := m.lineNumberWidth()
 	body := theme.Highlight(m.currentPath(), clip(l.Text, max(width-m.gutter(), 0)))
@@ -513,7 +513,7 @@ func (m Model) currentPath() string {
 
 // lineNumbers is a line's old and new numbers, blank on the side the line
 // does not exist on, and the plain, uncoloured +/- marker between them.
-func lineNumbers(l gh.DiffLine) (old, marker, num string) {
+func lineNumbers(l domain.DiffLine) (old, marker, num string) {
 	if l.OldLine > 0 {
 		old = strconv.Itoa(l.OldLine)
 	}
@@ -521,9 +521,9 @@ func lineNumbers(l gh.DiffLine) (old, marker, num string) {
 		num = strconv.Itoa(l.NewLine)
 	}
 	switch l.Kind {
-	case gh.LineAdded:
+	case domain.LineAdded:
 		marker = "+"
-	case gh.LineRemoved:
+	case domain.LineRemoved:
 		marker = "-"
 	default:
 		marker = " "
@@ -532,11 +532,11 @@ func lineNumbers(l gh.DiffLine) (old, marker, num string) {
 }
 
 // markerStyle colours the +/- marker for a line that is not the cursor row.
-func markerStyle(k gh.DiffLineKind) string {
+func markerStyle(k domain.DiffLineKind) string {
 	switch k {
-	case gh.LineAdded:
+	case domain.LineAdded:
 		return theme.DiffAdded().Render("+")
-	case gh.LineRemoved:
+	case domain.LineRemoved:
 		return theme.DiffRemoved().Render("-")
 	default:
 		return " "

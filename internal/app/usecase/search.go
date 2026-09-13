@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/kukv/octoscope/internal/app/config"
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // SearchItems runs the Search tab's query.
-func (u *Usecase) SearchItems(ctx context.Context, query string) ([]gh.WorkItem, error) {
+func (u *Usecase) SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error) {
 	return u.crossRepo.SearchItems(ctx, query)
 }
 

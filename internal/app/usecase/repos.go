@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 // seedLimit is how many repositories one owner contributes to the seeding
@@ -19,7 +19,7 @@ func (u *Usecase) SaveRepositories(repos []string) error {
 
 // SearchRepos looks for repositories to offer while the add dialog is being
 // typed into.
-func (u *Usecase) SearchRepos(ctx context.Context, query string, limit int) ([]gh.RepoCandidate, error) {
+func (u *Usecase) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
 	return u.repos.SearchRepos(ctx, query, limit)
 }
 
@@ -28,14 +28,14 @@ func (u *Usecase) SearchRepos(ctx context.Context, query string, limit int) ([]g
 // without the organisation scope is common enough that losing the rest over
 // it would be the wrong trade, so an organisation that cannot be read is
 // passed over rather than returned.
-func (u *Usecase) SeedCandidates(ctx context.Context) ([]gh.RepoCandidate, error) {
+func (u *Usecase) SeedCandidates(ctx context.Context) ([]domain.RepoCandidate, error) {
 	own, err := u.repos.ListOwnRepos(ctx, "", seedLimit)
 	if err != nil {
 		return nil, fmt.Errorf("list own repos: %w", err)
 	}
 	seen := make(map[string]bool, len(own))
-	var out []gh.RepoCandidate
-	add := func(candidates []gh.RepoCandidate) {
+	var out []domain.RepoCandidate
+	add := func(candidates []domain.RepoCandidate) {
 		for _, c := range candidates {
 			if seen[c.Name] {
 				continue

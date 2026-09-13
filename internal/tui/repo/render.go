@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
 	"github.com/kukv/octoscope/internal/tui/layout"
@@ -196,7 +196,7 @@ func (m Model) rowWindow(rows int) int {
 func (m Model) row(i int) string {
 	var (
 		state, number, title, checks, age string
-		labels                            []gh.Label
+		labels                            []domain.Label
 	)
 	if m.tab == tabPRs {
 		pr := m.prs[i]
@@ -266,7 +266,7 @@ func (m Model) summary() []string {
 
 // checksBar colours the two halves of the bar apart: what has passed takes the
 // colour of the roll-up, what has not stays muted.
-func checksBar(c gh.Checks) string {
+func checksBar(c domain.Checks) string {
 	done, rest := icon.ChecksBar(c)
 	if done == "" && rest == "" {
 		return ""
@@ -276,7 +276,7 @@ func checksBar(c gh.Checks) string {
 
 // badges draws the labels that fit in room columns, in the colours GitHub
 // gave them. A label that would be cut in half is left out altogether.
-func badges(labels []gh.Label, room int) string {
+func badges(labels []domain.Label, room int) string {
 	var b strings.Builder
 	for _, l := range labels {
 		text := " " + l.Name + " "

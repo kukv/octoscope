@@ -3,7 +3,7 @@ package review
 import (
 	"strings"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/theme"
 )
@@ -30,12 +30,12 @@ func (m Model) View() string {
 // leave it on picked out.
 func (m Model) eventLine() string {
 	options := []struct {
-		event gh.ReviewEvent
+		event domain.ReviewEvent
 		text  string
 	}{
-		{gh.EventComment, i18n.T("submit.comment")},
-		{gh.EventApprove, i18n.T("submit.approve")},
-		{gh.EventRequestChanges, i18n.T("submit.request_changes")},
+		{domain.EventComment, i18n.T("submit.comment")},
+		{domain.EventApprove, i18n.T("submit.approve")},
+		{domain.EventRequestChanges, i18n.T("submit.request_changes")},
 	}
 	parts := make([]string, len(options))
 	for i, o := range options {

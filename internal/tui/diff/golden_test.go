@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 	"github.com/kukv/octoscope/internal/tui/icon"
@@ -29,10 +29,10 @@ var goldenLanguages = []struct {
 
 // goldenFixture adds a Japanese comment to the plain fixture, so a recording
 // catches the column drift that all-ASCII source would hide.
-func goldenFixture() []gh.FileDiff {
+func goldenFixture() []domain.FileDiff {
 	files := fixture()
-	files[0].Hunks[0].Lines = append([]gh.DiffLine{
-		{Kind: gh.LineContext, OldLine: 11, NewLine: 11, Text: "\t// 深さの上限に達したら探索を打ち切る"},
+	files[0].Hunks[0].Lines = append([]domain.DiffLine{
+		{Kind: domain.LineContext, OldLine: 11, NewLine: 11, Text: "\t// 深さの上限に達したら探索を打ち切る"},
 	}, files[0].Hunks[0].Lines...)
 	return files
 }
@@ -40,17 +40,17 @@ func goldenFixture() []gh.FileDiff {
 // goldenReview names the pull request, its branches, and one open thread
 // with a Japanese comment, so the recording covers the header's title line
 // and a thread row at once.
-func goldenReview() gh.ReviewContext {
-	return gh.ReviewContext{
+func goldenReview() domain.ReviewContext {
+	return domain.ReviewContext{
 		PullRequestID: "PR_128",
 		Title:         "add relation graph traversal",
 		Head:          "feat/graph",
 		Base:          "main",
-		Threads: []gh.ReviewThread{
+		Threads: []domain.ReviewThread{
 			{
-				Path: "graph/walk.go", Line: 13, Side: gh.SideRight,
-				Comments: []gh.ThreadComment{
-					{Author: gh.Author{Login: "kukv"}, Body: "ここは 2 が既定ではないでしょうか、直しておいてもらえますか?"},
+				Path: "graph/walk.go", Line: 13, Side: domain.SideRight,
+				Comments: []domain.ThreadComment{
+					{Author: domain.Author{Login: "kukv"}, Body: "ここは 2 が既定ではないでしょうか、直しておいてもらえますか?"},
 				},
 			},
 		},
@@ -59,7 +59,7 @@ func goldenReview() gh.ReviewContext {
 
 func goldenModel(width int) Model {
 	m := New(&fakeSource{files: goldenFixture()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: goldenFixture()})
 	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: goldenReview()})
@@ -85,18 +85,18 @@ func postingModel(width int) Model {
 
 // wideLineNumberFixture is a file whose hunk starts past line nine thousand,
 // so its line numbers need five columns instead of four.
-func wideLineNumberFixture() []gh.FileDiff {
-	return []gh.FileDiff{
+func wideLineNumberFixture() []domain.FileDiff {
+	return []domain.FileDiff{
 		{
-			Path: "vendor/generated.go", Status: gh.FileModified, Additions: 2, Deletions: 1,
-			Hunks: []gh.Hunk{
+			Path: "vendor/generated.go", Status: domain.FileModified, Additions: 2, Deletions: 1,
+			Hunks: []domain.Hunk{
 				{
 					Header: "@@ -10240,3 +10240,4 @@ func generated() {",
-					Lines: []gh.DiffLine{
-						{Kind: gh.LineContext, OldLine: 10240, NewLine: 10240, Text: strings.Repeat("x", 200)},
-						{Kind: gh.LineRemoved, OldLine: 10241, Text: strings.Repeat("x", 200)},
-						{Kind: gh.LineAdded, NewLine: 10241, Text: strings.Repeat("x", 200)},
-						{Kind: gh.LineAdded, NewLine: 10242, Text: strings.Repeat("x", 200)},
+					Lines: []domain.DiffLine{
+						{Kind: domain.LineContext, OldLine: 10240, NewLine: 10240, Text: strings.Repeat("x", 200)},
+						{Kind: domain.LineRemoved, OldLine: 10241, Text: strings.Repeat("x", 200)},
+						{Kind: domain.LineAdded, NewLine: 10241, Text: strings.Repeat("x", 200)},
+						{Kind: domain.LineAdded, NewLine: 10242, Text: strings.Repeat("x", 200)},
 					},
 				},
 			},
@@ -109,7 +109,7 @@ func wideLineNumberFixture() []gh.FileDiff {
 // truncates, and would hide the overrun this model exists to catch.
 func wideLineNumberModel(width int) Model {
 	m := New(&fakeSource{files: wideLineNumberFixture()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 130})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 130})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: wideLineNumberFixture()})
 	return m
@@ -135,7 +135,7 @@ func TestGolden(t *testing.T) {
 // has arrived.
 func loadingModel(width int) Model {
 	m := New(&fakeSource{files: goldenFixture()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	return m
 }
@@ -190,7 +190,7 @@ func declinedNoLineModel(width int) Model {
 // overrun a narrow terminal.
 func declinedLoadingModel(width int) Model {
 	m := New(&fakeSource{files: goldenFixture()},
-		gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 128})
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: goldenFixture()})
 	return press(m, "c")
@@ -256,7 +256,7 @@ func TestNoUnresolvedIDsInTheDiffView(t *testing.T) {
 		t.Run(lang.name, func(t *testing.T) {
 			i18n.SetLanguage(lang.tag)
 			t.Cleanup(func() { i18n.SetLanguage(language.English) })
-			loading := New(&fakeSource{}, gh.ItemRef{Kind: gh.ItemPR, Repo: "kukv/koto", Number: 1})
+			loading := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1})
 			loading, _ = loading.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 			threads := withThreads(t, 120, 40)
 			expanded := press(openCollapsedThread(threads), "enter")

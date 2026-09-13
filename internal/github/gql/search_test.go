@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 const workJSON = `{"data":{"results":{"nodes":[
@@ -37,7 +37,7 @@ func TestASearchResultBecomesWorkItems(t *testing.T) {
 	f := &fake{body: []byte(workJSON)}
 	c := f.client()
 
-	items, err := c.ListWorkSection(context.Background(), gh.SectionReviewRequested)
+	items, err := c.ListWorkSection(context.Background(), domain.SectionReviewRequested)
 	if err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
@@ -49,24 +49,24 @@ func TestASearchResultBecomesWorkItems(t *testing.T) {
 	}
 
 	item := items[0]
-	if item.Ref.Kind != gh.ItemPR {
+	if item.Ref.Kind != domain.ItemPR {
 		t.Errorf("kind: got %v, want ItemPR", item.Ref.Kind)
 	}
 	if item.Ref.Repo != "kukv/octoscope" {
 		t.Errorf("repo: got %q, want kukv/octoscope", item.Ref.Repo)
 	}
-	if item.Review != gh.ReviewRequired {
+	if item.Review != domain.ReviewRequired {
 		t.Errorf("review: got %v, want ReviewRequired", item.Review)
 	}
 	if item.Checks.Total != 3 || item.Checks.Passed != 1 ||
 		item.Checks.Failed != 1 || item.Checks.Running != 1 {
 		t.Errorf("checks counts: got %+v", item.Checks)
 	}
-	if item.Checks.State != gh.CheckFailure {
+	if item.Checks.State != domain.CheckFailure {
 		t.Errorf("checks state: got %v, want CheckFailure", item.Checks.State)
 	}
 
-	if items[1].Ref.Kind != gh.ItemIssue {
+	if items[1].Ref.Kind != domain.ItemIssue {
 		t.Errorf("second item: got %v, want ItemIssue", items[1].Ref.Kind)
 	}
 }
@@ -76,7 +76,7 @@ func TestListWorkSectionReportsAFailure(t *testing.T) {
 
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) { return []byte("not json"), nil }}
 
-	if _, err := c.ListWorkSection(context.Background(), gh.SectionAssigned); err == nil {
+	if _, err := c.ListWorkSection(context.Background(), domain.SectionAssigned); err == nil {
 		t.Error("ListWorkSection accepted a body that is not JSON")
 	}
 }
@@ -95,14 +95,14 @@ func TestChecksNoCommitsYieldsCheckNone(t *testing.T) {
 
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) { return []byte(noRollupJSON), nil }}
 
-	items, err := c.ListWorkSection(context.Background(), gh.SectionReviewRequested)
+	items, err := c.ListWorkSection(context.Background(), domain.SectionReviewRequested)
 	if err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
 	if len(items) != 1 {
 		t.Fatalf("the column holds %d items, want 1", len(items))
 	}
-	if got := items[0].Checks; !reflect.DeepEqual(got, gh.Checks{State: gh.CheckNone}) {
+	if got := items[0].Checks; !reflect.DeepEqual(got, domain.Checks{State: domain.CheckNone}) {
 		t.Errorf("checks = %+v, want zero counts with CheckNone", got)
 	}
 }
@@ -113,15 +113,15 @@ func TestCheckOutcome(t *testing.T) {
 	tests := []struct {
 		name string
 		node CheckContext
-		want gh.CheckState
+		want domain.CheckState
 	}{
-		{"CheckRun success", CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "SUCCESS"}, gh.CheckSuccess},
-		{"CheckRun failure", CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "FAILURE"}, gh.CheckFailure},
-		{"CheckRun in progress", CheckContext{Typename: "CheckRun", Status: "IN_PROGRESS"}, gh.CheckRunning},
-		{"StatusContext success", CheckContext{Typename: "StatusContext", State: "SUCCESS"}, gh.CheckSuccess},
-		{"StatusContext failure", CheckContext{Typename: "StatusContext", State: "FAILURE"}, gh.CheckFailure},
-		{"StatusContext error", CheckContext{Typename: "StatusContext", State: "ERROR"}, gh.CheckFailure},
-		{"StatusContext pending", CheckContext{Typename: "StatusContext", State: "PENDING"}, gh.CheckPending},
+		{"CheckRun success", CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "SUCCESS"}, domain.CheckSuccess},
+		{"CheckRun failure", CheckContext{Typename: "CheckRun", Status: "COMPLETED", Conclusion: "FAILURE"}, domain.CheckFailure},
+		{"CheckRun in progress", CheckContext{Typename: "CheckRun", Status: "IN_PROGRESS"}, domain.CheckRunning},
+		{"StatusContext success", CheckContext{Typename: "StatusContext", State: "SUCCESS"}, domain.CheckSuccess},
+		{"StatusContext failure", CheckContext{Typename: "StatusContext", State: "FAILURE"}, domain.CheckFailure},
+		{"StatusContext error", CheckContext{Typename: "StatusContext", State: "ERROR"}, domain.CheckFailure},
+		{"StatusContext pending", CheckContext{Typename: "StatusContext", State: "PENDING"}, domain.CheckPending},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -153,14 +153,14 @@ func TestEachCheckKeepsItsOwnName(t *testing.T) {
 
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) { return []byte(namedJSON), nil }}
 
-	items, err := c.ListWorkSection(context.Background(), gh.SectionReviewRequested)
+	items, err := c.ListWorkSection(context.Background(), domain.SectionReviewRequested)
 	if err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
 	item := items[0]
-	want := []gh.CheckRun{
-		{Name: "build", State: gh.CheckSuccess, Kind: gh.CheckKindRun},
-		{Name: "ci/legacy", State: gh.CheckFailure, Kind: gh.CheckKindStatus},
+	want := []domain.CheckRun{
+		{Name: "build", State: domain.CheckSuccess, Kind: domain.CheckKindRun},
+		{Name: "ci/legacy", State: domain.CheckFailure, Kind: domain.CheckKindStatus},
 	}
 	if !reflect.DeepEqual(item.Checks.Runs, want) {
 		t.Errorf("runs = %+v, want %+v", item.Checks.Runs, want)
@@ -293,14 +293,14 @@ func TestListWorkSectionParsesARecordedResponse(t *testing.T) {
 	}
 
 	c := fileClient(t, "testdata/work_section.json")
-	items, err := c.ListWorkSection(context.Background(), gh.SectionAssigned)
+	items, err := c.ListWorkSection(context.Background(), domain.SectionAssigned)
 	if err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
 	if len(items) == 0 {
 		t.Fatal("no work items parsed out of the recording")
 	}
-	kinds := map[gh.ItemKind]bool{}
+	kinds := map[domain.ItemKind]bool{}
 	for _, item := range items {
 		kinds[item.Ref.Kind] = true
 		if item.Ref.Repo == "" {
@@ -314,13 +314,13 @@ func TestListWorkSectionParsesARecordedResponse(t *testing.T) {
 		}
 		// The recording is is:open assignee:@me, so anything else means the
 		// fixture predates the state field and was not re-recorded.
-		if item.State != gh.StateOpen {
+		if item.State != domain.StateOpen {
 			t.Errorf("%q came back %v; re-record work_section.json", item.Title, item.State)
 		}
 	}
 	// The assigned column is the one recorded because it mixes the two
 	// shapes: a recording of pull requests alone never runs the Issue branch.
-	if !kinds[gh.ItemPR] || !kinds[gh.ItemIssue] {
+	if !kinds[domain.ItemPR] || !kinds[domain.ItemIssue] {
 		t.Errorf("the recording holds only %v; it must exercise both branches", kinds)
 	}
 }
@@ -350,14 +350,14 @@ func TestAMergedPullRequestComesBackMerged(t *testing.T) {
 	]}}}`
 
 	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) { return []byte(merged), nil }}
-	items, err := c.ListWorkSection(context.Background(), gh.SectionAssigned)
+	items, err := c.ListWorkSection(context.Background(), domain.SectionAssigned)
 	if err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
 	if len(items) != 1 {
 		t.Fatalf("got %d items, want 1", len(items))
 	}
-	if items[0].State != gh.StateMerged {
+	if items[0].State != domain.StateMerged {
 		t.Errorf("State = %v, want StateMerged", items[0].State)
 	}
 }
@@ -395,7 +395,7 @@ func TestSearchItemsParsesARecordedSearch(t *testing.T) {
 	if len(items) == 0 {
 		t.Fatal("no items parsed out of the recording")
 	}
-	states := map[gh.ItemState]bool{}
+	states := map[domain.ItemState]bool{}
 	for _, item := range items {
 		states[item.State] = true
 		if item.Ref.Repo == "" {

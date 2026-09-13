@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/text/language"
 
-	"github.com/kukv/octoscope/internal/gh"
+	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/golden"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -28,15 +28,15 @@ var goldenLanguages = []struct {
 // a recording made against the wall clock would go stale immediately.
 var goldenAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 
-func goldenPR() gh.PR {
-	return gh.PR{
+func goldenPR() domain.PR {
+	return domain.PR{
 		Number: 12, Title: "レンダリングのパイプラインを置き換える",
-		Author: gh.Author{Login: "kukv"}, State: gh.StateOpen,
-		Review: gh.ReviewApproved, UpdatedAt: goldenAt,
+		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen,
+		Review: domain.ReviewApproved, UpdatedAt: goldenAt,
 		Body:   "This replaces the renderer.\n\n- one\n- two",
-		Labels: []gh.Label{{Name: "enhancement", Color: "a2eeef"}},
-		Comments: []gh.Comment{
-			{Author: gh.Author{Login: "bob"}, Body: "見た目が良い", CreatedAt: goldenAt},
+		Labels: []domain.Label{{Name: "enhancement", Color: "a2eeef"}},
+		Comments: []domain.Comment{
+			{Author: domain.Author{Login: "bob"}, Body: "見た目が良い", CreatedAt: goldenAt},
 		},
 	}
 }
@@ -47,8 +47,8 @@ func goldenModel(width int) Model {
 	// it will be drawn at.
 	f := &fakeSource{
 		pr:        goldenPR(),
-		labels:    []gh.Label{{Name: "bug", Color: "d73a4a"}},
-		reviewCtx: gh.ReviewContext{PullRequestID: "PR_128", PendingID: "PRR_1"},
+		labels:    []domain.Label{{Name: "bug", Color: "d73a4a"}},
+		reviewCtx: domain.ReviewContext{PullRequestID: "PR_128", PendingID: "PRR_1"},
 	}
 	m := New(f, prRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
