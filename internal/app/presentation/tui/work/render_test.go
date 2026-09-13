@@ -328,13 +328,19 @@ func TestAShortTitleStillFillsTheCard(t *testing.T) {
 }
 
 // TestAShortBoardStillDrawsACard covers the floor under the height budget: a
-// terminal too short for one card must not produce a board of zero rows.
+// terminal too short for one taller card must still show one. The board is
+// asked directly rather than the whole view, because the drawer repeats the
+// selected card and would answer for it.
 func TestAShortBoardStillDrawsACard(t *testing.T) {
 	m := loaded()
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
-	out := ansi.Strip(m.View())
-	if !strings.Contains(out, "#12") {
-		t.Errorf("a ten-line terminal draws no card:\n%s", out)
+	if m.height-footerHeight-drawerHeight >= headingHeight+m.cardHeight() {
+		t.Fatal("ten lines leave room for a card; this test covers nothing")
+	}
+
+	board := ansi.Strip(strings.Join(m.board(m.boardHeight()), "\n"))
+	if !strings.Contains(board, "#12") {
+		t.Errorf("a ten-line terminal draws no card:\n%s", board)
 	}
 	for _, line := range strings.Split(m.View(), "\n") {
 		if got := ansi.StringWidth(line); got > 120 {
