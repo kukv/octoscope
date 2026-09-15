@@ -10,11 +10,15 @@ import (
 
 // workQueries is each column's GitHub search. The strings are fixed text,
 // not user input: they are the definition of what the column means.
+//
+// archived:false is on every column because an archived repository is
+// read-only: its pull requests cannot be merged or reviewed and its issues
+// cannot be closed, so a card from one is work nobody can pick up.
 var workQueries = [domain.WorkSectionCount]string{
-	domain.SectionReviewRequested: "is:open is:pr review-requested:@me",
-	domain.SectionYourPRs:         "is:open is:pr author:@me",
-	domain.SectionAssigned:        "is:open assignee:@me",
-	domain.SectionMentioned:       "is:open mentions:@me",
+	domain.SectionReviewRequested: "is:open is:pr review-requested:@me archived:false",
+	domain.SectionYourPRs:         "is:open is:pr author:@me archived:false",
+	domain.SectionAssigned:        "is:open assignee:@me archived:false",
+	domain.SectionMentioned:       "is:open mentions:@me archived:false",
 }
 
 // workQuery is the GitHub search that defines one column of the Work board.

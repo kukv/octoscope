@@ -181,10 +181,15 @@ Y 座標を引いてから子に渡すので、子は自分が画面のどこに
 
 | 列 | 検索クエリ |
 |---|---|
-| Review requested | `is:open is:pr review-requested:@me` |
-| Your PRs | `is:open is:pr author:@me` |
-| Assigned | `is:open assignee:@me` |
-| Mentioned | `is:open mentions:@me` |
+| Review requested | `is:open is:pr review-requested:@me archived:false` |
+| Your PRs | `is:open is:pr author:@me archived:false` |
+| Assigned | `is:open assignee:@me archived:false` |
+| Mentioned | `is:open mentions:@me archived:false` |
+
+どの列も `archived:false` を付ける。アーカイブ済みリポジトリは読み取り専用で、
+PR はマージもレビューもできず Issue も閉じられない。盤面から手を出せないものを
+並べても滞留量が読めなくなるだけである。Search タブはユーザーの書いたクエリを
+そのまま送るので、この既定は掛けない。
 
 **画面は必ず端末に収まる。** 上から タブ行 / 盤面 / ドロワー / キーバー で、
 ドロワーとキーバーの高さは固定。盤面は残りをもらい、**カーソルのある列だけが
