@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -107,15 +108,32 @@ func TestAnUnknownTabStartsOnTheDefault(t *testing.T) {
 // Path is the one function that decides where the settings file lives on
 // every platform; a broken join here silently makes every setting
 // unreadable.
+//
+// The wanted path is each platform's own convention, spelled out rather than
+// read back from os.UserConfigDir: a test that asked the same function the
+// implementation asks would pass however the file moved. Only Linux reads
+// XDG_CONFIG_HOME — macOS and Windows have their own directory and their own
+// environment variable, so the test has to say which it is setting.
 func TestPathPutsTheFileUnderTheConfigDirectory(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	var want string
+	switch runtime.GOOS {
+	case "darwin":
+		t.Setenv("HOME", dir)
+		want = filepath.Join(dir, "Library", "Application Support", "octoscope", "config.yaml")
+	case "windows":
+		t.Setenv("AppData", dir)
+		want = filepath.Join(dir, "octoscope", "config.yaml")
+	default:
+		t.Setenv("XDG_CONFIG_HOME", dir)
+		want = filepath.Join(dir, "octoscope", "config.yaml")
+	}
 
 	got, err := config.Path()
 	if err != nil {
 		t.Fatalf("Path: %v", err)
 	}
-	want := filepath.Join(dir, "octoscope", "config.yaml")
 	if got != want {
 		t.Errorf("Path() = %q, want %q", got, want)
 	}
