@@ -16,7 +16,14 @@ func withComments() usecase.Item {
 	it.Body = "This replaces the renderer.\n\n- one\n- two"
 	it.Comments = []domain.Comment{
 		{Author: domain.Author{Login: "bob"}, Body: "見た目が良い", CreatedAt: metaAt()},
-		{Author: domain.Author{Login: "alice"}, Body: "LGTM\n\nand a second paragraph", CreatedAt: metaAt()},
+		// The login is long enough to push the header past a narrow pane.
+		// glamour wraps the body it is handed, so the header — which the view
+		// builds itself — is the line that can run off the edge.
+		{
+			Author:    domain.Author{Login: "octoscope-release-bot"},
+			Body:      "LGTM\n\nand a second paragraph",
+			CreatedAt: metaAt(),
+		},
 	}
 	return it
 }

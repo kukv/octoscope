@@ -15,10 +15,19 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// bodyIndent is how far the description sits in from the section heading. It
-// replaces the margin glamour would otherwise add, which is turned off in
-// markdownLines so that a comment's bar has nothing between it and the text.
-const bodyIndent = "  "
+// bodyIndent is how far the description sits in from the section heading, and
+// bodyIndentWidth is what it costs. It replaces the margin glamour would
+// otherwise add, which is turned off in markdownLines so that a comment's bar
+// has nothing between it and the text.
+const (
+	bodyIndent      = "  "
+	bodyIndentWidth = 2
+)
+
+// commentBarWidth is what the bar down the left of a comment takes from the
+// text beside it: the glyph and the space after it. The glyph is one column in
+// every set (icon's TestEveryGlyphIsOneColumn), whatever it measures in bytes.
+const commentBarWidth = 2
 
 // bodyLines is what scrolls: the description under its heading, then every
 // comment behind its own bar.
@@ -29,7 +38,7 @@ func bodyLines(it usecase.Item, w int) []string {
 	if strings.TrimSpace(body) == "" {
 		body = i18n.T("detail.no_description")
 	}
-	for _, l := range markdownLines(body, max(w-len(bodyIndent), 1)) {
+	for _, l := range markdownLines(body, max(w-bodyIndentWidth, 1)) {
 		lines = append(lines, bodyIndent+l)
 	}
 
@@ -61,7 +70,7 @@ func fit(lines []string, w int) []string {
 func commentLines(c domain.Comment, w int) []string {
 	bar := theme.Dim().Render(icon.CommentBar() + " ")
 	lines := []string{bar + theme.Dim().Render("@"+c.Author.Login+" · "+i18n.DateTime(c.CreatedAt))}
-	for _, l := range markdownLines(c.Body, max(w-2, 1)) {
+	for _, l := range markdownLines(c.Body, max(w-commentBarWidth, 1)) {
 		lines = append(lines, bar+l)
 	}
 	return lines
