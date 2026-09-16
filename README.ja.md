@@ -71,10 +71,18 @@ git リポジトリの中で実行する。
 
 ### 設定ファイル
 
-octoscope は `os.UserConfigDir()` 配下の `octoscope/config.yaml` を読む。
-場所は Windows なら `%AppData%`、macOS なら `~/Library/Application Support`、
-Linux なら `~/.config`。無くても、または空でも構わない。その場合は全項目が
-デフォルトのまま動く。
+octoscope は `$XDG_CONFIG_HOME`、設定されていなければ `~/.config` の下の
+`octoscope/config.yaml` を読む。macOS も同じなので、dotfiles の配置を
+OS ごとに分ける必要がない。Windows だけは `%AppData%` の下。無くても、
+または空でも構わない。その場合は全項目がデフォルトのまま動く。
+
+v0.7.0 より前は、macOS では `~/Library/Application Support` の下を見ていた。
+既存のファイルを引き継ぐには次を 1 回実行する。
+
+```bash
+mkdir -p ~/.config/octoscope
+mv ~/Library/Application\ Support/octoscope/config.yaml ~/.config/octoscope/
+```
 
 | キー | 値 |
 |---|---|
