@@ -20,6 +20,13 @@ import (
 // ("リポジトリ", ten columns) plus two.
 const metaLabelWidth = 12
 
+// metaSep is what separates two facts on the same line, and metaSepWidth is
+// what it costs: the middle dot is one column, not one byte.
+const (
+	metaSep      = " · "
+	metaSepWidth = 3
+)
+
 // metaRow is one fact about the item. The value is already styled; the label
 // is drawn by whichever layout is in use.
 type metaRow struct {
@@ -153,11 +160,33 @@ func metaInlineLines(rows []metaRow, w int) []string {
 			parts[i] = theme.Dim().Render(r.label+" ") + r.value
 		}
 	}
-	joined := strings.Join(parts, theme.Dim().Render(" · "))
-	if w <= 0 {
-		return []string{joined}
+	if len(parts) == 0 {
+		return nil
 	}
-	return strings.Split(ansi.Wrap(joined, w, ""), "\n")
+	sep := theme.Dim().Render(metaSep)
+	if w <= 0 {
+		return []string{strings.Join(parts, sep)}
+	}
+
+	// The paragraph is filled a fact at a time rather than wrapped a
+	// character at a time: ansi.Wrap breaks on any space, including the
+	// padding inside a label's badge, and a fact split across two lines
+	// reads as two facts.
+	var lines []string
+	line := ""
+	for _, p := range parts {
+		p = layout.Clip(p, w) // a single fact wider than the terminal
+		switch {
+		case line == "":
+			line = p
+		case ansi.StringWidth(line)+metaSepWidth+ansi.StringWidth(p) <= w:
+			line += sep + p
+		default:
+			lines = append(lines, line)
+			line = p
+		}
+	}
+	return append(lines, line)
 }
 
 // stateText and reviewText name a state in the reader's language. GitHub's

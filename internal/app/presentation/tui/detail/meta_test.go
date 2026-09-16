@@ -1,14 +1,17 @@
 package detail
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
+	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/usecase"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 func metaAt() time.Time { return time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC) }
@@ -112,6 +115,70 @@ func TestTheInlineMetaNamesTheAssignees(t *testing.T) {
 	for _, l := range lines {
 		if w := ansi.StringWidth(l); w > 80 {
 			t.Errorf("line %q is %d columns wide, want at most 80", ansi.Strip(l), w)
+		}
+	}
+}
+
+// spacedLabelItem carries the two facts that hold a space of their own: a
+// label whose name is three words, and a branch pair with arrows around it.
+func spacedLabelItem() usecase.Item {
+	it := fullPRItem()
+	it.Labels = []domain.Label{{Name: "good first issue", Color: "d73a4a"}}
+	it.PR.Labels = it.Labels
+	return it
+}
+
+// TestTheInlineMetaKeepsAFactOnOneLine is why the paragraph is filled a fact
+// at a time. A fact broken over two lines reads as two facts, and a break
+// inside a label's badge loses the padding that makes it a badge.
+func TestTheInlineMetaKeepsAFactOnOneLine(t *testing.T) {
+	const narrow = 44
+
+	lines := metaInlineLines(metaRows(fullRef(), spacedLabelItem()), narrow)
+
+	for _, fact := range []string{
+		"kukv/octoscope #12", "good first issue", "feat/x → main",
+		"assignees @alice", "Sep 6, 2026 12:00",
+	} {
+		if !slices.ContainsFunc(lines, func(l string) bool {
+			return strings.Contains(ansi.Strip(l), fact)
+		}) {
+			t.Errorf("%q was split across lines:\n%s", fact, ansi.Strip(strings.Join(lines, "\n")))
+		}
+	}
+}
+
+// TestTheInlineMetaFitsANarrowWidth includes a width under which no fact fits
+// whole: the paragraph may not put a fact on a line of its own and call it
+// fitted.
+func TestTheInlineMetaFitsANarrowWidth(t *testing.T) {
+	for _, narrow := range []int{44, 12} {
+		for _, l := range metaInlineLines(metaRows(fullRef(), spacedLabelItem()), narrow) {
+			if w := ansi.StringWidth(l); w > narrow {
+				t.Errorf("at %d columns the line %q is %d wide", narrow, ansi.Strip(l), w)
+			}
+		}
+	}
+}
+
+// TestEveryMetaLabelFitsItsColumn guards the constant against a catalog: a
+// label wider than the column would be clipped, and layout.Pad clips to one
+// column short of what it is given.
+func TestEveryMetaLabelFitsItsColumn(t *testing.T) {
+	ids := []string{
+		"detail.meta.repo", "detail.meta.author", "detail.meta.state",
+		"detail.meta.review", "detail.meta.checks", "detail.meta.branch",
+		"detail.meta.changes", "detail.meta.assignees", "detail.meta.labels",
+		"detail.meta.updated",
+	}
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		i18n.SetLanguage(lang)
+		for _, id := range ids {
+			if w := ansi.StringWidth(i18n.T(id)); w > metaLabelWidth-1 {
+				t.Errorf("%s in %s is %d columns wide, want at most %d",
+					id, lang, w, metaLabelWidth-1)
+			}
 		}
 	}
 }
