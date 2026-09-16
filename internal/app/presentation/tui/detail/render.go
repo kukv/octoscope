@@ -212,33 +212,6 @@ func issueMarkdown(it usecase.Item) string {
 	return b.String()
 }
 
-// stateText and reviewText name a state in the reader's language. GitHub's
-// own spelling stopped at the access layer (.claude/rules/architecture.md),
-// and a state word is ours to translate.
-func stateText(s domain.ItemState) string {
-	switch s {
-	case domain.StateOpen:
-		return i18n.T("state.open")
-	case domain.StateMerged:
-		return i18n.T("state.merged")
-	default:
-		return i18n.T("state.closed")
-	}
-}
-
-func reviewText(r domain.ReviewState) string {
-	switch r {
-	case domain.ReviewApproved:
-		return i18n.T("review.approved")
-	case domain.ReviewChangesRequested:
-		return i18n.T("review.changes_requested")
-	case domain.ReviewRequired:
-		return i18n.T("review.required")
-	default:
-		return i18n.T("review.none")
-	}
-}
-
 func writeCommonMeta(b *strings.Builder, labels []domain.Label, updatedAt time.Time) {
 	if len(labels) > 0 {
 		names := make([]string, len(labels))
