@@ -134,6 +134,35 @@ detail:
     other: "Issue #{{.Number}} {{.Title}}"
   decline_loading:
     other: "the item is still on its way; try that key again in a moment"
+  no_description:
+    other: "_no description_"
+  meta:
+    repo:
+      other: "repository"
+    author:
+      other: "author"
+    state:
+      other: "state"
+    review:
+      other: "review"
+    checks:
+      other: "checks"
+    branch:
+      other: "branch"
+    changes:
+      other: "changes"
+    assignees:
+      other: "assignees"
+    labels:
+      other: "labels"
+    updated:
+      other: "updated"
+  section:
+    description:
+      other: "Description"
+    comments:
+      one: "{{.Count}} comment"
+      other: "{{.Count}} comments"
 
 compose:
   title:
@@ -495,6 +524,8 @@ state:
     other: "open"
   closed:
     other: "closed"
+  draft_suffix:
+    other: " (draft)"
   merged:
     other: "merged"
 

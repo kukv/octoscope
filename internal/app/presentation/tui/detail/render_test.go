@@ -177,3 +177,24 @@ func TestNoUnresolvedIDsInRenderedViews(t *testing.T) {
 		}
 	}
 }
+
+// TestTheNewMetaKeysResolve catches a key that was added to one catalog and
+// not the other before it reaches a view.
+func TestTheNewMetaKeysResolve(t *testing.T) {
+	ids := []string{
+		"detail.meta.repo", "detail.meta.author", "detail.meta.state",
+		"detail.meta.review", "detail.meta.checks", "detail.meta.branch",
+		"detail.meta.changes", "detail.meta.assignees", "detail.meta.labels",
+		"detail.meta.updated",
+		"detail.section.description", "detail.section.comments",
+		"detail.no_description", "state.draft_suffix",
+	}
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		i18n.SetLanguage(lang)
+		t.Cleanup(func() { i18n.SetLanguage(language.English) })
+		for _, id := range ids {
+			i18n.AssertNoUnresolvedIDs(t, i18n.T(id))
+		}
+	}
+	i18n.AssertNoUnresolvedIDs(t, i18n.Tn("detail.section.comments", 2))
+}
