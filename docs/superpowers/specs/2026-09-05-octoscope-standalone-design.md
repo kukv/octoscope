@@ -546,10 +546,13 @@ Work の列数は 1 / 2 / 4 の 3 段。セクションが 4 つなので、ど�
 
 ## 5. 設定ファイル
 
-`os.UserConfigDir()` 配下の `octoscope/config.yaml` を読む。
-カタログと同じ形式に揃え、YAML のパーサを 1 つに保つ。
-これにより Windows（`%AppData%`）、macOS（`~/Library/Application Support`）、
-Linux（`~/.config`）で自然な場所に収まる。
+`$XDG_CONFIG_HOME`（未設定なら `~/.config`）配下の `octoscope/config.yaml` を読む。
+Windows だけは `%AppData%` 配下。カタログと同じ形式に揃え、YAML のパーサを 1 つに保つ。
+
+**macOS も `~/.config` に置く。** `os.UserConfigDir()` は macOS で
+`~/Library/Application Support` を返すが、dotfiles で設定を持ち回る利用者にとって、
+そこは空白を含むうえに OS ごとの分岐を強いる場所である。Unix の側を 1 つの規則に
+まとめ、分岐を「Windows かどうか」だけに留める（2026-09-16 に変更。v0.7.0）。
 
 保持する内容は次に留める。設定が無くても全機能が動くことを前提とする。
 
