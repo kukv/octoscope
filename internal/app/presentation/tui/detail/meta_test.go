@@ -182,3 +182,37 @@ func TestEveryMetaLabelFitsItsColumn(t *testing.T) {
 		}
 	}
 }
+
+// valueOf is what the pane draws beside a label. The rows are searched by
+// label because their order is what the other tests are for.
+func valueOf(rows []metaRow, label string) string {
+	for _, r := range rows {
+		if r.label == label {
+			return ansi.Strip(r.value)
+		}
+	}
+	return ""
+}
+
+// TestADraftSaysSoInItsState covers the suffix the state word alone leaves
+// out: a draft is open, and "open" is what every other open pull request says
+// too. An issue is never a draft, so its state carries nothing extra.
+func TestADraftSaysSoInItsState(t *testing.T) {
+	draft := fullPRItem()
+	draft.PR.IsDraft = true
+
+	got := valueOf(metaRows(fullRef(), draft), i18n.T("detail.meta.state"))
+	want := i18n.T("state.open") + i18n.T("state.draft_suffix")
+	if got != want {
+		t.Errorf("the draft's state = %q, want %q", got, want)
+	}
+
+	issue := usecase.Item{
+		Kind: domain.ItemIssue, Number: 7, Title: "an issue",
+		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen, UpdatedAt: metaAt(),
+	}
+	ref := domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7}
+	if got := valueOf(metaRows(ref, issue), i18n.T("detail.meta.state")); got != i18n.T("state.open") {
+		t.Errorf("the issue's state = %q, want %q", got, i18n.T("state.open"))
+	}
+}
