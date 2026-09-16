@@ -21,6 +21,11 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
+// chromeLines is what the body never gets: the title line, the key bar, and
+// one line held back for the error, which must not push the key bar off the
+// bottom of the screen.
+const chromeLines = 4
+
 type itemSource interface {
 	GetItem(ctx context.Context, ref domain.ItemRef) (usecase.Item, error)
 	AddComment(ref domain.ItemRef, body string) error
@@ -194,6 +199,12 @@ type Model struct {
 	title string
 	state domain.ItemState
 	url   string
+
+	// item is the whole of what was fetched. The meta pane reads it at draw
+	// time, so unlike title and state it cannot be turned into a string once
+	// and thrown away: its layout changes with the terminal's width.
+	item   usecase.Item
+	loaded bool
 
 	textarea textarea.Model
 
@@ -406,8 +417,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) resize(msg tea.WindowSizeMsg) Model {
 	m.width, m.height = msg.Width, msg.Height
-	m.body.SetWidth(msg.Width)
-	m.body.SetHeight(max(msg.Height-4, 5))
+	m.relayout()
 	m.textarea.SetWidth(msg.Width)
 	m.textarea.SetHeight(max(msg.Height-6, 3))
 	if m.submit.Active() {
@@ -437,13 +447,14 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.labels = labelNames(it.Labels)
 	m.assignees = authorLogins(it.Assignees)
 	m.url = it.URL
+	m.item, m.loaded = it, true
 	if it.Kind == domain.ItemPR {
 		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
-		m.setContent(prMarkdown(*it.PR))
 	} else {
 		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})
-		m.setContent(issueMarkdown(it))
 	}
+	m.relayout()
+	m.body.GotoTop()
 	return m
 }
 
@@ -854,20 +865,46 @@ func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) setContent(md string) {
-	width := m.width
-	if width <= 0 {
-		width = 80
+// relayout gives the body its width and height and lays the content out
+// again. It runs both on a resize and when the item arrives: what the body
+// is worth depends on the width, and — once the meta block sits above it —
+// how tall that block turned out.
+func (m *Model) relayout() {
+	w := m.width
+	if w <= 0 {
+		w = 80
+	}
+	h := m.height
+	if h <= 0 {
+		h = 24
+	}
+	m.body.SetWidth(max(w, 1))
+	m.body.SetHeight(max(h-chromeLines, 5))
+	m.setBodyContent(max(w, 1))
+}
+
+// setBodyContent re-renders the body at w, keeping the reader's place. The
+// content is laid out for a width, so every width change rebuilds it.
+func (m *Model) setBodyContent(w int) {
+	if !m.loaded {
+		return
+	}
+	var md string
+	if m.item.Kind == domain.ItemPR {
+		md = prMarkdown(*m.item.PR)
+	} else {
+		md = issueMarkdown(m.item)
 	}
 	content := md
 	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle("dark"),
-		glamour.WithWordWrap(width-2)); err == nil {
+		glamour.WithWordWrap(w-2)); err == nil {
 		if out, err := r.Render(md); err == nil {
 			content = out
 		}
 	}
+	at := m.body.YOffset()
 	m.body.SetContent(content)
-	m.body.GotoTop()
+	m.body.SetYOffset(at)
 }
 
 func labelNames(labels []domain.Label) []string {

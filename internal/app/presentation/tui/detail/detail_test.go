@@ -1210,3 +1210,38 @@ func TestTheMergeKeyIsInTheFooterOnAPullRequestOnly(t *testing.T) {
 		t.Errorf("an issue's footer offers a merge:\n%s", i.View())
 	}
 }
+
+// TestTheModelKeepsTheItem is what the meta pane will read. Until now the
+// view kept only what it had already turned into a string.
+func TestTheModelKeepsTheItem(t *testing.T) {
+	f := &fakeSource{pr: domain.PR{
+		Number: 1, Title: "first pr", Author: domain.Author{Login: "kukv"},
+		Head: "feat/x", Base: "main", Additions: 10, Deletions: 2,
+	}}
+	m := loaded(f, prRef())
+	if m.item.PR == nil {
+		t.Fatal("the model did not keep the pull request")
+	}
+	if got := m.item.PR.Head; got != "feat/x" {
+		t.Errorf("Head = %q, want %q", got, "feat/x")
+	}
+}
+
+// TestResizeKeepsThePlaceInTheBody covers the re-render a resize now needs:
+// the body is laid out for a width that changed, and the reader should not be
+// thrown back to the top of a long description.
+func TestResizeKeepsThePlaceInTheBody(t *testing.T) {
+	m := loaded(&fakeSource{pr: longPR()}, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
+	m, _ = m.Update(wheelDown())
+	before := m.body.YOffset()
+	if before == 0 {
+		t.Fatal("the wheel did not scroll the body")
+	}
+
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+
+	if got := m.body.YOffset(); got != before {
+		t.Errorf("YOffset = %d after a resize, want the place to be kept at %d", got, before)
+	}
+}
