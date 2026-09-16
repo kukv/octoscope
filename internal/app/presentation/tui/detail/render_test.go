@@ -4,7 +4,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -13,40 +12,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
-
-func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
-	pr := domain.PR{
-		Number: 12, Title: "feat: pane", Author: domain.Author{Login: "kukv"},
-		State: domain.StateOpen, IsDraft: true, Review: domain.ReviewRequired,
-		Labels: []domain.Label{{Name: "Kind: Feature"}},
-		Body:   "body text",
-		Comments: []domain.Comment{
-			{
-				Author: domain.Author{Login: "bob"}, Body: "comment text",
-				CreatedAt: time.Date(2026, 7, 11, 11, 0, 0, 0, time.UTC),
-			},
-		},
-	}
-	md := prMarkdown(pr)
-	// The state and the review are named in the reader's language: GitHub's
-	// own spelling stopped at the access layer.
-	for _, want := range []string{
-		"#12", "feat: pane", "@kukv",
-		i18n.T("state.open") + i18n.T("md.draft_suffix"),
-		i18n.T("review.required"), "Kind: Feature", "body text", "@bob", "comment text",
-	} {
-		if !strings.Contains(md, want) {
-			t.Errorf("markdown missing %q:\n%s", want, md)
-		}
-	}
-}
-
-func TestIssueMarkdownEmptyBody(t *testing.T) {
-	md := issueMarkdown(issueItem(domain.Issue{Number: 3, Title: "an issue"}))
-	if !strings.Contains(md, "_no description_") {
-		t.Errorf("markdown missing empty-body placeholder:\n%s", md)
-	}
-}
 
 // overlongTitle is wider than any terminal the width test uses, in both
 // scripts. Without it the fixture's longest line has room to spare at every
@@ -197,4 +162,69 @@ func TestTheNewMetaKeysResolve(t *testing.T) {
 		}
 	}
 	i18n.AssertNoUnresolvedIDs(t, i18n.Tn("detail.section.comments", 2))
+}
+
+// TestTheViewSplitsInTwoWhenItCan covers the threshold: the rule between the
+// panes is what tells the two layouts apart.
+func TestTheViewSplitsInTwoWhenItCan(t *testing.T) {
+	f := &fakeSource{pr: domain.PR{
+		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
+		State: domain.StateOpen, Body: "the description",
+	}}
+
+	for _, tc := range []struct {
+		name  string
+		width int
+		split bool
+	}{
+		{"a wide terminal splits", 120, true},
+		{"the threshold itself splits", 100, true},
+		{"one column short does not", 99, false},
+		{"eighty does not", 80, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := loaded(f, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12})
+			m, _ = m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 24})
+
+			got := strings.Contains(ansi.Strip(m.View()), "repository  kukv/octoscope #12")
+			if got != tc.split {
+				t.Errorf("split = %v at %d columns, want %v:\n%s",
+					got, tc.width, tc.split, ansi.Strip(m.View()))
+			}
+		})
+	}
+}
+
+// TestTheSingleColumnKeepsEveryFact is why the narrow layout joins the rows
+// rather than dropping them.
+func TestTheSingleColumnKeepsEveryFact(t *testing.T) {
+	pr := domain.PR{
+		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
+		State: domain.StateOpen, Review: domain.ReviewApproved, Body: "the description",
+		Assignees: []domain.Author{{Login: "alice"}},
+		Checks:    domain.Checks{Total: 2, Passed: 1, Failed: 1},
+		Head:      "feat/x", Base: "main", Additions: 218, Deletions: 31,
+	}
+	m := loaded(&fakeSource{pr: pr}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"kukv/octoscope #12", "@kukv", "feat/x → main", "+218", "−31", "@alice"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the single-column header dropped %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestNoLineOverrunsTheTerminal is the check a two-pane layout most easily
+// fails, and the one a Japanese terminal fails first.
+func TestNoLineOverrunsTheTerminal(t *testing.T) {
+	for _, w := range []int{80, 100, 120, 160} {
+		m := goldenModel(w)
+		for _, l := range strings.Split(m.View(), "\n") {
+			if got := ansi.StringWidth(l); got > w {
+				t.Errorf("at %d columns a line is %d wide: %q", w, got, ansi.Strip(l))
+			}
+		}
+	}
 }

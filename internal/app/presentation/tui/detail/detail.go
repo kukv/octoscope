@@ -11,7 +11,6 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/glamour/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
@@ -21,9 +20,10 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// chromeLines is what the body never gets: the title line, the key bar, and
-// one line held back for the error, which must not push the key bar off the
-// bottom of the screen.
+// chromeLines is what the body never gets. Two of it is exact -- the title
+// line above and the key bar below -- and the other two are slack, so that an
+// error long enough to wrap onto a second line still does not push the key bar
+// off the bottom of the screen.
 const chromeLines = 4
 
 type itemSource interface {
@@ -203,6 +203,11 @@ type Model struct {
 	// item is the whole of what was fetched. The meta pane reads it at draw
 	// time, so unlike title and state it cannot be turned into a string once
 	// and thrown away: its layout changes with the terminal's width.
+	//
+	// loaded is the invariant the drawing relies on: item is the fetched
+	// value only once it is true, and every reader of item -- rows,
+	// headerLines, setBodyContent -- draws nothing until then, rather than
+	// drawing the zero item as an unnamed, unauthored, never-updated one.
 	item   usecase.Item
 	loaded bool
 
@@ -243,6 +248,9 @@ func New(src Source, ref domain.ItemRef) Model {
 func newBody() viewport.Model {
 	v := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 	v.MouseWheelEnabled = true
+	// The rule between the panes runs as far as the body does, so the body
+	// has to be as tall as the pane even when the item is short.
+	v.FillHeight = true
 	return v
 }
 
@@ -878,9 +886,15 @@ func (m *Model) relayout() {
 	if h <= 0 {
 		h = 24
 	}
-	m.body.SetWidth(max(w, 1))
-	m.body.SetHeight(max(h-chromeLines, 5))
-	m.setBodyContent(max(w, 1))
+	bodyW, bodyH := w, h-chromeLines
+	if twoPane(w) {
+		bodyW = w - metaPaneWidth(w) - 1 // the rule JoinPanes draws between them
+	} else {
+		bodyH -= len(m.headerLines()) + 1 // the paragraph and its rule
+	}
+	m.body.SetWidth(max(bodyW, 1))
+	m.body.SetHeight(max(bodyH, 5))
+	m.setBodyContent(max(bodyW, 1))
 }
 
 // setBodyContent re-renders the body at w, keeping the reader's place. The
@@ -889,21 +903,8 @@ func (m *Model) setBodyContent(w int) {
 	if !m.loaded {
 		return
 	}
-	var md string
-	if m.item.Kind == domain.ItemPR {
-		md = prMarkdown(*m.item.PR)
-	} else {
-		md = issueMarkdown(m.item)
-	}
-	content := md
-	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle("dark"),
-		glamour.WithWordWrap(w-2)); err == nil {
-		if out, err := r.Render(md); err == nil {
-			content = out
-		}
-	}
 	at := m.body.YOffset()
-	m.body.SetContent(content)
+	m.body.SetContentLines(bodyLines(m.item, w))
 	m.body.SetYOffset(at)
 }
 

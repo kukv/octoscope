@@ -239,7 +239,7 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 
 	m = run(t, m, "enter") // the Repos row -> the detail view
 	// The Repos row carries the number too; the state line is detail's alone.
-	if !strings.Contains(content(m), "state: open") {
+	if !strings.Contains(content(m), "state       open") {
 		t.Fatalf("the detail view did not open:\n%s", content(m))
 	}
 
@@ -248,7 +248,7 @@ func TestClosingFromTheReposTabShowsTheNewState(t *testing.T) {
 	if f.pr.State != domain.StateClosed {
 		t.Fatalf("state = %v, want closed", f.pr.State)
 	}
-	if got := content(m); !strings.Contains(got, "state: closed") {
+	if got := content(m); !strings.Contains(got, "state       closed") {
 		t.Errorf("the view does not show the new state:\n%s", got)
 	}
 }
@@ -263,7 +263,7 @@ func TestPickingALabelFromTheDetailViewAppliesIt(t *testing.T) {
 	}
 
 	m = run(t, m, "enter")
-	if !strings.Contains(content(m), "state: open") {
+	if !strings.Contains(content(m), "state       open") {
 		t.Fatalf("precondition: the detail view did not open:\n%s", content(m))
 	}
 
@@ -298,7 +298,7 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	// The board's own d opens the diff too, so enter is checked on its own.
 	m = run(t, m, "enter") // the card under the cursor -> the detail view
 	// The card carries the number too; the state line is detail's alone.
-	if !strings.Contains(content(m), "state: open") {
+	if !strings.Contains(content(m), "state       open") {
 		t.Fatalf("the detail view did not open:\n%s", content(m))
 	}
 
