@@ -57,7 +57,12 @@ jobs:
           cache: false
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@v1.13.0
+      # bash rather than the Windows default of pwsh: PowerShell splits
+      # -coverprofile=coverage.out at the dot and hands go a bare ".out",
+      # which it then looks for as a package. Git Bash is on the Windows
+      # runner, so one command line works on all three.
       - name: Test
+        shell: bash
         run: gotestsum --format testdox --junitfile test-report.xml -- -race -coverprofile=coverage.out -covermode=atomic ./...
       # Skip the report-posting steps for PRs with a read-only GITHUB_TOKEN
       # (external forks, and Dependabot even though its branch is same-repo):
