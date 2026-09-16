@@ -88,6 +88,11 @@ func markdownLines(src string, w int) []string {
 	// of it, which shifts everything after it sideways.
 	src = strings.ReplaceAll(src, "\r", "")
 
+	// out starts as the source so that a renderer glamour will not build, or a
+	// document it will not render, still puts the author's words on the
+	// screen. Markdown is readable unrendered, and there is nowhere in a
+	// scrolling body to report the failure that would not cost more than it
+	// tells the reader.
 	out := src
 	cfg := styles.DarkStyleConfig
 	var noMargin uint
