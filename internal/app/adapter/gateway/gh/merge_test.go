@@ -235,3 +235,34 @@ func TestEnableAutoMergePassesTheConvertedMethod(t *testing.T) {
 		t.Errorf("method passed to the backend = %v, want MergeMethodMerge", got)
 	}
 }
+
+func TestTheAdminPermissionSurvivesTheTranslation(t *testing.T) {
+	t.Parallel()
+
+	got := toMergeContext(gql.MergeContext{
+		PullRequestID:    "PR_1",
+		Mergeable:        "MERGEABLE",
+		MergeStateStatus: "BLOCKED",
+		ViewerPermission: "ADMIN",
+	})
+	if !got.ViewerIsAdmin {
+		t.Error("ViewerIsAdmin = false, want true: the popup has no other way to know")
+	}
+	if !got.CanMergeAsAdmin() {
+		t.Error("CanMergeAsAdmin() = false, want true for a blocked pull request")
+	}
+}
+
+func TestANonAdminPermissionDoesNotSetViewerIsAdmin(t *testing.T) {
+	t.Parallel()
+
+	got := toMergeContext(gql.MergeContext{
+		PullRequestID:    "PR_1",
+		Mergeable:        "MERGEABLE",
+		MergeStateStatus: "BLOCKED",
+		ViewerPermission: "WRITE",
+	})
+	if got.ViewerIsAdmin {
+		t.Error("ViewerIsAdmin = true, want false for a WRITE permission")
+	}
+}
