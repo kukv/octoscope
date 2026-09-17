@@ -78,6 +78,12 @@ func mergeBlockedModel(t *testing.T, width int) Model {
 	return sized(t, &fakeSource{ctx: c}, width)
 }
 
+// mergeAdminModel is held by a branch rule, with the viewer able to push past
+// it: the one state where the popup offers a key while merging is blocked.
+func mergeAdminModel(t *testing.T, width int) Model {
+	return sized(t, &fakeSource{ctx: blocked()}, width)
+}
+
 // mergeComputingModel is a pull request GitHub has not worked out an answer
 // for yet, which is the longest of the reasons in both languages.
 func mergeComputingModel(t *testing.T, width int) Model {
@@ -130,6 +136,7 @@ var goldenStates = []struct {
 	{"merge_auto", mergeAutoModel},
 	{"merge_auto_on", mergeAutoOnModel},
 	{"merge_blocked", mergeBlockedModel},
+	{"merge_admin", mergeAdminModel},
 	{"merge_computing", mergeComputingModel},
 	{"merge_auto_forbidden", mergeAutoForbiddenModel},
 	{"merge_failed", mergeFailedModel},

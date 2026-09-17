@@ -553,8 +553,12 @@ merge:
     other: "レビューが承認されていません"
   review_changes:
     other: "変更が要求されています"
+  admin_offer:
+    other: "admin 権限で押し切れます"
   key_merge:
     other: "enter:マージ"
+  key_admin:
+    other: "a:adminでマージ"
   key_auto:
     other: "space:auto"
   key_auto_off:

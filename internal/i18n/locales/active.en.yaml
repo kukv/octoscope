@@ -574,8 +574,12 @@ merge:
     other: "it has not been approved"
   review_changes:
     other: "changes have been requested"
+  admin_offer:
+    other: "you can merge it anyway as an admin"
   key_merge:
     other: "enter:merge"
+  key_admin:
+    other: "a:admin merge"
   key_auto:
     other: "space:auto"
   key_auto_off:

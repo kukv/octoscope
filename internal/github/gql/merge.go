@@ -24,17 +24,19 @@ type MergeContext struct {
 	DeleteBranchOnMerge      bool
 	AutoMergeAllowed         bool
 	ViewerCanEnableAutoMerge bool
+	ViewerPermission         string
 	AutoMergeEnabled         bool
 }
 
 type mergeContextResponse struct {
 	Data struct {
 		Repository struct {
-			SquashMergeAllowed  bool `json:"squashMergeAllowed"`
-			MergeCommitAllowed  bool `json:"mergeCommitAllowed"`
-			RebaseMergeAllowed  bool `json:"rebaseMergeAllowed"`
-			DeleteBranchOnMerge bool `json:"deleteBranchOnMerge"`
-			AutoMergeAllowed    bool `json:"autoMergeAllowed"`
+			SquashMergeAllowed  bool   `json:"squashMergeAllowed"`
+			MergeCommitAllowed  bool   `json:"mergeCommitAllowed"`
+			RebaseMergeAllowed  bool   `json:"rebaseMergeAllowed"`
+			DeleteBranchOnMerge bool   `json:"deleteBranchOnMerge"`
+			AutoMergeAllowed    bool   `json:"autoMergeAllowed"`
+			ViewerPermission    string `json:"viewerPermission"`
 			PullRequest         struct {
 				ID                       string `json:"id"`
 				IsDraft                  bool   `json:"isDraft"`
@@ -80,6 +82,7 @@ func (c *Client) PRMergeContext(ctx context.Context, repo string, number int) (M
 		DeleteBranchOnMerge:      r.DeleteBranchOnMerge,
 		AutoMergeAllowed:         r.AutoMergeAllowed,
 		ViewerCanEnableAutoMerge: pr.ViewerCanEnableAutoMerge,
+		ViewerPermission:         r.ViewerPermission,
 		AutoMergeEnabled:         pr.AutoMergeRequest != nil,
 	}, nil
 }

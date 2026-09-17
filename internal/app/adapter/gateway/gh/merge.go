@@ -45,6 +45,12 @@ func toMergeContext(c gql.MergeContext) domain.MergeContext {
 		AutoMergeAllowed:         c.AutoMergeAllowed,
 		ViewerCanEnableAutoMerge: c.ViewerCanEnableAutoMerge,
 		AutoMergeEnabled:         c.AutoMergeEnabled,
+		// viewerCanMergeAsAdmin only reads classic branch protection, so it
+		// answers false under a ruleset even for a viewer the ruleset lists
+		// as an always-bypass actor. The repository permission is a
+		// near-enough stand-in for "may bypass": a ruleset can name other
+		// roles as bypass actors, and an admin need not be one of them.
+		ViewerIsAdmin: c.ViewerPermission == "ADMIN",
 	}
 }
 

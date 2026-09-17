@@ -165,10 +165,24 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.auto = !m.auto
 		}
 		return m, nil
+	case "a":
+		return m.mergeAsAdmin()
 	case "enter":
 		return m.send()
 	}
 	return m, nil
+}
+
+// mergeAsAdmin pushes the merge past what is holding it. It is a key of its
+// own rather than a meaning enter takes on when merging is blocked: breaking
+// a protection must not share a keystroke with an ordinary merge, or a
+// mistake looks exactly like the thing the user does every day.
+func (m Model) mergeAsAdmin() (Model, tea.Cmd) {
+	if !m.ctx.CanMergeAsAdmin() {
+		return m, nil
+	}
+	method := m.method()
+	return m.sendCmd(true, func() error { return m.src.MergePR(m.ctx.PullRequest, method) })
 }
 
 // send does the one thing the popup is for. Leaving the auto-merge queue is
