@@ -29,6 +29,12 @@ type repoNamer interface {
 	RepoName(ctx context.Context) (string, error)
 }
 
+// viewerNamer names the signed-in user. Like repoNamer it is the root's
+// alone: the views are told who is reading, they do not ask.
+type viewerNamer interface {
+	Viewer(ctx context.Context) (string, error)
+}
+
 // Source is the union of what the child views need. Each view takes only its
 // own slice of it.
 type Source interface {
@@ -39,6 +45,7 @@ type Source interface {
 	checks.Source
 	search.Source
 	repoNamer
+	viewerNamer
 }
 
 // Options carries what main determined before the UI started.
@@ -112,6 +119,37 @@ func resolved(ctx context.Context, name string, err error) repoResolvedMsg {
 	return repoResolvedMsg{name: name}
 }
 
+// viewerLookupTimeout bounds the one call that learns who is signed in. It
+// is as generous as repoLookupTimeout, and for the same reason: the call
+// reaches the API, and a cold one is slow.
+const viewerLookupTimeout = 20 * time.Second
+
+// viewerResolvedMsg carries the login, or "" when there is none to be had.
+// Unlike repoResolvedMsg it does not tell a timeout apart from a failure:
+// nothing on the screen changes either way.
+type viewerResolvedMsg struct{ login string }
+
+// resolveViewer asks GitHub who is signed in, so the detail view can tell a
+// comment addressed at the reader from one that is not.
+//
+// A failure is dropped. The name buys a highlight, not correctness: without
+// it every view draws as it always did, and an error screen over a
+// decoration would cost the user the session. That is also what keeps
+// Gateway's promoted Viewer -- whose failures carry the client's own
+// sentinels, not the domain's -- away from the fatal-error screen
+// (adapter/gateway/gh/backend.go).
+func resolveViewer(src Source) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), viewerLookupTimeout)
+		defer cancel()
+		login, err := src.Viewer(ctx)
+		if err != nil {
+			return viewerResolvedMsg{}
+		}
+		return viewerResolvedMsg{login: login}
+	}
+}
+
 type tabID int
 
 const (
@@ -174,6 +212,11 @@ type Model struct {
 	// lookup ran out of time, not because the working directory has none.
 	repoLookupTimedOut bool
 
+	// viewer is the login of the signed-in user, handed to each detail view
+	// as it is opened. Empty until the lookup answers, and for good if it
+	// failed.
+	viewer string
+
 	// wantRepos holds the settings file's opening tab until the current
 	// repository is known. It is cleared once spent, so a later answer to
 	// the same lookup does not pull the user back off the tab they moved to.
@@ -226,6 +269,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 	case repoResolvedMsg:
 		return m.repoResolved(msg)
+	case viewerResolvedMsg:
+		m.viewer = msg.login
+		return m, nil
 	case work.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
 	case repo.OpenDetailMsg:
@@ -440,6 +486,7 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		var fetch tea.Cmd
 		m.work, fetch = m.work.Refresh()
 		cmds = append(cmds, fetch, m.repo.Init(), m.search.Init())
+		cmds = append(cmds, resolveViewer(m.src))
 		if m.opts.Repo == "" {
 			cmds = append(cmds, resolveRepo(m.src))
 		}
@@ -448,7 +495,7 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) openDetail(ref domain.ItemRef) (tea.Model, tea.Cmd) {
-	m.detail = detail.New(m.src, ref)
+	m.detail = detail.New(m.src, ref).SetViewer(m.viewer)
 	m.stack = []overlay{overlayDetail}
 	// The view is built after the terminal size is known, so it never sees the
 	// WindowSizeMsg that told the others how wide they are.

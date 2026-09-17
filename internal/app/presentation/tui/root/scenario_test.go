@@ -80,6 +80,8 @@ func (f *scenarioSource) ListIssues(_ context.Context, repo string) ([]domain.Is
 
 func (f *scenarioSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
 
+func (f *scenarioSource) Viewer(context.Context) (string, error) { return "kukv", nil }
+
 func (f *scenarioSource) RepoCounts(context.Context, []string) ([]domain.RepoCount, error) {
 	return nil, nil
 }

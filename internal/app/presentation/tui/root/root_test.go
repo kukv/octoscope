@@ -57,6 +57,10 @@ type fakeSource struct {
 
 	searchItems []domain.WorkItem
 	searchCalls int
+
+	viewer      string
+	viewerErr   error
+	viewerAsked bool
 }
 
 func (f *fakeSource) SearchItems(context.Context, string) ([]domain.WorkItem, error) {
@@ -91,6 +95,11 @@ func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]domain.Issue,
 }
 
 func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
+
+func (f *fakeSource) Viewer(context.Context) (string, error) {
+	f.viewerAsked = true
+	return f.viewer, f.viewerErr
+}
 
 func (f *fakeSource) RepoCounts(_ context.Context, repos []string) ([]domain.RepoCount, error) {
 	f.countCalls = append(f.countCalls, repos)
@@ -1482,5 +1491,65 @@ func TestTheSettingsFileSavedQueriesReachThePicker(t *testing.T) {
 
 	if got := content(m); !strings.Contains(got, "from-the-file") {
 		t.Errorf("the picker does not list what the settings file held:\n%s", got)
+	}
+}
+
+// TestTheViewerLookupReachesTheDetailView covers the one thing the login is
+// fetched for. The lookup answers while the board is on screen, and the view
+// built afterwards has to be told.
+func TestTheViewerLookupReachesTheDetailView(t *testing.T) {
+	src := &fakeSource{}
+	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m := resolve(t, next.(Model), cmd)
+
+	// Running the commands the size returned is what proves the lookup is
+	// fired at all: handing the answer in below would keep this green with
+	// the command gone.
+	if !src.viewerAsked {
+		t.Error("the root never asked who is signed in")
+	}
+
+	next, _ = m.Update(viewerResolvedMsg{login: "kukv"})
+	m = next.(Model)
+
+	if m.viewer != "kukv" {
+		t.Errorf("the root kept %q, want %q", m.viewer, "kukv")
+	}
+
+	next, _ = m.openDetail(domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/demo", Number: 1})
+	if got := next.(Model).detail.ViewerForTest(); got != "kukv" {
+		t.Errorf("the detail view was told %q, want %q", got, "kukv")
+	}
+}
+
+// TestTheViewerLookupRunsEvenWithTheRepoFlag covers the branch the line in
+// resize is most likely to be lost from: --repo skips the repository lookup,
+// and who is signed in is not a fact about the repository being looked at.
+func TestTheViewerLookupRunsEvenWithTheRepoFlag(t *testing.T) {
+	src := &fakeSource{}
+	next, cmd := New(src, Options{Repo: "kukv/demo"}).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	resolve(t, next.(Model), cmd)
+
+	if !src.viewerAsked {
+		t.Error("the root never asked who is signed in")
+	}
+}
+
+// TestAFailedViewerLookupIsNotAnError covers what happens when GitHub will
+// not say who is signed in: the highlight is worth doing without, and an
+// error screen over a decoration would cost the whole session.
+func TestAFailedViewerLookupIsNotAnError(t *testing.T) {
+	m := New(&fakeSource{viewerErr: errors.New("boom")}, Options{})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = next.(Model)
+
+	next, _ = m.Update(resolveViewer(m.src)())
+	m = next.(Model)
+
+	if m.viewer != "" {
+		t.Errorf("a failed lookup left %q behind", m.viewer)
+	}
+	if strings.Contains(content(m), "boom") {
+		t.Error("a failed viewer lookup reached the screen")
 	}
 }
