@@ -37,7 +37,8 @@ Phase 4 で spec §7 のフェーズ分割は終わる。
 
 ## 3. 設定ファイル（スライス 1）
 
-`os.UserConfigDir()` 配下の `octoscope/config.yaml`。パーサは i18n と同じ
+`$XDG_CONFIG_HOME`（未設定なら `~/.config`、Windows のみ `%AppData%`）配下の
+`octoscope/config.yaml`。パーサは i18n と同じ
 `go.yaml.in/yaml/v3` を使い、YAML の実装を 1 つに保つ。項目は spec §5 の 5 つ
 （`repositories` / `saved_queries` / `default_tab` / `nerd_font` / `language`）から
 増やさない。

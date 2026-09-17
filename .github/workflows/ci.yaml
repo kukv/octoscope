@@ -29,8 +29,19 @@ jobs:
       - name: Format check
         run: golangci-lint fmt --diff ./...
 
+  # octoscope ships one binary for three operating systems, so the tests run
+  # on all three. A Linux-only job let a settings-path test that only Linux
+  # could pass sit green for days (#95): os.UserConfigDir, filepath and the
+  # environment variables around them differ per platform, and nothing else
+  # catches that.
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      # One platform failing must not hide what the other two would have
+      # said; a per-OS failure is exactly what this matrix exists to show.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       actions: read
@@ -46,19 +57,28 @@ jobs:
           cache: false
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@v1.13.0
+      # bash rather than the Windows default of pwsh: PowerShell splits
+      # -coverprofile=coverage.out at the dot and hands go a bare ".out",
+      # which it then looks for as a package. Git Bash is on the Windows
+      # runner, so one command line works on all three.
       - name: Test
+        shell: bash
         run: gotestsum --format testdox --junitfile test-report.xml -- -race -coverprofile=coverage.out -covermode=atomic ./...
       # Skip the report-posting steps for PRs with a read-only GITHUB_TOKEN
       # (external forks, and Dependabot even though its branch is same-repo):
       # posting would fail and turn CI red even when tests pass. Still run on
       # trusted same-repo PRs even if the test step failed (!cancelled()).
+      #
+      # They also post only from the Linux leg: a check run and a coverage
+      # comment are one per pull request, and three legs would overwrite each
+      # other's. A failure on another leg is still red through its own job.
       - name: Test Report
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
-        if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
         with:
           name: Test Report
           path: test-report.xml
           reporter: java-junit
       - name: Report coverage
         uses: k1LoW/octocov-action@a167dc0dee441b7ffc45e1b862ab55ec0d87f278 # v1.5.2
-        if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}

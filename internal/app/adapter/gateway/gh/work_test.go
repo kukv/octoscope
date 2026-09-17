@@ -39,10 +39,10 @@ func TestWorkQueryDefinesEachColumn(t *testing.T) {
 		section domain.WorkSection
 		want    string
 	}{
-		{domain.SectionReviewRequested, "is:open is:pr review-requested:@me"},
-		{domain.SectionYourPRs, "is:open is:pr author:@me"},
-		{domain.SectionAssigned, "is:open assignee:@me"},
-		{domain.SectionMentioned, "is:open mentions:@me"},
+		{domain.SectionReviewRequested, "is:open is:pr review-requested:@me archived:false"},
+		{domain.SectionYourPRs, "is:open is:pr author:@me archived:false"},
+		{domain.SectionAssigned, "is:open assignee:@me archived:false"},
+		{domain.SectionMentioned, "is:open mentions:@me archived:false"},
 	}
 	if len(tests) != domain.WorkSectionCount {
 		t.Fatalf("the table covers %d columns, the board has %d", len(tests), domain.WorkSectionCount)
@@ -69,7 +69,7 @@ func TestListWorkSectionSendsTheColumnsQuery(t *testing.T) {
 	if _, err := g.ListWorkSection(context.Background(), domain.SectionMentioned); err != nil {
 		t.Fatalf("ListWorkSection: %v", err)
 	}
-	if want := "is:open mentions:@me"; gotQuery != want {
+	if want := "is:open mentions:@me archived:false"; gotQuery != want {
 		t.Errorf("ListWorkSection sent %q, want %q", gotQuery, want)
 	}
 }

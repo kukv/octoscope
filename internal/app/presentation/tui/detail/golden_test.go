@@ -35,10 +35,29 @@ func goldenPR() domain.PR {
 		Review: domain.ReviewApproved, UpdatedAt: goldenAt,
 		Body:   "This replaces the renderer.\n\n- one\n- two",
 		Labels: []domain.Label{{Name: "enhancement", Color: "a2eeef"}},
+		// Everything the meta pane can draw is filled in: a recording made
+		// against an item with no branches, no checks and no assignee would
+		// never show those rows at all.
+		Assignees: []domain.Author{{Login: "alice"}},
+		Checks:    domain.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1},
+		Head:      "feat/graph", Base: "main", Additions: 218, Deletions: 31,
 		Comments: []domain.Comment{
 			{Author: domain.Author{Login: "bob"}, Body: "見た目が良い", CreatedAt: goldenAt},
+			// A second comment is what shows the bar starting over.
+			{
+				Author:    domain.Author{Login: "alice"},
+				Body:      "ここは次の PR で直すつもり。\n\n長さのある段落をもう一つ置いて、折り返した行にも罫がつくことを記録に残す。",
+				CreatedAt: goldenAt,
+			},
 		},
 	}
+}
+
+// goldenRef names a repository, unlike prRef: the meta pane's first row is
+// the reference, and an empty repository would leave it out of every
+// recording.
+func goldenRef() domain.ItemRef {
+	return domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12}
 }
 
 func goldenModel(width int) Model {
@@ -50,9 +69,9 @@ func goldenModel(width int) Model {
 		labels:    []domain.Label{{Name: "bug", Color: "d73a4a"}},
 		reviewCtx: domain.ReviewContext{PullRequest: "PR_128", Pending: "PRR_1"},
 	}
-	m := New(f, prRef())
+	m := New(f, goldenRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-	m, _ = m.Update(fetch(f, prRef())())
+	m, _ = m.Update(fetch(f, goldenRef())())
 	return m
 }
 
@@ -83,7 +102,7 @@ func TestGolden(t *testing.T) {
 				submitting, _ := openingReview.Update(cmd())
 				golden.Assert(t, fmt.Sprintf("detail_submit_%s_%d", lang.name, w), submitting.View())
 
-				loading := New(&fakeSource{pr: goldenPR()}, prRef())
+				loading := New(&fakeSource{pr: goldenPR()}, goldenRef())
 				loading, _ = loading.Update(tea.WindowSizeMsg{Width: w, Height: 40})
 				golden.Assert(t, fmt.Sprintf("detail_loading_%s_%d", lang.name, w), loading.View())
 
@@ -91,7 +110,7 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("detail_loading_declined_%s_%d", lang.name, w), declined.View())
 
 				// No other recording covers the error line.
-				failed, _ := m.Update(stateErrorMsg{ref: prRef(), err: errors.New("boom")})
+				failed, _ := m.Update(stateErrorMsg{ref: goldenRef(), err: errors.New("boom")})
 				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())
 			})
 		}

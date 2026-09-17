@@ -130,6 +130,34 @@ detail:
     other: "Issue #{{.Number}} {{.Title}}"
   decline_loading:
     other: "本文がまだ届いていません。少し待ってからもう一度"
+  no_description:
+    other: "_説明はありません_"
+  meta:
+    repo:
+      other: "リポジトリ"
+    author:
+      other: "作成者"
+    state:
+      other: "状態"
+    review:
+      other: "レビュー"
+    checks:
+      other: "checks"
+    branch:
+      other: "ブランチ"
+    changes:
+      other: "変更"
+    assignees:
+      other: "担当"
+    labels:
+      other: "ラベル"
+    updated:
+      other: "更新"
+  section:
+    description:
+      other: "説明"
+    comments:
+      other: "コメント {{.Count}} 件"
 
 compose:
   title:
@@ -443,22 +471,6 @@ checks:
   decline_no_url:
     other: "この check は開けるページを報告していません"
 
-md:
-  author:
-    other: "作成者"
-  state:
-    other: "状態"
-  review:
-    other: "レビュー"
-  labels:
-    other: "ラベル"
-  updated:
-    other: "更新"
-  draft_suffix:
-    other: "（下書き）"
-  no_description:
-    other: "_説明はありません_"
-
 time:
   now:
     other: "たった今"
@@ -477,6 +489,8 @@ state:
     other: "オープン"
   closed:
     other: "クローズ"
+  draft_suffix:
+    other: "（下書き）"
   merged:
     other: "マージ済み"
 

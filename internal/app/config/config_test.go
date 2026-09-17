@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -107,15 +108,48 @@ func TestAnUnknownTabStartsOnTheDefault(t *testing.T) {
 // Path is the one function that decides where the settings file lives on
 // every platform; a broken join here silently makes every setting
 // unreadable.
+//
+// The wanted path is spelled out rather than read back from os.UserConfigDir:
+// a test that asked the same function the implementation asks would pass
+// however the file moved. Windows has its own directory and its own
+// environment variable, so the test has to say which it is setting.
 func TestPathPutsTheFileUnderTheConfigDirectory(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	if runtime.GOOS == "windows" {
+		t.Setenv("AppData", dir)
+	} else {
+		t.Setenv("XDG_CONFIG_HOME", dir)
+	}
 
 	got, err := config.Path()
 	if err != nil {
 		t.Fatalf("Path: %v", err)
 	}
 	want := filepath.Join(dir, "octoscope", "config.yaml")
+	if got != want {
+		t.Errorf("Path() = %q, want %q", got, want)
+	}
+}
+
+// Someone with no XDG_CONFIG_HOME set — which is most people on macOS — must
+// still land in ~/.config, the one place a dotfiles repository can reach on
+// every Unix.
+func TestPathFallsBackToDotConfigWithoutXDG(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has %AppData%, not a home-relative fallback")
+	}
+	dir := t.TempDir()
+	// Setting it empty rather than leaving it alone: the shell running the
+	// tests may export one, and then this would not be testing the fallback.
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", dir)
+
+	got, err := config.Path()
+	if err != nil {
+		t.Fatalf("Path: %v", err)
+	}
+	want := filepath.Join(dir, ".config", "octoscope", "config.yaml")
 	if got != want {
 		t.Errorf("Path() = %q, want %q", got, want)
 	}

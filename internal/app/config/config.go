@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	yaml "go.yaml.in/yaml/v3"
@@ -50,15 +51,34 @@ func (c Config) DefaultTabName() string {
 	}
 }
 
-// Path is where the settings file lives: octoscope/config.yaml under the
-// directory the operating system keeps configuration in (%AppData% on
-// Windows, ~/Library/Application Support on macOS, ~/.config on Linux).
+// Path is where the settings file lives: octoscope/config.yaml under
+// %AppData% on Windows, and under $XDG_CONFIG_HOME or ~/.config everywhere
+// else.
+//
+// macOS follows the XDG convention here rather than the ~/Library/Application
+// Support that os.UserConfigDir answers, so that one dotfiles layout reaches
+// the file on every Unix. A path with a space in it, behind a per-OS branch
+// in the dotfiles, is a cost paid every time the settings move machine.
 func Path() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := configDir()
 	if err != nil {
 		return "", fmt.Errorf("locate the config directory: %w", err)
 	}
 	return filepath.Join(dir, "octoscope", "config.yaml"), nil
+}
+
+func configDir() (string, error) {
+	if runtime.GOOS == "windows" {
+		return os.UserConfigDir()
+	}
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return dir, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config"), nil
 }
 
 // Load reads the settings file. A file that is not there is not a failure:

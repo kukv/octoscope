@@ -73,10 +73,18 @@ Or point it at any repository:
 
 ### Settings file
 
-octoscope reads `octoscope/config.yaml` under the directory the operating
-system keeps configuration in: `%AppData%` on Windows, `~/Library/Application
-Support` on macOS, `~/.config` on Linux. It is optional; a missing or empty
-file just means every setting is at its default.
+octoscope reads `octoscope/config.yaml` under `$XDG_CONFIG_HOME`, or
+`~/.config` when that is unset — macOS included, so one dotfiles layout
+reaches it everywhere. On Windows it is under `%AppData%`. The file is
+optional; a missing or empty one just means every setting is at its default.
+
+Before v0.7.0 macOS looked under `~/Library/Application Support`. To carry an
+existing file over:
+
+```bash
+mkdir -p ~/.config/octoscope
+mv ~/Library/Application\ Support/octoscope/config.yaml ~/.config/octoscope/
+```
 
 | Key | Values |
 |---|---|
