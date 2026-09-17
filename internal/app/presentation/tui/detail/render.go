@@ -66,11 +66,27 @@ func (m Model) View() string {
 		b.WriteString(theme.Rule().Render(strings.Repeat("─", max(m.width, 0))) + "\n")
 		b.WriteString(m.body.View() + "\n")
 	}
+	// The failure and the key bar are both drawn after the cut: what the
+	// reader is told about a failure, and what tells them esc is the way out,
+	// are the two things a short terminal must not swallow
+	// (.claude/rules/errors.md).
+	var failure string
 	if m.errText != "" {
-		b.WriteString(wrapErr(m.errText, m.width) + "\n")
+		failure = wrapErr(m.errText, m.width) + "\n"
 	}
-	return fitHeight(b.String(), m.height) + footer
+	height := m.height
+	if height > 0 {
+		// A wrapped failure can be taller than the terminal. Flooring the
+		// budget at one keeps this a subtraction rather than a way back into
+		// fitHeight's "no size yet" branch, where nothing would be cut at all.
+		height = max(height-lineCount(failure), 1)
+	}
+	return fitHeight(b.String(), height) + failure + footer
 }
+
+// lineCount counts the lines in a block that ends in a newline, and returns
+// zero for the empty string.
+func lineCount(s string) int { return strings.Count(s, "\n") }
 
 // fitHeight cuts what is drawn above the key bar down to the lines the
 // terminal has, so that the key bar is still on the screen. The meta pane is

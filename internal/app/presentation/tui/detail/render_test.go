@@ -251,3 +251,32 @@ func TestTheKeyBarSurvivesAShortTerminal(t *testing.T) {
 		})
 	}
 }
+
+// TestAFailureSurvivesAShortTerminal covers the other line the cut must not
+// swallow. What gh or GitHub said is the whole of what the reader has to go
+// on after a failed close, so it belongs on the same side of the cut as the
+// key bar (.claude/rules/errors.md); the meta pane's tail is what gives way.
+func TestAFailureSurvivesAShortTerminal(t *testing.T) {
+	const boom = "HTTP 403: Resource not accessible by integration"
+
+	for _, h := range []int{8, 12, 16, 24} {
+		t.Run(fmt.Sprintf("height_%d", h), func(t *testing.T) {
+			m := goldenModel(120)
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: h})
+			m, _ = m.Update(stateErrorMsg{ref: goldenRef(), err: errors.New(boom)})
+
+			view := m.View()
+			if !strings.Contains(ansi.Strip(view), boom) {
+				t.Errorf("the failure is off the screen at a height of %d:\n%s", h, ansi.Strip(view))
+			}
+			lines := strings.Split(view, "\n")
+			if len(lines) > h {
+				t.Errorf("the view is %d lines at a height of %d", len(lines), h)
+			}
+			last := ansi.Strip(lines[len(lines)-1])
+			if !strings.Contains(last, "esc") {
+				t.Errorf("the last line is %q, want the key bar", last)
+			}
+		})
+	}
+}
