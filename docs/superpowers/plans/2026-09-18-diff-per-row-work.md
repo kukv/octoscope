@@ -38,7 +38,7 @@
 | `internal/app/presentation/tui/diff/render.go` | 描画 | `lineNumberWidth` が保持した値を返す、`sidebarLines` を画面の高さで打ち切る |
 | `internal/app/presentation/tui/diff/mouse.go` | マウスの当たり判定 | `m.rows = m.buildRows()` の 1 箇所を同じメソッドに置き換える |
 | `internal/app/presentation/tui/diff/bench_test.go` | ベンチ | 大きな入力のベンチを 1 本追加 |
-| `internal/app/presentation/tui/diff/diff_test.go` | テスト | 退行テストを 2 本追加 |
+| `internal/app/presentation/tui/diff/diff_test.go` | テスト | 退行テストを 5 本追加 |
 
 `Model` の公開 API、`buildRows` のシグネチャ、ゴールデンファイルは**変更しない**。
 
@@ -84,7 +84,15 @@ func hugeDiff(files, linesPerFile int) []domain.FileDiff {
 // hugeModel is the diff view opened on hugeDiff, with a review context
 // carrying a thread per file: threadCount walks every thread for every file
 // the sidebar draws, so the threads have to be there to measure it.
-func hugeModel(width, files, linesPerFile int) Model {
+//
+// The width and the file count are constants rather than arguments: every
+// caller wants the same ones, and unparam rejects a parameter that never
+// varies. A caller needing another size sends its own WindowSizeMsg.
+func hugeModel(linesPerFile int) Model {
+	const (
+		width = 160
+		files = 300
+	)
 	diff := hugeDiff(files, linesPerFile)
 	threads := make([]domain.ReviewThread, 0, len(diff))
 	for _, f := range diff {
@@ -106,7 +114,7 @@ func hugeModel(width, files, linesPerFile int) Model {
 // file runs to 5,000 lines. Only a screenful is drawn, so neither number
 // should reach the cost.
 func BenchmarkViewHugeDiff(b *testing.B) {
-	m := hugeModel(160, 300, 5000)
+	m := hugeModel(5000)
 	if len(m.rows) < 5000 {
 		b.Fatalf("the diff did not land: %d rows", len(m.rows))
 	}
@@ -306,7 +314,7 @@ git commit -m "perf(diff): count the gutter's width once a file, not twice a row
 // paid to draw every one of them on every frame. Two lines per file, so the
 // list may not run past the pane.
 func TestSidebarStopsAtTheBottom(t *testing.T) {
-	m := hugeModel(160, 300, 10)
+	m := hugeModel(10)
 
 	if got, want := len(m.sidebarLines()), m.paneHeight(); got > want {
 		t.Fatalf("the sidebar drew %d lines for a %d-line pane", got, want)
@@ -317,7 +325,7 @@ func TestSidebarStopsAtTheBottom(t *testing.T) {
 // break: followSidebar scrolls fileTop so the selected file is on screen,
 // and the cut has to leave that file in the list it returns.
 func TestSidebarStillReachesTheSelectedFile(t *testing.T) {
-	m := hugeModel(160, 300, 10)
+	m := hugeModel(10)
 	for range 40 {
 		m = m.moveFile(1)
 	}
@@ -352,14 +360,28 @@ func (m Model) sidebarLines() []string {
 		return nil
 	}
 	// body only draws paneHeight lines, and a file takes two of them. Going
-	// past that built rows nobody sees -- three lipgloss renders and a walk
-	// of every review thread, per file, on every frame.
+	// past that built rows nobody sees -- two or three lipgloss renders and
+	// a walk of every review thread, per file, on every frame.
 	h := m.paneHeight()
-	lines := make([]string, 0, h)
+	lines := make([]string, 0, h+1)
 	for i := m.fileTop; i < len(m.files) && len(lines) < h; i++ {
 ```
 
-ループ本体と `return lines` はそのまま。
+ループ本体はそのまま。`return lines` は打ち切る形にする。
+
+```go
+	// An odd pane leaves the loop one line over: the last file starts its
+	// two lines at index h-1. Cutting here rather than stopping the loop
+	// earlier keeps that file's path on screen, which is what body would
+	// have drawn anyway -- it only ever reads sidebar[0:h].
+	return lines[:min(len(lines), h)]
+```
+
+**なぜループ側で止めないか**（`ffe40e0` で入った修正。当初の計画はここを取り違えていた）:
+`len(lines) < h` だけだと奇数の `paneHeight` で `h+1` 行返る。テストが
+「`paneHeight` 行以内」を主張していたのに、コードはそれを保証していなかった。
+ループを厳密に `h` で止めると、半分だけ見えている最後のファイルのパス行が消えて
+**描画が変わる**。`body` が読む範囲で切れば描画は不変のまま主張が真になる。
 
 - [x] **Step 4: テストとゴールデンを走らせる**
 
@@ -389,8 +411,11 @@ go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=10
 プロファイルで、残り 6.27 ms のうち 4.7 ms が `theme.Highlight`（画面に出る約 36 行ぶん）で、
 これは PR の大きさに比例しない固定費だと分かった。サイドバーぶんは 1.5 ms なので、この Task で
 届くのは約 4.7 ms である。**総量比例のコストが消えたことの確認は数字の絶対値ではなく、
-`hugeModel` のファイル数を 300 から 1000 に増やしても `BenchmarkViewHugeDiff` がほとんど
-変わらないことで行う**（ベンチを書き換えるのではなく、手元で一時的に数字を変えて確かめる）。
+`hugeModel` の `const files` を 300 から 1000 に上げても `BenchmarkViewHugeDiff` が
+ほとんど変わらないことで行う**（手元で一時的に書き換えて確かめ、コミットしない）。
+
+実測: base は 300 ファイルで 13.06 ms、1000 ファイルで 17.49 ms と増えるのに対し、
+このタスクのあとは 4.93 ms と 4.82 ms で動かない。
 
 - [x] **Step 6: コミット**
 
