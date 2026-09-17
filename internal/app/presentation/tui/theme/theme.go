@@ -111,6 +111,10 @@ const chromaReset = "\x1b[0m"
 // only on columns that have a character in them. A caller marking one word
 // inside a line, rather than a whole row, passes the word alone -- the
 // padding requirement is for a row, not for every call.
+//
+// A filled row must not be passed to fillLine again: a background is not a
+// reset, so the inner fill wins outright and the outer colour never reaches
+// the text.
 func fillLine(s string, bg color.Color) string {
 	seq := ansi.Style{}.BackgroundColor(bg).String()
 	s = strings.ReplaceAll(s, ansi.ResetStyle, ansi.ResetStyle+seq)
