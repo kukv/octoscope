@@ -482,21 +482,11 @@ func (m Model) diffTextLine(l domain.DiffLine, width int) string {
 // that separates it from the text.
 func (m Model) gutter() int { return 2*m.lineNumberWidth() + 3 }
 
-// lineNumberWidth is how many columns the widest line number in the file
-// currently shown needs, floored at gutterWidth's four digits. The format
-// that draws a line number pads to a minimum rather than truncating, so a
-// file whose numbers run past four digits must widen the gutter, or the row
-// it draws runs past the budget the rest of the layout assumes.
-func (m Model) lineNumberWidth() int {
-	w := (gutterWidth - 3) / 2
-	for _, r := range m.rows {
-		if r.kind != rowLine {
-			continue
-		}
-		w = max(w, len(strconv.Itoa(r.line.OldLine)), len(strconv.Itoa(r.line.NewLine)))
-	}
-	return w
-}
+// lineNumberWidth is the gutter's number field, counted when the rows were
+// built (countLineNumberWidth). The floor is applied here too, so a Model
+// whose rows have not been built yet still measures the same as an empty
+// file rather than zero.
+func (m Model) lineNumberWidth() int { return max(m.numWidth, (gutterWidth-3)/2) }
 
 // currentPath is the file the cursor is in, used to pick the syntax
 // highlighter's lexer.

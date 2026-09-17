@@ -5,6 +5,7 @@ package diff
 
 import (
 	"context"
+	"strconv"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textarea"
@@ -165,6 +166,13 @@ type Model struct {
 	row  int
 	top  int // the first row on screen
 
+	// numWidth is how many columns the widest line number in rows needs,
+	// counted when the rows are built. The gutter is asked for it twice for
+	// every row drawn, and counting it there walked the whole file each
+	// time. withRows is the only place the two are set, so they cannot fall
+	// out of step.
+	numWidth int
+
 	// sidebar is where the cursor is: false in the diff pane, true in the
 	// file list. h and l move between them.
 	sidebar bool
@@ -305,7 +313,7 @@ func (m Model) filesArrived(msg diffMsg) Model {
 	m.loading = false
 	m.files = msg.files
 	m.file, m.top, m.fileTop = 0, 0, 0
-	m.rows = m.buildRows()
+	m = m.withRows()
 	m.row = firstRow(m.rows)
 	m.declined = ""
 	return m.follow()
@@ -320,7 +328,7 @@ func (m Model) reviewArrived(msg reviewMsg) Model {
 	m.review = msg.ctx
 	m.reviewErr = nil
 	m.declined = ""
-	m.rows = m.buildRows()
+	m = m.withRows()
 	m.row = clamp(m.row, len(m.rows)-1)
 	m = m.follow()
 	return m
@@ -489,7 +497,7 @@ func (m Model) toggleCollapsed() Model {
 		m.expanded = map[string]bool{}
 	}
 	m.expanded[r.key] = !m.expanded[r.key]
-	m.rows = m.buildRows()
+	m = m.withRows()
 	m.row = clamp(m.row, len(m.rows)-1)
 	m.declined = ""
 	return m.follow()
@@ -531,6 +539,32 @@ func (m Model) buildRows() []row {
 	return rows
 }
 
+// withRows rebuilds the rows and everything counted from them. Every place
+// that changes what the diff pane shows goes through this rather than
+// assigning rows directly: a count left behind would draw the previous
+// file's gutter.
+func (m Model) withRows() Model {
+	m.rows = m.buildRows()
+	m.numWidth = countLineNumberWidth(m.rows)
+	return m
+}
+
+// countLineNumberWidth is how many columns the widest line number in rows
+// needs, floored at the four digits the gutter reserves. The format that
+// draws a line number pads to a minimum rather than truncating, so a file
+// whose numbers run past four digits must widen the gutter, or the row it
+// draws runs past the budget the rest of the layout assumes.
+func countLineNumberWidth(rows []row) int {
+	w := (gutterWidth - 3) / 2
+	for _, r := range rows {
+		if r.kind != rowLine {
+			continue
+		}
+		w = max(w, len(strconv.Itoa(r.line.OldLine)), len(strconv.Itoa(r.line.NewLine)))
+	}
+	return w
+}
+
 func (m Model) moveRow(delta int) Model {
 	if m.sidebar {
 		return m.moveFile(delta)
@@ -547,7 +581,7 @@ func (m Model) moveFile(delta int) Model {
 	m.file = clamp(m.file+delta, len(m.files)-1)
 	m.top = 0
 	m.declined = ""
-	m.rows = m.buildRows()
+	m = m.withRows()
 	m.row = firstRow(m.rows)
 	m = m.follow()
 	return m.followSidebar()
