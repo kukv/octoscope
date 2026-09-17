@@ -148,6 +148,15 @@ func TestGolden(t *testing.T) {
 				dlg = typeInto(dlg, "lip")
 				dlg, _ = dlg.Update(candidatesMsg{gen: dlg.searchGen, candidates: goldenCandidates()})
 				golden.Assert(t, fmt.Sprintf("repo_add_dialog_%s_%d", lang.name, w), dlg.View())
+
+				// The sidebar's own cursor, reached with h as a user would.
+				// Not recorded below minSidebarWidth, where the sidebar folds
+				// away and there is nothing to record.
+				if w >= minSidebarWidth {
+					sidebar := goldenModel(w)
+					sidebar, _ = sidebar.Update(key("h"))
+					golden.Assert(t, fmt.Sprintf("repo_sidebar_focus_%s_%d", lang.name, w), sidebar.View())
+				}
 			})
 		}
 	}
