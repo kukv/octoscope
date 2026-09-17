@@ -316,10 +316,11 @@ func (m Model) visibleLogRows() []string {
 	return lines
 }
 
-// logRows builds every line the log pane would draw, ungated by scrolling:
-// a heading per step and the step's own lines under it. A continuation
-// line has no timestamp of its own (LogLine.Time is zero), so only a
-// stamped line gets one drawn in front of it.
+// logRows is every line the log pane would draw, ungated by scrolling. The
+// log's own lines were built when it arrived (buildLogLines); what is left
+// here is the three states that have no log to draw and do change from one
+// frame to the next -- the spinner advances, and which "empty" it is
+// depends on the cursor.
 func (m Model) logRows() []string {
 	if m.logPhase == phaseLoading {
 		return []string{m.spin.View() + " " + i18n.T("checks.log_loading")}
@@ -333,10 +334,18 @@ func (m Model) logRows() []string {
 		}
 		return nil
 	}
+	return m.logLines
+}
+
+// buildLogLines draws a job's log as rows: a heading per step and the
+// step's own lines under it. A continuation line has no timestamp of its
+// own (LogLine.Time is zero), so only a stamped line gets one drawn in
+// front of it.
+func buildLogLines(log []domain.LogLine) []string {
 	var lines []string
 	last := ""
 	first := true
-	for _, l := range m.log {
+	for _, l := range log {
 		if first || l.Step != last {
 			lines = append(lines, theme.Heading().Render(l.Step))
 			last = l.Step

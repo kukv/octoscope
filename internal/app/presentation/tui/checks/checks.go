@@ -80,7 +80,12 @@ type Model struct {
 	// failedOnly was toggled off. logJob is the id of the check that log
 	// belongs to (or is being fetched for); an answer is kept only while the
 	// cursor is still on the job it was asked for.
-	log        []domain.LogLine
+	log []domain.LogLine
+	// logLines is log drawn as rows, built when the log arrives rather than
+	// on every draw: View, the cursor clamp and the horizontal bound each
+	// ask for them, and a job log runs to tens of thousands of lines. The
+	// checks list keeps its own order the same way.
+	logLines   []string
 	logJob     domain.JobHandle
 	logRow     int
 	hscroll    int
