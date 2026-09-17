@@ -685,7 +685,7 @@ func TestLineNumberWidthIsCounted(t *testing.T) {
 // paid to draw every one of them on every frame. Two lines per file, so the
 // list may not run past the pane.
 func TestSidebarStopsAtTheBottom(t *testing.T) {
-	m := hugeModel(160, 300, 10)
+	m := hugeModel(10)
 
 	if got, want := len(m.sidebarLines()), m.paneHeight(); got > want {
 		t.Fatalf("the sidebar drew %d lines for a %d-line pane", got, want)
@@ -697,7 +697,7 @@ func TestSidebarStopsAtTheBottom(t *testing.T) {
 // paneHeight lands mid-file, and the cut must trim the spare line rather
 // than either running past the pane or dropping the last file's path.
 func TestSidebarStopsAtTheBottomOnAnOddPane(t *testing.T) {
-	m := hugeModel(160, 300, 10)
+	m := hugeModel(10)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 41})
 
 	if want := m.paneHeight(); want%2 == 0 {
@@ -712,7 +712,7 @@ func TestSidebarStopsAtTheBottomOnAnOddPane(t *testing.T) {
 // break: followSidebar scrolls fileTop so the selected file is on screen,
 // and the cut has to leave that file in the list it returns.
 func TestSidebarStillReachesTheSelectedFile(t *testing.T) {
-	m := hugeModel(160, 300, 10)
+	m := hugeModel(10)
 	for range 40 {
 		m = m.moveFile(1)
 	}

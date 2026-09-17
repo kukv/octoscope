@@ -50,7 +50,18 @@ func hugeDiff(files, linesPerFile int) []domain.FileDiff {
 // hugeModel is the diff view opened on hugeDiff, with a review context
 // carrying a thread per file: threadCount walks every thread for every file
 // the sidebar draws, so the threads have to be there to measure it.
-func hugeModel(width, files, linesPerFile int) Model {
+//
+// The width is the one a screen most commonly opens at, and the file count
+// is what a large pull request runs to; a caller that needs another size
+// sends its own WindowSizeMsg. To check that the cost no longer follows the
+// size of the pull request, raise files here and see that the benchmark
+// barely moves.
+func hugeModel(linesPerFile int) Model {
+	const (
+		width = 160
+		files = 300
+	)
+
 	diff := hugeDiff(files, linesPerFile)
 	threads := make([]domain.ReviewThread, 0, len(diff))
 	for _, f := range diff {
@@ -72,7 +83,7 @@ func hugeModel(width, files, linesPerFile int) Model {
 // file runs to 5,000 lines. Only a screenful is drawn, so neither number
 // should reach the cost.
 func BenchmarkViewHugeDiff(b *testing.B) {
-	m := hugeModel(160, 300, 5000)
+	m := hugeModel(5000)
 	if len(m.rows) < 5000 {
 		b.Fatalf("the diff did not land: %d rows", len(m.rows))
 	}
