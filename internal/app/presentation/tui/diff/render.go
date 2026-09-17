@@ -346,16 +346,17 @@ func (m Model) body() []string {
 // right when it does not fit, and the size of that file's change under it,
 // followed by the count of review threads on that file. It starts at
 // m.fileTop, which followSidebar keeps in step with the selected file, the
-// same way m.top keeps the diff pane's cursor on screen.
+// same way m.top keeps the diff pane's cursor on screen, and it stops once
+// it has built as many lines as the pane can show.
 func (m Model) sidebarLines() []string {
 	if len(m.files) == 0 {
 		return nil
 	}
 	// body only draws paneHeight lines, and a file takes two of them. Going
-	// past that built rows nobody sees -- three lipgloss renders and a walk
-	// of every review thread, per file, on every frame.
+	// past that built rows nobody sees -- two or three lipgloss renders and a
+	// walk of every review thread, per file, on every frame.
 	h := m.paneHeight()
-	lines := make([]string, 0, h)
+	lines := make([]string, 0, h+1)
 	for i := m.fileTop; i < len(m.files) && len(lines) < h; i++ {
 		f := m.files[i]
 		path := clip(f.Path, sidebarWidth)
@@ -381,7 +382,11 @@ func (m Model) sidebarLines() []string {
 		}
 		lines = append(lines, path, size)
 	}
-	return lines
+	// A file takes two lines, so an odd paneHeight lets the loop above build
+	// one line past it -- the second line of the last, half-visible file.
+	// body only reads sidebar[0:h] anyway, so cut here rather than in the
+	// loop and lose that file's path line on an odd pane.
+	return lines[:min(len(lines), h)]
 }
 
 // threadCount reports how many review threads sit on a file, and whether any

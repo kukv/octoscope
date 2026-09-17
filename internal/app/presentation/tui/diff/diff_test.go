@@ -692,6 +692,22 @@ func TestSidebarStopsAtTheBottom(t *testing.T) {
 	}
 }
 
+// TestSidebarStopsAtTheBottomOnAnOddPane pins the case a strict "stop once
+// the loop reaches h" fix would get wrong: two lines per file, so an odd
+// paneHeight lands mid-file, and the cut must trim the spare line rather
+// than either running past the pane or dropping the last file's path.
+func TestSidebarStopsAtTheBottomOnAnOddPane(t *testing.T) {
+	m := hugeModel(160, 300, 10)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 41})
+
+	if want := m.paneHeight(); want%2 == 0 {
+		t.Fatalf("paneHeight() = %d, want odd for this test to mean anything", want)
+	}
+	if got, want := len(m.sidebarLines()), m.paneHeight(); got != want {
+		t.Fatalf("sidebarLines() = %d lines, want exactly the %d-line pane", got, want)
+	}
+}
+
 // TestSidebarStillReachesTheSelectedFile guards what the cut must not
 // break: followSidebar scrolls fileTop so the selected file is on screen,
 // and the cut has to leave that file in the list it returns.
