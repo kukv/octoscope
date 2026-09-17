@@ -326,9 +326,14 @@ func TestSelectedLineFollowsTheBackground(t *testing.T) {
 // benchSink keeps the compiler from optimising the benchmarked call away.
 var benchSink string
 
-// BenchmarkHighlightScreen is one screenful of diff: Highlight is called
-// once per visible row, so this is what a keypress costs before anything
-// else the view does.
+// BenchmarkHighlightScreen asks for the same line fifty times, which is
+// what a cache hit costs now that coloured lines are remembered -- not
+// what colouring one costs. It was the latter before the cache, and the
+// drop from tens of milliseconds to microseconds is the change, not a
+// screenful suddenly being free.
+//
+// What a real screenful costs is measured where a real screen is drawn:
+// BenchmarkViewHugeDiff and BenchmarkScrollHugeDiff in the diff package.
 func BenchmarkHighlightScreen(b *testing.B) {
 	const code = "func (m Model) diffTextLine(l domain.DiffLine, width int) string {"
 	for b.Loop() {
