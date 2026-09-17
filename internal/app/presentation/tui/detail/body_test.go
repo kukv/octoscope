@@ -124,20 +124,34 @@ func TestTheHeavyBarCostsTheTextNoColumns(t *testing.T) {
 	it := withComments()
 	it.Comments[0].Body = "@kukv ここ見てもらえますか"
 
-	for _, l := range commentLines(it.Comments[0], 40, "kukv") {
-		s := ansi.Strip(l)
-		if w := ansi.StringWidth(string([]rune(s)[0])); w != 1 {
-			t.Errorf("the heavy bar is %d columns wide, want 1", w)
-		}
-		if w := ansi.StringWidth(s); w > 40 {
-			t.Errorf("a line is %d columns wide, want at most 40", w)
-		}
+	// The same comment drawn twice: once for the reader it names and once for
+	// nobody. What the text is indented by has to come out the same both
+	// times, and saying it this way leans on nothing glamour does.
+	mine := ansi.Strip(commentLines(it.Comments[0], 40, "kukv")[0])
+	plain := ansi.Strip(commentLines(it.Comments[0], 40, "")[0])
+
+	if w := ansi.StringWidth(string([]rune(mine)[0])); w != 1 {
+		t.Errorf("the heavy bar is %d columns wide, want 1", w)
 	}
+	if got, want := textColumn(mine), textColumn(plain); got != want {
+		t.Errorf("a comment that names the reader starts its text at column %d, want %d", got, want)
+	}
+}
+
+// textColumn is how far into the line the author's name sits: the width of
+// everything the bar puts before it.
+func textColumn(line string) int {
+	return ansi.StringWidth(line[:strings.Index(line, "@")])
 }
 
 // TestTheDescriptionHeadingSaysWhenItNamesTheReader covers the other block:
 // a description is not a comment and has no bar, so the heading above it is
 // what carries the news.
+//
+// It sees that the words and the width did not move and that something in the
+// escapes did, but not which colour moved nor that the rule beside the name
+// was left alone -- a change that lit the whole rule would pass here. The
+// detail_mention recordings are what guard that.
 func TestTheDescriptionHeadingSaysWhenItNamesTheReader(t *testing.T) {
 	it := withComments()
 	it.Body = "cc @kukv お願いします"
