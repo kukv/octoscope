@@ -182,6 +182,34 @@ func TestHighlightFollowsTheBackground(t *testing.T) {
 	}
 }
 
+// TestHighlightIsStableForTheSameLine is the whole premise of remembering a
+// coloured line: the same input must always give the same output, or the
+// cache would be showing something the uncached call would not have.
+func TestHighlightIsStableForTheSameLine(t *testing.T) {
+	const code = "func Walk(ctx context.Context) error {"
+
+	first := theme.Highlight("walk.go", code)
+	second := theme.Highlight("walk.go", code)
+
+	if first != second {
+		t.Fatalf("the same line coloured two ways:\n%q\n%q", first, second)
+	}
+}
+
+// TestHighlightTellsPathsApart guards the cache key: two files with the
+// same text but different lexers must not answer for each other. A key
+// missing the path would colour a Makefile as Go.
+func TestHighlightTellsPathsApart(t *testing.T) {
+	const code = "install: build"
+
+	asMake := theme.Highlight("Makefile", code)
+	asGo := theme.Highlight("walk.go", code)
+
+	if asMake == asGo {
+		t.Fatalf("a Makefile and a Go file coloured the same: %q", asMake)
+	}
+}
+
 // TestHighlightKeepsTheWidth is what stops highlighting from breaking every
 // column downstream: ANSI escapes must not count towards the width, and the
 // text must come back rune for rune, not smuggling newlines or other characters.

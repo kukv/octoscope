@@ -321,6 +321,59 @@ func lexerFor(path string) chroma.Lexer {
 	return l
 }
 
+// highlightCacheMax is how many coloured lines are remembered before the
+// lot is dropped. A line and its colours run to about a kilobyte together,
+// so this is a few megabytes -- and 8192 is two hundred screenfuls, far
+// more than scrolling or moving between files needs.
+const highlightCacheMax = 8192
+
+// highlightKey is what decides a coloured line: the palette the background
+// chose, the lexer the path chose, and the text itself. The caller clips
+// the text to the width it has, so a resize asks with a different key
+// rather than getting a line that no longer fits.
+type highlightKey struct {
+	dark bool
+	path string
+	code string
+}
+
+// highlightCache remembers coloured lines. Colouring one costs about 130
+// microseconds, of which chroma spends two thirds rebuilding its
+// style-to-escape-sequence table -- work that does not depend on the line
+// at all. View runs on every message, and scrolling a line leaves all but
+// one row of the screen the same as the frame before, so the same lines
+// are coloured again and again.
+//
+// When it fills it is dropped whole rather than evicted one at a time.
+// What has to survive is the screenful just drawn, and that is the most
+// recently added however the limit is reached; one frame after the drop
+// pays full price, and the rest are cheap again.
+var (
+	highlightMu    sync.RWMutex
+	highlightLines = map[highlightKey]string{}
+)
+
+// cachedHighlight answers from the cache, or colours the line with colour
+// and remembers it.
+func cachedHighlight(key highlightKey, colour func() string) string {
+	highlightMu.RLock()
+	line, ok := highlightLines[key]
+	highlightMu.RUnlock()
+	if ok {
+		return line
+	}
+
+	line = colour()
+
+	highlightMu.Lock()
+	defer highlightMu.Unlock()
+	if len(highlightLines) >= highlightCacheMax {
+		highlightLines = map[highlightKey]string{}
+	}
+	highlightLines[key] = line
+	return line
+}
+
 // Highlight colours one line of source, chosen by the file's name.
 //
 // It is one line at a time because a diff is all we have: a string or a
@@ -331,6 +384,18 @@ func lexerFor(path string) chroma.Lexer {
 // A file chroma has no lexer for, and any failure inside chroma, comes back
 // unchanged: the diff is still readable without colour.
 func Highlight(path, code string) string {
+	mu.RLock()
+	dark := isDark
+	mu.RUnlock()
+
+	return cachedHighlight(highlightKey{dark: dark, path: path, code: code}, func() string {
+		return highlight(path, code)
+	})
+}
+
+// highlight is Highlight without the cache in front of it: everything below
+// here is what colouring one line actually costs.
+func highlight(path, code string) string {
 	lexer := lexerFor(path)
 	if lexer == nil {
 		return code
