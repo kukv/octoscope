@@ -333,7 +333,7 @@ func (m *Model) setBodyContent(w int) {
 		return
 	}
 	at := m.body.YOffset()
-	m.body.SetContentLines(bodyLines(m.item, w))
+	m.body.SetContentLines(bodyLines(m.item, w, m.viewer))
 	m.body.SetYOffset(at)
 }
 
