@@ -47,7 +47,7 @@ func (m Model) candidateLines() string {
 	for i, c := range m.candidates {
 		line := layout.Pad(c.Name, nameWidth) + layout.Right(theme.Dim().Render(stars(c.Stars)), starColumn)
 		if i == m.cursor {
-			line = theme.Selected().Render(line)
+			line = theme.SelectedLine(line)
 		}
 		b.WriteString(line + "\n")
 	}

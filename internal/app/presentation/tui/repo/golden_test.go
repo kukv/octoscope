@@ -148,6 +148,22 @@ func TestGolden(t *testing.T) {
 				dlg = typeInto(dlg, "lip")
 				dlg, _ = dlg.Update(candidatesMsg{gen: dlg.searchGen, candidates: goldenCandidates()})
 				golden.Assert(t, fmt.Sprintf("repo_add_dialog_%s_%d", lang.name, w), dlg.View())
+
+				// The same dialog with tab moved the cursor onto the first
+				// candidate, so the selected row is what is on screen rather
+				// than the field.
+				picked := dlg
+				picked, _ = picked.Update(key("tab"))
+				golden.Assert(t, fmt.Sprintf("repo_add_dialog_picked_%s_%d", lang.name, w), picked.View())
+
+				// The sidebar's own cursor, reached with h as a user would.
+				// Not recorded below minSidebarWidth, where the sidebar folds
+				// away and there is nothing to record.
+				if w >= minSidebarWidth {
+					sidebar := goldenModel(w)
+					sidebar, _ = sidebar.Update(key("h"))
+					golden.Assert(t, fmt.Sprintf("repo_sidebar_focus_%s_%d", lang.name, w), sidebar.View())
+				}
 			})
 		}
 	}

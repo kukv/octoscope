@@ -72,9 +72,8 @@ func (m Model) savedRow(q domain.SavedQuery, i int, width int) string {
 	if rest := width - ansi.StringWidth(line) - 1; rest > 0 {
 		line += " " + theme.Dim().Render(layout.Clip(q.Query, rest))
 	}
-	line = layout.Clip(line, width)
 	if i == m.pick {
-		return theme.Selected().Render(line)
+		return theme.SelectedLine(layout.Fill(line, width))
 	}
-	return line
+	return layout.Clip(line, width)
 }

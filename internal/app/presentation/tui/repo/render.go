@@ -220,7 +220,7 @@ func (m Model) row(i int) string {
 		layout.Right(theme.Dim().Render(age), ageColumn)
 
 	if i == m.cursors[m.tab] {
-		return theme.Selected().Render(layout.Clip(line, m.bodyWidth()))
+		return theme.SelectedLine(layout.Fill(line, m.bodyWidth()))
 	}
 	return layout.Clip(line, m.bodyWidth())
 }

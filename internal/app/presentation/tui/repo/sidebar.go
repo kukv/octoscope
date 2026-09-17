@@ -95,7 +95,7 @@ func (m Model) sidebar() []string {
 			layout.Right(theme.Dim().Render(badge), badgeColumn)
 		switch {
 		case i == m.selected && m.focus == paneSidebar:
-			line = theme.Selected().Render(line)
+			line = theme.SelectedLine(line)
 		case i == m.selected:
 			line = theme.Accent().Render(line)
 		}

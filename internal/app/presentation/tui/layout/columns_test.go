@@ -55,3 +55,28 @@ func TestClipMarksWhatItCut(t *testing.T) {
 		t.Errorf("Clip = %q, want an ellipsis where it cut", got)
 	}
 }
+
+// TestFillPadsToExactlyTheWidth is what a selection background needs: it
+// lands only on columns that have a character in them, so a short line must
+// be carried out to the full width before it is wrapped.
+func TestFillPadsToExactlyTheWidth(t *testing.T) {
+	if got := ansi.StringWidth(layout.Fill("ab", 5)); got != 5 {
+		t.Errorf("Fill(%q, 5) is %d columns wide, want 5", "ab", got)
+	}
+}
+
+// TestFillCountsJapaneseAsTwoColumns: a full-width character takes two
+// columns, so padding by rune count would overshoot by the number of them.
+func TestFillCountsJapaneseAsTwoColumns(t *testing.T) {
+	if got := ansi.StringWidth(layout.Fill("設定", 6)); got != 6 {
+		t.Errorf("Fill(%q, 6) is %d columns wide, want 6", "設定", got)
+	}
+}
+
+// TestFillDoesNotOverrunTheWidth: unlike Pad, Fill is given the width the
+// line itself occupies, so a long line is cut to it rather than one short.
+func TestFillDoesNotOverrunTheWidth(t *testing.T) {
+	if got := ansi.StringWidth(layout.Fill("abcdefgh", 4)); got != 4 {
+		t.Errorf("Fill(%q, 4) is %d columns wide, want 4", "abcdefgh", got)
+	}
+}

@@ -200,16 +200,16 @@ func (m Model) columnLines(s domain.WorkSection, w, height int) []string {
 	if m.state[s] == colLoading {
 		// The spinner carries its own colour, so it is not wrapped in a style
 		// that would end at the spinner's own reset.
-		return append(lines, fit(gutter+m.spin.View()+" "+i18n.T("common.loading"), w))
+		return append(lines, layout.Fill(gutter+m.spin.View()+" "+i18n.T("common.loading"), w))
 	}
 	if len(items) == 0 {
 		// The empty-column text would report an outage as good news. Only a
 		// column that has never been answered is empty in the first place: a
 		// failed refetch keeps the cards it had, which is the point.
 		if m.state[s] == colFailed {
-			return append(lines, theme.Error().Render(fit(gutter+i18n.T("notice.fetch_failed"), w)))
+			return append(lines, theme.Error().Render(layout.Fill(gutter+i18n.T("notice.fetch_failed"), w)))
 		}
-		return append(lines, theme.Dim().Render(fit(gutter+i18n.T("work.empty_column"), w)))
+		return append(lines, theme.Dim().Render(layout.Fill(gutter+i18n.T("work.empty_column"), w)))
 	}
 
 	first, last := 0, len(items)
@@ -261,12 +261,22 @@ func (m Model) cardWindow(s domain.WorkSection, height int) int {
 // card draws one card in a box of its own: where it lives on the first line,
 // its title on the next two, how it is doing on the last. The selection is
 // the box's colour and background.
+//
+// The body's lines are filled one at a time before the box is drawn around
+// them. lipgloss fills its own padding, but the background it is given ends
+// at the first reset inside the text, and every line here has a coloured
+// marker or a dimmed repository in it.
 func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
 	body := append([]string{cardHead(it, inner)}, cardTitle(it, inner, selected)...)
 	body = append(body, m.cardMeta(it, at, inner))
+	if selected {
+		for i, line := range body {
+			body[i] = theme.SelectedLine(line)
+		}
+	}
 	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
 
@@ -410,10 +420,4 @@ func (m Model) columnWidth(n int) int {
 // so the count is never a byte or a rune count.
 func clip(s string, w int) string {
 	return ansi.Truncate(s, w, "…")
-}
-
-// fit clips s and pads it out to exactly w display columns.
-func fit(s string, w int) string {
-	s = clip(s, w)
-	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
 }

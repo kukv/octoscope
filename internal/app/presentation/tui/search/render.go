@@ -289,9 +289,9 @@ func (m Model) filterRow(id FilterID) string {
 		return theme.Dim().Render(line)
 	}
 	if m.pane == paneFilters && id == m.cursor {
-		return theme.Selected().Render(line)
+		return theme.SelectedLine(layout.Fill(line, filterPaneWidth))
 	}
-	return line
+	return layout.Clip(line, filterPaneWidth)
 }
 
 // filterLabelID names the message ID for one filter's label, which is
@@ -375,7 +375,7 @@ func (m Model) resultRow(i int, width int) string {
 		layout.Right(theme.Dim().Render(age), ageColumn)
 
 	if i == m.sel {
-		return theme.Selected().Render(layout.Clip(line, width))
+		return theme.SelectedLine(layout.Fill(line, width))
 	}
 	return layout.Clip(line, width)
 }

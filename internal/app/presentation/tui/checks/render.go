@@ -92,7 +92,7 @@ func (m Model) summaryLine() string {
 // on the left and the log pane's current mode -- failed steps or full log --
 // where the divider crosses into it.
 func (m Model) headingLine() string {
-	left := fit(theme.Heading().Render(i18n.T("checks.title")), listWidth)
+	left := layout.Fill(theme.Heading().Render(i18n.T("checks.title")), listWidth)
 	div := theme.Rule().Render("│")
 	label := theme.Heading().Render(m.logModeLabel())
 	rest := max(m.width-listWidth-ansi.StringWidth(div)-ansi.StringWidth(label), 0)
@@ -151,7 +151,7 @@ func (m Model) rerunLines() []string {
 
 func (m Model) rerunOption(scope domain.RerunScope, text string) string {
 	if scope == m.rerunScope {
-		return theme.Selected().Render(text)
+		return theme.SelectedLine(text)
 	}
 	return text
 }
@@ -196,7 +196,7 @@ func (m Model) body() []string {
 		if i < len(right) {
 			r = right[i]
 		}
-		lines[i] = fit(l, listWidth) + div + r
+		lines[i] = layout.Fill(l, listWidth) + div + r
 	}
 	return lines
 }
@@ -269,8 +269,7 @@ func (m Model) workflowTitle(r domain.CheckRun) string {
 
 // checkLine draws one check: its glyph, its name and, once it has one, how
 // long it took. It is highlighted only while the cursor acts on the list --
-// once the log pane has focus the row it points at stays plain, the same way
-// the diff view's file list does.
+// once the log pane has focus the row it points at stays plain.
 func (m Model) checkLine(r domain.CheckRun, cursor bool) string {
 	text := "  " + icon.Check(r.State) + " " + r.Name
 	// A cut duration reads as a shorter one rather than as a cut one, so a
@@ -281,7 +280,7 @@ func (m Model) checkLine(r domain.CheckRun, cursor bool) string {
 		}
 	}
 	if cursor && m.pane == paneList {
-		return theme.Selected().Render(fit(text, listWidth))
+		return theme.SelectedLine(layout.Fill(text, listWidth))
 	}
 	return theme.Check(r.State).Render(clip(text, listWidth))
 }
@@ -355,12 +354,6 @@ func (m Model) logRows() []string {
 // clip cuts s to w display columns. Japanese takes two columns per
 // character, so the count is never a byte or a rune count.
 func clip(s string, w int) string { return ansi.Truncate(s, w, "…") }
-
-// fit clips s and pads it out to exactly w display columns.
-func fit(s string, w int) string {
-	s = clip(s, w)
-	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
-}
 
 // singleLine folds an error's body onto one row, the same way the diff
 // view's does: a multi-line message would draw as extra visual rows and

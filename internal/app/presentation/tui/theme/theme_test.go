@@ -211,3 +211,86 @@ func TestHighlightKeepsTheWidth(t *testing.T) {
 		})
 	}
 }
+
+// selectionBackground is the SGR sequence SelectedLine opens the line with.
+// The test reads it out of the output rather than naming a colour: which
+// colour the selection uses is theme's business and may change, but whatever
+// it is must come back after every reset.
+func selectionBackground(t *testing.T, line string) string {
+	t.Helper()
+	if !strings.HasPrefix(line, "\x1b[") {
+		t.Fatalf("the line does not open with a style: %q", line)
+	}
+	end := strings.IndexByte(line, 'm')
+	if end < 0 {
+		t.Fatalf("the opening style is unterminated: %q", line)
+	}
+	return line[:end+1]
+}
+
+// TestSelectedLineCarriesTheBackgroundPastALipglossReset is the whole point of
+// the function: a reset clears the background along with the foreground, so a
+// line with any colour in it would lose its fill from the first reset on.
+func TestSelectedLineCarriesTheBackgroundPastALipglossReset(t *testing.T) {
+	dark(t)
+
+	line := theme.SelectedLine(theme.Dim().Render("x") + "y")
+	bg := selectionBackground(t, line)
+
+	if n := strings.Count(line, ansi.ResetStyle+bg); n != 1 {
+		t.Errorf("the background is restored %d times after a lipgloss reset, want 1: %q", n, line)
+	}
+	if !strings.HasSuffix(line, ansi.ResetStyle) {
+		t.Errorf("the line does not close with a reset: %q", line)
+	}
+}
+
+// TestSelectedLineCarriesTheBackgroundPastAChromaReset covers the other reset
+// the drawing can produce. chroma does not use the ansi package and writes
+// "\x1b[0m" after every token it colours, so a highlighted diff line is full
+// of them.
+func TestSelectedLineCarriesTheBackgroundPastAChromaReset(t *testing.T) {
+	dark(t)
+
+	line := theme.SelectedLine("a\x1b[0mb")
+	bg := selectionBackground(t, line)
+
+	if !strings.Contains(line, "\x1b[0m"+bg) {
+		t.Errorf("the background is not restored after a chroma reset: %q", line)
+	}
+}
+
+// TestSelectedLineKeepsASpanWithItsOwnBackground guards the one case where the
+// row's fill must *not* win: a GitHub label is drawn in the colour GitHub gave
+// it, and the row's background belongs on either side of the chip, not over it.
+func TestSelectedLineKeepsASpanWithItsOwnBackground(t *testing.T) {
+	dark(t)
+
+	chip := theme.Badge("d73a4a").Render(" bug ")
+	line := theme.SelectedLine("title " + chip)
+	bg := selectionBackground(t, line)
+
+	if !strings.Contains(line, "48;2;215;58;74") {
+		t.Errorf("the label lost the colour GitHub gave it: %q", line)
+	}
+	if !strings.Contains(line, ansi.ResetStyle+bg) {
+		t.Errorf("the row's background does not come back after the label: %q", line)
+	}
+}
+
+// TestSelectedLineFollowsTheBackground guards the light variant of the
+// selection colour: selectionBackground reads whatever SelectedLine opens
+// with rather than naming a colour, so a mistyped light hex would still pass
+// the other tests above.
+func TestSelectedLineFollowsTheBackground(t *testing.T) {
+	dark(t)
+
+	theme.SetDark(true)
+	onDark := theme.SelectedLine("x")
+	theme.SetDark(false)
+	onLight := theme.SelectedLine("x")
+
+	if onDark == onLight {
+		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
+	}
+}
