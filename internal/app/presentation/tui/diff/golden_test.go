@@ -125,8 +125,8 @@ func wideLineNumberFixture() []domain.FileDiff {
 }
 
 // wideLineNumberModel leaves the cursor on the hunk header (row 0), never on
-// one of the five-digit line rows: a cursor row goes through fit/clip, which
-// truncates, and would hide the overrun this model exists to catch.
+// one of the five-digit line rows: a cursor row goes through layout.Fill,
+// which truncates, and would hide the overrun this model exists to catch.
 func wideLineNumberModel(width int) Model {
 	m := New(&fakeSource{files: wideLineNumberFixture()},
 		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 130})
