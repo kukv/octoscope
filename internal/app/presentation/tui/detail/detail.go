@@ -5,13 +5,11 @@ package detail
 
 import (
 	"context"
-	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/glamour/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
@@ -20,6 +18,12 @@ import (
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
+
+// chromeLines is what the body never gets. Two of it is exact -- the title
+// line above and the key bar below -- and the other two are slack, so that an
+// error long enough to wrap onto a second line still does not push the key bar
+// off the bottom of the screen.
+const chromeLines = 4
 
 type itemSource interface {
 	GetItem(ctx context.Context, ref domain.ItemRef) (usecase.Item, error)
@@ -195,6 +199,17 @@ type Model struct {
 	state domain.ItemState
 	url   string
 
+	// item is the whole of what was fetched. The meta pane reads it at draw
+	// time, so unlike title and state it cannot be turned into a string once
+	// and thrown away: its layout changes with the terminal's width.
+	//
+	// loaded is the invariant the drawing relies on: item is the fetched
+	// value only once it is true, and every reader of item -- rows,
+	// headerLines, setBodyContent -- draws nothing until then, rather than
+	// drawing the zero item as an unnamed, unauthored, never-updated one.
+	item   usecase.Item
+	loaded bool
+
 	textarea textarea.Model
 
 	picker    picker
@@ -232,52 +247,14 @@ func New(src Source, ref domain.ItemRef) Model {
 func newBody() viewport.Model {
 	v := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 	v.MouseWheelEnabled = true
+	// The rule between the panes runs as far as the body does, so the body
+	// has to be as tall as the pane even when the item is short.
+	v.FillHeight = true
 	return v
 }
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, fetch(m.src, m.ref))
-}
-
-func fetch(src Source, ref domain.ItemRef) tea.Cmd {
-	return func() tea.Msg {
-		item, err := src.GetItem(context.Background(), ref)
-		if err != nil {
-			return errMsg{ref, err}
-		}
-		return itemMsg{ref, item}
-	}
-}
-
-// fetchReviewContext is what v runs before it can open the review popup: an
-// issue has no review, so this is only ever called on a pull request.
-func fetchReviewContext(src reviewOpener, ref domain.ItemRef) tea.Cmd {
-	return func() tea.Msg {
-		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
-		if err != nil {
-			return reviewContextErrMsg{ref: ref, err: err}
-		}
-		return reviewContextMsg{ref: ref, ctx: ctx}
-	}
-}
-
-func (m Model) openWeb(ref domain.ItemRef, url string) tea.Cmd {
-	open := m.open
-	return func() tea.Msg {
-		if err := open(url); err != nil {
-			return errMsg{ref, err}
-		}
-		return nil
-	}
-}
-
-func postComment(src Source, ref domain.ItemRef, body string) tea.Cmd {
-	return func() tea.Msg {
-		if err := src.AddComment(ref, body); err != nil {
-			return commentErrorMsg{ref: ref, err: err}
-		}
-		return commentPostedMsg{ref: ref}
-	}
 }
 
 // stateAction reports whether the shown item can change state, and if so
@@ -303,571 +280,39 @@ func (m Model) canMerge() bool {
 	return m.ref.Kind == domain.ItemPR && ok && closing
 }
 
-func setState(src Source, ref domain.ItemRef, closing bool) tea.Cmd {
-	return func() tea.Msg {
-		if err := src.SetState(ref, closing); err != nil {
-			return stateErrorMsg{ref: ref, err: err}
-		}
-		return stateChangedMsg{ref: ref}
+// relayout gives the body its width and height and lays the content out
+// again. It runs both on a resize and when the item arrives: what the body
+// is worth depends on the width, and — once the meta block sits above it —
+// how tall that block turned out.
+func (m *Model) relayout() {
+	w := m.width
+	if w <= 0 {
+		w = 80
 	}
-}
-
-func fetchLabelPicker(src candidateSource, ref domain.ItemRef) tea.Cmd {
-	return func() tea.Msg {
-		labels, err := src.ListLabels(context.Background(), ref.Repo)
-		if err != nil {
-			return pickErrorMsg{ref: ref, err: err}
-		}
-		return pickerCandidatesMsg{ref: ref, kind: pickLabels, labels: labels}
+	h := m.height
+	if h <= 0 {
+		h = 24
 	}
-}
-
-func fetchAssigneePicker(src candidateSource, ref domain.ItemRef) tea.Cmd {
-	return func() tea.Msg {
-		users, err := src.ListAssignees(context.Background(), ref.Repo)
-		if err != nil {
-			return pickErrorMsg{ref: ref, err: err}
-		}
-		return pickerCandidatesMsg{ref: ref, kind: pickAssignees, users: users}
-	}
-}
-
-func applyPicker(src Source, ref domain.ItemRef, kind pickerKind, add, remove []string) tea.Cmd {
-	return func() tea.Msg {
-		var err error
-		if kind == pickLabels {
-			err = src.EditLabels(ref, add, remove)
-		} else {
-			err = src.EditAssignees(ref, add, remove)
-		}
-		if err != nil {
-			return pickErrorMsg{ref: ref, err: err}
-		}
-		return pickerAppliedMsg{ref: ref}
-	}
-}
-
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		return m.resize(msg), nil
-	case spinner.TickMsg:
-		return m.tick(msg)
-	case itemMsg:
-		return m.itemArrived(msg), nil
-	case commentPostedMsg:
-		return m.commentPosted(msg)
-	case commentErrorMsg:
-		return m.commentFailed(msg), nil
-	case stateChangedMsg:
-		return m.stateChanged(msg)
-	case stateErrorMsg:
-		return m.stateFailed(msg), nil
-	case pickerCandidatesMsg:
-		return m.candidatesArrived(msg), nil
-	case pickerAppliedMsg:
-		return m.pickApplied(msg)
-	case pickErrorMsg:
-		return m.pickFailed(msg), nil
-	case reviewContextMsg:
-		return m.reviewContextArrived(msg), nil
-	case reviewContextErrMsg:
-		return m.reviewContextFailed(msg), nil
-	case review.CancelledMsg:
-		return m.submitCancelled(), nil
-	case review.SubmittedMsg:
-		return m.submitDone()
-	case review.ErrorMsg:
-		return m.submitFailed(msg)
-	case merge.CancelledMsg:
-		return m.mergeCancelled(), nil
-	case merge.MergedMsg:
-		return m.mergeDone(msg)
-	case merge.ErrorMsg:
-		return m.mergeFailed(msg)
-	case errMsg:
-		return m.fetchFailed(msg)
-	case tea.KeyPressMsg:
-		return m.handleKey(msg)
-	}
-	// The merge popup fetches for itself, and its answer is a type this view
-	// cannot name. Everything left over while it is open is its: sizes, keys
-	// and its three public messages have already returned above.
-	if m.mode == modeMerge {
-		var cmd tea.Cmd
-		m.merge, cmd = m.merge.Update(msg)
-		return m, cmd
-	}
-	if msg, ok := msg.(tea.MouseWheelMsg); ok {
-		return m.wheel(msg)
-	}
-	return m, nil
-}
-
-func (m Model) resize(msg tea.WindowSizeMsg) Model {
-	m.width, m.height = msg.Width, msg.Height
-	m.body.SetWidth(msg.Width)
-	m.body.SetHeight(max(msg.Height-4, 5))
-	m.textarea.SetWidth(msg.Width)
-	m.textarea.SetHeight(max(msg.Height-6, 3))
-	if m.submit.Active() {
-		m.submit, _ = m.submit.Update(msg)
-	}
-	if m.merge.Active() {
-		m.merge, _ = m.merge.Update(msg)
-	}
-	return m
-}
-
-func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.spin, cmd = m.spin.Update(msg)
-	return m, cmd
-}
-
-func (m Model) itemArrived(msg itemMsg) Model {
-	if msg.ref != m.ref {
-		return m
-	}
-	it := msg.item
-	m.phase = phaseIdle
-	m.state = it.State
-	m.errText = ""
-	m.declined = ""
-	m.labels = labelNames(it.Labels)
-	m.assignees = authorLogins(it.Assignees)
-	m.url = it.URL
-	if it.Kind == domain.ItemPR {
-		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
-		m.setContent(prMarkdown(*it.PR))
+	bodyW, bodyH := w, h-chromeLines
+	if twoPane(w) {
+		bodyW = w - metaPaneWidth(w) - 1 // the rule JoinPanes draws between them
 	} else {
-		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})
-		m.setContent(issueMarkdown(it))
+		bodyH -= len(m.headerLines()) // the meta paragraph above the body
 	}
-	return m
+	m.body.SetWidth(max(bodyW, 1))
+	m.body.SetHeight(max(bodyH, 5))
+	m.setBodyContent(max(bodyW, 1))
 }
 
-func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
-		return m, nil
+// setBodyContent re-renders the body at w, keeping the reader's place. The
+// content is laid out for a width, so every width change rebuilds it.
+func (m *Model) setBodyContent(w int) {
+	if !m.loaded {
+		return
 	}
-	m.errText = ""
-	m.textarea.Reset()
-	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
-}
-
-func (m Model) commentFailed(msg commentErrorMsg) Model {
-	if msg.ref != m.ref {
-		return m
-	}
-	m.phase = phaseIdle
-	m.errText = msg.err.Error()
-	return m
-}
-
-func (m Model) stateChanged(msg stateChangedMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
-		return m, nil
-	}
-	m.errText = ""
-	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
-}
-
-func (m Model) stateFailed(msg stateErrorMsg) Model {
-	if msg.ref != m.ref {
-		return m
-	}
-	m.mode, m.phase = modeView, phaseIdle
-	m.errText = msg.err.Error()
-	return m
-}
-
-func (m Model) candidatesArrived(msg pickerCandidatesMsg) Model {
-	if msg.ref != m.ref {
-		return m // an answer for an item the user has already left
-	}
-	if msg.kind == pickLabels {
-		names := make([]string, len(msg.labels))
-		colors := make(map[string]string, len(msg.labels))
-		for i, l := range msg.labels {
-			names[i] = l.Name
-			colors[l.Name] = l.Color
-		}
-		m.picker = newPicker(pickLabels, i18n.T("picker.labels"), names, colors, m.labels)
-	} else {
-		m.picker = newPicker(pickAssignees, i18n.T("picker.assignees"), msg.users, nil, m.assignees)
-	}
-	m.mode, m.phase = modePick, phaseIdle
-	return m
-}
-
-func (m Model) pickApplied(msg pickerAppliedMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
-		return m, nil
-	}
-	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
-}
-
-func (m Model) pickFailed(msg pickErrorMsg) Model {
-	if msg.ref != m.ref {
-		return m
-	}
-	if m.phase == phaseWorking { // the apply failed; the picker stays up
-		m.phase = phaseIdle
-	} else { // the candidates never arrived; there is no picker to show
-		m.mode, m.phase = modeView, phaseIdle
-	}
-	m.errText = msg.err.Error()
-	return m
-}
-
-func (m Model) reviewContextArrived(msg reviewContextMsg) Model {
-	if msg.ref != m.ref {
-		return m // an answer for an item the user has already left
-	}
-	target := review.Target{
-		PullRequest:     msg.ctx.PullRequest,
-		Pending:         msg.ctx.Pending,
-		PendingComments: msg.ctx.PendingCount(),
-	}
-	m.submit = review.New(m.src, target)
-	m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-	m.mode, m.phase = modeSubmit, phaseIdle
-	m.errText = ""
-	return m
-}
-
-func (m Model) reviewContextFailed(msg reviewContextErrMsg) Model {
-	if msg.ref != m.ref {
-		return m
-	}
-	m.mode, m.phase = modeView, phaseIdle
-	m.errText = msg.err.Error()
-	return m
-}
-
-func (m Model) submitCancelled() Model {
-	if m.mode != modeSubmit {
-		return m
-	}
-	m.mode, m.phase = modeView, phaseIdle
-	m.errText = ""
-	return m
-}
-
-func (m Model) submitDone() (Model, tea.Cmd) {
-	if m.mode != modeSubmit {
-		return m, nil
-	}
-	m.errText = ""
-	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
-}
-
-func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
-	if m.mode != modeSubmit {
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.submit, cmd = m.submit.Update(msg)
-	m.errText = msg.Err.Error()
-	return m, cmd
-}
-
-func (m Model) mergeCancelled() Model {
-	if m.mode != modeMerge {
-		return m
-	}
-	m.mode, m.phase = modeView, phaseIdle
-	m.errText = ""
-	// The zero popup is the inactive one: without this Active() would keep
-	// handing it window sizes after it is gone.
-	m.merge = merge.Model{}
-	return m
-}
-
-// mergeDone leaves the view when the pull request was merged: a merged pull
-// request is not something to keep reading. Joining or leaving the auto-merge
-// queue leaves it open, so the popup keeps the screen and refetches instead.
-// The board and the Repos list are refreshed by the root either way, which
-// sees the same merge message this one came from, so nothing is sent on.
-func (m Model) mergeDone(msg merge.MergedMsg) (Model, tea.Cmd) {
-	if m.mode != modeMerge {
-		return m, nil
-	}
-	if !msg.Merged {
-		var cmd tea.Cmd
-		m.merge, cmd = m.merge.Update(msg)
-		return m, cmd
-	}
-	m.mode, m.phase = modeView, phaseIdle
-	m.errText = ""
-	m.merge = merge.Model{}
-	return m, func() tea.Msg { return ClosedMsg{} }
-}
-
-// mergeFailed shows the failure the popup on screen raised. A popup that was
-// closed and opened again leaves its own request in flight, and that one's
-// failure must not land in this view's footer.
-func (m Model) mergeFailed(msg merge.ErrorMsg) (Model, tea.Cmd) {
-	if m.mode != modeMerge || !m.merge.Owns(msg) {
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.merge, cmd = m.merge.Update(msg)
-	m.errText = msg.Err.Error()
-	return m, cmd
-}
-
-func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
-		return m, nil
-	}
-	m.phase = phaseIdle
-	err := msg.err
-	return m, func() tea.Msg { return ErrorMsg{err} }
-}
-
-func (m Model) wheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
-	// The body is drawn only with nothing over it and nothing in flight.
-	if m.mode != modeView || m.phase != phaseIdle {
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.body, cmd = m.body.Update(msg)
-	return m, cmd
-}
-
-// stillLoading is what the keys that need the item answer with while it is
-// on its way. Against the real API the item was still not there four seconds
-// after it was asked for, which is long enough for a key that does nothing
-// to read as a key that is broken.
-func (m Model) stillLoading() Model {
-	m.declined = i18n.T("detail.decline_loading")
-	return m
-}
-
-func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// An overlay's keys have nothing to act on until its fetch answers.
-	// modeView is the exception: the body is drawn, and q still leaves.
-	if m.mode != modeView && m.phase == phaseLoading {
-		return m, nil
-	}
-	switch m.mode {
-	case modeCompose:
-		return m.handleComposeKey(msg)
-	case modeConfirm:
-		return m.handleConfirmKey(msg)
-	case modePick:
-		return m.handlePickerKey(msg)
-	case modeSubmit:
-		return m.handleSubmitKey(msg)
-	case modeMerge:
-		return m.handleMergeKey(msg)
-	case modeView:
-	}
-	switch msg.String() {
-	case "q", "esc":
-		return m, func() tea.Msg { return ClosedMsg{} }
-	case "o":
-		if m.url == "" {
-			return m, nil
-		}
-		return m, m.openWeb(m.ref, m.url)
-	case "d":
-		// An issue has no diff.
-		if m.ref.Kind != domain.ItemPR {
-			return m, nil
-		}
-		ref := m.ref
-		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
-	case "s":
-		// An issue has no checks.
-		if m.ref.Kind != domain.ItemPR {
-			return m, nil
-		}
-		ref := m.ref
-		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
-	case "m":
-		// An issue has nothing to merge.
-		if m.ref.Kind != domain.ItemPR {
-			return m, nil
-		}
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		// Nor has a pull request that is already merged or closed. GitHub
-		// answers UNKNOWN for a merged one, so the popup would say it is
-		// still working the answer out, for ever.
-		if !m.canMerge() {
-			return m, nil
-		}
-		m.mode, m.phase = modeMerge, phaseIdle
-		m.errText = ""
-		m.merge = merge.New(m.src, m.ref)
-		m.merge, _ = m.merge.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		return m, m.merge.Init()
-	case "r":
-		m.phase = phaseLoading
-		m.declined = ""
-		return m, fetch(m.src, m.ref)
-	case "c":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		m.mode, m.phase = modeCompose, phaseIdle
-		m.errText = ""
-		m.textarea.Reset()
-		m.textarea.Focus()
-		return m, textarea.Blink
-	case "x":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		if _, ok := m.stateAction(); !ok {
-			return m, nil // merged and the like: no action
-		}
-		m.mode, m.phase = modeConfirm, phaseIdle
-		m.errText = ""
-		return m, nil
-	case "v":
-		// An issue has no review. Unlike the diff view's v, this always
-		// fetches first: detail holds no review context of its own.
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		if m.ref.Kind != domain.ItemPR {
-			return m, nil
-		}
-		m.mode, m.phase = modeSubmit, phaseLoading
-		m.errText = ""
-		return m, fetchReviewContext(m.src, m.ref)
-	case "l":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		m.mode, m.phase = modePick, phaseLoading
-		m.errText = ""
-		return m, fetchLabelPicker(m.src, m.ref)
-	case "a":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		m.mode, m.phase = modePick, phaseLoading
-		m.errText = ""
-		return m, fetchAssigneePicker(m.src, m.ref)
-	}
-	var cmd tea.Cmd
-	m.body, cmd = m.body.Update(msg)
-	return m, cmd
-}
-
-func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.phase == phaseWorking {
-		return m, nil // ignore every other key while the edit is in flight
-	}
-	switch msg.String() {
-	case "esc":
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = ""
-		return m, nil
-	case "j", "down":
-		m.picker.moveDown(visibleRows(m.height))
-		return m, nil
-	case "k", "up":
-		m.picker.moveUp()
-		return m, nil
-	case " ", "space":
-		m.picker.toggle()
-		return m, nil
-	case "enter":
-		add, remove := m.picker.diff()
-		if len(add) == 0 && len(remove) == 0 {
-			m.mode, m.phase = modeView, phaseIdle // nothing changed: just close
-			m.errText = ""
-			return m, nil
-		}
-		m.phase = phaseWorking
-		m.errText = ""
-		return m, applyPicker(m.src, m.ref, m.picker.kind, add, remove)
-	}
-	return m, nil
-}
-
-func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.submit, cmd = m.submit.Update(msg)
-	return m, cmd
-}
-
-func (m Model) handleMergeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.merge, cmd = m.merge.Update(msg)
-	return m, cmd
-}
-
-func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.phase == phaseWorking {
-		return m, nil // ignore every other key while the change is in flight
-	}
-	switch msg.String() {
-	case "y":
-		closing, ok := m.stateAction()
-		if !ok {
-			m.mode, m.phase = modeView, phaseIdle
-			return m, nil
-		}
-		m.phase = phaseWorking
-		m.errText = ""
-		return m, setState(m.src, m.ref, closing)
-	case "n", "esc":
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = ""
-		return m, nil
-	}
-	return m, nil
-}
-
-func (m Model) handleComposeKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.phase == phaseWorking {
-		return m, nil // ignore every other key while the comment is in flight
-	}
-	switch msg.String() {
-	case "esc":
-		m.mode, m.phase = modeView, phaseIdle
-		m.errText = ""
-		m.textarea.Reset()
-		return m, nil
-	case "ctrl+s":
-		if strings.TrimSpace(m.textarea.Value()) == "" {
-			return m, nil // an empty body is not sent
-		}
-		m.phase = phaseWorking
-		m.errText = ""
-		return m, postComment(m.src, m.ref, m.textarea.Value())
-	}
-	var cmd tea.Cmd
-	m.textarea, cmd = m.textarea.Update(msg)
-	return m, cmd
-}
-
-func (m *Model) setContent(md string) {
-	width := m.width
-	if width <= 0 {
-		width = 80
-	}
-	content := md
-	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle("dark"),
-		glamour.WithWordWrap(width-2)); err == nil {
-		if out, err := r.Render(md); err == nil {
-			content = out
-		}
-	}
-	m.body.SetContent(content)
-	m.body.GotoTop()
+	at := m.body.YOffset()
+	m.body.SetContentLines(bodyLines(m.item, w))
+	m.body.SetYOffset(at)
 }
 
 func labelNames(labels []domain.Label) []string {

@@ -1,18 +1,33 @@
 package detail
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
+
+const (
+	// twoPaneMinColumns is where the view splits in two. It is the Work
+	// board's own threshold for its drawer, which is the same shape of
+	// problem: a hundred columns leave the meta pane thirty-three and the
+	// body sixty-six.
+	twoPaneMinColumns = 100
+
+	// metaPaneMaxColumns caps the meta pane. Its values are short, and past
+	// forty columns the width would be spent on nothing.
+	metaPaneMaxColumns = 40
+)
+
+func twoPane(w int) bool { return w >= twoPaneMinColumns }
+
+// metaPaneWidth is the left pane's share. The floor is the threshold: at a
+// hundred columns this is already thirty-three.
+func metaPaneWidth(w int) int { return min(w/3, metaPaneMaxColumns) }
 
 func (m Model) View() string {
 	if m.phase == phaseLoading {
@@ -35,13 +50,83 @@ func (m Model) View() string {
 		return m.pickerView()
 	case modeView:
 	}
-	header := theme.Title().Render(m.title)
-	footer := theme.Dim().Render(m.footer())
-	body := layout.ClipLines(header, m.width) + "\n" + m.body.View() + "\n"
-	if m.errText != "" {
-		body += wrapErr(m.errText, m.width) + "\n"
+	header := layout.ClipLines(theme.Title().Render(m.title), m.width)
+	footer := layout.ClipLines(theme.Dim().Render(m.footer()), m.width)
+
+	var b strings.Builder
+	b.WriteString(header + "\n")
+	if twoPane(m.width) {
+		left := metaPaneLines(m.rows(), metaPaneWidth(m.width))
+		right := strings.Split(m.body.View(), "\n")
+		b.WriteString(strings.Join(layout.JoinPanes(left, right, metaPaneWidth(m.width)), "\n") + "\n")
+	} else {
+		for _, l := range m.headerLines() {
+			b.WriteString(l + "\n")
+		}
+		// No rule of its own under the meta: the description's heading draws
+		// one on the very next line, and two rules together say nothing the
+		// first does not.
+		b.WriteString(m.body.View() + "\n")
 	}
-	return body + layout.ClipLines(footer, m.width)
+	// The failure and the key bar are both drawn after the cut: what the
+	// reader is told about a failure, and what tells them esc is the way out,
+	// are the two things a short terminal must not swallow
+	// (.claude/rules/errors.md).
+	var failure string
+	if m.errText != "" {
+		failure = wrapErr(m.errText, m.width) + "\n"
+	}
+	height := m.height
+	if height > 0 {
+		// A wrapped failure can be taller than the terminal. Flooring the
+		// budget at one keeps this a subtraction rather than a way back into
+		// fitHeight's "no size yet" branch, where nothing would be cut at all.
+		height = max(height-lineCount(failure), 1)
+	}
+	return fitHeight(b.String(), height) + failure + footer
+}
+
+// lineCount counts the lines in a block that ends in a newline, and returns
+// zero for the empty string.
+func lineCount(s string) int { return strings.Count(s, "\n") }
+
+// fitHeight cuts what is drawn above the key bar down to the lines the
+// terminal has, so that the key bar is still on the screen. The meta pane is
+// as tall as the item has facts and does not scroll, and on a short terminal
+// it would otherwise push the bar off the bottom -- taking with it the only
+// notice that esc is the way out. What is lost instead is the tail of the
+// pane, which the reader can get back by making the window taller.
+//
+// A height of zero or less means no size has arrived yet, and nothing is cut.
+func fitHeight(s string, height int) string {
+	if height <= 0 {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	// The key bar is appended after this and takes the last line; s ends in a
+	// newline, so its final element is the empty string before it.
+	if budget := height - 1; len(lines) > budget {
+		lines = append(lines[:budget], "")
+	}
+	return strings.Join(lines, "\n")
+}
+
+// rows is the meta pane's content. It is worked out at draw time rather than
+// kept, because its layout follows the terminal's width.
+func (m Model) rows() []metaRow {
+	if !m.loaded {
+		return nil
+	}
+	return metaRows(m.ref, m.item)
+}
+
+// headerLines is the meta block of the single-column layout: the same rows,
+// joined into one wrapped paragraph above the body.
+func (m Model) headerLines() []string {
+	if !m.loaded {
+		return nil
+	}
+	return metaInlineLines(m.rows(), m.width)
 }
 
 // footer builds the detail view's key bar from hints, most important first,
@@ -181,87 +266,4 @@ func cursorPrefix(selected bool) string {
 		return "▸ "
 	}
 	return "  "
-}
-
-func prMarkdown(pr domain.PR) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# #%d %s\n\n", pr.Number, pr.Title)
-	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), pr.Author.Login)
-	state := stateText(pr.State)
-	if pr.IsDraft {
-		state += i18n.T("md.draft_suffix")
-	}
-	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), state)
-	if pr.Review != domain.ReviewNone {
-		fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.review"), reviewText(pr.Review))
-	}
-	writeCommonMeta(&b, pr.Labels, pr.UpdatedAt)
-	writeBody(&b, pr.Body)
-	writeComments(&b, pr.Comments)
-	return b.String()
-}
-
-func issueMarkdown(it usecase.Item) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# #%d %s\n\n", it.Number, it.Title)
-	fmt.Fprintf(&b, "- **%s**: @%s\n", i18n.T("md.author"), it.Author.Login)
-	fmt.Fprintf(&b, "- **%s**: %s\n", i18n.T("md.state"), stateText(it.State))
-	writeCommonMeta(&b, it.Labels, it.UpdatedAt)
-	writeBody(&b, it.Body)
-	writeComments(&b, it.Comments)
-	return b.String()
-}
-
-// stateText and reviewText name a state in the reader's language. GitHub's
-// own spelling stopped at the access layer (.claude/rules/architecture.md),
-// and a state word is ours to translate.
-func stateText(s domain.ItemState) string {
-	switch s {
-	case domain.StateOpen:
-		return i18n.T("state.open")
-	case domain.StateMerged:
-		return i18n.T("state.merged")
-	default:
-		return i18n.T("state.closed")
-	}
-}
-
-func reviewText(r domain.ReviewState) string {
-	switch r {
-	case domain.ReviewApproved:
-		return i18n.T("review.approved")
-	case domain.ReviewChangesRequested:
-		return i18n.T("review.changes_requested")
-	case domain.ReviewRequired:
-		return i18n.T("review.required")
-	default:
-		return i18n.T("review.none")
-	}
-}
-
-func writeCommonMeta(b *strings.Builder, labels []domain.Label, updatedAt time.Time) {
-	if len(labels) > 0 {
-		names := make([]string, len(labels))
-		for i, l := range labels {
-			names[i] = l.Name
-		}
-		fmt.Fprintf(b, "- **%s**: %s\n", i18n.T("md.labels"), strings.Join(names, ", "))
-	}
-	fmt.Fprintf(b, "- **%s**: %s\n", i18n.T("md.updated"), i18n.DateTime(updatedAt))
-}
-
-func writeBody(b *strings.Builder, body string) {
-	b.WriteString("\n---\n\n")
-	if body != "" {
-		b.WriteString(body)
-	} else {
-		b.WriteString(i18n.T("md.no_description"))
-	}
-}
-
-func writeComments(b *strings.Builder, comments []domain.Comment) {
-	for _, c := range comments {
-		fmt.Fprintf(b, "\n\n---\n\n**@%s** — %s\n\n%s",
-			c.Author.Login, i18n.DateTime(c.CreatedAt), c.Body)
-	}
 }

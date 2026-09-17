@@ -2,9 +2,9 @@ package detail
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -13,40 +13,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/i18n"
 )
-
-func TestPRMarkdownContainsMetaBodyAndComments(t *testing.T) {
-	pr := domain.PR{
-		Number: 12, Title: "feat: pane", Author: domain.Author{Login: "kukv"},
-		State: domain.StateOpen, IsDraft: true, Review: domain.ReviewRequired,
-		Labels: []domain.Label{{Name: "Kind: Feature"}},
-		Body:   "body text",
-		Comments: []domain.Comment{
-			{
-				Author: domain.Author{Login: "bob"}, Body: "comment text",
-				CreatedAt: time.Date(2026, 7, 11, 11, 0, 0, 0, time.UTC),
-			},
-		},
-	}
-	md := prMarkdown(pr)
-	// The state and the review are named in the reader's language: GitHub's
-	// own spelling stopped at the access layer.
-	for _, want := range []string{
-		"#12", "feat: pane", "@kukv",
-		i18n.T("state.open") + i18n.T("md.draft_suffix"),
-		i18n.T("review.required"), "Kind: Feature", "body text", "@bob", "comment text",
-	} {
-		if !strings.Contains(md, want) {
-			t.Errorf("markdown missing %q:\n%s", want, md)
-		}
-	}
-}
-
-func TestIssueMarkdownEmptyBody(t *testing.T) {
-	md := issueMarkdown(issueItem(domain.Issue{Number: 3, Title: "an issue"}))
-	if !strings.Contains(md, "_no description_") {
-		t.Errorf("markdown missing empty-body placeholder:\n%s", md)
-	}
-}
 
 // overlongTitle is wider than any terminal the width test uses, in both
 // scripts. Without it the fixture's longest line has room to spare at every
@@ -175,5 +141,142 @@ func TestNoUnresolvedIDsInRenderedViews(t *testing.T) {
 				i18n.AssertNoUnresolvedIDs(t, view)
 			})
 		}
+	}
+}
+
+// TestTheNewMetaKeysResolve catches a key that was added to one catalog and
+// not the other before it reaches a view.
+func TestTheNewMetaKeysResolve(t *testing.T) {
+	ids := []string{
+		"detail.meta.repo", "detail.meta.author", "detail.meta.state",
+		"detail.meta.review", "detail.meta.checks", "detail.meta.branch",
+		"detail.meta.changes", "detail.meta.assignees", "detail.meta.labels",
+		"detail.meta.updated",
+		"detail.section.description", "detail.section.comments",
+		"detail.no_description", "state.draft_suffix",
+	}
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		i18n.SetLanguage(lang)
+		t.Cleanup(func() { i18n.SetLanguage(language.English) })
+		for _, id := range ids {
+			i18n.AssertNoUnresolvedIDs(t, i18n.T(id))
+		}
+	}
+	i18n.AssertNoUnresolvedIDs(t, i18n.Tn("detail.section.comments", 2))
+}
+
+// TestTheViewSplitsInTwoWhenItCan covers the threshold: the rule between the
+// panes is what tells the two layouts apart.
+func TestTheViewSplitsInTwoWhenItCan(t *testing.T) {
+	f := &fakeSource{pr: domain.PR{
+		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
+		State: domain.StateOpen, Body: "the description",
+	}}
+
+	for _, tc := range []struct {
+		name  string
+		width int
+		split bool
+	}{
+		{"a wide terminal splits", 120, true},
+		{"the threshold itself splits", 100, true},
+		{"one column short does not", 99, false},
+		{"eighty does not", 80, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := loaded(f, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12})
+			m, _ = m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 24})
+
+			got := strings.Contains(ansi.Strip(m.View()), "repository  kukv/octoscope #12")
+			if got != tc.split {
+				t.Errorf("split = %v at %d columns, want %v:\n%s",
+					got, tc.width, tc.split, ansi.Strip(m.View()))
+			}
+		})
+	}
+}
+
+// TestTheSingleColumnKeepsEveryFact is why the narrow layout joins the rows
+// rather than dropping them.
+func TestTheSingleColumnKeepsEveryFact(t *testing.T) {
+	pr := domain.PR{
+		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
+		State: domain.StateOpen, Review: domain.ReviewApproved, Body: "the description",
+		Assignees: []domain.Author{{Login: "alice"}},
+		Checks:    domain.Checks{Total: 2, Passed: 1, Failed: 1},
+		Head:      "feat/x", Base: "main", Additions: 218, Deletions: 31,
+	}
+	m := loaded(&fakeSource{pr: pr}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"kukv/octoscope #12", "@kukv", "feat/x → main", "+218", "−31", "@alice"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the single-column header dropped %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestNoLineOverrunsTheTerminal is the check a two-pane layout most easily
+// fails, and the one a Japanese terminal fails first.
+func TestNoLineOverrunsTheTerminal(t *testing.T) {
+	for _, w := range []int{80, 100, 120, 160} {
+		m := goldenModel(w)
+		for _, l := range strings.Split(m.View(), "\n") {
+			if got := ansi.StringWidth(l); got > w {
+				t.Errorf("at %d columns a line is %d wide: %q", w, got, ansi.Strip(l))
+			}
+		}
+	}
+}
+
+// TestTheKeyBarSurvivesAShortTerminal covers the one line the view cannot
+// afford to lose: esc is the only way out of the detail view, and the key bar
+// is what says so. A pull request has ten meta rows, which is taller than a
+// short terminal's body, and JoinPanes runs to whichever pane is taller.
+func TestTheKeyBarSurvivesAShortTerminal(t *testing.T) {
+	for _, h := range []int{8, 12, 16, 24} {
+		t.Run(fmt.Sprintf("height_%d", h), func(t *testing.T) {
+			m := goldenModel(120)
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: h})
+
+			lines := strings.Split(m.View(), "\n")
+			if len(lines) > h {
+				t.Errorf("the view is %d lines at a height of %d", len(lines), h)
+			}
+			last := ansi.Strip(lines[len(lines)-1])
+			if !strings.Contains(last, "esc") {
+				t.Errorf("the last line is %q, want the key bar", last)
+			}
+		})
+	}
+}
+
+// TestAFailureSurvivesAShortTerminal covers the other line the cut must not
+// swallow. What gh or GitHub said is the whole of what the reader has to go
+// on after a failed close, so it belongs on the same side of the cut as the
+// key bar (.claude/rules/errors.md); the meta pane's tail is what gives way.
+func TestAFailureSurvivesAShortTerminal(t *testing.T) {
+	const boom = "HTTP 403: Resource not accessible by integration"
+
+	for _, h := range []int{8, 12, 16, 24} {
+		t.Run(fmt.Sprintf("height_%d", h), func(t *testing.T) {
+			m := goldenModel(120)
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: h})
+			m, _ = m.Update(stateErrorMsg{ref: goldenRef(), err: errors.New(boom)})
+
+			view := m.View()
+			if !strings.Contains(ansi.Strip(view), boom) {
+				t.Errorf("the failure is off the screen at a height of %d:\n%s", h, ansi.Strip(view))
+			}
+			lines := strings.Split(view, "\n")
+			if len(lines) > h {
+				t.Errorf("the view is %d lines at a height of %d", len(lines), h)
+			}
+			last := ansi.Strip(lines[len(lines)-1])
+			if !strings.Contains(last, "esc") {
+				t.Errorf("the last line is %q, want the key bar", last)
+			}
+		})
 	}
 }
