@@ -59,6 +59,46 @@ merged な #98 では `mergeStateStatus: "UNKNOWN"`、`viewerCanMergeAsAdmin: fa
 
 **この検証を実装の最初のステップに置く**（§6）。
 
+### 1.4 実測の結果: `viewerCanMergeAsAdmin` は ruleset 下では使えない（2026-09-18）
+
+PR #100 で測った。9 本の status check が全て通り、残る要件が
+レビュー 1 件だけになった状態である。
+
+```
+$ gh api graphql -f query='{repository(owner:"kukv",name:"octoscope"){
+    viewerPermission pullRequest(number:100){
+      mergeStateStatus reviewDecision viewerCanMergeAsAdmin }}}'
+
+{"data":{"repository":{"viewerPermission":"ADMIN","pullRequest":{
+  "mergeStateStatus":"BLOCKED",
+  "reviewDecision":"REVIEW_REQUIRED",
+  "viewerCanMergeAsAdmin":false}}}}
+```
+
+**`false` である。** ruleset `protect-default-branch` は
+`{"actor_type":"RepositoryRole","actor_id":5,"bypass_mode":"always"}` を持ち、
+この閲覧者は `viewerPermission: "ADMIN"` であるから、実際にはバイパスできる。
+このフィールドは classic branch protection のものを見ており、ruleset を見ていない。
+
+**よって判定は `repository.viewerPermission == "ADMIN"` を使う。**
+§2 以降の `viewerCanMergeAsAdmin` はこれに読み替える。ドメインが持つのは
+`ViewerIsAdmin bool` で、GraphQL の文字列との突き合わせはゲートウェイで閉じる。
+
+この判定の限界を承知のうえで採る。
+
+- ruleset の bypass actor は role ごとに設定できるので、`MAINTAIN` の閲覧者が
+  bypass actor に入っている構成では、押し切れるのにキーが出ない
+- 逆に `ADMIN` が bypass actor に入っていないリポジトリでは、キーが出て押すと失敗する。
+  その失敗は §4 の経路でフッターに出る
+
+**gh はこの判定をそもそも持たない。** `allowsAdminOverride(status)` は
+`mergeStateStatus` だけを見て、権限フィールドを一切読まない
+（`pkg/cmd/pr/merge/merge.go:851`）。つまり gh は誰にでも `--admin` を提案し、
+断るのはサーバに任せている。octoscope がここで権限を見るのは、§4.4.4 の
+「選べない項目を並べて押させてから断らない」に従うためであり、gh より厳しい側に
+外している。正確な判定には ruleset の bypass actor を REST で引く必要があるが、
+ポップアップを開くたびに 1 往復増やすだけの価値は無い。
+
 ## 2. 何を足すか
 
 ```
@@ -92,13 +132,15 @@ merged な #98 では `mergeStateStatus: "UNKNOWN"`、`viewerCanMergeAsAdmin: fa
 
 ### 3.1 `internal/github/gql`
 
-`merge.graphql` の `pullRequest` に `viewerCanMergeAsAdmin` を 1 行足し、
-`mergeContextResponse` と `MergeContext` に対応する bool を足す。
+`merge.graphql` の `repository` に `viewerPermission` を 1 行足し（§1.4）、
+`mergeContextResponse` と `MergeContext` に `ViewerPermission string` を足す。
 
 ### 3.2 `internal/app/adapter/gateway/gh/merge.go`
 
-`toMergeContext` で素通しする。`MergePR` / `EnableAutoMerge` /
-`DisableAutoMerge` は**変更しない**。
+`toMergeContext` で `c.ViewerPermission == "ADMIN"` を `ViewerIsAdmin` に入れる。
+**GraphQL の文字列との突き合わせはここで閉じる**——ドメインが GitHub の enum の
+綴りを知るのは、他の状態と同じくゲートウェイの仕事である。
+`MergePR` / `EnableAutoMerge` / `DisableAutoMerge` は**変更しない**。
 
 ### 3.3 `internal/app/domain/merge.go`
 
@@ -108,7 +150,7 @@ merged な #98 では `mergeStateStatus: "UNKNOWN"`、`viewerCanMergeAsAdmin: fa
 // rule to bypass: it is work that is not finished, and no permission makes
 // it finished.
 func (c MergeContext) CanMergeAsAdmin() bool {
-	if !c.ViewerCanMergeAsAdmin {
+	if !c.ViewerIsAdmin {
 		return false
 	}
 	switch c.Block() {
@@ -174,11 +216,11 @@ case "a":
 | 対象 | 確かめること |
 |---|---|
 | `domain` | `CanMergeAsAdmin` を 7 つの `MergeBlock` × フラグ 2 値の表で |
-| `gql` | `viewerCanMergeAsAdmin` がレスポンスから読めること |
+| `gql` | `viewerPermission` がレスポンスから読めること |
 | `tui/merge` | blocked で `enter` が**今まで通り**何も送らないこと |
 | `tui/merge` | `a` が `MergePR` を呼ぶこと（blocked / behind） |
 | `tui/merge` | draft / conflict / 計算中 / dirty で `a` が何も送らないこと |
-| `tui/merge` | `ViewerCanMergeAsAdmin` が false なら `a` が何も送らないこと |
+| `tui/merge` | `ViewerIsAdmin` が false なら `a` が何も送らないこと |
 | golden | `merge_admin` を追加（既存の golden と同じ言語・幅の組で） |
 
 `enter` が blocked で沈黙し続けることを明示的に守るのは、この変更で
@@ -189,13 +231,8 @@ case "a":
 
 ## 6. 実装の順番
 
-1. **`viewerCanMergeAsAdmin` を ruleset 下で実測する。** blocked な PR を 1 つ
-   作り、`mergeStateStatus` と合わせてクエリする。
-   - `true` が返れば §3.1 以降をそのまま進める
-   - `false` が返るなら判定を `repository.viewerPermission == "ADMIN"` に替える。
-     bypass actor に入っていない admin にもキーが出るようになるが、押せば
-     GitHub が断り、§4 の経路でフッターに理由が出る。**どちらを採ったかを
-     この文書に追記してから先へ進む**
+1. **済（§1.4）。** `viewerCanMergeAsAdmin` を ruleset 下で実測し、使えないと分かった。
+   判定は `repository.viewerPermission == "ADMIN"` を採る
 2. gql → gateway → domain → tui → i18n の順。各段でテストを足してから次へ
 3. `make check`
 4. `--lang ja` と `--lang en` で実機確認
