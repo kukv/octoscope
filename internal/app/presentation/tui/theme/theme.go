@@ -60,6 +60,14 @@ func muted() lipgloss.Style     { return fg("#57606a", "#8b949e") }
 // selection is the background a cursor row or card is marked with.
 func selection() color.Color { return pick("#e8eef5", "#1d2735") }
 
+// diffAddedBg and diffRemovedBg are the backgrounds an added and a removed
+// line are filled with. GitHub's own values are alpha tints over the page's
+// canvas -- addition rgba(46,160,67,.15) and deletion rgba(248,81,73,.10) on
+// dark -- and a terminal has no alpha, so the dark pair below is those tints
+// flattened onto #0d1117. The light pair is Primer's own opaque values.
+func diffAddedBg() color.Color   { return pick("#e6ffec", "#12261e") }
+func diffRemovedBg() color.Color { return pick("#ffebe9", "#25171c") }
+
 // Heading styles a column or section heading. The mockup letter-spaces and
 // upper-cases them; a terminal cannot letter-space, and upper-casing does
 // nothing to Japanese, so the heading is set apart by weight instead.
@@ -86,14 +94,13 @@ func Card(selected bool) lipgloss.Style {
 // the one reset in the drawing that is not ansi.ResetStyle.
 const chromaReset = "\x1b[0m"
 
-// SelectedLine draws s as the selected row: the selection's background,
-// carried the whole way across the line.
+// fillLine draws s filled with bg the whole way across.
 //
 // A background cannot simply be wrapped around a line that already has colour
 // in it. Every coloured span ends in a reset, and a reset clears the
 // background along with the foreground, so the fill would stop at the first
-// one and leave the cursor invisible from there on. Putting the background
-// back after each reset is what makes a selected row both fully filled and
+// one and leave the rest invisible from there on. Putting the background
+// back after each reset is what makes a filled row both fully filled and
 // still readable as itself.
 //
 // The two resets below are the only ones the drawing produces: lipgloss
@@ -104,11 +111,29 @@ const chromaReset = "\x1b[0m"
 // only on columns that have a character in them. A caller marking one word
 // inside a line, rather than a whole row, passes the word alone -- the
 // padding requirement is for a row, not for every call.
-func SelectedLine(s string) string {
-	bg := ansi.Style{}.BackgroundColor(selection()).String()
-	s = strings.ReplaceAll(s, ansi.ResetStyle, ansi.ResetStyle+bg)
-	s = strings.ReplaceAll(s, chromaReset, chromaReset+bg)
-	return bg + s + ansi.ResetStyle
+func fillLine(s string, bg color.Color) string {
+	seq := ansi.Style{}.BackgroundColor(bg).String()
+	s = strings.ReplaceAll(s, ansi.ResetStyle, ansi.ResetStyle+seq)
+	s = strings.ReplaceAll(s, chromaReset, chromaReset+seq)
+	return seq + s + ansi.ResetStyle
+}
+
+// SelectedLine draws s as the selected row.
+func SelectedLine(s string) string { return fillLine(s, selection()) }
+
+// DiffLine fills an added or a removed line with the colour that says which
+// it is, so the two are told apart by the whole row rather than by the one
+// marker column. A context line is the majority of a diff and is returned
+// untouched.
+func DiffLine(k domain.DiffLineKind, s string) string {
+	switch k {
+	case domain.LineAdded:
+		return fillLine(s, diffAddedBg())
+	case domain.LineRemoved:
+		return fillLine(s, diffRemovedBg())
+	default:
+		return s
+	}
 }
 
 // Popup styles the frame around a small window drawn over an existing view:

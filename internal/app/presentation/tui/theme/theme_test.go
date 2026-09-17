@@ -294,3 +294,73 @@ func TestSelectedLineFollowsTheBackground(t *testing.T) {
 		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
 	}
 }
+
+// TestDiffLineCarriesTheBackgroundPastAChromaReset is the same guarantee
+// SelectedLine has, for the second colour that now uses the same mechanism:
+// a diff line is full of chroma's resets, and each one would end the tint.
+func TestDiffLineCarriesTheBackgroundPastAChromaReset(t *testing.T) {
+	dark(t)
+
+	line := theme.DiffLine(domain.LineAdded, "a\x1b[0mb")
+	bg := selectionBackground(t, line)
+
+	if !strings.Contains(line, "\x1b[0m"+bg) {
+		t.Errorf("the background is not restored after a chroma reset: %q", line)
+	}
+	if !strings.HasSuffix(line, ansi.ResetStyle) {
+		t.Errorf("the line does not close with a reset: %q", line)
+	}
+}
+
+// TestDiffLineCarriesTheBackgroundPastALipglossReset covers the other reset
+// the drawing produces: a line chroma has no lexer for still goes through
+// lipgloss styles around it.
+func TestDiffLineCarriesTheBackgroundPastALipglossReset(t *testing.T) {
+	dark(t)
+
+	line := theme.DiffLine(domain.LineRemoved, theme.Dim().Render("x")+"y")
+	bg := selectionBackground(t, line)
+
+	if n := strings.Count(line, ansi.ResetStyle+bg); n != 1 {
+		t.Errorf("the background is restored %d times after a lipgloss reset, want 1: %q", n, line)
+	}
+}
+
+// TestDiffLineLeavesAContextLineAlone guards the third kind: an unchanged
+// line is the majority of a diff and must stay as cheap and as plain as it
+// is today.
+func TestDiffLineLeavesAContextLineAlone(t *testing.T) {
+	dark(t)
+
+	if got := theme.DiffLine(domain.LineContext, "x"); got != "x" {
+		t.Errorf("a context line was styled: %q", got)
+	}
+}
+
+// TestDiffLineSeparatesAddedFromRemoved is what the whole change is for:
+// the two states must not land on the same colour.
+func TestDiffLineSeparatesAddedFromRemoved(t *testing.T) {
+	dark(t)
+
+	added := theme.DiffLine(domain.LineAdded, "x")
+	removed := theme.DiffLine(domain.LineRemoved, "x")
+	if selectionBackground(t, added) == selectionBackground(t, removed) {
+		t.Errorf("added and removed lines share a background: %q", added)
+	}
+}
+
+// TestDiffLineFollowsTheBackground guards the light variants the way
+// TestSelectedLineFollowsTheBackground guards the selection's: a mistyped
+// light hex would pass every test above.
+func TestDiffLineFollowsTheBackground(t *testing.T) {
+	dark(t)
+
+	theme.SetDark(true)
+	onDark := theme.DiffLine(domain.LineAdded, "x")
+	theme.SetDark(false)
+	onLight := theme.DiffLine(domain.LineAdded, "x")
+
+	if onDark == onLight {
+		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
+	}
+}
