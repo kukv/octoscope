@@ -51,7 +51,7 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	if !strings.Contains(ansi.Strip(out), "looks good") {
 		t.Errorf("the note was lost after a failed submit:\n%s", ansi.Strip(out))
 	}
-	wantSelected := theme.Selected().Render(i18n.T("submit.approve"))
+	wantSelected := theme.SelectedLine(i18n.T("submit.approve"))
 	if !strings.Contains(out, wantSelected) {
 		t.Errorf("the chosen event (approve) was lost after a failed submit:\n%s", ansi.Strip(out))
 	}

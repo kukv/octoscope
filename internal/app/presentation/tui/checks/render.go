@@ -151,7 +151,7 @@ func (m Model) rerunLines() []string {
 
 func (m Model) rerunOption(scope domain.RerunScope, text string) string {
 	if scope == m.rerunScope {
-		return theme.Selected().Render(text)
+		return theme.SelectedLine(text)
 	}
 	return text
 }
@@ -281,7 +281,7 @@ func (m Model) checkLine(r domain.CheckRun, cursor bool) string {
 		}
 	}
 	if cursor && m.pane == paneList {
-		return theme.Selected().Render(layout.Fill(text, listWidth))
+		return theme.SelectedLine(layout.Fill(text, listWidth))
 	}
 	return theme.Check(r.State).Render(clip(text, listWidth))
 }

@@ -40,7 +40,7 @@ func (m Model) eventLine() string {
 	parts := make([]string, len(options))
 	for i, o := range options {
 		if o.event == m.event {
-			parts[i] = theme.Selected().Render(o.text)
+			parts[i] = theme.SelectedLine(o.text)
 			continue
 		}
 		parts[i] = o.text
