@@ -196,9 +196,9 @@ go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight' -v
 
 ```go
 // highlightCacheMax is how many coloured lines are remembered before the
-// lot is dropped. A line and its colours run to about a kilobyte together,
-// so this is a few megabytes -- and 8192 is two hundred screenfuls, far
-// more than scrolling or moving between files needs.
+// lot is dropped. A line and its colours run to about a kilobyte and a half
+// together, so this is about nine megabytes -- and 8192 is two hundred
+// screenfuls, far more than scrolling or moving between files needs.
 const highlightCacheMax = 8192
 
 // highlightKey is what decides a coloured line: the palette the background
@@ -211,12 +211,12 @@ type highlightKey struct {
 	code string
 }
 
-// highlightCache remembers coloured lines. Colouring one costs about 130
-// microseconds, of which chroma spends two thirds rebuilding its
-// style-to-escape-sequence table -- work that does not depend on the line
-// at all. View runs on every message, and scrolling a line leaves all but
-// one row of the screen the same as the frame before, so the same lines
-// are coloured again and again.
+// highlightMu and highlightLines remember coloured lines. Colouring one
+// costs about 130 microseconds, of which chroma spends two thirds
+// rebuilding its style-to-escape-sequence table -- work that does not
+// depend on the line at all. View runs on every message, and scrolling a
+// line leaves all but one row of the screen the same as the frame before,
+// so the same lines are coloured again and again.
 //
 // When it fills it is dropped whole rather than evicted one at a time.
 // What has to survive is the screenful just drawn, and that is the most
@@ -227,8 +227,8 @@ var (
 	highlightLines = map[highlightKey]string{}
 )
 
-// cachedHighlight answers from the cache, or colours the line with colour
-// and remembers it.
+// cachedHighlight answers from the cache, colouring and remembering the
+// line on a miss.
 func cachedHighlight(key highlightKey, colour func() string) string {
 	highlightMu.RLock()
 	line, ok := highlightLines[key]
@@ -249,29 +249,46 @@ func cachedHighlight(key highlightKey, colour func() string) string {
 }
 ```
 
-`Highlight` の本体を、今の中身を包む形に変える。`isDark` は `mu` が守っているので
-`chromaStyle` と同じように読む。
+`Highlight` の本体を、今の中身を包む形に変える。`isDark` は `mu` が守っているが、
+`Highlight` の中で 1 回だけ読んで `dark` に持つ。`chromaStyle` と `highlight` は
+`isDark` を自分で読まず、渡された `dark` を使う — 鍵を作ってから色を付けるまでの間に
+別のゴルーチンで `SetDark` が走ると、2 回読んだのでは片方の背景で色を付けて
+もう片方の背景の鍵の下にしまうことになる。
 
 ```go
 func Highlight(path, code string) string {
+	if lexerFor(path) == nil {
+		return code
+	}
+
 	mu.RLock()
 	dark := isDark
 	mu.RUnlock()
 
 	return cachedHighlight(highlightKey{dark: dark, path: path, code: code}, func() string {
-		return highlight(path, code)
+		return highlight(path, code, dark)
 	})
 }
 
 // highlight is Highlight without the cache in front of it: everything below
 // here is what colouring one line actually costs.
-func highlight(path, code string) string {
+//
+// dark is read once by Highlight and passed down rather than read again
+// here, for the reason above.
+func highlight(path, code string, dark bool) string {
 	lexer := lexerFor(path)
+	...
+	style := styles.Get(chromaStyle(dark))
 	...
 }
 ```
 
-`highlight` の中身は今の `Highlight` の本体をそのまま移す。**1 行も変えない。**
+`lexerFor(path) == nil` の早期リターンは、レキサの無いファイルがキャッシュに触れずに
+今までどおりの速さで返るためにある — キャッシュはそこでは当たらず、本物のエントリを
+押し出すだけになる。
+
+`highlight` の中身は今の `Highlight` の本体をそのまま移す。**変えるのは
+`chromaStyle()` を `chromaStyle(dark)` にする 1 行だけ。**
 `Highlight` の doc コメントは `Highlight` に残し、`highlight` には上の 2 行を付ける。
 
 - [ ] **Step 4: テストを走らせる**
