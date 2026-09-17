@@ -503,7 +503,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 		}
 ```
 
-行は `Pad` + `Right` で `contentWidth` ちょうどなので `Fill` は要らない。
+行は `Pad` + `Right` で `contentWidth` ちょうどなので `Fill` は要らない、はずである。
+**これは読んで確かめること。** `nameWidth` は `m.contentWidth()-starColumn` で、
+`Pad(name, nameWidth)` と `Right(stars, starColumn)` の和が `contentWidth` になる。
+録り直した golden で候補行の塗りが右端まで届いていなければ、この読みが誤りなので
+`layout.Fill(line, m.contentWidth())` を通す。
 
 - [ ] **Step 2: golden を録り直して目で確かめる**
 
@@ -574,6 +578,27 @@ func (m Model) rerunOption(scope domain.RerunScope, text string) string {
 
 `rerunOption` と `eventLine` は幅まで埋めない。**並んだ選択肢のうち 1 語を
 指すもので、行全体ではない。** 全幅に広げるとどれを選んでいるか読めなくなる。
+
+- [ ] **Step 1b: `Selected()` から期待値を組み立てているテストを直す**
+
+`review/render.go` を移すと、次の 2 本が落ちる。
+
+- `internal/app/presentation/tui/diff/review_test.go:40`
+- `internal/app/presentation/tui/detail/review_test.go:54`
+
+どちらも同じ 1 行である。
+
+```go
+	wantSelected := theme.Selected().Render(i18n.T("submit.approve"))
+```
+
+これを次に直す。
+
+```go
+	wantSelected := theme.SelectedLine(i18n.T("submit.approve"))
+```
+
+期待値を `theme` から組み立てているので、色を変えても落ちない形は保たれる。
 
 - [ ] **Step 2: golden が動かないことを確かめる**
 
@@ -794,6 +819,16 @@ grep -rn "theme.Selected()\|func Selected()" internal/
 ```
 
 期待: `theme/theme.go` の定義 1 行だけ。他が出たら、そのビューをまだ移していない。
+
+**テストが 2 本、期待値を `theme.Selected()` から組み立てている。**
+
+- `internal/app/presentation/tui/diff/review_test.go:40`
+- `internal/app/presentation/tui/detail/review_test.go:54`
+
+どちらも `wantSelected := theme.Selected().Render(i18n.T("submit.approve"))` で、
+Task 6 で `review/render.go` を移した時点で落ちる。Task 6 の中で
+`theme.SelectedLine(i18n.T("submit.approve"))` に直しておくこと。
+ここまで残っていたら、Task 6 が漏れている。
 
 - [ ] **Step 2: 消す**
 
