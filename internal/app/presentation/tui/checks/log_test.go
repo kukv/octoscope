@@ -2,22 +2,22 @@ package checks
 
 import "testing"
 
-// TestLogLinesClearedWithLog locks what the cached rows must follow: the
-// log they were built from. A cache left behind after clearLog would draw
-// the previous check's log under the check the cursor moved to.
+// TestLogLinesClearedWithLog locks that clearLog drops logLines together
+// with log: a clearLog that dropped only one of the two would leave the
+// previous check's log to be drawn under the check the cursor moved to.
 func TestLogLinesClearedWithLog(t *testing.T) {
 	m := goldenModel(160)
 	m, _ = m.Update(keyPress("enter"))
 	m = m.logArrived(logMsg{ref: m.ref, jobID: m.selectedJob(), lines: goldenLog()})
 
-	if len(m.logRows()) == 0 {
+	if len(m.logLines) == 0 {
 		t.Fatal("no rows after a log arrived")
 	}
 
 	m = m.clearLog()
 
-	if got := m.logRows(); got != nil {
-		t.Fatalf("rows survived clearLog: %q", got)
+	if m.logLines != nil {
+		t.Fatalf("logLines survived clearLog: %q", m.logLines)
 	}
 }
 
