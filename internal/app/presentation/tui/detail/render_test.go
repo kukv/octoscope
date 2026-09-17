@@ -2,6 +2,7 @@ package detail
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -226,5 +227,27 @@ func TestNoLineOverrunsTheTerminal(t *testing.T) {
 				t.Errorf("at %d columns a line is %d wide: %q", w, got, ansi.Strip(l))
 			}
 		}
+	}
+}
+
+// TestTheKeyBarSurvivesAShortTerminal covers the one line the view cannot
+// afford to lose: esc is the only way out of the detail view, and the key bar
+// is what says so. A pull request has ten meta rows, which is taller than a
+// short terminal's body, and JoinPanes runs to whichever pane is taller.
+func TestTheKeyBarSurvivesAShortTerminal(t *testing.T) {
+	for _, h := range []int{8, 12, 16, 24} {
+		t.Run(fmt.Sprintf("height_%d", h), func(t *testing.T) {
+			m := goldenModel(120)
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: h})
+
+			lines := strings.Split(m.View(), "\n")
+			if len(lines) > h {
+				t.Errorf("the view is %d lines at a height of %d", len(lines), h)
+			}
+			last := ansi.Strip(lines[len(lines)-1])
+			if !strings.Contains(last, "esc") {
+				t.Errorf("the last line is %q, want the key bar", last)
+			}
+		})
 	}
 }

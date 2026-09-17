@@ -69,7 +69,28 @@ func (m Model) View() string {
 	if m.errText != "" {
 		b.WriteString(wrapErr(m.errText, m.width) + "\n")
 	}
-	return b.String() + footer
+	return fitHeight(b.String(), m.height) + footer
+}
+
+// fitHeight cuts what is drawn above the key bar down to the lines the
+// terminal has, so that the key bar is still on the screen. The meta pane is
+// as tall as the item has facts and does not scroll, and on a short terminal
+// it would otherwise push the bar off the bottom -- taking with it the only
+// notice that esc is the way out. What is lost instead is the tail of the
+// pane, which the reader can get back by making the window taller.
+//
+// A height of zero or less means no size has arrived yet, and nothing is cut.
+func fitHeight(s string, height int) string {
+	if height <= 0 {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	// The key bar is appended after this and takes the last line; s ends in a
+	// newline, so its final element is the empty string before it.
+	if budget := height - 1; len(lines) > budget {
+		lines = append(lines[:budget], "")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // rows is the meta pane's content. It is worked out at draw time rather than
