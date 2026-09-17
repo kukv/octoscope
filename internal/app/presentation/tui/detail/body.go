@@ -33,8 +33,16 @@ const commentBarWidth = 2
 // the edge of the pane. The name on its own was quieter than the text beneath
 // it -- theme.Heading is muted, and a GitHub body is not -- which left the
 // reader looking for the end of the description in a blank line.
-func sectionHeading(name string, w int) string {
-	head := theme.Heading().Render(name)
+//
+// mine says the block under it names the reader. Only the name changes
+// colour: the rule runs the width of the pane, and colouring that too would
+// shout louder than a comment's bar does for the same piece of news.
+func sectionHeading(name string, w int, mine bool) string {
+	style := theme.Heading()
+	if mine {
+		style = theme.Accent().Bold(true)
+	}
+	head := style.Render(name)
 	// The space is what keeps the rule from running into the last character.
 	rest := w - ansi.StringWidth(name) - 1
 	if rest <= 0 {
@@ -44,9 +52,13 @@ func sectionHeading(name string, w int) string {
 }
 
 // bodyLines is what scrolls: the description under its heading, then every
-// comment behind its own bar.
-func bodyLines(it usecase.Item, w int) []string {
-	lines := []string{sectionHeading(i18n.T("detail.section.description"), w)}
+// comment behind its own bar. viewer is the reader's login, or "" when it is
+// not known, which highlights nothing.
+func bodyLines(it usecase.Item, w int, viewer string) []string {
+	// The mention is looked for in what GitHub sent, not in the placeholder
+	// that stands in for an empty description.
+	lines := []string{sectionHeading(i18n.T("detail.section.description"), w,
+		mentionsViewer(it.Body, viewer))}
 
 	body := it.Body
 	if strings.TrimSpace(body) == "" {
@@ -59,11 +71,13 @@ func bodyLines(it usecase.Item, w int) []string {
 	if len(it.Comments) == 0 {
 		return fit(lines, w)
 	}
+	// The comments heading is never the reader's own: which of the comments
+	// under it names them is said by each one's bar.
 	lines = append(lines, "",
-		sectionHeading(i18n.Tn("detail.section.comments", len(it.Comments)), w))
+		sectionHeading(i18n.Tn("detail.section.comments", len(it.Comments)), w, false))
 	for _, c := range it.Comments {
 		lines = append(lines, "")
-		lines = append(lines, commentLines(c, w)...)
+		lines = append(lines, commentLines(c, w, viewer)...)
 	}
 	return fit(lines, w)
 }
@@ -81,9 +95,18 @@ func fit(lines []string, w int) []string {
 // commentLines draws one comment: who wrote it and when, then the body, with
 // a bar down the left of every line. The bar is what says where one comment
 // ends and the next begins, so it cannot be left off a wrapped line.
-func commentLines(c domain.Comment, w int) []string {
-	bar := theme.Dim().Render(icon.CommentBar() + " ")
-	lines := []string{bar + theme.Dim().Render("@"+c.Author.Login+" · "+i18n.DateTime(c.CreatedAt))}
+//
+// A comment that names the reader gets a heavier bar and the accent colour,
+// down the whole of it. Only the bar and the header are coloured: the body
+// has been through glamour, which has put colours of its own in it, and a
+// style wrapped around that would reset them part way through a line.
+func commentLines(c domain.Comment, w int, viewer string) []string {
+	glyph, style := icon.CommentBar(), theme.Dim()
+	if mentionsViewer(c.Body, viewer) {
+		glyph, style = icon.MentionBar(), theme.Accent()
+	}
+	bar := style.Render(glyph + " ")
+	lines := []string{bar + style.Render("@"+c.Author.Login+" · "+i18n.DateTime(c.CreatedAt))}
 	for _, l := range markdownLines(c.Body, max(w-commentBarWidth, 1)) {
 		lines = append(lines, bar+l)
 	}

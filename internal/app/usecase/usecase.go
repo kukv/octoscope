@@ -45,6 +45,12 @@ type lister interface {
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
+// viewerFetcher names the signed-in user. It is not part of lister: there is
+// no repository involved, and nothing is being listed.
+type viewerFetcher interface {
+	Viewer(ctx context.Context) (string, error)
+}
+
 // crossRepoLister is what an operation that cannot name a single repository
 // takes: unlike lister's operations, none of these are "the contents of one
 // named repository".
@@ -110,6 +116,7 @@ type source interface {
 	labelEditor
 	assigneeEditor
 	lister
+	viewerFetcher
 	crossRepoLister
 	repoFinder
 	reviewFetcher
@@ -126,6 +133,7 @@ type Usecase struct {
 	labels     labelEditor
 	assignees  assigneeEditor
 	lists      lister
+	viewer     viewerFetcher
 	crossRepo  crossRepoLister
 	repos      repoFinder
 	repoStore  repoStore
@@ -146,6 +154,7 @@ func New(src source, store settingsStore) *Usecase {
 		labels:     src,
 		assignees:  src,
 		lists:      src,
+		viewer:     src,
 		crossRepo:  src,
 		repos:      src,
 		repoStore:  store,
@@ -253,6 +262,9 @@ func (u *Usecase) ListIssues(ctx context.Context, repo string) ([]domain.Issue, 
 }
 
 func (u *Usecase) RepoName(ctx context.Context) (string, error) { return u.lists.RepoName(ctx) }
+
+// Viewer is the login of the signed-in user.
+func (u *Usecase) Viewer(ctx context.Context) (string, error) { return u.viewer.Viewer(ctx) }
 
 func (u *Usecase) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	return u.lists.ListLabels(ctx, repo)

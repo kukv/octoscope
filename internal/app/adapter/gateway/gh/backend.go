@@ -51,6 +51,15 @@ type lister interface {
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
+// viewerFetcher names the signed-in user. Gateway promotes it unchanged:
+// there is nothing to convert -- a login is a string in both languages.
+// Promoting it is safe under the rule at the top of this file because the
+// only caller (root's resolveViewer) drops the failure rather than showing
+// it on the fatal-error screen.
+type viewerFetcher interface {
+	Viewer(ctx context.Context) (string, error)
+}
+
 // crossRepoLister is what an operation that cannot name a single repository
 // takes: unlike lister's operations, none of these are "the contents of one
 // named repository". Which columns the Work board has, and what each one
@@ -109,6 +118,7 @@ type backend interface {
 	labelEditor
 	assigneeEditor
 	lister
+	viewerFetcher
 	crossRepoLister
 	repoFinder
 	reviewFetcher

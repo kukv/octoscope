@@ -178,6 +178,11 @@ type Model struct {
 	src Source
 	ref domain.ItemRef
 
+	// viewer is the login of the signed-in user, or "" when it is not known
+	// -- the lookup has not answered yet, or it failed. Empty draws the body
+	// exactly as it was drawn before mentions were highlighted at all.
+	viewer string
+
 	width, height int
 
 	mode  mode
@@ -240,6 +245,23 @@ func New(src Source, ref domain.ItemRef) Model {
 		open:     browser.Open,
 	}
 }
+
+// SetViewer names the signed-in user, so the body can tell a comment
+// addressed at the reader from one that is not. The root calls it as the
+// view is built; search.New(src).SetSavedQueries(...) is the same shape.
+//
+// It is not a parameter of New because the login is the one input that may
+// not have arrived yet, and every test that builds a detail view would
+// otherwise have to say it does not care.
+func (m Model) SetViewer(login string) Model {
+	m.viewer = login
+	return m
+}
+
+// ViewerForTest is what the root told this view. It exists so that the
+// root's test can see the login arrive without reaching into another
+// package's fields.
+func (m Model) ViewerForTest() string { return m.viewer }
 
 // newBody is the scrolling body pane. The wheel has to be turned on for the
 // viewport to act on it; the root model is what asks the terminal to report
@@ -311,7 +333,7 @@ func (m *Model) setBodyContent(w int) {
 		return
 	}
 	at := m.body.YOffset()
-	m.body.SetContentLines(bodyLines(m.item, w))
+	m.body.SetContentLines(bodyLines(m.item, w, m.viewer))
 	m.body.SetYOffset(at)
 }
 

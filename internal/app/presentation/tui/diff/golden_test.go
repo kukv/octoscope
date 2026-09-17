@@ -124,14 +124,19 @@ func wideLineNumberFixture() []domain.FileDiff {
 	}
 }
 
-// wideLineNumberModel leaves the cursor on the hunk header (row 0), never on
-// one of the five-digit line rows: a cursor row goes through layout.Fill,
-// which truncates, and would hide the overrun this model exists to catch.
+// wideLineNumberModel puts the cursor back on the hunk header (row 0),
+// off every one of the five-digit line rows: a selected row goes through
+// layout.Fill by way of theme.SelectedLine, and an added or removed row goes
+// through it by way of theme.DiffLine, and either fill pads the row to width
+// and would hide the overrun this model exists to catch. The context row
+// among the four goes through neither, which is what leaves this check
+// something to trust.
 func wideLineNumberModel(width int) Model {
 	m := New(&fakeSource{files: wideLineNumberFixture()},
 		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 130})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: wideLineNumberFixture()})
+	m.row = 0
 	return m
 }
 
