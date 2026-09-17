@@ -30,9 +30,16 @@ func hugeLog(n int) []domain.LogLine {
 // BenchmarkViewHugeLog is one frame with a 50,000-line log open. Only a
 // screenful is drawn, so the cost must not follow the log's length.
 func BenchmarkViewHugeLog(b *testing.B) {
+	const lines = 50000
 	m := goldenModel(160)
 	m, _ = m.Update(keyPress("enter"))
-	m = m.logArrived(logMsg{ref: m.ref, jobID: m.selectedJob(), lines: hugeLog(50000)})
+	m = m.logArrived(logMsg{ref: m.ref, jobID: m.selectedJob(), lines: hugeLog(lines)})
+	// logArrived drops a log whose job does not match the cursor's job; a
+	// dropped log would leave this benchmark measuring the empty-log pane
+	// instead of a huge one, passing trivially fast without gating anything.
+	if len(m.log) != lines {
+		b.Fatalf("the log was dropped: %d lines", len(m.log))
+	}
 	for b.Loop() {
 		benchSink = m.View()
 	}
@@ -42,9 +49,16 @@ func BenchmarkViewHugeLog(b *testing.B) {
 // cursor and re-bounds the horizontal offset, each of which asks for the
 // log's rows.
 func BenchmarkMoveRowHugeLog(b *testing.B) {
+	const lines = 50000
 	m := goldenModel(160)
 	m, _ = m.Update(keyPress("enter"))
-	m = m.logArrived(logMsg{ref: m.ref, jobID: m.selectedJob(), lines: hugeLog(50000)})
+	m = m.logArrived(logMsg{ref: m.ref, jobID: m.selectedJob(), lines: hugeLog(lines)})
+	// logArrived drops a log whose job does not match the cursor's job; a
+	// dropped log would leave this benchmark measuring the empty-log pane
+	// instead of a huge one, passing trivially fast without gating anything.
+	if len(m.log) != lines {
+		b.Fatalf("the log was dropped: %d lines", len(m.log))
+	}
 	m.pane = paneLog
 	for b.Loop() {
 		m = m.moveRow(1)
