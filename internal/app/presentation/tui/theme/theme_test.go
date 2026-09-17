@@ -319,3 +319,36 @@ func BenchmarkHighlightUnknownExt(b *testing.B) {
 		benchSink = theme.Highlight("docs/notes.unknownext", code)
 	}
 }
+
+// TestHighlightFollowsBackground locks the boundary of the lexer cache:
+// which lexer a path gets never changes, but which palette it is drawn in
+// does, every time the terminal reports its background. Caching the whole
+// answer by path would freeze the colours at whatever the first draw used.
+func TestHighlightFollowsBackground(t *testing.T) {
+	t.Cleanup(func() { theme.SetDark(true) })
+	const code = "func main() { return }"
+
+	theme.SetDark(true)
+	dark := theme.Highlight("main.go", code)
+	theme.SetDark(false)
+	light := theme.Highlight("main.go", code)
+
+	if dark == light {
+		t.Fatalf("the same colours on both backgrounds: %q", dark)
+	}
+}
+
+// TestHighlightUnknownExtension is a file chroma has no lexer for, asked
+// for twice: the second call must come back uncoloured the same way the
+// first did. A cache that only remembers hits would colour it as whatever
+// was asked for before it.
+func TestHighlightUnknownExtension(t *testing.T) {
+	const code = "the quick brown fox"
+	theme.Highlight("main.go", code)
+
+	for range 2 {
+		if got := theme.Highlight("docs/notes.unknownext", code); got != code {
+			t.Fatalf("Highlight coloured a file with no lexer: %q", got)
+		}
+	}
+}

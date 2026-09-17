@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
@@ -268,6 +269,29 @@ func chromaStyle() string {
 	return "github"
 }
 
+// lexerCache remembers which lexer a path resolved to. lexers.Match globs a
+// path against every lexer chroma has registered, which measures at about
+// 1.5ms -- and Highlight is called once per visible row, every frame, so
+// that one call is nearly the whole cost of drawing the diff. A path's
+// lexer never changes while the program runs.
+//
+// A path that matched nothing is remembered too, as a nil lexer: a miss
+// costs more than a hit, not less, because Match only gives up after trying
+// every pattern it has.
+var lexerCache sync.Map // path -> chroma.Lexer, nil when none matches
+
+func lexerFor(path string) chroma.Lexer {
+	if v, ok := lexerCache.Load(path); ok {
+		// A remembered miss is a nil interface, which this assertion
+		// reports as not-ok; either way the answer is nil.
+		l, _ := v.(chroma.Lexer)
+		return l
+	}
+	l := lexers.Match(path)
+	lexerCache.Store(path, l)
+	return l
+}
+
 // Highlight colours one line of source, chosen by the file's name.
 //
 // It is one line at a time because a diff is all we have: a string or a
@@ -278,7 +302,7 @@ func chromaStyle() string {
 // A file chroma has no lexer for, and any failure inside chroma, comes back
 // unchanged: the diff is still readable without colour.
 func Highlight(path, code string) string {
-	lexer := lexers.Match(path)
+	lexer := lexerFor(path)
 	if lexer == nil {
 		return code
 	}
