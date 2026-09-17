@@ -53,6 +53,16 @@ func goldenPR() domain.PR {
 	}
 }
 
+// goldenMentionPR is the same item with the reader named in two places: the
+// description and the first comment. The second comment names nobody, which
+// is what makes the recording show the difference rather than only a colour.
+func goldenMentionPR() domain.PR {
+	pr := goldenPR()
+	pr.Body = "This replaces the renderer.\n\n- one\n- two\n\ncc @kukv"
+	pr.Comments[0].Body = "@kukv 見てもらえますか"
+	return pr
+}
+
 // goldenRef names a repository, unlike prRef: the meta pane's first row is
 // the reference, and an empty repository would leave it out of every
 // recording.
@@ -75,6 +85,16 @@ func goldenModel(width int) Model {
 	return m
 }
 
+// goldenMentionModel is goldenModel with the reader known, so the recording
+// keeps what the highlight actually draws.
+func goldenMentionModel(width int) Model {
+	f := &fakeSource{pr: goldenMentionPR()}
+	m := New(f, goldenRef()).SetViewer("kukv")
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	m, _ = m.Update(fetch(f, goldenRef())())
+	return m
+}
+
 func TestGolden(t *testing.T) {
 	for _, lang := range goldenLanguages {
 		for _, w := range goldenWidths {
@@ -84,6 +104,8 @@ func TestGolden(t *testing.T) {
 
 				m := goldenModel(w)
 				golden.Assert(t, fmt.Sprintf("detail_%s_%d", lang.name, w), m.View())
+				golden.Assert(t, fmt.Sprintf("detail_mention_%s_%d", lang.name, w),
+					goldenMentionModel(w).View())
 
 				// Every state below is reached by the key that opens it:
 				// a recording of an unreachable state guards nothing.

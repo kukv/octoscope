@@ -39,7 +39,7 @@ type glyphs struct {
 	issue                                            string
 	checkSuccess, checkFailure, checkRunning         string
 	barDone, barRest                                 string
-	collapsed, commentBar                            string
+	collapsed, commentBar, mentionBar                string
 	threadBadge                                      string
 	radioOn, radioOff                                string
 	warning                                          string
@@ -51,7 +51,7 @@ var sets = map[Set]glyphs{
 		issue:        "⦿",
 		checkSuccess: "✓", checkFailure: "×", checkRunning: "◍",
 		barDone: "▰", barRest: "▱",
-		collapsed: "▸", commentBar: "▌",
+		collapsed: "▸", commentBar: "▌", mentionBar: "█",
 		threadBadge: "●",
 		radioOn:     "●", radioOff: "○", warning: "⚠",
 	},
@@ -60,7 +60,7 @@ var sets = map[Set]glyphs{
 		issue:        "",
 		checkSuccess: "", checkFailure: "", checkRunning: "",
 		barDone: "█", barRest: "░",
-		collapsed: "▸", commentBar: "▌",
+		collapsed: "▸", commentBar: "▌", mentionBar: "█",
 		threadBadge: "●",
 		radioOn:     "●", radioOff: "○", warning: "⚠",
 	},
@@ -69,7 +69,7 @@ var sets = map[Set]glyphs{
 		issue:        "@",
 		checkSuccess: "+", checkFailure: "x", checkRunning: "~",
 		barDone: "#", barRest: "-",
-		collapsed: ">", commentBar: "|",
+		collapsed: ">", commentBar: "|", mentionBar: "#",
 		threadBadge: "*",
 		radioOn:     "*", radioOff: "o", warning: "!",
 	},
@@ -153,6 +153,12 @@ func Collapsed() string { return active().collapsed }
 // CommentBar returns the one-column bar drawn down the left of a review
 // comment.
 func CommentBar() string { return active().commentBar }
+
+// MentionBar returns the one-column bar drawn down the left of a comment
+// that names the reader. It is heavier than CommentBar rather than only a
+// different colour, so that the two stay apart on a terminal that draws no
+// colour at all.
+func MentionBar() string { return active().mentionBar }
 
 // Radio returns the one-column marker for one option in a list where a
 // single one is chosen.
