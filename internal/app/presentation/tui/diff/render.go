@@ -361,21 +361,19 @@ func (m Model) sidebarLines() []string {
 		if count > 0 {
 			badge = fmt.Sprintf("%s%d", icon.ThreadBadge(), count)
 		}
-		plainRow := plainSize
-		if badge != "" && ansi.StringWidth(plainSize)+1+ansi.StringWidth(badge) <= sidebarWidth {
-			plainRow = plainSize + " " + badge
-		}
-		selected := i == m.file && m.sidebar
-		if selected {
-			lines = append(lines,
-				theme.Selected().Render(layout.Fill(path, sidebarWidth)),
-				theme.Selected().Render(layout.Fill(plainRow, sidebarWidth)))
-			continue
-		}
 		size := theme.Added().Render("+"+strconv.Itoa(f.Additions)) +
 			" " + theme.Removed().Render("−"+strconv.Itoa(f.Deletions))
-		if plainRow != plainSize {
+		// Whether the badge fits is measured on the uncoloured strings. The
+		// answer is the same either way, since ansi.StringWidth ignores
+		// colour, but one pair of widths is easier to read than two.
+		if badge != "" && ansi.StringWidth(plainSize)+1+ansi.StringWidth(badge) <= sidebarWidth {
 			size += " " + theme.Count(pending).Render(badge)
+		}
+		if i == m.file && m.sidebar {
+			lines = append(lines,
+				theme.SelectedLine(layout.Fill(path, sidebarWidth)),
+				theme.SelectedLine(layout.Fill(size, sidebarWidth)))
+			continue
 		}
 		lines = append(lines, path, size)
 	}
@@ -414,16 +412,21 @@ func (m Model) diffLines() []string {
 	return lines
 }
 
-// diffLine draws one row of the diff pane. A selected row is drawn with no
-// colour of its own at all, then wrapped whole in theme.Selected(): every
-// coloured span lipgloss or chroma renders ends in its own reset, so a
-// background wrapped around one goes patchy from the first reset on. A
-// plain, fully legible selection beats syntax colour on the one line it
-// would otherwise break.
+// diffLine draws one row of the diff pane. The selected row is drawn exactly
+// as an unselected one and then filled by theme.SelectedLine, which carries
+// the fill past the resets that lipgloss and chroma leave behind. The cursor
+// row keeps its syntax highlighting and its +/- colours.
 func (m Model) diffLine(r row, selected bool, width int) string {
+	line := m.styledLine(r, width)
 	if selected {
-		return theme.Selected().Render(layout.Fill(m.plainText(r), width))
+		return theme.SelectedLine(layout.Fill(line, width))
 	}
+	return line
+}
+
+// styledLine is one row in its own colours, whether or not the cursor is on
+// it.
+func (m Model) styledLine(r row, width int) string {
 	switch r.kind {
 	case rowHunkHeader:
 		return theme.HunkHeader().Render(clip(r.text, width))
@@ -445,22 +448,6 @@ func (m Model) threadLine(r row, width int) string {
 	return theme.Thread(r.comment.Pending).Render(clip(m.threadText(r), width))
 }
 
-// plainText is what a row reads as with no styling at all, for the cursor
-// row.
-func (m Model) plainText(r row) string {
-	switch r.kind {
-	case rowLine:
-		old, marker, num := lineNumbers(r.line)
-		return fmt.Sprintf("%*s %*s%s %s", m.lineNumberWidth(), old, m.lineNumberWidth(), num, marker, r.line.Text)
-	case rowThread:
-		return m.threadText(r)
-	case rowCollapsed:
-		return icon.Collapsed() + " " + r.text
-	default:
-		return r.text
-	}
-}
-
 // threadText is what threadLine draws, without its colour.
 func (m Model) threadText(r row) string {
 	body := r.comment.Author.Login + " · " + singleLine(r.comment.Body)
@@ -473,7 +460,7 @@ func (m Model) threadText(r row) string {
 // diffTextLine draws the gutter (two line numbers and the +/- marker) and
 // the line's own text, syntax-highlighted.
 func (m Model) diffTextLine(l domain.DiffLine, width int) string {
-	old, _, num := lineNumbers(l)
+	old, num := lineNumbers(l)
 	fw := m.lineNumberWidth()
 	body := theme.Highlight(m.currentPath(), clip(l.Text, max(width-m.gutter(), 0)))
 	gutter := theme.LineNumber().Render(fmt.Sprintf("%*s %*s", fw, old, fw, num)) +
@@ -512,26 +499,18 @@ func (m Model) currentPath() string {
 }
 
 // lineNumbers is a line's old and new numbers, blank on the side the line
-// does not exist on, and the plain, uncoloured +/- marker between them.
-func lineNumbers(l domain.DiffLine) (old, marker, num string) {
+// does not exist on.
+func lineNumbers(l domain.DiffLine) (old, num string) {
 	if l.OldLine > 0 {
 		old = strconv.Itoa(l.OldLine)
 	}
 	if l.NewLine > 0 {
 		num = strconv.Itoa(l.NewLine)
 	}
-	switch l.Kind {
-	case domain.LineAdded:
-		marker = "+"
-	case domain.LineRemoved:
-		marker = "-"
-	default:
-		marker = " "
-	}
-	return old, marker, num
+	return old, num
 }
 
-// markerStyle colours the +/- marker for a line that is not the cursor row.
+// markerStyle colours the +/- marker.
 func markerStyle(k domain.DiffLineKind) string {
 	switch k {
 	case domain.LineAdded:
@@ -544,9 +523,9 @@ func markerStyle(k domain.DiffLineKind) string {
 }
 
 // tabWidth is how many columns expandTabs turns a tab into. It matches
-// lipgloss's own default, so a row that goes through Style.Render (the
-// cursor row) and one that does not (chroma's formatter, which leaves a
-// tab as a literal byte) measure the same either way.
+// lipgloss's own default, so a row that goes through Style.Render and one
+// that does not (chroma's formatter, which leaves a tab as a literal byte)
+// measure the same either way.
 const tabWidth = 4
 
 // expandTabs replaces a literal tab with spaces. A raw tab has no fixed
