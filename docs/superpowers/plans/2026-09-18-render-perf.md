@@ -65,7 +65,7 @@
 - Create: `internal/app/presentation/tui/checks/bench_test.go`
 - Modify: `internal/app/presentation/tui/theme/theme_test.go`（末尾に追記）
 
-- [ ] **Step 1: theme のベンチを書く**
+- [x] **Step 1: theme のベンチを書く**
 
 `internal/app/presentation/tui/theme/theme_test.go` の末尾に追記する。このファイルは `package theme_test`（外部テストパッケージ）なので、`theme.` を付けて呼ぶ。
 
@@ -96,7 +96,7 @@ func BenchmarkHighlightUnknownExt(b *testing.B) {
 }
 ```
 
-- [ ] **Step 2: diff のベンチを書く**
+- [x] **Step 2: diff のベンチを書く**
 
 `internal/app/presentation/tui/diff/bench_test.go` を新規作成する。`goldenModel` と `fixture` は既存のテストヘルパ（`golden_test.go` / `diff_test.go`）にある。
 
@@ -119,7 +119,7 @@ func BenchmarkView(b *testing.B) {
 }
 ```
 
-- [ ] **Step 3: checks のベンチを書く**
+- [x] **Step 3: checks のベンチを書く**
 
 `internal/app/presentation/tui/checks/bench_test.go` を新規作成する。`goldenModel` は `golden_test.go` にある。5 万行は、長い Actions のジョブログの現実的な上限。
 
@@ -178,7 +178,7 @@ func BenchmarkMoveRowHugeLog(b *testing.B) {
 }
 ```
 
-- [ ] **Step 4: 走らせて現状値を記録する**
+- [x] **Step 4: 走らせて現状値を記録する**
 
 ```bash
 go test ./internal/app/presentation/tui/theme/ -bench=Highlight -run=XXX -benchtime=300x
@@ -190,7 +190,7 @@ go test ./internal/app/presentation/tui/checks/ -bench=HugeLog -run=XXX -benchti
 
 `logArrived` が `msg.jobID != m.selectedJob()` でログを捨てる作りなので、`keyPress("enter")` を先に送ってカーソル位置のジョブを確定させている。もし `m.log` が空のままベンチが数 μs で終わったら、それはログが捨てられている。`m.selectedJob()` が空でないかを確認すること。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 git add internal/app/presentation/tui/theme/theme_test.go internal/app/presentation/tui/diff/bench_test.go internal/app/presentation/tui/checks/bench_test.go
@@ -205,9 +205,15 @@ git commit -m "test(perf): measure what one frame of the diff and the log cost"
 - Modify: `internal/app/presentation/tui/theme/theme.go`（`Highlight` とその手前）
 - Modify: `internal/app/presentation/tui/theme/theme_test.go`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `theme_test.go` に追記する。ここも `package theme_test` なので `theme.` を付ける。キャッシュは外から見えないので、**キャッシュしてはいけないものがキャッシュされていないこと**を固定する。これが壊れると画面の配色が背景に追従しなくなる。
+
+**実施時の訂正（406c3f0）:** 下の `TestHighlightFollowsBackground` は、既にあった
+`TestHighlightFollowsTheBackground` と同じことを検証していた。計画を書いた時点で既存テストを
+見落としていた。追加したうえで削除し、既存のものを残してある。残ったのは
+`TestHighlightUnknownExtension` だけで、こちらは既存の `TestHighlightLeavesUnknownFilesAlone`
+とは別物である（別のパスを引いた直後に、一致しないパスを繰り返し引く経路を見ている）。
 
 ```go
 // TestHighlightFollowsBackground locks the boundary of the lexer cache:
@@ -244,7 +250,7 @@ func TestHighlightUnknownExtension(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 走らせて、現状では通ることを確かめる**
+- [x] **Step 2: 走らせて、現状では通ることを確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight(FollowsBackground|UnknownExtension)' -v
@@ -252,7 +258,7 @@ go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight(FollowsBackgr
 
 期待: 両方 PASS。**これは回帰テストなので、今 PASS するのが正しい。** Step 3 の変更でここが FAIL したら、キャッシュの範囲を間違えている。
 
-- [ ] **Step 3: キャッシュを入れる**
+- [x] **Step 3: キャッシュを入れる**
 
 `theme.go` の import に `"github.com/alecthomas/chroma/v2"` を足す。
 
@@ -302,7 +308,7 @@ func Highlight(path, code string) string {
 
 `mu` は使わない。`sync.Map` は自前で同期する。
 
-- [ ] **Step 4: テストとベンチを走らせる**
+- [x] **Step 4: テストとベンチを走らせる**
 
 ```bash
 go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight' -v
@@ -313,10 +319,13 @@ go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=10
 期待:
 - テストは全 PASS（`TestHighlightFollowsBackground` が落ちたら、配色までキャッシュしている）
 - `BenchmarkHighlightScreen` が **16 ms/op 未満**（80 ms → 6〜7 ms のはず）
-- `BenchmarkHighlightUnknownExt` が **1 μs 未満**（キャッシュされた miss が返るだけ）
+- `BenchmarkHighlightUnknownExt` が **10 μs 未満**。キャッシュされた miss 自体は約 10 ns だが、
+  この `-benchtime=300x` には初回の実 miss（約 2 ms）が 1 回だけ含まれ、300 で割った約 7 μs が
+  平均に乗る。実測 8.0 μs。**計画時に書いた「1 μs 未満」は、この初回ぶんを数え忘れていた。**
+  キャッシュが効いていることを直接見たいなら `-benchtime=10000x` で約 10 ns/op に収束する
 - `BenchmarkViewHugeLog` は変わらない（ログ側は別の原因）
 
-- [ ] **Step 5: 見た目が変わっていないことをゴールデンで確かめる**
+- [x] **Step 5: 見た目が変わっていないことをゴールデンで確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -run TestGolden
@@ -324,7 +333,7 @@ go test ./internal/app/presentation/tui/diff/ -run TestGolden
 
 期待: PASS。**`-update` を付けない。** ここでゴールデンが落ちるなら色か桁が動いているので、更新ではなく原因を直す。
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 git add internal/app/presentation/tui/theme/theme.go internal/app/presentation/tui/theme/theme_test.go
@@ -340,7 +349,7 @@ git commit -m "perf(theme): look a path's lexer up once instead of once a row"
 - Modify: `internal/app/presentation/tui/checks/log.go`（`logArrived` と `clearLog`）
 - Modify: `internal/app/presentation/tui/checks/render.go:323`（`logRows`）
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `internal/app/presentation/tui/checks/log_test.go` を新規作成する（今は無い）。冒頭は `package checks` と `import "testing"` だけでよい。`goldenModel` / `keyPress` / `goldenLog` は既存のテストヘルパにある。
 
@@ -384,7 +393,7 @@ func TestLogRowsBuiltOnce(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 走らせて失敗を確かめる**
+- [x] **Step 2: 走らせて失敗を確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/checks/ -run 'TestLogLinesClearedWithLog|TestLogRowsBuiltOnce' -v
@@ -392,7 +401,7 @@ go test ./internal/app/presentation/tui/checks/ -run 'TestLogLinesClearedWithLog
 
 期待: `TestLogRowsBuiltOnce` が `logRows built the rows a second time` で FAIL。`TestLogLinesClearedWithLog` は PASS（`clearLog` が `m.log` を捨てるので今も通る。Step 3 で壊さないための回帰テスト）。
 
-- [ ] **Step 3: Model に組んだ行を持たせる**
+- [x] **Step 3: Model に組んだ行を持たせる**
 
 `checks.go` の `log` フィールドのコメントブロックに続けて足す。
 
@@ -422,7 +431,7 @@ go test ./internal/app/presentation/tui/checks/ -run 'TestLogLinesClearedWithLog
 	m.logJob = ""
 ```
 
-- [ ] **Step 4: `logRows` を組む側と返す側に分ける**
+- [x] **Step 4: `logRows` を組む側と返す側に分ける**
 
 `render.go` の `logRows` を差し替える。ローディング中と空表示は毎フレームのままにする（スピナーのコマは 1 フレームごとに進み、空表示の文言は `failedOnly` と選択中のジョブで変わる）。
 
@@ -474,7 +483,7 @@ func buildLogLines(log []domain.LogLine) []string {
 
 `render.go` の import から使わなくなったものが出たら消す（`domain` は `buildLogLines` の引数で使い続けるので残る）。
 
-- [ ] **Step 5: テストを走らせる**
+- [x] **Step 5: テストを走らせる**
 
 ```bash
 go test ./internal/app/presentation/tui/checks/ -run 'TestLog' -v
@@ -483,7 +492,7 @@ go test ./internal/app/presentation/tui/checks/ -run TestGolden
 
 期待: すべて PASS。ゴールデンは `-update` を付けずに通ること。
 
-- [ ] **Step 6: ベンチで効いたことを確かめる**
+- [x] **Step 6: ベンチで効いたことを確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/checks/ -bench=HugeLog -run=XXX -benchtime=100x
@@ -491,7 +500,7 @@ go test ./internal/app/presentation/tui/checks/ -bench=HugeLog -run=XXX -benchti
 
 期待: `BenchmarkViewHugeLog` と `BenchmarkMoveRowHugeLog` がどちらも **16 ms/op 未満**。Task 1 で控えた値と比べて桁で落ちていること。落ちていないなら、`logRows` のどこかがまだ全行を触っている。
 
-- [ ] **Step 7: コミット**
+- [x] **Step 7: コミット**
 
 ```bash
 git add internal/app/presentation/tui/checks/checks.go internal/app/presentation/tui/checks/log.go internal/app/presentation/tui/checks/render.go internal/app/presentation/tui/checks/log_test.go
@@ -502,7 +511,7 @@ git commit -m "perf(checks): build a job log's rows when it arrives, not every f
 
 ### Task 4: 全体の検査と、実機での確認
 
-- [ ] **Step 1: `make check` を通す**
+- [x] **Step 1: `make check` を通す**
 
 ```bash
 make check
@@ -510,7 +519,7 @@ make check
 
 期待: tidy / lint / fmt / test すべて PASS。`sync.Map` に `//nolint` は要らない。もし lint が出たら `.claude/rules/go-style.md` の順（指摘どおり直す → 設計を変える → 設定を直す）に従う。
 
-- [ ] **Step 2: 実際に起動して diff を見る**
+- [x] **Step 2: 実際に起動して diff を見る**
 
 `.claude/rules` と CLAUDE.md は、TUI の変更をテストだけで完了としない。
 
@@ -524,7 +533,7 @@ go run ./cmd/octoscope --repo kukv/octoscope
 - スクロールが引っかからない
 - 未知の拡張子のファイル（`.md`、`.yaml` でないもの）でも崩れない
 
-- [ ] **Step 3: 日本語でも見る**
+- [x] **Step 3: 日本語でも見る**
 
 ```bash
 go run ./cmd/octoscope --repo kukv/octoscope --lang ja
@@ -532,10 +541,10 @@ go run ./cmd/octoscope --repo kukv/octoscope --lang ja
 
 全角は 1 文字で 2 桁使う。日本語コメントを含む diff 行で桁がずれていないことを見る。
 
-- [ ] **Step 4: Actions のログを見る**
+- [x] **Step 4: Actions のログを見る**
 
 同じ起動から checks ビュー（`c`）を開き、失敗したジョブで `enter`、続けて `L` を押して全ステップのログを出す。`j` を押しっぱなしにしてスクロールし、引っかからないこと、ステップ見出しが正しい位置にあること、`h` / `l` の横スクロールが効くことを見る。
 
-- [ ] **Step 5: 見たものを報告する**
+- [x] **Step 5: 見たものを報告する**
 
 何を開いて何を確認したかを、PR の説明に書く。「テストが通った」は TUI の完了条件ではない。
