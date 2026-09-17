@@ -9,6 +9,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -50,7 +51,7 @@ func (m Model) drawer() []string {
 			r = right[row]
 		}
 		lines = append(lines, strings.TrimRight(
-			fit(l, leftWidth)+strings.Repeat(" ", drawerGap)+fit(r, rightWidth), " "))
+			layout.Fill(l, leftWidth)+strings.Repeat(" ", drawerGap)+layout.Fill(r, rightWidth), " "))
 	}
 	return lines
 }
