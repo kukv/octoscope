@@ -9,7 +9,7 @@
 - **行番号の桁数:** `lineNumberWidth()` は全 `m.rows` を走査して `strconv.Itoa` を 2 回ずつ呼ぶ。これが 1 行描くたびに **2 回** 呼ばれる（`diffTextLine` の直接呼び出しと、同じ行の `m.gutter()` 経由）。5,000 行のファイルを 50 行の画面に描くと 50 万回。答えは `m.rows` が変わるまで変わらないので、`buildRows` と同時に 1 回数えて Model に持つ。
 - **サイドバー:** `sidebarLines()` は `fileTop` から**全ファイル末尾まで**行を作り、1 ファイルにつき lipgloss の `Render` を 3〜4 回呼ぶ。中で呼ぶ `threadCount` はスレッド全件を走査するので、実質 O(ファイル数 × スレッド数)。`body` は `paneHeight` 行しか使わないので、そこで打ち切る。
 
-前の計画で学んだこと（`logLines` が `log` と食い違いうる問題）をそのまま適用する: **導出値と元データは、同じ 1 箇所で更新する。** `m.rows = m.buildRows()` が 5 箇所に散っているので、行と桁数を一緒に入れ替える 1 つのメソッドに畳む。
+前の計画で学んだこと（`logLines` が `log` と食い違いうる問題）をそのまま適用する: **導出値と元データは、同じ 1 箇所で更新する。** `m.rows = m.buildRows()` が 5 箇所（`diff.go` に 4 つ、`mouse.go` に 1 つ）に散っているので、行と桁数を一緒に入れ替える 1 つのメソッドに畳む。
 
 **Tech Stack:** Go / Bubble Tea v2 (`charm.land/bubbletea/v2`) / `internal/golden` によるゴールデンテスト / `go test -bench`
 
@@ -34,7 +34,7 @@
 
 | ファイル | 役割 | 変更 |
 |---|---|---|
-| `internal/app/presentation/tui/diff/diff.go` | Model と行の組み立て | `numWidth` フィールドを追加、`m.rows = m.buildRows()` の 5 箇所を 1 メソッドに畳む |
+| `internal/app/presentation/tui/diff/diff.go` | Model と行の組み立て | `numWidth` フィールドを追加、`m.rows = m.buildRows()` の 4 箇所を 1 メソッドに畳む |
 | `internal/app/presentation/tui/diff/render.go` | 描画 | `lineNumberWidth` が保持した値を返す、`sidebarLines` を画面の高さで打ち切る |
 | `internal/app/presentation/tui/diff/mouse.go` | マウスの当たり判定 | `m.rows = m.buildRows()` の 1 箇所を同じメソッドに置き換える |
 | `internal/app/presentation/tui/diff/bench_test.go` | ベンチ | 大きな入力のベンチを 1 本追加 |
@@ -249,7 +249,7 @@ func countLineNumberWidth(rows []row) int {
 `countLineNumberWidth` を `diff.go` に置くので、`diff.go` の import に `"strconv"` を足す
 （今は入っていない）。
 
-`m.rows = m.buildRows()` と書いてある**全 6 箇所**を `m = m.withRows()` に置き換える。`diff.go` に 5 箇所（現状 308・323・492・550 行付近）、`mouse.go` に 1 箇所（29 行付近）。置き換えたあと `grep -rn 'm.rows = m.buildRows()' internal/` が何も出ないことを確かめる。
+`m.rows = m.buildRows()` と書いてある**全 5 箇所**を `m = m.withRows()` に置き換える。`diff.go` に 4 箇所（現状 308・323・492・550 行付近）、`mouse.go` に 1 箇所（29 行付近）。置き換えたあと `grep -rn 'm.rows = m.buildRows()' internal/` が何も出ないことを確かめる。
 
 `render.go` の `lineNumberWidth` を、保持した値を返すだけにする。
 
@@ -378,7 +378,14 @@ go test ./internal/app/presentation/tui/diff/ -run TestMouse -v
 go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=100x
 ```
 
-期待: `BenchmarkViewHugeDiff` が **16 ms/op 未満**、かつ `BenchmarkView`（小さい fixture）と同じオーダーに入っていること。同じオーダーに入っていれば「行数にもファイル数にも比例しない」が達成できている。届かないなら、まだどこかが総量を触っている。
+期待: `BenchmarkViewHugeDiff` が **5 ms/op 未満**。
+
+**当初の合否条件（`BenchmarkView` と同じオーダー）は誤りだった。** Task 2 のあとに取った
+プロファイルで、残り 6.27 ms のうち 4.7 ms が `theme.Highlight`（画面に出る約 36 行ぶん）で、
+これは PR の大きさに比例しない固定費だと分かった。サイドバーぶんは 1.5 ms なので、この Task で
+届くのは約 4.7 ms である。**総量比例のコストが消えたことの確認は数字の絶対値ではなく、
+`hugeModel` のファイル数を 300 から 1000 に増やしても `BenchmarkViewHugeDiff` がほとんど
+変わらないことで行う**（ベンチを書き換えるのではなく、手元で一時的に数字を変えて確かめる）。
 
 - [ ] **Step 6: コミット**
 
@@ -388,6 +395,36 @@ git commit -m "perf(diff): draw the file list only as far as the pane goes"
 ```
 
 ---
+
+## 見つかった 3 番目のコスト（この計画では直さない）
+
+Task 2 のあとのプロファイル（`BenchmarkViewHugeDiff` = 6.27 ms、Apple M5）の内訳:
+
+| 箇所 | ms/op | 形 |
+|---|---|---|
+| `theme.Highlight`（画面に出る約 36 行） | 4.7 | 総量比例ではない |
+| ├ chroma の style → エスケープ列の生成 | 2.8 | 1 回の `Format` ごとに固定 |
+| └ レキシング（regexp2） | 1.5 | 行の長さに比例 |
+| `sidebarLines` | 1.5 | 総量比例（Task 3 が消す） |
+
+chroma の `indexedTTYFormatter.Format` は、呼ばれるたびにスタイルの全トークン型（Go で 80 前後）
+について 256 色テーブルを線形走査して最も近い色を探す。1 行あたり最大 80 × 2 × 256 回の色距離計算を、
+**その行の中身と無関係に**払っている。行ごとに `Format` を呼んでいるので、1 フレームで 36 回。
+
+これを外すと約 2.2 ms まで落ちる見込みで、36 行を色付きで描く還元不能な床は約 2.1 ms。
+ただし素直な直し方が無い。`styleToEscapeSequence` も `indexedTTYFormatter` も chroma の
+非公開シンボルなので、`theme` 側で「エスケープ列を 1 回だけ作るフォーマッタ」を差し込むことは
+できない。取りうるのは次のどちらかで、どちらも `theme.Highlight` のシグネチャを
+1 行から複数行へ変える話になる。
+
+- 画面に出る行を連結して `Highlight` を 1 回だけ呼ぶ — 行をまたぐレキサ状態（ブロックコメント、
+  複数行文字列）が変わるので**見た目が変わる**。ゴールデンが動く
+- 行ごとの `Tokenise` はそのままに、トークン列を連結して `Format` を 1 回だけ呼ぶ —
+  行ごとのレキシングが保たれるので出力は変わらないはずだが、`theme` と `diff` の
+  描画ループの両方を組み替える必要がある
+
+**この計画の範囲外とする。** 形が違う（総量比例ではない）うえ、公開 API の変更を伴うので、
+やるなら設計から起こす。
 
 ### Task 4: 全体の検査と、実機での確認
 
