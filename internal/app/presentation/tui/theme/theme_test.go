@@ -212,11 +212,11 @@ func TestHighlightKeepsTheWidth(t *testing.T) {
 	}
 }
 
-// selectionBackground is the SGR sequence SelectedLine opens the line with.
+// openingBackground is the SGR sequence a line drawn by fillLine opens with.
 // The test reads it out of the output rather than naming a colour: which
-// colour the selection uses is theme's business and may change, but whatever
-// it is must come back after every reset.
-func selectionBackground(t *testing.T, line string) string {
+// colour a fill uses is theme's business and may change, but whatever it is
+// must come back after every reset.
+func openingBackground(t *testing.T, line string) string {
 	t.Helper()
 	if !strings.HasPrefix(line, "\x1b[") {
 		t.Fatalf("the line does not open with a style: %q", line)
@@ -235,7 +235,7 @@ func TestSelectedLineCarriesTheBackgroundPastALipglossReset(t *testing.T) {
 	dark(t)
 
 	line := theme.SelectedLine(theme.Dim().Render("x") + "y")
-	bg := selectionBackground(t, line)
+	bg := openingBackground(t, line)
 
 	if n := strings.Count(line, ansi.ResetStyle+bg); n != 1 {
 		t.Errorf("the background is restored %d times after a lipgloss reset, want 1: %q", n, line)
@@ -253,7 +253,7 @@ func TestSelectedLineCarriesTheBackgroundPastAChromaReset(t *testing.T) {
 	dark(t)
 
 	line := theme.SelectedLine("a\x1b[0mb")
-	bg := selectionBackground(t, line)
+	bg := openingBackground(t, line)
 
 	if !strings.Contains(line, "\x1b[0m"+bg) {
 		t.Errorf("the background is not restored after a chroma reset: %q", line)
@@ -268,7 +268,7 @@ func TestSelectedLineKeepsASpanWithItsOwnBackground(t *testing.T) {
 
 	chip := theme.Badge("d73a4a").Render(" bug ")
 	line := theme.SelectedLine("title " + chip)
-	bg := selectionBackground(t, line)
+	bg := openingBackground(t, line)
 
 	if !strings.Contains(line, "48;2;215;58;74") {
 		t.Errorf("the label lost the colour GitHub gave it: %q", line)
@@ -279,7 +279,7 @@ func TestSelectedLineKeepsASpanWithItsOwnBackground(t *testing.T) {
 }
 
 // TestSelectedLineFollowsTheBackground guards the light variant of the
-// selection colour: selectionBackground reads whatever SelectedLine opens
+// selection colour: openingBackground reads whatever SelectedLine opens
 // with rather than naming a colour, so a mistyped light hex would still pass
 // the other tests above.
 func TestSelectedLineFollowsTheBackground(t *testing.T) {
@@ -292,5 +292,99 @@ func TestSelectedLineFollowsTheBackground(t *testing.T) {
 
 	if onDark == onLight {
 		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
+	}
+}
+
+// TestDiffLineCarriesTheBackgroundPastAChromaReset is the same guarantee
+// SelectedLine has, for the second colour that now uses the same mechanism:
+// a diff line is full of chroma's resets, and each one would end the tint.
+func TestDiffLineCarriesTheBackgroundPastAChromaReset(t *testing.T) {
+	dark(t)
+
+	line := theme.DiffLine(domain.LineAdded, "a\x1b[0mb")
+	bg := openingBackground(t, line)
+
+	if !strings.Contains(line, "\x1b[0m"+bg) {
+		t.Errorf("the background is not restored after a chroma reset: %q", line)
+	}
+	if !strings.HasSuffix(line, ansi.ResetStyle) {
+		t.Errorf("the line does not close with a reset: %q", line)
+	}
+}
+
+// TestDiffLineCarriesTheBackgroundPastALipglossReset covers the other reset
+// the drawing produces: a line chroma has no lexer for still goes through
+// lipgloss styles around it.
+func TestDiffLineCarriesTheBackgroundPastALipglossReset(t *testing.T) {
+	dark(t)
+
+	line := theme.DiffLine(domain.LineRemoved, theme.Dim().Render("x")+"y")
+	bg := openingBackground(t, line)
+
+	if n := strings.Count(line, ansi.ResetStyle+bg); n != 1 {
+		t.Errorf("the background is restored %d times after a lipgloss reset, want 1: %q", n, line)
+	}
+}
+
+// TestDiffLineLeavesAContextLineAlone guards the third kind: an unchanged
+// line is the majority of a diff and must stay as cheap and as plain as it
+// is today.
+func TestDiffLineLeavesAContextLineAlone(t *testing.T) {
+	dark(t)
+
+	if got := theme.DiffLine(domain.LineContext, "x"); got != "x" {
+		t.Errorf("a context line was styled: %q", got)
+	}
+}
+
+// TestDiffLineSeparatesAddedFromRemoved is what the whole change is for:
+// the two states must not land on the same colour. Checked on both
+// backgrounds, since dark and light each name their own pair of hexes and a
+// typo in either pair would only show up on that one background.
+func TestDiffLineSeparatesAddedFromRemoved(t *testing.T) {
+	dark(t)
+
+	for _, tc := range []struct {
+		name string
+		dark bool
+	}{
+		{"dark", true},
+		{"light", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			theme.SetDark(tc.dark)
+			added := theme.DiffLine(domain.LineAdded, "x")
+			removed := theme.DiffLine(domain.LineRemoved, "x")
+			if openingBackground(t, added) == openingBackground(t, removed) {
+				t.Errorf("added and removed lines share a background: %q", added)
+			}
+		})
+	}
+}
+
+// TestDiffLineFollowsTheBackground guards the light variants the way
+// TestSelectedLineFollowsTheBackground guards the selection's: a mistyped
+// light hex would pass every test above. Checked for both kinds, since added
+// and removed each carry their own pair of hexes.
+func TestDiffLineFollowsTheBackground(t *testing.T) {
+	dark(t)
+
+	for _, tc := range []struct {
+		name string
+		kind domain.DiffLineKind
+	}{
+		{"added", domain.LineAdded},
+		{"removed", domain.LineRemoved},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			theme.SetDark(true)
+			onDark := theme.DiffLine(tc.kind, "x")
+			theme.SetDark(false)
+			onLight := theme.DiffLine(tc.kind, "x")
+
+			if onDark == onLight {
+				t.Errorf("the same colour is used on both backgrounds: %q", onDark)
+			}
+		})
 	}
 }

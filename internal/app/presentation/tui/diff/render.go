@@ -412,16 +412,25 @@ func (m Model) diffLines() []string {
 	return lines
 }
 
-// diffLine draws one row of the diff pane. The selected row is drawn exactly
+// diffLine draws one row of the diff pane. The cursor row is drawn exactly
 // as an unselected one and then filled by theme.SelectedLine, which carries
-// the fill past the resets that lipgloss and chroma leave behind. The cursor
-// row keeps its syntax highlighting and its +/- colours.
+// the fill past the resets that lipgloss and chroma leave behind; an added
+// or removed row elsewhere is filled the same way in its own colour. The
+// two never stack: a row carrying the added fill and then wrapped in the
+// selection's would keep the added background, since a background is not a
+// reset for the selection's fill to carry past, so the cursor wins outright.
 func (m Model) diffLine(r row, selected bool, width int) string {
 	line := m.styledLine(r, width)
-	if selected {
+	switch {
+	case selected:
 		return theme.SelectedLine(layout.Fill(line, width))
+	case r.kind == rowLine && r.line.Kind != domain.LineContext:
+		// layout.Fill is needed here for the same reason it is above: a
+		// background lands only on columns that have a character in them.
+		return theme.DiffLine(r.line.Kind, layout.Fill(line, width))
+	default:
+		return line
 	}
-	return line
 }
 
 // styledLine is one row in its own colours, whether or not the cursor is on

@@ -539,6 +539,86 @@ func TestTheSidebarScrollsToKeepTheSelectionVisible(t *testing.T) {
 	}
 }
 
+// openingStyle is the SGR sequence a filled row opens with. The test reads
+// it out of the output rather than naming a colour: which colour is theme's
+// business (.claude/rules/tui.md).
+func openingStyle(t *testing.T, line string) string {
+	t.Helper()
+	if !strings.HasPrefix(line, "\x1b[") {
+		t.Fatalf("the line does not open with a style: %q", line)
+	}
+	end := strings.IndexByte(line, 'm')
+	if end < 0 {
+		t.Fatalf("the opening style is unterminated: %q", line)
+	}
+	return line[:end+1]
+}
+
+// rowOfLineKind is the first row of the current file holding a line of the
+// kind asked for. It fails rather than returning nothing, so a fixture that
+// stops covering a kind is a failure and not a silently empty test.
+func rowOfLineKind(t *testing.T, m Model, k domain.DiffLineKind) row {
+	t.Helper()
+	for _, r := range m.rows {
+		if r.kind == rowLine && r.line.Kind == k {
+			return r
+		}
+	}
+	t.Fatalf("the fixture has no line of kind %v", k)
+	return row{}
+}
+
+// TestAddedAndRemovedLinesAreFilled is the point of the change: the two
+// states are told apart by the whole row, not by the marker column alone.
+func TestAddedAndRemovedLinesAreFilled(t *testing.T) {
+	m := goldenModel(120)
+
+	added := m.diffLine(rowOfLineKind(t, m, domain.LineAdded), false, 80)
+	removed := m.diffLine(rowOfLineKind(t, m, domain.LineRemoved), false, 80)
+
+	addedStyle, removedStyle := openingStyle(t, added), openingStyle(t, removed)
+	if addedStyle == removedStyle {
+		t.Errorf("an added and a removed line are filled the same: %q", added)
+	}
+	if !strings.HasPrefix(addedStyle, "\x1b[48;") {
+		t.Errorf("an added line does not open with a background: %q", added)
+	}
+	if !strings.HasPrefix(removedStyle, "\x1b[48;") {
+		t.Errorf("a removed line does not open with a background: %q", removed)
+	}
+}
+
+// TestAContextLineIsNotFilled guards the majority of a diff: an unchanged
+// line keeps no background of its own, or the fill would say nothing.
+func TestAContextLineIsNotFilled(t *testing.T) {
+	m := goldenModel(120)
+
+	line := m.diffLine(rowOfLineKind(t, m, domain.LineContext), false, 80)
+	if strings.Contains(line, "\x1b[48;") {
+		t.Errorf("a context line carries a background: %q", line)
+	}
+}
+
+// TestTheCursorWinsOverTheFill is the one interaction the two fills have.
+// Tinting a row and then wrapping it in SelectedLine would leave the tint's
+// own background in the line, re-asserted after every reset the selection's
+// fill carries past, and the cursor row would come out in the tint's colour
+// with the selection nowhere on it.
+func TestTheCursorWinsOverTheFill(t *testing.T) {
+	m := goldenModel(120)
+	added := rowOfLineKind(t, m, domain.LineAdded)
+
+	tint := openingStyle(t, m.diffLine(added, false, 80))
+	selected := m.diffLine(added, true, 80)
+
+	if strings.Contains(selected, tint) {
+		t.Errorf("the cursor row still carries the added line's fill: %q", selected)
+	}
+	if openingStyle(t, selected) == tint {
+		t.Errorf("the cursor row opens with the added line's fill: %q", selected)
+	}
+}
+
 // TestEveryStateNamesItself catches a state dropped from String: every
 // assertion in this package reports mode and phase with %v, and an unnamed
 // one is printed as a number nobody can read.
