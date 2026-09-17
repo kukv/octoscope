@@ -64,6 +64,15 @@ type MergeContext struct {
 	AutoMergeAllowed         bool
 	ViewerCanEnableAutoMerge bool
 	AutoMergeEnabled         bool
+
+	// ViewerIsAdmin is what keeps the popup from offering a key that fails.
+	// The mutation that merges takes no admin input -- gh pr merge --admin
+	// sends the same one -- so nothing in the answer to the merge itself
+	// says whether this viewer may push past a rule. GitHub's own
+	// viewerCanMergeAsAdmin reads classic branch protection only and answers
+	// false under a ruleset, so the gateway fills this from the repository
+	// permission instead.
+	ViewerIsAdmin bool
 }
 
 // Block says why merging is refused. Draft comes first: GitHub reports a
@@ -91,4 +100,19 @@ func (c MergeContext) Block() MergeBlock {
 // for, so it wants an ordinary merge instead.
 func (c MergeContext) CanAutoMerge() bool {
 	return c.AutoMergeAllowed && c.ViewerCanEnableAutoMerge && c.State != MergeStateClean
+}
+
+// CanMergeAsAdmin reports whether the viewer can push the merge through what
+// is holding it. Only two blocks give way, the same two gh's --admin silences.
+// A draft or a conflict is not a rule to bypass: it is work that is not
+// finished, and no permission finishes it.
+func (c MergeContext) CanMergeAsAdmin() bool {
+	if !c.ViewerIsAdmin {
+		return false
+	}
+	switch c.Block() {
+	case BlockProtected, BlockBehind:
+		return true
+	}
+	return false
 }
