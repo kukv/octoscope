@@ -293,7 +293,7 @@ func (m Model) filesHeadingLine() string {
 	if !m.showSidebar() {
 		return theme.Rule().Render(strings.Repeat("─", m.width))
 	}
-	left := fit(theme.Heading().Render(i18n.T("diff.files")), sidebarWidth)
+	left := layout.Fill(theme.Heading().Render(i18n.T("diff.files")), sidebarWidth)
 	div := theme.Rule().Render("│")
 	rest := max(m.width-sidebarWidth-ansi.StringWidth(div), 0)
 	return left + div + theme.Rule().Render(strings.Repeat("─", rest))
@@ -337,7 +337,7 @@ func (m Model) body() []string {
 		if i < len(pane) {
 			right = pane[i]
 		}
-		lines[i] = fit(left, sidebarWidth) + div + right
+		lines[i] = layout.Fill(left, sidebarWidth) + div + right
 	}
 	return lines
 }
@@ -368,8 +368,8 @@ func (m Model) sidebarLines() []string {
 		selected := i == m.file && m.sidebar
 		if selected {
 			lines = append(lines,
-				theme.Selected().Render(fit(path, sidebarWidth)),
-				theme.Selected().Render(fit(plainRow, sidebarWidth)))
+				theme.Selected().Render(layout.Fill(path, sidebarWidth)),
+				theme.Selected().Render(layout.Fill(plainRow, sidebarWidth)))
 			continue
 		}
 		size := theme.Added().Render("+"+strconv.Itoa(f.Additions)) +
@@ -422,7 +422,7 @@ func (m Model) diffLines() []string {
 // would otherwise break.
 func (m Model) diffLine(r row, selected bool, width int) string {
 	if selected {
-		return theme.Selected().Render(fit(m.plainText(r), width))
+		return theme.Selected().Render(layout.Fill(m.plainText(r), width))
 	}
 	switch r.kind {
 	case rowHunkHeader:
@@ -568,9 +568,3 @@ func singleLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 // clip cuts s to w display columns. Japanese takes two columns per
 // character, so the count is never a byte or a rune count.
 func clip(s string, w int) string { return ansi.Truncate(s, w, "…") }
-
-// fit clips s and pads it out to exactly w display columns.
-func fit(s string, w int) string {
-	s = clip(s, w)
-	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
-}

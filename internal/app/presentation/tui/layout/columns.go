@@ -17,6 +17,14 @@ func Pad(s string, w int) string {
 	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
 }
 
+// Fill clips s to w display columns and pads it out to exactly w. Unlike Pad
+// it does not keep a column back: it is for a line that occupies the whole
+// width rather than for a field that sits next to another one.
+func Fill(s string, w int) string {
+	s = Clip(s, w)
+	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
+}
+
 // Right pads s on the left instead, so a column of ages ends flush.
 func Right(s string, w int) string {
 	s = Clip(s, w)
