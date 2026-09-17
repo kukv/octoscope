@@ -90,83 +90,18 @@ func commentLines(c domain.Comment, w int) []string {
 	return lines
 }
 
-// markdownLines renders one block of GitHub markdown to w columns, except for
-// its tables, which are left as they were written.
+// markdownLines renders one block of GitHub markdown to w columns.
 //
-// glamour draws a table as a box and stretches its columns to the full width,
-// so three short cells become three wide ones ruled with the same glyph that
-// separates the panes. The pipes the author typed are narrower, and they are
-// what the author was looking at.
+// The document margin is turned off: glamour would indent every line by two
+// columns, which inside a comment would open a gap between the bar and the
+// text. The blank lines glamour puts around a document are dropped for the
+// same reason — a bar with nothing beside it reads as a break in the comment.
 func markdownLines(src string, w int) []string {
 	// A GitHub body carries whatever line endings its author used. A stray
 	// carriage return inside a drawn line sends the cursor back to the start
 	// of it, which shifts everything after it sideways.
-	lines := strings.Split(strings.ReplaceAll(src, "\r", ""), "\n")
+	src = strings.ReplaceAll(src, "\r", "")
 
-	var out, prose []string
-	flush := func() {
-		if len(prose) == 0 {
-			return
-		}
-		out = appendBlock(out, renderMarkdown(strings.Join(prose, "\n"), w))
-		prose = nil
-	}
-	for i := 0; i < len(lines); {
-		n := tableAt(lines, i)
-		if n == 0 {
-			prose = append(prose, lines[i])
-			i++
-			continue
-		}
-		flush()
-		out = appendBlock(out, lines[i:i+n])
-		i += n
-	}
-	flush()
-	return trimBlankEdges(out)
-}
-
-// appendBlock puts a blank line between two blocks. Each is trimmed of its own
-// blank edges, so without one a table would sit flush against the paragraph
-// that introduces it.
-func appendBlock(out, block []string) []string {
-	block = trimBlankEdges(block)
-	if len(block) == 0 {
-		return out
-	}
-	if len(out) > 0 {
-		out = append(out, "")
-	}
-	return append(out, block...)
-}
-
-// tableAt reports how many lines from i form a table, or zero if none does. A
-// table is a row of cells followed by the dashes that separate them from the
-// body, which is what tells one apart from a line that merely has a pipe in it.
-func tableAt(lines []string, i int) int {
-	if i+1 >= len(lines) || !strings.Contains(lines[i], "|") || !isTableDivider(lines[i+1]) {
-		return 0
-	}
-	n := 2
-	for i+n < len(lines) && strings.Contains(lines[i+n], "|") {
-		n++
-	}
-	return n
-}
-
-// isTableDivider reports whether the line is the one under a table's headings:
-// pipes, dashes and the colons that set a column's alignment, and nothing else.
-func isTableDivider(line string) bool {
-	if !strings.Contains(line, "-") || !strings.Contains(line, "|") {
-		return false
-	}
-	return strings.TrimLeft(line, "|-: \t") == ""
-}
-
-// renderMarkdown is glamour with the document margin turned off: it would
-// indent every line by two columns, which inside a comment would open a gap
-// between the bar and the text.
-func renderMarkdown(src string, w int) []string {
 	// out starts as the source so that a renderer glamour will not build, or a
 	// document it will not render, still puts the author's words on the
 	// screen. Markdown is readable unrendered, and there is nowhere in a
@@ -182,7 +117,7 @@ func renderMarkdown(src string, w int) []string {
 			out = rendered
 		}
 	}
-	return strings.Split(out, "\n")
+	return trimBlankEdges(strings.Split(out, "\n"))
 }
 
 // trimBlankEdges drops the blank lines at either end of a rendered block.

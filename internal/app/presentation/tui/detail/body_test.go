@@ -87,45 +87,6 @@ func TestAnEmptyDescriptionSaysSo(t *testing.T) {
 	}
 }
 
-// TestATableKeepsThePipesItWasWrittenWith covers what glamour does to a table
-// that the reader did not ask for: it boxes the cells and stretches them to
-// the full width, so three short columns become three wide ones.
-func TestATableKeepsThePipesItWasWrittenWith(t *testing.T) {
-	it := fullPRItem()
-	it.Body = "before\n\n| 幅 | 列数 |\n|---|---|\n| 80 | 2 |\n\nafter"
-
-	lines := markdownLines(it.Body, 70)
-	text := ansi.Strip(strings.Join(lines, "\n"))
-
-	for _, want := range []string{"| 幅 | 列数 |", "|---|---|", "| 80 | 2 |"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("the table was redrawn rather than left alone; %q is missing:\n%s", want, text)
-		}
-	}
-	// The prose around it still goes through glamour, and a blank line still
-	// separates the three blocks.
-	for _, want := range []string{"before", "after"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("the prose around the table was lost; %q is missing:\n%s", want, text)
-		}
-	}
-	if strings.Contains(text, "┼") {
-		t.Errorf("the table was drawn as a box:\n%s", text)
-	}
-}
-
-// TestAPipeOnItsOwnIsNotATable keeps ordinary prose out of the passthrough: a
-// table is a row of cells with the dashes underneath, not any line with a pipe.
-func TestAPipeOnItsOwnIsNotATable(t *testing.T) {
-	src := "run `a | b` to pipe it"
-
-	text := ansi.Strip(strings.Join(markdownLines(src, 70), "\n"))
-
-	if !strings.Contains(text, "a | b") {
-		t.Errorf("the line was mangled:\n%s", text)
-	}
-}
-
 func TestTheBodyFitsItsWidth(t *testing.T) {
 	for _, l := range bodyLines(withComments(), 40) {
 		if w := ansi.StringWidth(l); w > 40 {
