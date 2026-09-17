@@ -579,8 +579,16 @@ func (m Model) rerunOption(scope domain.RerunScope, text string) string {
 		}
 ```
 
-`rerunOption` と `eventLine` は幅まで埋めない。**並んだ選択肢のうち 1 語を
-指すもので、行全体ではない。** 全幅に広げるとどれを選んでいるか読めなくなる。
+`rerunOption` と `eventLine` は幅まで埋めない。ただし**理由は 2 つで別である。**
+
+`eventLine` は `Comment  Approve  Request changes` を `strings.Join(parts, "  ")`
+で 1 行に並べる。埋めると隣の選択肢まで塗りつぶし、どれを選んでいるか読めなくなる。
+
+`rerunOption` は各選択肢がそれぞれ 1 行を占めるので「1 行の中の 1 語」ではない。
+それでも埋めないのは、この一覧が枠も列幅も持たない 2 行の確認メニューだからである。
+`m.width` まで埋めると、80〜160 桁の端末幅いっぱいに帯が走り、周りの素の
+テキストから浮く。`checkLine` が埋めるのは、あちらが列幅を持つペインの
+行そのものだからで、この差は意図的である。
 
 - [ ] **Step 1b: `Selected()` から期待値を組み立てているテストを直す**
 
@@ -861,6 +869,20 @@ Task 6 で `review/render.go` を移した時点で落ちる。Task 6 の中で
 - [ ] **Step 2: 消す**
 
 `theme/theme.go` から `Selected()` とその doc コメントを削除する。
+
+- [ ] **Step 2b: Task 7 で古くなったコメントを直す**
+
+`checks/render.go` の `checkLine` の doc コメントは、Diff のファイル一覧が
+カーソル行の色を捨てていたことを引き合いに出している。
+
+```go
+// ...once the log pane has focus the row it points at stays plain, the same
+// way the diff view's file list does.
+```
+
+Task 7 でその挙動は無くなったので、後半の比較は存在しないものを指している。
+「ログペインにフォーカスが移ったらこの行は素に戻る」という前半の事実だけを残し、
+Diff への参照を落とす。
 
 - [ ] **Step 3: ビルドが通ることを確かめる**
 
