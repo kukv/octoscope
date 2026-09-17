@@ -95,7 +95,7 @@ root は `openDetail` で `detail.New(m.src, ref).SetViewer(m.viewer)` と書く
 | GitHub | `internal/github/gql/viewer.go` + `viewer.graphql` | `Viewer(ctx) (string, error)` |
 | gateway | `internal/app/adapter/gateway/gh/backend.go` | `backend` interface に `Viewer` を足す。変換が要らないので promotion で通り、`gh` 側にメソッドは書かない |
 | usecase | `internal/app/usecase/usecase.go` | ポート `viewerFetcher` と、それを呼ぶ `Viewer(ctx)` |
-| root | `internal/app/presentation/tui/root/root.go` | `Source` に `detail.Source` 経由で `Viewer` が入る。`resolveViewer` / `viewerResolvedMsg` / `m.viewer` |
+| root | `internal/app/presentation/tui/root/root.go` | `Source` に `viewerNamer` を直接足して `Viewer` を持つ。`resolveViewer` / `viewerResolvedMsg` / `m.viewer` |
 | detail | `detail.go` | `Source` に `viewerFetcher` 相当は**不要**（root が引くので、detail は結果を受け取るだけ） |
 
 最後の行が要点である。`Viewer` を呼ぶのは root だけなので、`detail.Source` には足さない。
