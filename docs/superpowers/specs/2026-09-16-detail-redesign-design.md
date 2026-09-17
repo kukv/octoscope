@@ -85,6 +85,13 @@ esc:戻る  j/k:移動  c:コメント …                      ← 全幅・固
   `│` で、Work ボードと同じ
 - 左ペインが右より短いときは `JoinPanes` が罫を伸ばす（既存の振る舞い）
 
+**端末が低いとき。** 左ペインはスクロールせず、PR では 10 行ある。`JoinPanes` は高い方の
+ペインの高さぶん返すので、放っておくと高さ 12 行あたりからキーバーが画面外へ出る。
+`View()` は最後に全体を端末の高さに収め、**キーバーと（あれば）エラー行を切り詰めの外に置く**。
+失われるのは左ペインの末尾で、窓を広げれば戻る。キーバーを失ってよい理由は無い —
+`esc` が詳細画面から出る唯一の手段で、それを知らせているのがキーバーだからである。
+エラーの原文を残す理由は `.claude/rules/errors.md`（利用者がそれだけを頼りに次を決める）。
+
 しきい値 100 は `work` の `drawerMinColumns` と同じ値・同じ形（`detail/render.go` の const
 ブロックに理由つきのコメントを添える）。100 桁で右ペインは 100 − 33 − 1 = 66 桁残る。
 
@@ -158,15 +165,25 @@ feat/graph → main · +218 −31 · 担当 @alice ·  bug  · 2026年9月6日 1
 
 ### 5.1 ファイル
 
-`render.go` は現在 267 行で、ポップアップ 5 種の描画も持っている。ここにメタ行と 2 ペインを
-足すと 300 行を超える（`.claude/rules/architecture.md` の見直しの合図）。
+描画を足すと `render.go` が 300 行を超え、`detail.go` はもともと 925 行あった
+（`.claude/rules/architecture.md` の見直しの合図）。パッケージは責務ごとに次の 7 つになる。
 
-- `render.go` — `View()` とポップアップ各種。`prMarkdown` / `issueMarkdown` /
-  `writeCommonMeta` / `writeBody` / `writeComments` を削除
-- `meta.go`（新規） — 左ペインの行の組み立てと、1 カラムの連結行
-- `body.go`（新規） — 説明とコメントのブロック描画（glamour の呼び出しはここだけ）
+| ファイル | 責務 | 行数（2026-09-17） |
+|---|---|---|
+| `detail.go` | `Model`、4 つの interface、メッセージ型、mode / phase、`New`、寸法計算 | 332 |
+| `commands.go` | GitHub に何かを頼む `tea.Cmd` 8 つ | 100 |
+| `update.go` | `Update` と各メッセージのハンドラ | 319 |
+| `keys.go` | mode ごとのキー処理 6 つ | 219 |
+| `render.go` | `View()`、2 ペイン / 1 カラムの組み立て、ポップアップ各種 | 267 |
+| `meta.go` | メタ行の組み立てと、その 2 通りの描き方 | 217 |
+| `body.go` | 説明とコメントのブロック描画（glamour の呼び出しはここだけ） | 118 |
+| `picker.go` | ラベル / 担当のピッカー | 132 |
 
+`prMarkdown` / `issueMarkdown` / `writeCommonMeta` / `writeBody` / `writeComments` は削除し、
 `stateText` / `reviewText` は `meta.go` へ移す（呼ぶのはメタ行だけになるため）。
+
+`update.go` と `detail.go` は 300 をわずかに超えている。300 は規則ではなく合図であり、
+どちらも責務は 1 つに言えるのでこの形で止めた。
 
 ### 5.2 幅と高さ
 
