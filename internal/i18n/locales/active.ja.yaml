@@ -471,22 +471,6 @@ checks:
   decline_no_url:
     other: "この check は開けるページを報告していません"
 
-md:
-  author:
-    other: "作成者"
-  state:
-    other: "状態"
-  review:
-    other: "レビュー"
-  labels:
-    other: "ラベル"
-  updated:
-    other: "更新"
-  draft_suffix:
-    other: "（下書き）"
-  no_description:
-    other: "_説明はありません_"
-
 time:
   now:
     other: "たった今"

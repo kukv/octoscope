@@ -486,22 +486,6 @@ checks:
   decline_no_url:
     other: "this check reports no page of its own to open"
 
-md:
-  author:
-    other: "author"
-  state:
-    other: "state"
-  review:
-    other: "review"
-  labels:
-    other: "labels"
-  updated:
-    other: "updated"
-  draft_suffix:
-    other: " (draft)"
-  no_description:
-    other: "_no description_"
-
 time:
   now:
     other: "now"
