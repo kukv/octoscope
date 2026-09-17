@@ -17,6 +17,7 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 )
@@ -80,6 +81,34 @@ func Card(selected bool) lipgloss.Style {
 // Selected styles a selected row in a list that has no box to fill.
 func Selected() lipgloss.Style {
 	return lipgloss.NewStyle().Background(pick("#e8eef5", "#1d2735"))
+}
+
+// chromaReset is the reset chroma's terminal formatter writes after each
+// token it colours. chroma does not go through the ansi package, so this is
+// the one reset in the drawing that is not ansi.ResetStyle.
+const chromaReset = "\x1b[0m"
+
+// SelectedLine draws s as the selected row: the selection's background,
+// carried the whole way across the line.
+//
+// A background cannot simply be wrapped around a line that already has colour
+// in it. Every coloured span ends in a reset, and a reset clears the
+// background along with the foreground, so the fill would stop at the first
+// one and leave the cursor invisible from there on. Putting the background
+// back after each reset is what makes a selected row both fully filled and
+// still readable as itself.
+//
+// The two resets below are the only ones the drawing produces: lipgloss
+// renders through ansi.Style.Styled, which always closes a span with
+// ansi.ResetStyle, and chroma writes chromaReset.
+//
+// s must already be padded to the width it should fill: a background lands
+// only on columns that have a character in them.
+func SelectedLine(s string) string {
+	bg := ansi.Style{}.BackgroundColor(pick("#e8eef5", "#1d2735")).String()
+	s = strings.ReplaceAll(s, ansi.ResetStyle, ansi.ResetStyle+bg)
+	s = strings.ReplaceAll(s, chromaReset, chromaReset+bg)
+	return bg + s + ansi.ResetStyle
 }
 
 // Popup styles the frame around a small window drawn over an existing view:
