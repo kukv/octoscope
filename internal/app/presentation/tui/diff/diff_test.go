@@ -601,8 +601,9 @@ func TestAContextLineIsNotFilled(t *testing.T) {
 
 // TestTheCursorWinsOverTheFill is the one interaction the two fills have.
 // Tinting a row and then wrapping it in SelectedLine would leave the tint's
-// own background in the line, re-asserting itself after every reset, and the
-// cursor row would come out striped in two colours.
+// own background in the line, re-asserted after every reset the selection's
+// fill carries past, and the cursor row would come out in the tint's colour
+// with the selection nowhere on it.
 func TestTheCursorWinsOverTheFill(t *testing.T) {
 	m := goldenModel(120)
 	added := rowOfLineKind(t, m, domain.LineAdded)
