@@ -435,3 +435,104 @@ func TestAStaleFailureIsNotThePopupsOwn(t *testing.T) {
 		t.Error("the popup stopped waiting on the answer to its own fetch")
 	}
 }
+
+// blocked is a pull request a branch rule is holding, with the viewer able
+// to push past it.
+func blocked() domain.MergeContext {
+	c := mergeable()
+	c.State = domain.MergeStateBlocked
+	c.ViewerIsAdmin = true
+	return c
+}
+
+func TestAPressedOnABlockedPullRequestMergesIt(t *testing.T) {
+	t.Parallel()
+
+	f := &fakeSource{ctx: blocked()}
+	m := loaded(t, f)
+	_, cmd := press(m, "a")
+	if cmd == nil {
+		t.Fatal("a returned no command: nothing was sent")
+	}
+	if msg := cmd(); msg != (MergedMsg{Merged: true}) {
+		t.Fatalf("cmd() = %#v, want MergedMsg{Merged: true}", msg)
+	}
+	if len(f.merged) != 1 || f.merged[0] != domain.MergeSquash {
+		t.Errorf("merged = %v, want one MergeSquash (the method on the cursor)", f.merged)
+	}
+}
+
+// The key that breaks a protection must never be the key an ordinary merge
+// is sent with: a mistake has to be a wrong key, not the usual one.
+func TestEnterStillSendsNothingOnABlockedPullRequest(t *testing.T) {
+	t.Parallel()
+
+	f := &fakeSource{ctx: blocked()}
+	m := loaded(t, f)
+	_, cmd := enter(m)
+	if cmd != nil {
+		t.Fatal("enter returned a command: a blocked merge must still be refused")
+	}
+	if len(f.merged) != 0 {
+		t.Errorf("merged = %v, want nothing", f.merged)
+	}
+}
+
+func TestAIsRefusedWhereNoPermissionWouldHelp(t *testing.T) {
+	t.Parallel()
+
+	draft := blocked()
+	draft.IsDraft = true
+
+	conflicting := blocked()
+	conflicting.Mergeable = domain.MergeableConflicting
+	conflicting.State = domain.MergeStateDirty
+
+	computing := blocked()
+	computing.Mergeable = domain.MergeableUnknown
+	computing.State = domain.MergeStateUnknown
+
+	notAdmin := blocked()
+	notAdmin.ViewerIsAdmin = false
+
+	tests := []struct {
+		name string
+		ctx  domain.MergeContext
+	}{
+		{"draft", draft},
+		{"conflicting", conflicting},
+		{"computing", computing},
+		{"the viewer is no admin", notAdmin},
+		{"nothing is holding it: enter is the key for that", mergeable()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := &fakeSource{ctx: tt.ctx}
+			m := loaded(t, f)
+			_, cmd := press(m, "a")
+			if cmd != nil {
+				t.Error("a returned a command, want nothing sent")
+			}
+			if len(f.merged) != 0 {
+				t.Errorf("merged = %v, want nothing", f.merged)
+			}
+		})
+	}
+}
+
+func TestAIsIgnoredWhileAMergeIsInFlight(t *testing.T) {
+	t.Parallel()
+
+	f := &fakeSource{ctx: blocked()}
+	m := loaded(t, f)
+	m, cmd := press(m, "a") // the command is deliberately left unrun
+	if cmd == nil {
+		t.Fatal("a returned no command: the test needs the popup mid-send")
+	}
+	_, cmd = press(m, "a")
+	if cmd != nil {
+		t.Error("a returned a second command while the first was in flight")
+	}
+}
