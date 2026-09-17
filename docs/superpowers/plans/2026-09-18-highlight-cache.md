@@ -34,7 +34,8 @@
 | ファイル | 役割 | 変更 |
 |---|---|---|
 | `internal/app/presentation/tui/theme/theme.go` | 配色と syntax highlight | キャッシュと `Highlight` の差し替え |
-| `internal/app/presentation/tui/theme/theme_test.go` | theme のテスト | 退行テストを 3 本追加 |
+| `internal/app/presentation/tui/theme/theme_test.go` | theme のテスト | 退行テストを 2 本追加、ベンチのコメントを直す |
+| `internal/app/presentation/tui/theme/theme_internal_test.go` | 非公開のものを読むテスト | 新規。上限の検査 1 本 |
 | `internal/app/presentation/tui/diff/bench_test.go` | diff のベンチ | `hugeDiff` の行を 1 行ずつ違うテキストにする、スクロールのベンチを 1 本追加 |
 
 `Highlight` のシグネチャ、`diff` パッケージの production コード、ゴールデンファイルは**変更しない**。
@@ -176,17 +177,21 @@ func TestHighlightSurvivesTheCacheFilling(t *testing.T) {
 		t.Fatalf("the answer changed once the cache had been dropped:\n%q\n%q", got, want)
 	}
 }
-
-**訂正（実施後）:** 当初この計画は上限の検査を書いておらず、「境界をまたいでも答えが同じ」
-だけを見ていた。それは上限が有ろうが無かろうが真なので、**上限を丸ごと削ってもテストが
-通ってしまった**。`len(highlightLines)` を直接見る行が要る。これで内部テストパッケージを
-置く理由も、定数 1 つを読むためではなく map を読むためになる。
 ```
 
-`highlightCacheMax` は theme パッケージの非公開の定数なので、外部テストパッケージからは
-見えない。**この 1 本だけ内部テストパッケージに置く**（`.claude/rules/testing.md` の
-「非公開フィールドを読むテストは `package foo`」）。`theme_internal_test.go` を新規作成し、
-`package theme` として、その中では `Highlight(...)` を修飾なしで呼ぶ。`fmt` を import する。
+最初の 2 本は `theme_test.go`（`package theme_test`）に置き、`theme.` を付けて呼ぶ。
+
+3 本目だけは `highlightCacheMax` と `highlightLines` という非公開のものを読むので、
+**内部テストパッケージに置く**（`.claude/rules/testing.md` の「非公開フィールドを読む
+テストは `package foo`」）。`theme_internal_test.go` を新規作成し、`package theme` として、
+その中では `Highlight(...)` を修飾なしで呼ぶ。`fmt` を import する。上のコード片で
+`theme.Highlight` と裸の `Highlight` が混ざって見えるのはそのためで、実物は
+内部パッケージ側なので全部修飾なしになる。
+
+**訂正（実施後）:** 当初この計画は `len(highlightLines)` の検査を書いておらず、
+「境界をまたいでも答えが同じ」だけを見ていた。それは上限が有ろうが無かろうが真なので、
+**上限を丸ごと削ってもテストが通ってしまった**。上限そのものを見る行が要る。
+これで内部テストパッケージを置く理由も、定数 1 つを読むためではなく map を読むためになる。
 
 - [x] **Step 2: 走らせて、最初の 2 本が通り 3 本目が落ちることを確かめる**
 

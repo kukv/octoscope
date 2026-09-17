@@ -320,9 +320,11 @@ func lexerFor(path string) chroma.Lexer {
 }
 
 // highlightCacheMax is how many coloured lines are remembered before the
-// lot is dropped. A line and its colours run to about a kilobyte and a half
-// together, so this is about nine megabytes -- and 8192 is two hundred
-// screenfuls, far more than scrolling or moving between files needs.
+// lot is dropped. Measured, an entry runs from 620 bytes for a mix of
+// ordinary lines to 1750 for a screen full of 160-column ones, so the
+// limit is five megabytes at typical widths and fourteen at the worst.
+// 8192 is two hundred screenfuls, far more than scrolling or moving
+// between files needs.
 const highlightCacheMax = 8192
 
 // highlightKey is what decides a coloured line: the palette the background
@@ -343,9 +345,10 @@ type highlightKey struct {
 // so the same lines are coloured again and again.
 //
 // When it fills it is dropped whole rather than evicted one at a time.
-// What has to survive is the screenful just drawn, and that is the most
-// recently added however the limit is reached; one frame after the drop
-// pays full price, and the rest are cheap again.
+// That does throw away the screen just drawn, so the next frame colours
+// its rows again -- which costs what every frame cost before any of this
+// existed, once, after eight thousand new lines have gone past. An LRU
+// would avoid that one frame and carry a list node per entry to do it.
 var (
 	highlightMu    sync.RWMutex
 	highlightLines = map[highlightKey]string{}
@@ -382,7 +385,8 @@ func cachedHighlight(key highlightKey, colour func() string) string {
 // A file chroma has no lexer for, and any failure inside chroma, comes back
 // unchanged: the diff is still readable without colour.
 func Highlight(path, code string) string {
-	if lexerFor(path) == nil {
+	lexer := lexerFor(path)
+	if lexer == nil {
 		return code
 	}
 
@@ -391,22 +395,18 @@ func Highlight(path, code string) string {
 	mu.RUnlock()
 
 	return cachedHighlight(highlightKey{dark: dark, path: path, code: code}, func() string {
-		return highlight(path, code, dark)
+		return highlight(lexer, code, dark)
 	})
 }
 
 // highlight is Highlight without the cache in front of it: everything below
 // here is what colouring one line actually costs.
 //
-// dark is read once by Highlight and passed down rather than read again
-// here: SetDark can run on another goroutine, and reading it twice could
-// pick a different background for the colours than for the cache key they
-// are stored under.
-func highlight(path, code string, dark bool) string {
-	lexer := lexerFor(path)
-	if lexer == nil {
-		return code
-	}
+// The lexer and dark are both settled by Highlight and passed down rather
+// than looked up again here. dark especially: SetDark can run on another
+// goroutine, and reading it twice could pick a different background for
+// the colours than for the cache key they are stored under.
+func highlight(lexer chroma.Lexer, code string, dark bool) string {
 	style := styles.Get(chromaStyle(dark))
 	formatter := formatters.Get("terminal256")
 	if style == nil || formatter == nil {
