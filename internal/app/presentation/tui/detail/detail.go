@@ -297,7 +297,7 @@ func (m *Model) relayout() {
 	if twoPane(w) {
 		bodyW = w - metaPaneWidth(w) - 1 // the rule JoinPanes draws between them
 	} else {
-		bodyH -= len(m.headerLines()) + 1 // the paragraph and its rule
+		bodyH -= len(m.headerLines()) // the meta paragraph above the body
 	}
 	m.body.SetWidth(max(bodyW, 1))
 	m.body.SetHeight(max(bodyH, 5))

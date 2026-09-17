@@ -29,10 +29,24 @@ const (
 // every set (icon's TestEveryGlyphIsOneColumn), whatever it measures in bytes.
 const commentBarWidth = 2
 
+// sectionHeading names a section and runs a rule from the end of the name to
+// the edge of the pane. The name on its own was quieter than the text beneath
+// it -- theme.Heading is muted, and a GitHub body is not -- which left the
+// reader looking for the end of the description in a blank line.
+func sectionHeading(name string, w int) string {
+	head := theme.Heading().Render(name)
+	// The space is what keeps the rule from running into the last character.
+	rest := w - ansi.StringWidth(name) - 1
+	if rest <= 0 {
+		return layout.Clip(head, w)
+	}
+	return head + " " + theme.Rule().Render(strings.Repeat("─", rest))
+}
+
 // bodyLines is what scrolls: the description under its heading, then every
 // comment behind its own bar.
 func bodyLines(it usecase.Item, w int) []string {
-	lines := []string{theme.Heading().Render(i18n.T("detail.section.description"))}
+	lines := []string{sectionHeading(i18n.T("detail.section.description"), w)}
 
 	body := it.Body
 	if strings.TrimSpace(body) == "" {
@@ -46,7 +60,7 @@ func bodyLines(it usecase.Item, w int) []string {
 		return fit(lines, w)
 	}
 	lines = append(lines, "",
-		theme.Heading().Render(i18n.Tn("detail.section.comments", len(it.Comments))))
+		sectionHeading(i18n.Tn("detail.section.comments", len(it.Comments)), w))
 	for _, c := range it.Comments {
 		lines = append(lines, "")
 		lines = append(lines, commentLines(c, w)...)

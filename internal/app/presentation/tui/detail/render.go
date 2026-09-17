@@ -63,7 +63,9 @@ func (m Model) View() string {
 		for _, l := range m.headerLines() {
 			b.WriteString(l + "\n")
 		}
-		b.WriteString(theme.Rule().Render(strings.Repeat("─", max(m.width, 0))) + "\n")
+		// No rule of its own under the meta: the description's heading draws
+		// one on the very next line, and two rules together say nothing the
+		// first does not.
 		b.WriteString(m.body.View() + "\n")
 	}
 	// The failure and the key bar are both drawn after the cut: what the
