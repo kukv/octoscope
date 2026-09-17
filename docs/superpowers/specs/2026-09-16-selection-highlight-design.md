@@ -186,7 +186,11 @@ lipgloss に空文字を描かせて切り出すような組み立て方はし�
 | `review/render.go:43` event の選択 | 同上。**埋めない（現状のまま）** |
 
 埋まらない 2 箇所（保存済みクエリ行・フィルタ行）は、移行と同じ作業で
-`layout.Pad` を通し、行として塗られるようにする。
+幅まで埋めてから塗る。`layout.Pad` は「隣の列とぶつからないよう 1 桁残す」
+ためのもので、行そのものを幅いっぱいにする用途には合わない。
+`diff` と `checks` が私有の `fit` として持っている「clip して幅まで空白で埋める」
+処理を `layout.Fill` として 1 つに出し、3 者で使う。
+写しを 3 つに増やさないための移動であり、処理は変わらない。
 rerun と event の 2 箇所は選択肢の語を並べた中の 1 語を指すものなので、
 全幅に広げるのはむしろ誤りである。現状の見た目を保つ。
 
@@ -219,6 +223,7 @@ rerun と event の 2 箇所は選択肢の語を並べた中の 1 語を指す�
 |---|---|
 | `theme/theme.go` | `Selected()` を消し `SelectedLine()` を足す |
 | `theme/theme_test.go` | `SelectedLine` の単体テスト |
+| `layout/columns.go` | `Fill()`（clip して幅まで空白で埋める）を足す。`diff` と `checks` が私有で持つ同じ処理をここに畳む |
 | `repo/render.go` `repo/sidebar.go` | 呼び出しの移行 |
 | `search/render.go` `search/saved_render.go` | 呼び出しの移行、フィルタ行と保存済みクエリ行の padding |
 | `dialog/render.go` `checks/render.go` `review/render.go` | 呼び出しの移行 |
