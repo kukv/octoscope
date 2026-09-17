@@ -261,12 +261,22 @@ func (m Model) cardWindow(s domain.WorkSection, height int) int {
 // card draws one card in a box of its own: where it lives on the first line,
 // its title on the next two, how it is doing on the last. The selection is
 // the box's colour and background.
+//
+// The body's lines are filled one at a time before the box is drawn around
+// them. lipgloss fills its own padding, but the background it is given ends
+// at the first reset inside the text, and every line here has a coloured
+// marker or a dimmed repository in it.
 func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []string {
 	// The box's own border and padding come out of the width lipgloss is
 	// given, so the text is clipped to what is left before it is handed over.
 	inner := w - 4
 	body := append([]string{cardHead(it, inner)}, cardTitle(it, inner, selected)...)
 	body = append(body, m.cardMeta(it, at, inner))
+	if selected {
+		for i, line := range body {
+			body[i] = theme.SelectedLine(line)
+		}
+	}
 	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
 
