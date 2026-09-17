@@ -1,0 +1,9 @@
+# Who is signed in. The detail view needs the name to tell a comment
+# addressed at the reader from one that is not; nothing else in octoscope has
+# ever had to know it -- the Work board asks GitHub for "mentions:@me" and
+# lets GitHub resolve it.
+query {
+  viewer {
+    login
+  }
+}
