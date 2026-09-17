@@ -133,15 +133,23 @@ func TestTheHeavyBarCostsTheTextNoColumns(t *testing.T) {
 	if w := ansi.StringWidth(string([]rune(mine)[0])); w != 1 {
 		t.Errorf("the heavy bar is %d columns wide, want 1", w)
 	}
-	if got, want := textColumn(mine), textColumn(plain); got != want {
+	if got, want := textColumn(t, mine), textColumn(t, plain); got != want {
 		t.Errorf("a comment that names the reader starts its text at column %d, want %d", got, want)
 	}
 }
 
 // textColumn is how far into the line the author's name sits: the width of
-// everything the bar puts before it.
-func textColumn(line string) int {
-	return ansi.StringWidth(line[:strings.Index(line, "@")])
+// everything the bar puts before it. A line with no "@" is not a header at
+// all, and measuring the whole of it would read as a column of zero -- the
+// two lines would then agree for the wrong reason.
+func textColumn(t *testing.T, line string) int {
+	t.Helper()
+
+	at := strings.Index(line, "@")
+	if at < 0 {
+		t.Fatalf("the line %q has no author to measure from", line)
+	}
+	return ansi.StringWidth(line[:at])
 }
 
 // TestTheDescriptionHeadingSaysWhenItNamesTheReader covers the other block:
