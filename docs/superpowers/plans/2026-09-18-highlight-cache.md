@@ -53,7 +53,7 @@
 **Files:**
 - Modify: `internal/app/presentation/tui/diff/bench_test.go`
 
-- [ ] **Step 1: 行を 1 行ずつ違うテキストにする**
+- [x] **Step 1: 行を 1 行ずつ違うテキストにする**
 
 `hugeDiff` の `Text` を差し替える。ほかは変えない。
 
@@ -69,7 +69,7 @@
 `hugeDiff` の doc コメントに、なぜ 1 行ずつ違えるのかを 1 文足す:
 色付けの結果を憶える実装にとって、全行が同じテキストの fixture は最良の場合しか測らない。
 
-- [ ] **Step 2: スクロールのベンチを書く**
+- [x] **Step 2: スクロールのベンチを書く**
 
 `bench_test.go` の末尾に追記する。
 
@@ -96,7 +96,7 @@ func BenchmarkScrollHugeDiff(b *testing.B) {
 }
 ```
 
-- [ ] **Step 3: 走らせて現状値を記録する**
+- [x] **Step 3: 走らせて現状値を記録する**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -bench='HugeDiff' -run=XXX -benchtime=100x
@@ -106,7 +106,7 @@ go test ./internal/app/presentation/tui/diff/ -bench='HugeDiff' -run=XXX -bencht
 Step 1 で行が 1 行ずつ違うようになったので、`BenchmarkViewHugeDiff` の数字は
 以前の 4.93 ms から動きうる。**両方の数値を控える。**
 
-- [ ] **Step 4: コミット**
+- [x] **Step 4: コミット**
 
 ```bash
 git add internal/app/presentation/tui/diff/bench_test.go
@@ -121,7 +121,7 @@ git commit -m "test(diff): measure a frame that scrolled, on rows that differ"
 - Modify: `internal/app/presentation/tui/theme/theme.go`
 - Modify: `internal/app/presentation/tui/theme/theme_test.go`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `theme_test.go` に追記する（`package theme_test` なので `theme.` を付ける）。
 既に `TestHighlightFollowsTheBackground` が「背景を変えると色が変わる」を固定していて、
@@ -164,15 +164,23 @@ func TestHighlightSurvivesTheCacheFilling(t *testing.T) {
 	const code = "func Walk(ctx context.Context) error {"
 	want := theme.Highlight("walk.go", code)
 
-	// Enough distinct lines to push the cache past its limit twice over.
-	for i := range highlightCacheMax * 2 {
+	// One more than the limit: enough to cross the boundary once.
+	for i := range highlightCacheMax + 1 {
 		theme.Highlight("walk.go", fmt.Sprintf("x%d := %d", i, i))
 	}
 
-	if got := theme.Highlight("walk.go", code); got != want {
+	if n := len(highlightLines); n > highlightCacheMax {
+		t.Fatalf("the cache holds %d entries, want at most %d", n, highlightCacheMax)
+	}
+	if got := Highlight("walk.go", code); got != want {
 		t.Fatalf("the answer changed once the cache had been dropped:\n%q\n%q", got, want)
 	}
 }
+
+**訂正（実施後）:** 当初この計画は上限の検査を書いておらず、「境界をまたいでも答えが同じ」
+だけを見ていた。それは上限が有ろうが無かろうが真なので、**上限を丸ごと削ってもテストが
+通ってしまった**。`len(highlightLines)` を直接見る行が要る。これで内部テストパッケージを
+置く理由も、定数 1 つを読むためではなく map を読むためになる。
 ```
 
 `highlightCacheMax` は theme パッケージの非公開の定数なので、外部テストパッケージからは
@@ -180,7 +188,7 @@ func TestHighlightSurvivesTheCacheFilling(t *testing.T) {
 「非公開フィールドを読むテストは `package foo`」）。`theme_internal_test.go` を新規作成し、
 `package theme` として、その中では `Highlight(...)` を修飾なしで呼ぶ。`fmt` を import する。
 
-- [ ] **Step 2: 走らせて、最初の 2 本が通り 3 本目が落ちることを確かめる**
+- [x] **Step 2: 走らせて、最初の 2 本が通り 3 本目が落ちることを確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight' -v
@@ -190,7 +198,7 @@ go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight' -v
 （キャッシュが無くても成り立つ回帰テスト）。`TestHighlightSurvivesTheCacheFilling` は
 `highlightCacheMax` が未定義でコンパイルできず失敗する。
 
-- [ ] **Step 3: キャッシュを入れる**
+- [x] **Step 3: キャッシュを入れる**
 
 `theme.go` の `Highlight` の手前に足す。
 
@@ -291,7 +299,7 @@ func highlight(path, code string, dark bool) string {
 `chromaStyle()` を `chromaStyle(dark)` にする 1 行だけ。**
 `Highlight` の doc コメントは `Highlight` に残し、`highlight` には上の 2 行を付ける。
 
-- [ ] **Step 4: テストを走らせる**
+- [x] **Step 4: テストを走らせる**
 
 ```bash
 go test ./internal/app/presentation/tui/theme/ -run 'TestHighlight' -v
@@ -303,7 +311,7 @@ go test ./internal/app/presentation/tui/root/ -run TestGolden
 期待: すべて PASS。ゴールデンは `-update` なしで通ること。
 `TestHighlightFollowsTheBackground` が落ちたら、キーに背景が入っていない。
 
-- [ ] **Step 5: ベンチで効いたことを確かめる**
+- [x] **Step 5: ベンチで効いたことを確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -bench='HugeDiff' -run=XXX -benchtime=100x
@@ -319,7 +327,7 @@ go test ./internal/app/presentation/tui/theme/ -bench=Highlight -run=XXX -bencht
   **数字が落ちたことを報告するだけでよく、ベンチを書き換えない**（何を測っているかが
   変わったことは Task 3 で記録する）
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 git add internal/app/presentation/tui/theme/theme.go internal/app/presentation/tui/theme/theme_test.go internal/app/presentation/tui/theme/theme_internal_test.go
@@ -330,7 +338,7 @@ git commit -m "perf(theme): remember a coloured line instead of colouring it aga
 
 ### Task 3: 記録と、実機での確認
 
-- [ ] **Step 1: `BenchmarkHighlightScreen` が何を測っているか書き直す**
+- [x] **Step 1: `BenchmarkHighlightScreen` が何を測っているか書き直す**
 
 Task 2 のあと、このベンチは同じ行を 50 回引くだけになる。コメントがそう言っていないと、
 次に読む人が「1 画面ぶんのハイライトが 0 ミリ秒」と誤読する。
@@ -343,7 +351,7 @@ git add internal/app/presentation/tui/theme/theme_test.go
 git commit -m "docs(theme): say what the screen benchmark measures now"
 ```
 
-- [ ] **Step 2: `make check` を通す**
+- [x] **Step 2: `make check` を通す**
 
 ```bash
 make check
@@ -351,7 +359,7 @@ make check
 
 期待: tidy / lint / fmt / test すべて PASS。
 
-- [ ] **Step 3: 実際に起動して確かめる**
+- [x] **Step 3: 実際に起動して確かめる**
 
 ```bash
 go run ./cmd/octoscope --repo kukv/octoscope
@@ -365,7 +373,7 @@ diff ビュー（`d`）で確認すること:
 - 端末の幅を変える。**桁がずれない**（キーはクリップ済みのテキストなので、幅を変えると
   別のキーになる）
 
-- [ ] **Step 4: 日本語でも見る**
+- [x] **Step 4: 日本語でも見る**
 
 ```bash
 go run ./cmd/octoscope --repo kukv/octoscope --lang ja
@@ -373,6 +381,6 @@ go run ./cmd/octoscope --repo kukv/octoscope --lang ja
 
 全角の桁がずれないことを見る。
 
-- [ ] **Step 5: 見たものを報告する**
+- [x] **Step 5: 見たものを報告する**
 
 何を開いて何を確認したかを PR の説明に書く。
