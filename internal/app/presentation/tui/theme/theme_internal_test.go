@@ -13,12 +13,18 @@ func TestHighlightSurvivesTheCacheFilling(t *testing.T) {
 	const code = "func Walk(ctx context.Context) error {"
 	want := Highlight("walk.go", code)
 
-	// Enough distinct lines to push the cache past its limit twice over.
-	for i := range highlightCacheMax * 2 {
+	// Enough distinct lines to push the cache past its limit once.
+	for i := range highlightCacheMax + 1 {
 		Highlight("walk.go", fmt.Sprintf("x%d := %d", i, i))
 	}
 
 	if got := Highlight("walk.go", code); got != want {
 		t.Fatalf("the answer changed once the cache had been dropped:\n%q\n%q", got, want)
+	}
+	// The answer surviving is not enough on its own -- it would survive just
+	// as well with no limit at all. The limit is only proven by the map
+	// never growing past it.
+	if n := len(highlightLines); n > highlightCacheMax {
+		t.Fatalf("the cache holds %d entries, want at most %d", n, highlightCacheMax)
 	}
 }
