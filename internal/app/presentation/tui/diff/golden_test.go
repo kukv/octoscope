@@ -126,6 +126,13 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("diff_submit_%s_%d", lang.name, w), submittingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_discard_%s_%d", lang.name, w), discardingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_loading_%s_%d", lang.name, w), loadingModel(w).View())
+
+				// The file list's own cursor, reached with h as a user
+				// would. Not recorded below minWidthForSidebar, where the
+				// sidebar folds away and there is nothing to record.
+				if w >= minWidthForSidebar {
+					golden.Assert(t, fmt.Sprintf("diff_sidebar_focus_%s_%d", lang.name, w), press(goldenModel(w), "h").View())
+				}
 			})
 		}
 	}
