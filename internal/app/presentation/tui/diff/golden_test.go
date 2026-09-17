@@ -75,6 +75,26 @@ func composingModel(width int) Model {
 	return press(goldenModel(width), "c")
 }
 
+// addedLineModel is goldenModel with the cursor moved down onto an added
+// line, the only row whose +/- marker has a colour of its own to keep under
+// the selection's fill. The view opens on the first line of the hunk, which
+// is a context line, so nothing else records a marker under the cursor.
+//
+// How far down that line sits is checked rather than trusted: a line added
+// to goldenFixture ahead of it would leave the cursor somewhere else, and
+// the recording would go on passing while covering nothing.
+func addedLineModel(t *testing.T, width int) Model {
+	t.Helper()
+	m := goldenModel(width)
+	for range 3 {
+		m = press(m, "j")
+	}
+	if r := m.rows[m.row]; r.kind != rowLine || r.line.Kind != domain.LineAdded {
+		t.Fatalf("three j presses put the cursor on row kind %v / line kind %v, want an added line", r.kind, r.line.Kind)
+	}
+	return m
+}
+
 // postingModel is composingModel after ctrl+s, with the post cmd
 // deliberately not run so the model is caught mid-send.
 func postingModel(width int) Model {
@@ -126,6 +146,7 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("diff_submit_%s_%d", lang.name, w), submittingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_discard_%s_%d", lang.name, w), discardingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_loading_%s_%d", lang.name, w), loadingModel(w).View())
+				golden.Assert(t, fmt.Sprintf("diff_added_line_%s_%d", lang.name, w), addedLineModel(t, w).View())
 
 				// The file list's own cursor, reached with h as a user
 				// would. Not recorded below minWidthForSidebar, where the

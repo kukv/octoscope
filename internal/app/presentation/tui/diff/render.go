@@ -363,9 +363,9 @@ func (m Model) sidebarLines() []string {
 		}
 		size := theme.Added().Render("+"+strconv.Itoa(f.Additions)) +
 			" " + theme.Removed().Render("−"+strconv.Itoa(f.Deletions))
-		// Whether the badge fits is measured on the uncoloured strings. The
-		// answer is the same either way, since ansi.StringWidth ignores
-		// colour, but one pair of widths is easier to read than two.
+		// The fit is decided on plainSize and badge, which have no colour in
+		// them, while what it lets through is the coloured size.
+		// ansi.StringWidth ignores colour, so the two agree.
 		if badge != "" && ansi.StringWidth(plainSize)+1+ansi.StringWidth(badge) <= sidebarWidth {
 			size += " " + theme.Count(pending).Render(badge)
 		}
