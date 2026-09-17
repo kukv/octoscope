@@ -269,8 +269,7 @@ func (m Model) workflowTitle(r domain.CheckRun) string {
 
 // checkLine draws one check: its glyph, its name and, once it has one, how
 // long it took. It is highlighted only while the cursor acts on the list --
-// once the log pane has focus the row it points at stays plain, the same way
-// the diff view's file list does.
+// once the log pane has focus the row it points at stays plain.
 func (m Model) checkLine(r domain.CheckRun, cursor bool) string {
 	text := "  " + icon.Check(r.State) + " " + r.Name
 	// A cut duration reads as a shorter one rather than as a cut one, so a

@@ -81,11 +81,6 @@ func Card(selected bool) lipgloss.Style {
 	return s.BorderForeground(pick("#d9dee4", "#262d39"))
 }
 
-// Selected styles a selected row in a list that has no box to fill.
-func Selected() lipgloss.Style {
-	return lipgloss.NewStyle().Background(pick("#e8eef5", "#1d2735"))
-}
-
 // chromaReset is the reset chroma's terminal formatter writes after each
 // token it colours. chroma does not go through the ansi package, so this is
 // the one reset in the drawing that is not ansi.ResetStyle.
