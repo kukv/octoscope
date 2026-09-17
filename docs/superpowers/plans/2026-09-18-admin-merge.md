@@ -17,6 +17,10 @@ GraphQL `mergePullRequest` ミューテーションのままで、変えるの�
 
 ---
 
+## コメントの規約
+
+`.claude/rules/go-style.md` は **実装計画や設計書への参照をコードに書くことを禁じている**（`Task 10`、`design 1.4` のような参照）。理由は、コードを読む人がそれを辿れず、その計画が終わったあとは意味を失うからである。**なぜそうなっているか**は書く。**どの文書の何番か**は書かない。このファイル内のコード片はその形で書いてある。
+
 ## ファイル構成
 
 | ファイル | 役割 | 変更 |
@@ -123,9 +127,10 @@ go test ./internal/github/gql/ -run TestPRMergeContextReadsEveryField
 ```graphql
     autoMergeAllowed
     # What says whether offering the admin merge is honest.
-    # viewerCanMergeAsAdmin would be the obvious field, but it reads classic
-    # branch protection and answers false under a ruleset this viewer can in
-    # fact bypass (measured on #100, design 1.4).
+    # viewerCanMergeAsAdmin is the field named for it, but it reads classic
+    # branch protection only: on a repository guarded by a ruleset it answers
+    # false even to a viewer the ruleset lists as an always-bypass actor
+    # (measured 2026-09-18). The permission is the closest honest signal left.
     viewerPermission
 ```
 
@@ -259,10 +264,10 @@ go test ./internal/app/domain/ -run TestOnlyTwoBlocksGiveWayToAnAdmin
 	// ViewerIsAdmin is what keeps the popup from offering a key that fails.
 	// The mutation that merges takes no admin input -- gh pr merge --admin
 	// sends the same one -- so nothing in the answer to the merge itself
-	// says whether this viewer may push past a rule. viewerCanMergeAsAdmin
-	// would be the field for it, but it reads classic branch protection and
-	// answers false under a ruleset this viewer can bypass, so the gateway
-	// fills this from the repository permission instead (design 1.4).
+	// says whether this viewer may push past a rule. GitHub's own
+	// viewerCanMergeAsAdmin reads classic branch protection only and answers
+	// false under a ruleset, so the gateway fills this from the repository
+	// permission instead.
 	ViewerIsAdmin bool
 ```
 
