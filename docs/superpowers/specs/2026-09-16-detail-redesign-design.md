@@ -168,21 +168,23 @@ feat/graph → main · +218 −31 · 担当 @alice ·  bug  · 2026年9月6日 1
 描画を足すと `render.go` が 300 行を超え、`detail.go` はもともと 925 行あった
 （`.claude/rules/architecture.md` の見直しの合図）。パッケージは責務ごとに次の 7 つになる。
 
-| ファイル | 責務 | 行数（2026-09-17） |
+| ファイル | 責務 | 行数（2026-09-18） |
 |---|---|---|
-| `detail.go` | `Model`、4 つの interface、メッセージ型、mode / phase、`New`、寸法計算 | 332 |
+| `detail.go` | `Model`、4 つの interface、メッセージ型、mode / phase、`New`、寸法計算 | 354 |
 | `commands.go` | GitHub に何かを頼む `tea.Cmd` 8 つ | 100 |
 | `update.go` | `Update` と各メッセージのハンドラ | 319 |
-| `keys.go` | mode ごとのキー処理 6 つ | 219 |
-| `render.go` | `View()`、2 ペイン / 1 カラムの組み立て、ポップアップ各種 | 267 |
+| `keys.go` | mode ごとのキー処理 6 つ | 250 |
+| `render.go` | `View()`、2 ペイン / 1 カラムの組み立て、ポップアップ各種 | 269 |
 | `meta.go` | メタ行の組み立てと、その 2 通りの描き方 | 217 |
-| `body.go` | 説明とコメントのブロック描画（glamour の呼び出しはここだけ） | 118 |
+| `body.go` | 説明とコメントのブロック描画（glamour の呼び出しはここだけ） | 155 |
 | `picker.go` | ラベル / 担当のピッカー | 132 |
+| `mention.go` | 生 markdown が読み手を名指ししているかの判定 | 83 |
 
 `prMarkdown` / `issueMarkdown` / `writeCommonMeta` / `writeBody` / `writeComments` は削除し、
 `stateText` / `reviewText` は `meta.go` へ移す（呼ぶのはメタ行だけになるため）。
 
-`update.go` と `detail.go` は 300 をわずかに超えている。300 は規則ではなく合図であり、
+`update.go` は 300 をわずかに超えている。`detail.go` はメンション強調の配管が
+`viewer` フィールドと `SetViewer` を足した分で 350 を超えた。300 は規則ではなく合図であり、
 どちらも責務は 1 つに言えるのでこの形で止めた。
 
 ### 5.2 幅と高さ
@@ -236,14 +238,7 @@ usecase / domain / gateway には一切触らない。この変更は描画の�
 
 ## 7. やらないこと
 
-- **自分宛てメンションの強調**（別の設計として後で足す。2026-09-16 に決めた）。
-  octoscope は自分のログイン名を知らない — Work ボードは GitHub へ `mentions:@me` と
-  投げているだけで、`@me` が誰かを解決していない（`gateway/gh/work.go:17`）。起動時に
-  `viewer { login }` を 1 回引き、gateway → usecase → `root.Options` → detail と渡す
-  配管が要る。この再設計は描画の中で閉じているので、先にレイアウトを入れて目で確かめる。
-  強調はブロック単位（自分宛てを含むコメントの罫と見出し行、担当が自分のときの行）に
-  留める。glamour が色を付けた後の本文に色を差し込むと、リセットで glamour 側の色まで
-  切れて行の後半がにじむため
+- **自分宛てメンションの強調**は `2026-09-17-mention-highlight-design.md` で設計し、実装した
 - コメントの折りたたみ、返信、リアクション
 - 左ペインへのカーソル移動やフォーカス切り替え（キーで畳む案は今回採らない）
 - checks の一覧表示（`s` キーの checks 画面が持っている。左ペインは集計だけ）

@@ -71,15 +71,18 @@ root.Update(WindowSizeMsg)  --> resolveRepo(src)    --> repoResolvedMsg
 
 ### 3.3 detail へ渡す
 
-`detail.New(src, ref)` に第 3 引数を足す。
+`detail.New(src, ref)` はそのままにし、chainable な setter を足す。
 
 ```go
-func New(src Source, ref domain.ItemRef, viewer string) Model
+func (m Model) SetViewer(login string) Model
 ```
 
-root は `openDetail` で `detail.New(m.src, ref, m.viewer)` と書く。詳細画面は開くたびに
-作り直されるので、開いた時点の `m.viewer` を持てばよく、開いている最中に流し込む経路
-（`SetViewer` のようなもの）は要らない。
+`search.New(src).SetSavedQueries(...)` と同じ形にした。`New` は 12 か所ほどのテストから
+呼ばれており、第 3 引数にすると、その全部が「ログイン名はどうでもよい」と書く羽目になる。
+
+root は `openDetail` で `detail.New(m.src, ref).SetViewer(m.viewer)` と書く。詳細画面は
+開くたびに作り直されるので、開いた時点の `m.viewer` を持てばよく、開いている最中に
+流し込む経路は要らない。
 
 答えがまだ来ていないうちに詳細画面を開いたら `viewer` は空文字で、その回は強調が出ない。
 起動直後の 1 回だけ起こりうる取りこぼしであり、`r` で読み直せば付く。これを消すために
