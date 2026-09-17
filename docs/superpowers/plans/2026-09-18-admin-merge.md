@@ -6,7 +6,7 @@
 
 **Architecture:** 新しい API 経路は作らない。`gh pr merge --admin` と同じく、送るのは既存の
 GraphQL `mergePullRequest` ミューテーションのままで、変えるのはクライアント側のゲートだけである。
-`viewerCanMergeAsAdmin` を merge context に読み足し、`domain.MergeContext.CanMergeAsAdmin()` が
+`repository.viewerPermission` を merge context に読み足し、`domain.MergeContext.CanMergeAsAdmin()` が
 `BlockProtected` / `BlockBehind` のときだけ true を返す。TUI はそのとき `a` を受け付ける。
 `enter` の挙動は一切変えない。
 
@@ -21,10 +21,10 @@ GraphQL `mergePullRequest` ミューテーションのままで、変えるの�
 
 | ファイル | 役割 | 変更 |
 |---|---|---|
-| `internal/github/gql/merge.graphql` | merge context のクエリ | `viewerCanMergeAsAdmin` を 1 行追加 |
-| `internal/github/gql/merge.go` | レスポンスのパース | 構造体に bool を 2 箇所追加 |
+| `internal/github/gql/merge.graphql` | merge context のクエリ | `viewerPermission` を 1 行追加 |
+| `internal/github/gql/merge.go` | レスポンスのパース | 構造体に string を 2 箇所追加 |
 | `internal/app/domain/merge.go` | ブロック判定の置き場 | フィールドと `CanMergeAsAdmin()` を追加 |
-| `internal/app/adapter/gateway/gh/merge.go` | gql → domain の変換 | `toMergeContext` に 1 行追加 |
+| `internal/app/adapter/gateway/gh/merge.go` | gql → domain の変換 | `toMergeContext` で権限文字列を bool にする |
 | `internal/i18n/locales/active.en.yaml` | 英語カタログ | 2 キー追加 |
 | `internal/i18n/locales/active.ja.yaml` | 日本語カタログ | 2 キー追加 |
 | `internal/app/presentation/tui/merge/merge.go` | ポップアップのキー処理 | `handleKey` に `a` を追加 |
@@ -35,74 +35,28 @@ GraphQL `mergePullRequest` ミューテーションのままで、変えるの�
 
 ---
 
-### Task 0: `viewerCanMergeAsAdmin` が ruleset 下で機能するか実測する
+### Task 0: `viewerCanMergeAsAdmin` が ruleset 下で機能するか実測する — **済（2026-09-18）**
 
-設計 §1.3 の未確認事項である。これが崩れると以降の判定が全部変わるので、**必ず最初にやる**。
+PR #100 で測った。9 本の status check が全て通り、残る要件がレビュー 1 件だけの状態で:
 
-**Files:**
-- Modify: `docs/superpowers/specs/2026-09-18-admin-merge-design.md`（結果を追記）
-
-- [ ] **Step 1: blocked な PR を 1 つ用意する**
-
-`kukv/octoscope` の `main` は ruleset `protect-default-branch` で守られており、
-レビュー 1 件と 9 本の status check を要求する。捨て枝で PR を作れば、
-checks が終わる前は `mergeStateStatus` が `BLOCKED` になる。
-
-```bash
-git checkout -b tmp/admin-merge-probe
-echo "probe" >> docs/superpowers/plans/2026-09-18-admin-merge.md
-git commit -am "chore: probe"
-git push -u origin tmp/admin-merge-probe
-gh pr create --title "chore: probe admin merge" --body "checking viewerCanMergeAsAdmin, will be closed" --draft=false
+```
+{"repository":{"viewerPermission":"ADMIN","pullRequest":{
+  "mergeStateStatus":"BLOCKED","reviewDecision":"REVIEW_REQUIRED",
+  "viewerCanMergeAsAdmin":false}}}
 ```
 
-- [ ] **Step 2: フィールドを問い合わせる**
+**`false`。** ruleset は admin ロールを `bypass_mode: always` で持っているので実際には
+押し切れる。このフィールドは classic branch protection しか見ていない。
 
-`<N>` は Step 1 で作られた PR 番号。
+**よって判定は `repository.viewerPermission == "ADMIN"` を採る。** 結果と限界は
+設計 §1.4 に記録済み（commit ac15ed5）。Task 1 以降はその前提で書き直してある。
 
-```bash
-gh api graphql -f query='{repository(owner:"kukv",name:"octoscope"){pullRequest(number:<N>){mergeStateStatus viewerCanMergeAsAdmin}}}'
-```
-
-期待: `{"data":{"repository":{"pullRequest":{"mergeStateStatus":"BLOCKED","viewerCanMergeAsAdmin":true}}}}`
-
-`mergeStateStatus` が `UNKNOWN` なら GitHub がまだ計算中なので、30 秒ほど置いて問い直す。
-
-- [ ] **Step 3: 結果で分岐する**
-
-- `viewerCanMergeAsAdmin: true` → 計画をこのまま進める
-- `viewerCanMergeAsAdmin: false` → **Task 1 以降の `viewerCanMergeAsAdmin` を
-  `repository { viewerPermission }` に読み替える。** GraphQL では
-  `repository.viewerPermission` が `"ADMIN"` / `"MAINTAIN"` / `"WRITE"` /
-  `"TRIAGE"` / `"READ"` の文字列を返すので、`gql.MergeContext` に
-  `ViewerPermission string` を持ち、gateway で `c.ViewerPermission == "ADMIN"` を
-  `domain.MergeContext.ViewerCanMergeAsAdmin` に入れる。domain より上の層は
-  この計画のまま変わらない
-
-- [ ] **Step 4: 設計文書に結果を追記する**
-
-`docs/superpowers/specs/2026-09-18-admin-merge-design.md` の §1.3 の末尾に、
-実測日・PR 番号・返ってきた JSON・どちらの判定を採ったかを書く。§6 の
-「どちらを採ったかをこの文書に追記してから先へ進む」がこれである。
-
-- [ ] **Step 5: 探り用の PR とブランチを片付ける**
-
-```bash
-gh pr close <N> --delete-branch
-git checkout fix/selection-highlight
-git branch -D tmp/admin-merge-probe
-```
-
-- [ ] **Step 6: コミット**
-
-```bash
-git add docs/superpowers/specs/2026-09-18-admin-merge-design.md
-git commit -m "docs(merge): record what viewerCanMergeAsAdmin answers under a ruleset"
-```
+- [x] 実測した
+- [x] 設計文書 §1.4 に追記した
 
 ---
 
-### Task 1: GraphQL から `viewerCanMergeAsAdmin` を読む
+### Task 1: GraphQL から `viewerPermission` を読む
 
 **Files:**
 - Modify: `internal/github/gql/merge.graphql`
@@ -121,10 +75,10 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 
 	body := `{"data":{"repository":{"squashMergeAllowed":true,"mergeCommitAllowed":false,` +
 		`"rebaseMergeAllowed":false,"deleteBranchOnMerge":true,"autoMergeAllowed":true,` +
+		`"viewerPermission":"ADMIN",` +
 		`"pullRequest":{"id":"PR_1","isDraft":false,"mergeable":"MERGEABLE",` +
 		`"mergeStateStatus":"CLEAN","reviewDecision":"APPROVED",` +
-		`"viewerCanEnableAutoMerge":true,"viewerCanMergeAsAdmin":true,` +
-		`"autoMergeRequest":null}}}}`
+		`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
 	f := &fakeSeq{outs: []string{body}}
 	c := &Client{Do: f.do}
 
@@ -144,7 +98,7 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 		DeleteBranchOnMerge:      true,
 		AutoMergeAllowed:         true,
 		ViewerCanEnableAutoMerge: true,
-		ViewerCanMergeAsAdmin:    true,
+		ViewerPermission:         "ADMIN",
 		AutoMergeEnabled:         false,
 	}
 	if got != want {
@@ -159,18 +113,20 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 go test ./internal/github/gql/ -run TestPRMergeContextReadsEveryField
 ```
 
-期待: コンパイルエラー `unknown field ViewerCanMergeAsAdmin in struct literal of type MergeContext`
+期待: コンパイルエラー `unknown field ViewerPermission in struct literal of type MergeContext`
 
 - [ ] **Step 3: クエリにフィールドを足す**
 
-`internal/github/gql/merge.graphql` の `viewerCanEnableAutoMerge` の直後:
+`internal/github/gql/merge.graphql` の `repository` の直下、`autoMergeAllowed` の直後
+（**`pullRequest` の中ではない**）:
 
 ```graphql
-      viewerCanEnableAutoMerge
-      # What tells an admin merge from a merge that is simply refused: the
-      # mutation is the same either way, so this is the only thing that says
-      # whether offering it is honest.
-      viewerCanMergeAsAdmin
+    autoMergeAllowed
+    # What says whether offering the admin merge is honest.
+    # viewerCanMergeAsAdmin would be the obvious field, but it reads classic
+    # branch protection and answers false under a ruleset this viewer can in
+    # fact bypass (measured on #100, design 1.4).
+    viewerPermission
 ```
 
 - [ ] **Step 4: 構造体に足す**
@@ -179,21 +135,21 @@ go test ./internal/github/gql/ -run TestPRMergeContextReadsEveryField
 
 ```go
 	ViewerCanEnableAutoMerge bool
-	ViewerCanMergeAsAdmin    bool
+	ViewerPermission         string
 ```
 
-`mergeContextResponse` の `PullRequest` の中、同じ位置:
+`mergeContextResponse` の `Repository` の中、`AutoMergeAllowed` の直後:
 
 ```go
-				ViewerCanEnableAutoMerge bool `json:"viewerCanEnableAutoMerge"`
-				ViewerCanMergeAsAdmin    bool `json:"viewerCanMergeAsAdmin"`
+			AutoMergeAllowed    bool   `json:"autoMergeAllowed"`
+			ViewerPermission    string `json:"viewerPermission"`
 ```
 
-`PRMergeContext` の戻り値の組み立て、同じ位置:
+`PRMergeContext` の戻り値の組み立て、`ViewerCanEnableAutoMerge` の直後。**`r.` であって `pr.` ではない**:
 
 ```go
 		ViewerCanEnableAutoMerge: pr.ViewerCanEnableAutoMerge,
-		ViewerCanMergeAsAdmin:    pr.ViewerCanMergeAsAdmin,
+		ViewerPermission:         r.ViewerPermission,
 ```
 
 - [ ] **Step 5: 通ることを確かめる**
@@ -210,7 +166,7 @@ JSON に無いキーは false になるだけなので `TestPRMergeContextReadsW
 
 ```bash
 git add internal/github/gql/merge.graphql internal/github/gql/merge.go internal/github/gql/merge_test.go
-git commit -m "feat(merge): read viewerCanMergeAsAdmin from the merge context query"
+git commit -m "feat(merge): read viewerPermission from the merge context query"
 ```
 
 ---
@@ -233,7 +189,7 @@ func TestOnlyTwoBlocksGiveWayToAnAdmin(t *testing.T) {
 	// every row below turns on the permission, so what the table measures is
 	// the block, not the flag. The one row that turns it off is last.
 	admin := func(c MergeContext) MergeContext {
-		c.ViewerCanMergeAsAdmin = true
+		c.ViewerIsAdmin = true
 		return c
 	}
 
@@ -289,7 +245,7 @@ go test ./internal/app/domain/ -run TestOnlyTwoBlocksGiveWayToAnAdmin
 ```
 
 期待: コンパイルエラー `ctx.CanMergeAsAdmin undefined` と
-`unknown field ViewerCanMergeAsAdmin`
+`unknown field ViewerIsAdmin`
 
 - [ ] **Step 3: フィールドとメソッドを足す**
 
@@ -300,11 +256,14 @@ go test ./internal/app/domain/ -run TestOnlyTwoBlocksGiveWayToAnAdmin
 	ViewerCanEnableAutoMerge bool
 	AutoMergeEnabled         bool
 
-	// ViewerCanMergeAsAdmin is GitHub's answer to "may this viewer push the
-	// merge past what is holding it". The mutation that merges takes no
-	// admin input -- gh pr merge --admin sends the same one -- so this is
-	// the only thing that keeps the popup from offering a key that fails.
-	ViewerCanMergeAsAdmin bool
+	// ViewerIsAdmin is what keeps the popup from offering a key that fails.
+	// The mutation that merges takes no admin input -- gh pr merge --admin
+	// sends the same one -- so nothing in the answer to the merge itself
+	// says whether this viewer may push past a rule. viewerCanMergeAsAdmin
+	// would be the field for it, but it reads classic branch protection and
+	// answers false under a ruleset this viewer can bypass, so the gateway
+	// fills this from the repository permission instead (design 1.4).
+	ViewerIsAdmin bool
 ```
 
 `CanAutoMerge` の直後:
@@ -315,7 +274,7 @@ go test ./internal/app/domain/ -run TestOnlyTwoBlocksGiveWayToAnAdmin
 // A draft or a conflict is not a rule to bypass: it is work that is not
 // finished, and no permission finishes it.
 func (c MergeContext) CanMergeAsAdmin() bool {
-	if !c.ViewerCanMergeAsAdmin {
+	if !c.ViewerIsAdmin {
 		return false
 	}
 	switch c.Block() {
@@ -360,11 +319,11 @@ func TestTheAdminPermissionSurvivesTheTranslation(t *testing.T) {
 	got := toMergeContext(gql.MergeContext{
 		PullRequestID:         "PR_1",
 		Mergeable:             "MERGEABLE",
-		MergeStateStatus:      "BLOCKED",
-		ViewerCanMergeAsAdmin: true,
+		MergeStateStatus: "BLOCKED",
+		ViewerPermission: "ADMIN",
 	})
-	if !got.ViewerCanMergeAsAdmin {
-		t.Error("ViewerCanMergeAsAdmin = false, want true: the popup has no other way to know")
+	if !got.ViewerIsAdmin {
+		t.Error("ViewerIsAdmin = false, want true: the popup has no other way to know")
 	}
 	if !got.CanMergeAsAdmin() {
 		t.Error("CanMergeAsAdmin() = false, want true for a blocked pull request")
@@ -380,7 +339,7 @@ func TestTheAdminPermissionSurvivesTheTranslation(t *testing.T) {
 go test ./internal/app/adapter/gateway/gh/ -run TestTheAdminPermissionSurvivesTheTranslation
 ```
 
-期待: FAIL `ViewerCanMergeAsAdmin = false, want true`
+期待: FAIL `ViewerIsAdmin = false, want true`
 
 - [ ] **Step 3: 変換に足す**
 
@@ -389,7 +348,7 @@ go test ./internal/app/adapter/gateway/gh/ -run TestTheAdminPermissionSurvivesTh
 
 ```go
 		AutoMergeEnabled:         c.AutoMergeEnabled,
-		ViewerCanMergeAsAdmin:    c.ViewerCanMergeAsAdmin,
+		ViewerIsAdmin:            c.ViewerPermission == "ADMIN",
 ```
 
 - [ ] **Step 4: 通ることを確かめる**
@@ -490,7 +449,7 @@ git commit -m "feat(merge): word the admin merge offer in both catalogs"
 func blocked() domain.MergeContext {
 	c := mergeable()
 	c.State = domain.MergeStateBlocked
-	c.ViewerCanMergeAsAdmin = true
+	c.ViewerIsAdmin = true
 	return c
 }
 
@@ -542,7 +501,7 @@ func TestAIsRefusedWhereNoPermissionWouldHelp(t *testing.T) {
 	computing.State = domain.MergeStateUnknown
 
 	notAdmin := blocked()
-	notAdmin.ViewerCanMergeAsAdmin = false
+	notAdmin.ViewerIsAdmin = false
 
 	tests := []struct {
 		name string
@@ -684,7 +643,7 @@ func TestAPopupWithNoAdminOfferSaysNothingAboutIt(t *testing.T) {
 	t.Parallel()
 
 	c := blocked()
-	c.ViewerCanMergeAsAdmin = false
+	c.ViewerIsAdmin = false
 	m := loaded(t, &fakeSource{ctx: c})
 	view := ansi.Strip(m.View())
 	if notWant := i18n.T("merge.key_admin"); strings.Contains(view, notWant) {
@@ -762,7 +721,7 @@ go test ./internal/app/presentation/tui/merge/ -run 'TestTheBlockedPopupOffersTh
 go test ./internal/app/presentation/tui/merge/
 ```
 
-期待: PASS。既存のゴールデン状態はどれも `ViewerCanMergeAsAdmin` が false のままなので、
+期待: PASS。既存のゴールデン状態はどれも `ViewerIsAdmin` が false のままなので、
 録画は 1 本も変わらない。**ここでゴールデンが落ちたら、変更が
 `CanMergeAsAdmin()` の外に漏れている。** 差分を読んでから進む。
 
