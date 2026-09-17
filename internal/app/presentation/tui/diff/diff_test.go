@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -676,5 +677,35 @@ func TestLineNumberWidthIsCounted(t *testing.T) {
 	}
 	if got, want := m.lineNumberWidth(), m.numWidth; got != want {
 		t.Fatalf("lineNumberWidth() = %d, want the counted %d", got, want)
+	}
+}
+
+// TestSidebarStopsAtTheBottom is why the file list is cut: body only ever
+// uses paneHeight of its lines, and a pull request with hundreds of files
+// paid to draw every one of them on every frame. Two lines per file, so the
+// list may not run past the pane.
+func TestSidebarStopsAtTheBottom(t *testing.T) {
+	m := hugeModel(160, 300, 10)
+
+	if got, want := len(m.sidebarLines()), m.paneHeight(); got > want {
+		t.Fatalf("the sidebar drew %d lines for a %d-line pane", got, want)
+	}
+}
+
+// TestSidebarStillReachesTheSelectedFile guards what the cut must not
+// break: followSidebar scrolls fileTop so the selected file is on screen,
+// and the cut has to leave that file in the list it returns.
+func TestSidebarStillReachesTheSelectedFile(t *testing.T) {
+	m := hugeModel(160, 300, 10)
+	for range 40 {
+		m = m.moveFile(1)
+	}
+	m.sidebar = true
+
+	lines := m.sidebarLines()
+	want := clip(m.files[m.file].Path, sidebarWidth)
+
+	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, want) }) {
+		t.Fatalf("the selected file %q is not in the %d lines drawn", want, len(lines))
 	}
 }

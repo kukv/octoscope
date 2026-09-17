@@ -351,8 +351,12 @@ func (m Model) sidebarLines() []string {
 	if len(m.files) == 0 {
 		return nil
 	}
-	lines := make([]string, 0, (len(m.files)-m.fileTop)*2)
-	for i := m.fileTop; i < len(m.files); i++ {
+	// body only draws paneHeight lines, and a file takes two of them. Going
+	// past that built rows nobody sees -- three lipgloss renders and a walk
+	// of every review thread, per file, on every frame.
+	h := m.paneHeight()
+	lines := make([]string, 0, h)
+	for i := m.fileTop; i < len(m.files) && len(lines) < h; i++ {
 		f := m.files[i]
 		path := clip(f.Path, sidebarWidth)
 		plainSize := fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)
