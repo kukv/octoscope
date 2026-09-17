@@ -277,6 +277,9 @@ func fit(s string, w int) string {
 `internal/app/presentation/tui/checks/render.go` も同じく定義を削除し、
 `fit(` 4 箇所を `layout.Fill(` に置き換える。
 
+**`work/render.go:416` にも 3 つ目の同じ写しがある。** そちらは Task 8 で
+同じファイルを触るときに畳む。このタスクでは触らない。
+
 ```bash
 grep -rn "fit(" internal/app/presentation/tui/diff/ internal/app/presentation/tui/checks/
 ```
@@ -770,6 +773,31 @@ func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []st
 	return strings.Split(theme.Card(selected).Width(w).Render(strings.Join(body, "\n")), "\n")
 }
 ```
+
+- [ ] **Step 1b: `work` の私有 `fit` を畳む**
+
+`work/render.go:416` は Task 2 が `diff` と `checks` から取り除いたのと同じ
+「clip して幅まで空白で埋める」関数の 3 つ目の写しである。
+
+```go
+func fit(s string, w int) string {
+	s = clip(s, w)
+	return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
+}
+```
+
+定義を削除し、`work` パッケージの中の `fit(` を `layout.Fill(` に置き換える。
+私有の `clip` は残す。`layout` が import されていなければ足す。
+
+```bash
+grep -rn "fit(" internal/app/presentation/tui/work/
+```
+
+期待: `layout.FitKeyBar` 以外は何も出ない。
+
+**この置き換えで golden は動かない。** Step 1 の塗りの変更と混ざるので、
+先にこの置き換えだけを行い、`go test ./internal/app/presentation/tui/work/` が
+**通る**ことを確かめてから Step 1 に進むこと。ここで落ちたら置き換えを間違えている。
 
 行を `Fill` で埋めないのは、**`theme.Card` の `Background` が残っていて
 lipgloss が行末までの padding を自分で塗るから**である。文字の終わりから
