@@ -101,7 +101,9 @@ const chromaReset = "\x1b[0m"
 // ansi.ResetStyle, and chroma writes chromaReset.
 //
 // s must already be padded to the width it should fill: a background lands
-// only on columns that have a character in them.
+// only on columns that have a character in them. A caller marking one word
+// inside a line, rather than a whole row, passes the word alone -- the
+// padding requirement is for a row, not for every call.
 func SelectedLine(s string) string {
 	bg := ansi.Style{}.BackgroundColor(selection()).String()
 	s = strings.ReplaceAll(s, ansi.ResetStyle, ansi.ResetStyle+bg)

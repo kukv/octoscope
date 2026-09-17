@@ -375,7 +375,7 @@ func (m Model) resultRow(i int, width int) string {
 		layout.Right(theme.Dim().Render(age), ageColumn)
 
 	if i == m.sel {
-		return theme.SelectedLine(layout.Clip(line, width))
+		return theme.SelectedLine(layout.Fill(line, width))
 	}
 	return layout.Clip(line, width)
 }
