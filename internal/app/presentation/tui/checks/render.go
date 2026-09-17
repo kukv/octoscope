@@ -317,10 +317,10 @@ func (m Model) visibleLogRows() []string {
 }
 
 // logRows is every line the log pane would draw, ungated by scrolling. The
-// log's own lines were built when it arrived (buildLogLines); what is left
-// here is the three states that have no log to draw and do change from one
-// frame to the next -- the spinner advances, and which "empty" it is
-// depends on the cursor.
+// log's own lines were built when it arrived (buildLogLines) and are fixed
+// until it arrives again; what is left here is the three states that have
+// no log to draw, and each depends on state that can change on any Update
+// -- the spinner's frame changes on every tick, the fastest of the three.
 func (m Model) logRows() []string {
 	if m.logPhase == phaseLoading {
 		return []string{m.spin.View() + " " + i18n.T("checks.log_loading")}
