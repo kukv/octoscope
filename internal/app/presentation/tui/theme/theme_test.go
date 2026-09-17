@@ -294,3 +294,28 @@ func TestSelectedLineFollowsTheBackground(t *testing.T) {
 		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
 	}
 }
+
+// benchSink keeps the compiler from optimising the benchmarked call away.
+var benchSink string
+
+// BenchmarkHighlightScreen is one screenful of diff: Highlight is called
+// once per visible row, so this is what a keypress costs before anything
+// else the view does.
+func BenchmarkHighlightScreen(b *testing.B) {
+	const code = "func (m Model) diffTextLine(l domain.DiffLine, width int) string {"
+	for b.Loop() {
+		for range 50 {
+			benchSink = theme.Highlight("internal/app/presentation/tui/diff/render.go", code)
+		}
+	}
+}
+
+// BenchmarkHighlightUnknownExt is a file chroma has no lexer for. It costs
+// more than a Go file, not less: lexers.Match only gives up after trying
+// every pattern it has.
+func BenchmarkHighlightUnknownExt(b *testing.B) {
+	const code = "the quick brown fox jumps over the lazy dog"
+	for b.Loop() {
+		benchSink = theme.Highlight("docs/notes.unknownext", code)
+	}
+}
