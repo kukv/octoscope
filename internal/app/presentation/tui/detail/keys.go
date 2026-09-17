@@ -56,77 +56,108 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ref := m.ref
 		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
 	case "m":
-		// An issue has nothing to merge.
-		if m.ref.Kind != domain.ItemPR {
-			return m, nil
-		}
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		// Nor has a pull request that is already merged or closed. GitHub
-		// answers UNKNOWN for a merged one, so the popup would say it is
-		// still working the answer out, for ever.
-		if !m.canMerge() {
-			return m, nil
-		}
-		m.mode, m.phase = modeMerge, phaseIdle
-		m.errText = ""
-		m.merge = merge.New(m.src, m.ref)
-		m.merge, _ = m.merge.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		return m, m.merge.Init()
+		return m.openMerge()
 	case "r":
-		m.phase = phaseLoading
-		m.declined = ""
-		return m, fetch(m.src, m.ref)
+		return m.refetch()
 	case "c":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		m.mode, m.phase = modeCompose, phaseIdle
-		m.errText = ""
-		m.textarea.Reset()
-		m.textarea.Focus()
-		return m, textarea.Blink
+		return m.openCompose()
 	case "x":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		if _, ok := m.stateAction(); !ok {
-			return m, nil // merged and the like: no action
-		}
-		m.mode, m.phase = modeConfirm, phaseIdle
-		m.errText = ""
-		return m, nil
+		return m.openConfirm()
 	case "v":
-		// An issue has no review. Unlike the diff view's v, this always
-		// fetches first: detail holds no review context of its own.
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		if m.ref.Kind != domain.ItemPR {
-			return m, nil
-		}
-		m.mode, m.phase = modeSubmit, phaseLoading
-		m.errText = ""
-		return m, fetchReviewContext(m.src, m.ref)
+		return m.openSubmit()
 	case "l":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		m.mode, m.phase = modePick, phaseLoading
-		m.errText = ""
-		return m, fetchLabelPicker(m.src, m.ref)
+		return m.openPicker(pickLabels)
 	case "a":
-		if m.phase == phaseLoading {
-			return m.stillLoading(), nil
-		}
-		m.mode, m.phase = modePick, phaseLoading
-		m.errText = ""
-		return m, fetchAssigneePicker(m.src, m.ref)
+		return m.openPicker(pickAssignees)
 	}
 	var cmd tea.Cmd
 	m.body, cmd = m.body.Update(msg)
 	return m, cmd
+}
+
+// openMerge opens the merge popup. An issue has nothing to merge, and nor
+// has a pull request that is already merged or closed: GitHub answers
+// UNKNOWN for a merged one, so the popup would say it is still working the
+// answer out, for ever.
+func (m Model) openMerge() (Model, tea.Cmd) {
+	if m.ref.Kind != domain.ItemPR {
+		return m, nil
+	}
+	if m.phase == phaseLoading {
+		return m.stillLoading(), nil
+	}
+	if !m.canMerge() {
+		return m, nil
+	}
+	m.mode, m.phase = modeMerge, phaseIdle
+	m.errText = ""
+	m.merge = merge.New(m.src, m.ref)
+	m.merge, _ = m.merge.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	return m, m.merge.Init()
+}
+
+// refetch asks for the item again. Unlike the others it is allowed while a
+// fetch is already in flight: asking twice is what a reader does when the
+// first one is taking too long.
+func (m Model) refetch() (Model, tea.Cmd) {
+	m.phase = phaseLoading
+	m.declined = ""
+	return m, fetch(m.src, m.ref)
+}
+
+// openCompose opens the comment composer.
+func (m Model) openCompose() (Model, tea.Cmd) {
+	if m.phase == phaseLoading {
+		return m.stillLoading(), nil
+	}
+	m.mode, m.phase = modeCompose, phaseIdle
+	m.errText = ""
+	m.textarea.Reset()
+	m.textarea.Focus()
+	return m, textarea.Blink
+}
+
+// openConfirm asks before closing or reopening the item.
+func (m Model) openConfirm() (Model, tea.Cmd) {
+	if m.phase == phaseLoading {
+		return m.stillLoading(), nil
+	}
+	if _, ok := m.stateAction(); !ok {
+		return m, nil // merged and the like: no action
+	}
+	m.mode, m.phase = modeConfirm, phaseIdle
+	m.errText = ""
+	return m, nil
+}
+
+// openSubmit opens the review popup. An issue has no review. Unlike the diff
+// view's v, this always fetches first: detail holds no review context of its
+// own.
+func (m Model) openSubmit() (Model, tea.Cmd) {
+	if m.phase == phaseLoading {
+		return m.stillLoading(), nil
+	}
+	if m.ref.Kind != domain.ItemPR {
+		return m, nil
+	}
+	m.mode, m.phase = modeSubmit, phaseLoading
+	m.errText = ""
+	return m, fetchReviewContext(m.src, m.ref)
+}
+
+// openPicker opens the label or the assignee picker. Both wait on the
+// repository's candidates, which is why the picker opens in phaseLoading
+// rather than with an empty list.
+func (m Model) openPicker(kind pickerKind) (Model, tea.Cmd) {
+	if m.phase == phaseLoading {
+		return m.stillLoading(), nil
+	}
+	m.mode, m.phase = modePick, phaseLoading
+	m.errText = ""
+	if kind == pickLabels {
+		return m, fetchLabelPicker(m.src, m.ref)
+	}
+	return m, fetchAssigneePicker(m.src, m.ref)
 }
 
 func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
