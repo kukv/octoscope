@@ -33,6 +33,7 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 
 	body := `{"data":{"repository":{"squashMergeAllowed":true,"mergeCommitAllowed":false,` +
 		`"rebaseMergeAllowed":false,"deleteBranchOnMerge":true,"autoMergeAllowed":true,` +
+		`"viewerPermission":"ADMIN",` +
 		`"pullRequest":{"id":"PR_1","isDraft":false,"mergeable":"MERGEABLE",` +
 		`"mergeStateStatus":"CLEAN","reviewDecision":"APPROVED",` +
 		`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
@@ -55,6 +56,7 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 		DeleteBranchOnMerge:      true,
 		AutoMergeAllowed:         true,
 		ViewerCanEnableAutoMerge: true,
+		ViewerPermission:         "ADMIN",
 		AutoMergeEnabled:         false,
 	}
 	if got != want {

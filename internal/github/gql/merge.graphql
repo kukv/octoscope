@@ -5,6 +5,12 @@ query ($owner: String!, $name: String!, $number: Int!) {
     rebaseMergeAllowed
     deleteBranchOnMerge
     autoMergeAllowed
+    # What says whether offering the admin merge is honest.
+    # viewerCanMergeAsAdmin is the field named for it, but it reads classic
+    # branch protection only: on a repository guarded by a ruleset it answers
+    # false even to a viewer the ruleset lists as an always-bypass actor
+    # (measured 2026-09-18). The permission is the closest honest signal left.
+    viewerPermission
     pullRequest(number: $number) {
       id
       isDraft
