@@ -204,7 +204,7 @@ go test ./internal/app/presentation/tui/checks/ -bench=HugeLog -run=XXX -benchti
 
 期待: すべて PASS し、`BenchmarkHighlightScreen` が 50〜100 ms/op、`BenchmarkViewHugeLog` と `BenchmarkMoveRowHugeLog` が数十 ms/op のオーダーで出る。**この 5 本の数値を控えておく。** Task 2・3 の後で同じコマンドを走らせて比べる。
 
-`logArrived` が `msg.jobID != m.selectedJob()` でログを捨てる作りなので、`keyPress("enter")` を先に送ってカーソル位置のジョブを確定させている。もし `m.log` が空のままベンチが数 μs で終わったら、それはログが捨てられている。`m.selectedJob()` が空でないかを確認すること。
+`logArrived` が `msg.jobID != m.selectedJob()` でログを捨てる作りなので、`keyPress("enter")` を先に送ってカーソル位置のジョブを確定させている。もし `m.log` が空のままベンチが数マイクロ秒で終わったら、それはログが捨てられている。`m.selectedJob()` が空でないかを確認すること。
 
 - [x] **Step 5: コミット**
 
@@ -335,9 +335,9 @@ go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=10
 期待:
 - テストは全 PASS（`TestHighlightFollowsBackground` が落ちたら、配色までキャッシュしている）
 - `BenchmarkHighlightScreen` が **16 ms/op 未満**（80 ms → 6〜7 ms のはず）
-- `BenchmarkHighlightUnknownExt` が **10 μs 未満**。キャッシュされた miss 自体は約 10 ns だが、
-  この `-benchtime=300x` には初回の実 miss（約 2 ms）が 1 回だけ含まれ、300 で割った約 7 μs が
-  平均に乗る。実測 8.0 μs。**計画時に書いた「1 μs 未満」は、この初回ぶんを数え忘れていた。**
+- `BenchmarkHighlightUnknownExt` が **10 マイクロ秒未満**。キャッシュされた miss 自体は約 10 ns だが、
+  この `-benchtime=300x` には初回の実 miss（約 2 ms）が 1 回だけ含まれ、300 で割った約 7 マイクロ秒が
+  平均に乗る。実測 8.0 マイクロ秒。**計画時に書いた「1 マイクロ秒未満」は、この初回ぶんを数え忘れていた。**
   キャッシュが効いていることを直接見たいなら `-benchtime=10000x` で約 10 ns/op に収束する
 - `BenchmarkViewHugeLog` は変わらない（ログ側は別の原因）
 
