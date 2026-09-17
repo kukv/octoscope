@@ -16,6 +16,9 @@ type fakeSource struct {
 	err    error
 	called []string
 
+	viewer    string
+	viewerErr error
+
 	checks       domain.Checks
 	checksRepo   string
 	checksNumber int
@@ -46,6 +49,8 @@ func (f *fakeSource) GetIssue(_ context.Context, _ string, _ int) (domain.Issue,
 	f.called = append(f.called, "GetIssue")
 	return f.issue, f.err
 }
+
+func (f *fakeSource) Viewer(context.Context) (string, error) { return f.viewer, f.viewerErr }
 
 func (f *fakeSource) PRChecks(_ context.Context, repo string, number int) (domain.Checks, error) {
 	f.checksRepo, f.checksNumber = repo, number
@@ -467,6 +472,23 @@ func TestSaveQueriesReachesTheStore(t *testing.T) {
 	}
 	if !slices.Equal(store.saved, want) {
 		t.Errorf("store holds %+v, want %+v", store.saved, want)
+	}
+}
+
+// TestViewerPassesTheLoginThrough is the whole of what this layer does with
+// it: there is nothing to decide, and a view is not allowed to reach the
+// GitHub layer itself (.claude/rules/architecture.md).
+func TestViewerPassesTheLoginThrough(t *testing.T) {
+	t.Parallel()
+
+	u := &Usecase{viewer: &fakeSource{viewer: "kukv"}}
+
+	got, err := u.Viewer(t.Context())
+	if err != nil {
+		t.Fatalf("Viewer: %v", err)
+	}
+	if got != "kukv" {
+		t.Errorf("login is %q, want %q", got, "kukv")
 	}
 }
 
