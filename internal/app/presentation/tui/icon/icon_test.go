@@ -44,7 +44,7 @@ func markers() []string {
 	}
 	done, rest := icon.ChecksBar(domain.Checks{Total: 2, Passed: 1})
 	got = append(got, done, rest)
-	got = append(got, icon.Collapsed(), icon.CommentBar(), icon.ThreadBadge())
+	got = append(got, icon.Collapsed(), icon.CommentBar(), icon.MentionBar(), icon.ThreadBadge())
 	got = append(got, icon.Radio(true), icon.Radio(false), icon.Warning())
 	return got
 }
