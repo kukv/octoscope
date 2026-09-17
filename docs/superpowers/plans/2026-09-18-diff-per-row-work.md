@@ -51,7 +51,7 @@
 **Files:**
 - Modify: `internal/app/presentation/tui/diff/bench_test.go`
 
-- [ ] **Step 1: 大きな diff の fixture とベンチを書く**
+- [x] **Step 1: 大きな diff の fixture とベンチを書く**
 
 `bench_test.go` の末尾に追記する。`fakeSource` は `diff_test.go` に、`diffMsg` / `reviewMsg` は `diff.go` にある。
 
@@ -120,7 +120,7 @@ import に `fmt`、`tea "charm.land/bubbletea/v2"`、`"github.com/kukv/octoscope
 
 `len(m.rows) < 5000` のガードは、前の計画で checks のベンチが静かに空を測りかけた失敗と同じ形を防ぐためのもの。`diffMsg` が捨てられればベンチは一瞬で終わり、何もゲートしなくなる。
 
-- [ ] **Step 2: 走らせて現状値を記録する**
+- [x] **Step 2: 走らせて現状値を記録する**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=20x
@@ -128,7 +128,7 @@ go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=20
 
 期待: `BenchmarkViewHugeDiff` が `BenchmarkView`（0.83 ms）より桁で遅い。**両方の数値を控える。** もし差が小さければ、見立てが外れているので Task 2・3 に進む前に報告すること（走査回数の見積もりであって実測ではない）。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 git add internal/app/presentation/tui/diff/bench_test.go
@@ -145,7 +145,7 @@ git commit -m "test(diff): measure a frame of a pull request that is actually bi
 - Modify: `internal/app/presentation/tui/diff/render.go`
 - Modify: `internal/app/presentation/tui/diff/diff_test.go`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `diff_test.go` に追記する。桁数はキャッシュしても値が変わってはいけない — そこが壊れるとガター幅が狂って全行がずれる。
 
@@ -195,7 +195,7 @@ func TestLineNumberWidthIsCounted(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 走らせて失敗を確かめる**
+- [x] **Step 2: 走らせて失敗を確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -run 'TestLineNumberWidth' -v
@@ -203,7 +203,7 @@ go test ./internal/app/presentation/tui/diff/ -run 'TestLineNumberWidth' -v
 
 期待: `TestLineNumberWidthIsCounted` が `m.numWidth` という未定義フィールドでコンパイルできず失敗する。`TestLineNumberWidthFollowsTheRows` は、コンパイルが通れば今も PASS する回帰テスト。
 
-- [ ] **Step 3: 行と桁数を一緒に入れ替える**
+- [x] **Step 3: 行と桁数を一緒に入れ替える**
 
 `diff.go` の Model に足す。`rows` の宣言の直後に置く。
 
@@ -263,7 +263,7 @@ func (m Model) lineNumberWidth() int { return max(m.numWidth, (gutterWidth-3)/2)
 
 `render.go` から `strconv` が使われなくなっていないか確かめる（`sidebarLines` がまだ使っているので残るはず）。
 
-- [ ] **Step 4: テストとゴールデンを走らせる**
+- [x] **Step 4: テストとゴールデンを走らせる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -run 'TestLineNumberWidth' -v
@@ -273,7 +273,7 @@ go test ./internal/app/presentation/tui/root/ -run TestGolden
 
 期待: すべて PASS。ゴールデンは `-update` を付けずに通ること。**ここでゴールデンが落ちたら、桁が動いている。** 更新ではなく原因を直す。
 
-- [ ] **Step 5: ベンチを見る**
+- [x] **Step 5: ベンチを見る**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=20x
@@ -281,7 +281,7 @@ go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=20
 
 期待: `BenchmarkViewHugeDiff` が Task 1 の値から落ちていること。まだサイドバーぶんが残っているので、ここで目標値には届かなくてよい。
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 git add internal/app/presentation/tui/diff/diff.go internal/app/presentation/tui/diff/mouse.go internal/app/presentation/tui/diff/render.go internal/app/presentation/tui/diff/diff_test.go
@@ -296,7 +296,7 @@ git commit -m "perf(diff): count the gutter's width once a file, not twice a row
 - Modify: `internal/app/presentation/tui/diff/render.go`
 - Modify: `internal/app/presentation/tui/diff/diff_test.go`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `diff_test.go` に追記する。
 
@@ -334,7 +334,7 @@ func TestSidebarStillReachesTheSelectedFile(t *testing.T) {
 
 import に `slices` と `strings` が要る（`strings` は既にあるかもしれない）。`hugeModel` は Task 1 で `bench_test.go` に置いたもので、同じパッケージなのでそのまま使える。
 
-- [ ] **Step 2: 走らせて失敗を確かめる**
+- [x] **Step 2: 走らせて失敗を確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -run 'TestSidebar' -v
@@ -342,7 +342,7 @@ go test ./internal/app/presentation/tui/diff/ -run 'TestSidebar' -v
 
 期待: `TestSidebarStopsAtTheBottom` が「600 行描いた」と報告して FAIL。`TestSidebarStillReachesTheSelectedFile` は今も PASS（全件描いているので必ず入っている）。Step 3 で壊さないための回帰テスト。
 
-- [ ] **Step 3: 打ち切る**
+- [x] **Step 3: 打ち切る**
 
 `render.go` の `sidebarLines` のループ条件を変える。ほかは変えない。
 
@@ -361,18 +361,23 @@ func (m Model) sidebarLines() []string {
 
 ループ本体と `return lines` はそのまま。
 
-- [ ] **Step 4: テストとゴールデンを走らせる**
+- [x] **Step 4: テストとゴールデンを走らせる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -run 'TestSidebar' -v
 go test ./internal/app/presentation/tui/diff/ -run TestGolden
 go test ./internal/app/presentation/tui/root/ -run TestGolden
-go test ./internal/app/presentation/tui/diff/ -run TestMouse -v
 ```
 
-期待: すべて PASS。マウスの当たり判定（`mouse.go` の `m.fileTop + (y-headerHeight)/2`）はサイドバーが返す行数ではなく `fileTop` を見ているので影響しないはずだが、走らせて確かめる。
+期待: すべて PASS。
 
-- [ ] **Step 5: ベンチで目標に届いたことを確かめる**
+**訂正:** ここには当初 `go test -run TestMouse` と書いてあったが、そんな名前のテストは
+このパッケージに無く、そのコマンドは 0 件しか走らせない。マウスの当たり判定
+（`mouse.go` の `fileAt`）が打ち切りでズレないことは、レビューで全 y 座標について新旧の
+`fileAt(y)` を突き合わせて確認した。`fileAt` が返しうる最大 index は `fileTop + (h-1)/2`、
+描画されるファイルの最大 index は `fileTop + floor((h-1)/2)` で一致する。
+
+- [x] **Step 5: ベンチで目標に届いたことを確かめる**
 
 ```bash
 go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=100x
@@ -387,7 +392,7 @@ go test ./internal/app/presentation/tui/diff/ -bench=View -run=XXX -benchtime=10
 `hugeModel` のファイル数を 300 から 1000 に増やしても `BenchmarkViewHugeDiff` がほとんど
 変わらないことで行う**（ベンチを書き換えるのではなく、手元で一時的に数字を変えて確かめる）。
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 git add internal/app/presentation/tui/diff/render.go internal/app/presentation/tui/diff/diff_test.go
@@ -428,7 +433,7 @@ chroma の `indexedTTYFormatter.Format` は、呼ばれるたびにスタイル�
 
 ### Task 4: 全体の検査と、実機での確認
 
-- [ ] **Step 1: `make check` を通す**
+- [x] **Step 1: `make check` を通す**
 
 ```bash
 make check
@@ -436,7 +441,7 @@ make check
 
 期待: tidy / lint / fmt / test すべて PASS。
 
-- [ ] **Step 2: 実際に起動して大きな PR を見る**
+- [x] **Step 2: 実際に起動して大きな PR を見る**
 
 ```bash
 go run ./cmd/octoscope --repo kukv/octoscope
@@ -449,7 +454,7 @@ go run ./cmd/octoscope --repo kukv/octoscope
 - 行番号が 5 桁になるファイルでガターが広がり、桁がずれない
 - サイドバーのスレッド件数バッジが以前と同じ位置に出る
 
-- [ ] **Step 3: 日本語と狭い端末でも見る**
+- [x] **Step 3: 日本語と狭い端末でも見る**
 
 ```bash
 go run ./cmd/octoscope --repo kukv/octoscope --lang ja
@@ -457,6 +462,6 @@ go run ./cmd/octoscope --repo kukv/octoscope --lang ja
 
 80 桁まで狭めて、サイドバーが畳まれる（`minWidthForSidebar` = 100）ところと、その手前の 100 桁の両方を見る。
 
-- [ ] **Step 4: 見たものを報告する**
+- [x] **Step 4: 見たものを報告する**
 
 何を開いて何を確認したかを PR の説明に書く。「テストが通った」は TUI の完了条件ではない。
