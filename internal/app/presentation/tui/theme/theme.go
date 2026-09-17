@@ -57,6 +57,9 @@ func attention() lipgloss.Style { return fg("#9a6700", "#d29922") }
 func accent() lipgloss.Style    { return fg("#0969da", "#58a6ff") }
 func muted() lipgloss.Style     { return fg("#57606a", "#8b949e") }
 
+// selection is the background a cursor row or card is marked with.
+func selection() color.Color { return pick("#e8eef5", "#1d2735") }
+
 // Heading styles a column or section heading. The mockup letter-spaces and
 // upper-cases them; a terminal cannot letter-space, and upper-casing does
 // nothing to Japanese, so the heading is set apart by weight instead.
@@ -73,7 +76,7 @@ func Card(selected bool) lipgloss.Style {
 	s := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 	if selected {
 		return s.BorderForeground(pick("#0e6f78", "#5bb4f5")).
-			Background(pick("#e8eef5", "#1d2735"))
+			Background(selection())
 	}
 	return s.BorderForeground(pick("#d9dee4", "#262d39"))
 }
@@ -105,7 +108,7 @@ const chromaReset = "\x1b[0m"
 // s must already be padded to the width it should fill: a background lands
 // only on columns that have a character in them.
 func SelectedLine(s string) string {
-	bg := ansi.Style{}.BackgroundColor(pick("#e8eef5", "#1d2735")).String()
+	bg := ansi.Style{}.BackgroundColor(selection()).String()
 	s = strings.ReplaceAll(s, ansi.ResetStyle, ansi.ResetStyle+bg)
 	s = strings.ReplaceAll(s, chromaReset, chromaReset+bg)
 	return bg + s + ansi.ResetStyle

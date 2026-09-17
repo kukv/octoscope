@@ -248,7 +248,7 @@ func TestSelectedLineCarriesTheBackgroundPastALipglossReset(t *testing.T) {
 // TestSelectedLineCarriesTheBackgroundPastAChromaReset covers the other reset
 // the drawing can produce. chroma does not use the ansi package and writes
 // "\x1b[0m" after every token it colours, so a highlighted diff line is full
-// of them (.../specs/2026-09-16-selection-highlight-design.md §1.4).
+// of them.
 func TestSelectedLineCarriesTheBackgroundPastAChromaReset(t *testing.T) {
 	dark(t)
 
@@ -275,5 +275,22 @@ func TestSelectedLineKeepsASpanWithItsOwnBackground(t *testing.T) {
 	}
 	if !strings.Contains(line, ansi.ResetStyle+bg) {
 		t.Errorf("the row's background does not come back after the label: %q", line)
+	}
+}
+
+// TestSelectedLineFollowsTheBackground guards the light variant of the
+// selection colour: selectionBackground reads whatever SelectedLine opens
+// with rather than naming a colour, so a mistyped light hex would still pass
+// the other tests above.
+func TestSelectedLineFollowsTheBackground(t *testing.T) {
+	dark(t)
+
+	theme.SetDark(true)
+	onDark := theme.SelectedLine("x")
+	theme.SetDark(false)
+	onLight := theme.SelectedLine("x")
+
+	if onDark == onLight {
+		t.Errorf("the same colour is used on both backgrounds: %q", onDark)
 	}
 }
