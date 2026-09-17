@@ -576,8 +576,15 @@ func TestAddedAndRemovedLinesAreFilled(t *testing.T) {
 	added := m.diffLine(rowOfLineKind(t, m, domain.LineAdded), false, 80)
 	removed := m.diffLine(rowOfLineKind(t, m, domain.LineRemoved), false, 80)
 
-	if openingStyle(t, added) == openingStyle(t, removed) {
+	addedStyle, removedStyle := openingStyle(t, added), openingStyle(t, removed)
+	if addedStyle == removedStyle {
 		t.Errorf("an added and a removed line are filled the same: %q", added)
+	}
+	if !strings.HasPrefix(addedStyle, "\x1b[48;") {
+		t.Errorf("an added line does not open with a background: %q", added)
+	}
+	if !strings.HasPrefix(removedStyle, "\x1b[48;") {
+		t.Errorf("a removed line does not open with a background: %q", removed)
 	}
 }
 
