@@ -291,7 +291,7 @@ func (m Model) filterRow(id FilterID) string {
 	if m.pane == paneFilters && id == m.cursor {
 		return theme.SelectedLine(layout.Fill(line, filterPaneWidth))
 	}
-	return line
+	return layout.Clip(line, filterPaneWidth)
 }
 
 // filterLabelID names the message ID for one filter's label, which is

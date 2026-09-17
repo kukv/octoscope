@@ -207,6 +207,31 @@ func TestATypedFilterFitsThePane(t *testing.T) {
 	}
 }
 
+// A long filter value must be clipped to the pane whether or not the row is
+// the one the cursor sits on: moving the cursor off must not un-clip it and
+// let it overrun the divider between the panes.
+func TestAFilterRowIsClippedWhetherOrNotItIsSelected(t *testing.T) {
+	t.Parallel()
+
+	m := sized(t, 120, nil)
+	m, _ = press(m, "j") // type -> state
+	m, _ = press(m, "j") // state -> org
+	m, _ = press(m, "enter")
+	for _, r := range strings.Repeat("x", 30) {
+		m, _ = press(m, string(r))
+	}
+	m, _ = press(m, "enter")
+
+	if got := ansi.StringWidth(m.filterRow(FilterOrg)); got > filterPaneWidth {
+		t.Errorf("selected filter row is %d columns, want at most %d:\n%s", got, filterPaneWidth, m.filterRow(FilterOrg))
+	}
+
+	m, _ = press(m, "j") // org -> repo, leaving org unselected
+	if got := ansi.StringWidth(m.filterRow(FilterOrg)); got > filterPaneWidth {
+		t.Errorf("unselected filter row is %d columns, want at most %d:\n%s", got, filterPaneWidth, m.filterRow(FilterOrg))
+	}
+}
+
 // The popup draws one row per saved query. Nothing caps them, so a list
 // grown over months pushes the box's top edge and the key bar off the
 // screen -- the whole popup becomes unusable.
