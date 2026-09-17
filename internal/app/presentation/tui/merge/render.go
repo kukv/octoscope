@@ -104,10 +104,16 @@ func (m Model) deleteBranchText() string {
 }
 
 // reason is the line under the options: why merging is refused, or, when
-// nothing refuses it, what the review still wants.
+// nothing refuses it, what the review still wants. A block an admin can push
+// past carries a second line saying so: the key bar alone names the key but
+// not that it is a protection being broken.
 func (m Model) reason() string {
 	if text := blockText(m.ctx.Block()); text != "" {
-		return theme.Error().Render(icon.Warning() + " " + text)
+		line := theme.Error().Render(icon.Warning() + " " + text)
+		if m.ctx.CanMergeAsAdmin() {
+			line += "\n" + theme.Dim().Render("  "+i18n.T("merge.admin_offer"))
+		}
+		return line
 	}
 	switch m.ctx.Review {
 	case domain.ReviewRequired:
@@ -162,7 +168,11 @@ func (m Model) hints() []string {
 	case m.ctx.AutoMergeEnabled:
 		hints = append(hints, i18n.T("merge.key_auto_off"))
 	case !m.answered() || m.ctx.Block() != domain.BlockNone:
-		// enter sends nothing: there is no answer, or something refuses it
+		// enter sends nothing: there is no answer, or something refuses it.
+		// a does, where the viewer may push past what refuses it.
+		if m.ctx.CanMergeAsAdmin() {
+			hints = append(hints, i18n.T("merge.key_admin"))
+		}
 	case m.auto:
 		hints = append(hints, i18n.T("merge.key_queue"))
 	default:

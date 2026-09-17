@@ -3,11 +3,14 @@ package merge
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 type fakeSource struct {
@@ -534,5 +537,37 @@ func TestAIsIgnoredWhileAMergeIsInFlight(t *testing.T) {
 	_, cmd = press(m, "a")
 	if cmd != nil {
 		t.Error("a returned a second command while the first was in flight")
+	}
+}
+
+// A key that works but is not on the bar is a key nobody finds.
+func TestTheBlockedPopupOffersTheAdminKey(t *testing.T) {
+	t.Parallel()
+
+	m := loaded(t, &fakeSource{ctx: blocked()})
+	view := ansi.Strip(m.View())
+	if want := i18n.T("merge.key_admin"); !strings.Contains(view, want) {
+		t.Errorf("the key bar has no %q:\n%s", want, view)
+	}
+	if want := i18n.T("merge.admin_offer"); !strings.Contains(view, want) {
+		t.Errorf("the popup does not say %q:\n%s", want, view)
+	}
+	if notWant := i18n.T("merge.key_merge"); strings.Contains(view, notWant) {
+		t.Errorf("the key bar offers %q on a blocked pull request:\n%s", notWant, view)
+	}
+}
+
+func TestAPopupWithNoAdminOfferSaysNothingAboutIt(t *testing.T) {
+	t.Parallel()
+
+	c := blocked()
+	c.ViewerIsAdmin = false
+	m := loaded(t, &fakeSource{ctx: c})
+	view := ansi.Strip(m.View())
+	if notWant := i18n.T("merge.key_admin"); strings.Contains(view, notWant) {
+		t.Errorf("the key bar offers %q to a viewer who may not:\n%s", notWant, view)
+	}
+	if notWant := i18n.T("merge.admin_offer"); strings.Contains(view, notWant) {
+		t.Errorf("the popup says %q to a viewer who may not:\n%s", notWant, view)
 	}
 }
