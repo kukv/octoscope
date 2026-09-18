@@ -11,6 +11,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -819,5 +820,38 @@ func TestNoUnresolvedIDsInTheWorkView(t *testing.T) {
 		loading, _ := empty.Refresh()
 		t.Cleanup(loading.Cancel)
 		i18n.AssertNoUnresolvedIDs(t, loading.View())
+	}
+}
+
+// TestAnIssueCardIsMarkedAsOne guards the one place a card tells the two
+// kinds apart. A review marker on an issue would claim a review state that
+// issues do not have.
+func TestAnIssueCardIsMarkedAsOne(t *testing.T) {
+	issue := domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/koto", Number: 8}}
+	if got := ansi.Strip(stateMarker(issue)); got != icon.Issue() {
+		t.Errorf("an issue is marked %q, want the issue marker %q", got, icon.Issue())
+	}
+
+	pr := domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 9}}
+	if got := ansi.Strip(stateMarker(pr)); got == icon.Issue() {
+		t.Errorf("a pull request is marked with the issue marker %q", got)
+	}
+}
+
+// TestAnIssueGetsNoChecksPane is the drawer's half of the same distinction.
+// An issue has no checks at all, so the pane is absent rather than empty:
+// the "no checks" line is a thing to say about a pull request that ran none,
+// not about an item that can never have any.
+func TestAnIssueGetsNoChecksPane(t *testing.T) {
+	m := loaded()
+
+	issue := domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/koto", Number: 8}}
+	if lines := m.checksPane(issue, 40); lines != nil {
+		t.Errorf("an issue was given a checks pane: %q", lines)
+	}
+
+	pr := domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 9}}
+	if lines := m.checksPane(pr, 40); lines == nil {
+		t.Error("a pull request with no checks was given no pane at all")
 	}
 }
