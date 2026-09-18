@@ -32,3 +32,29 @@ func TestACheckWithNoStartTimeHasNoDuration(t *testing.T) {
 		t.Errorf("Duration() = %v, want 0", got)
 	}
 }
+
+func TestOnlyACheckRunWithARunBehindItHasAWorkflow(t *testing.T) {
+	t.Parallel()
+
+	run := CheckRun{
+		Name:        "build",
+		Kind:        CheckKindRun,
+		WorkflowRun: RunHandle("R_1"),
+	}
+	if !run.HasWorkflow() {
+		t.Error("a check run that names a workflow run says it has none")
+	}
+
+	// A StatusContext is an external service reporting a state and a link.
+	status := CheckRun{Name: "codecov", Kind: CheckKindStatus}
+	if status.HasWorkflow() {
+		t.Error("a StatusContext says it has a workflow")
+	}
+
+	// A check run an App created has a null checkSuite.workflowRun behind it,
+	// which leaves WorkflowRun empty.
+	appRun := CheckRun{Name: "dependabot", Kind: CheckKindRun}
+	if appRun.HasWorkflow() {
+		t.Error("a check run with no run id says it has a workflow")
+	}
+}

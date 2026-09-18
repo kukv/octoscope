@@ -43,3 +43,11 @@ func (c CheckRun) Duration() time.Duration {
 	}
 	return c.CompletedAt.Sub(c.StartedAt)
 }
+
+// HasWorkflow reports whether this check has a workflow run behind it to be
+// grouped under. A StatusContext never does, and neither does a check run an
+// App created: GitHub reports those with a null checkSuite.workflowRun,
+// leaving WorkflowRun empty and the workflow's name empty.
+func (c CheckRun) HasWorkflow() bool {
+	return c.Kind == CheckKindRun && c.WorkflowRun != ""
+}

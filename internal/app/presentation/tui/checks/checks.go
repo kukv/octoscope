@@ -296,7 +296,7 @@ func arrange(runs []domain.CheckRun) []domain.CheckRun {
 	worst := map[string]int{}
 	first := map[string]int{}
 	for i, r := range runs {
-		if !hasWorkflow(r) {
+		if !r.HasWorkflow() {
 			continue
 		}
 		worst[r.Workflow] = max(worst[r.Workflow], rank(r.State))
@@ -313,10 +313,10 @@ func arrange(runs []domain.CheckRun) []domain.CheckRun {
 		// Ranking a check with no workflow against the workflows would let
 		// one such check's state carry every other one along with it: they
 		// have no group of their own to be ranked as.
-		if hasWorkflow(a) != hasWorkflow(b) {
-			return hasWorkflow(a)
+		if a.HasWorkflow() != b.HasWorkflow() {
+			return a.HasWorkflow()
 		}
-		if !hasWorkflow(a) || a.Workflow == b.Workflow {
+		if !a.HasWorkflow() || a.Workflow == b.Workflow {
 			return false
 		}
 		if worst[a.Workflow] != worst[b.Workflow] {
@@ -327,14 +327,6 @@ func arrange(runs []domain.CheckRun) []domain.CheckRun {
 		return first[a.Workflow] < first[b.Workflow]
 	})
 	return out
-}
-
-// hasWorkflow reports whether a check has a workflow run behind it to be
-// grouped under. A StatusContext never does, and neither does a check run an
-// App created: GitHub reports those with a null checkSuite.workflowRun,
-// leaving WorkflowRun empty and the workflow's name empty.
-func hasWorkflow(r domain.CheckRun) bool {
-	return r.Kind == domain.CheckKindRun && r.WorkflowRun != ""
 }
 
 func rank(s domain.CheckState) int {
