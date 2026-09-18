@@ -7,7 +7,6 @@ type WorkItem struct {
 	Ref     ItemRef
 	Title   string
 	Body    string
-	Author  string
 	IsDraft bool
 	// State is open, closed or merged. The Work board's own searches are
 	// all is:open; a search the user wrote is not.

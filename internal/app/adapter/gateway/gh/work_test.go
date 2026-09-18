@@ -161,7 +161,6 @@ func TestToWorkItemTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 		},
 		Title:   "build the queries in the gateway",
 		Body:    "the section knows the query now",
-		Author:  "kukv",
 		IsDraft: true,
 		State:   domain.StateMerged,
 		Labels: []domain.Label{
@@ -213,9 +212,8 @@ func TestToWorkItemLeavesPullRequestOnlyFieldsZeroForAnIssue(t *testing.T) {
 			Repo:   "kukv/octoscope",
 			Number: 7,
 		},
-		Title:  "track the conversion",
-		Author: "kukv",
-		State:  domain.StateClosed,
+		Title: "track the conversion",
+		State: domain.StateClosed,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("toWorkItem() = %+v, want %+v", got, want)
