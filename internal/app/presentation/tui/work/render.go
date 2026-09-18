@@ -373,7 +373,7 @@ func badges(labels []domain.Label, room int) string {
 }
 
 func stateMarker(it domain.WorkItem) string {
-	if it.Ref.Kind == domain.ItemIssue {
+	if it.Ref.IsIssue() {
 		return theme.Issue().Render(icon.Issue())
 	}
 	return theme.Review(it.Review, it.IsDraft).Render(icon.Review(it.Review, it.IsDraft))

@@ -187,7 +187,7 @@ type Item struct {
 
 // GetItem fetches whichever of the two the reference names.
 func (u *Usecase) GetItem(ctx context.Context, ref domain.ItemRef) (Item, error) {
-	if ref.Kind == domain.ItemPR {
+	if ref.IsPR() {
 		pr, err := u.items.GetPR(ctx, ref.Repo, ref.Number)
 		if err != nil {
 			return Item{}, fmt.Errorf("get pr: %w", err)
@@ -211,7 +211,7 @@ func (u *Usecase) GetItem(ctx context.Context, ref domain.ItemRef) (Item, error)
 }
 
 func (u *Usecase) AddComment(ref domain.ItemRef, body string) error {
-	if ref.Kind == domain.ItemPR {
+	if ref.IsPR() {
 		return u.comments.AddPRComment(ref.Repo, ref.Number, body)
 	}
 	return u.comments.AddIssueComment(ref.Repo, ref.Number, body)
@@ -220,9 +220,9 @@ func (u *Usecase) AddComment(ref domain.ItemRef, body string) error {
 // SetState closes the item when closing is true and reopens it otherwise.
 func (u *Usecase) SetState(ref domain.ItemRef, closing bool) error {
 	switch {
-	case ref.Kind == domain.ItemPR && closing:
+	case ref.IsPR() && closing:
 		return u.states.ClosePR(ref.Repo, ref.Number)
-	case ref.Kind == domain.ItemPR:
+	case ref.IsPR():
 		return u.states.ReopenPR(ref.Repo, ref.Number)
 	case closing:
 		return u.states.CloseIssue(ref.Repo, ref.Number)
@@ -232,14 +232,14 @@ func (u *Usecase) SetState(ref domain.ItemRef, closing bool) error {
 }
 
 func (u *Usecase) EditLabels(ref domain.ItemRef, add, remove []string) error {
-	if ref.Kind == domain.ItemPR {
+	if ref.IsPR() {
 		return u.labels.EditPRLabels(ref.Repo, ref.Number, add, remove)
 	}
 	return u.labels.EditIssueLabels(ref.Repo, ref.Number, add, remove)
 }
 
 func (u *Usecase) EditAssignees(ref domain.ItemRef, add, remove []string) error {
-	if ref.Kind == domain.ItemPR {
+	if ref.IsPR() {
 		return u.assignees.EditPRAssignees(ref.Repo, ref.Number, add, remove)
 	}
 	return u.assignees.EditIssueAssignees(ref.Repo, ref.Number, add, remove)

@@ -360,7 +360,7 @@ func (m Model) resultRow(i int, width int) string {
 	item := m.items[i]
 
 	state := theme.Issue().Render(icon.Issue())
-	if item.Ref.Kind == domain.ItemPR {
+	if item.Ref.IsPR() {
 		state = theme.Review(item.Review, item.IsDraft).Render(icon.Review(item.Review, item.IsDraft))
 	}
 	_, name, _ := strings.Cut(item.Ref.Repo, "/")
