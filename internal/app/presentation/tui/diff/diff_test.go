@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -632,5 +633,95 @@ func TestEveryStateNamesItself(t *testing.T) {
 		if got := fmt.Sprintf("%v", p); strings.Contains(got, "?") {
 			t.Errorf("phase %d prints as %q", uint8(p), got)
 		}
+	}
+}
+
+// TestLineNumberWidthFollowsTheRows locks the one thing caching the gutter
+// width can break: it must still answer for the file on screen. A file
+// whose numbers run past four digits needs a wider gutter than the floor,
+// and moving to a short file must give the floor back.
+func TestLineNumberWidthFollowsTheRows(t *testing.T) {
+	long := domain.FileDiff{Path: "long.go", Hunks: []domain.Hunk{{
+		Header: "@@ -12000,1 +12000,1 @@",
+		Lines:  []domain.DiffLine{{Kind: domain.LineContext, OldLine: 12000, NewLine: 12000, Text: "x"}},
+	}}}
+	short := domain.FileDiff{Path: "short.go", Hunks: []domain.Hunk{{
+		Header: "@@ -1,1 +1,1 @@",
+		Lines:  []domain.DiffLine{{Kind: domain.LineContext, OldLine: 1, NewLine: 1, Text: "x"}},
+	}}}
+
+	m := New(&fakeSource{files: []domain.FileDiff{long, short}},
+		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 30})
+	m, _ = m.Update(diffMsg{ref: m.ref, files: []domain.FileDiff{long, short}})
+
+	if got := m.lineNumberWidth(); got != 5 {
+		t.Fatalf("lineNumberWidth() = %d on a five-digit file, want 5", got)
+	}
+
+	m = m.moveFile(1)
+
+	if got := m.lineNumberWidth(); got != 4 {
+		t.Fatalf("lineNumberWidth() = %d after moving to a short file, want 4 (the floor)", got)
+	}
+}
+
+// TestLineNumberWidthIsCounted is why the width is kept at all: it is asked
+// for twice per drawn row, and the answer only changes when the rows do.
+// Counting it on every ask walked every row of the file each time.
+func TestLineNumberWidthIsCounted(t *testing.T) {
+	m := goldenModel(160)
+
+	if m.numWidth == 0 {
+		t.Fatal("the rows were built without counting the width")
+	}
+	if got, want := m.lineNumberWidth(), m.numWidth; got != want {
+		t.Fatalf("lineNumberWidth() = %d, want the counted %d", got, want)
+	}
+}
+
+// TestSidebarStopsAtTheBottom is why the file list is cut: body only ever
+// uses paneHeight of its lines, and a pull request with hundreds of files
+// paid to draw every one of them on every frame. Two lines per file, so the
+// list may not run past the pane.
+func TestSidebarStopsAtTheBottom(t *testing.T) {
+	m := hugeModel(10)
+
+	if got, want := len(m.sidebarLines()), m.paneHeight(); got > want {
+		t.Fatalf("the sidebar drew %d lines for a %d-line pane", got, want)
+	}
+}
+
+// TestSidebarStopsAtTheBottomOnAnOddPane pins the case a strict "stop once
+// the loop reaches h" fix would get wrong: two lines per file, so an odd
+// paneHeight lands mid-file, and the cut must trim the spare line rather
+// than either running past the pane or dropping the last file's path.
+func TestSidebarStopsAtTheBottomOnAnOddPane(t *testing.T) {
+	m := hugeModel(10)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 160, Height: 41})
+
+	if want := m.paneHeight(); want%2 == 0 {
+		t.Fatalf("paneHeight() = %d, want odd for this test to mean anything", want)
+	}
+	if got, want := len(m.sidebarLines()), m.paneHeight(); got != want {
+		t.Fatalf("sidebarLines() = %d lines, want exactly the %d-line pane", got, want)
+	}
+}
+
+// TestSidebarStillReachesTheSelectedFile guards what the cut must not
+// break: followSidebar scrolls fileTop so the selected file is on screen,
+// and the cut has to leave that file in the list it returns.
+func TestSidebarStillReachesTheSelectedFile(t *testing.T) {
+	m := hugeModel(10)
+	for range 40 {
+		m = m.moveFile(1)
+	}
+	m.sidebar = true
+
+	lines := m.sidebarLines()
+	want := clip(m.files[m.file].Path, sidebarWidth)
+
+	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, want) }) {
+		t.Fatalf("the selected file %q is not in the %d lines drawn", want, len(lines))
 	}
 }

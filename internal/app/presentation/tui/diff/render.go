@@ -346,13 +346,18 @@ func (m Model) body() []string {
 // right when it does not fit, and the size of that file's change under it,
 // followed by the count of review threads on that file. It starts at
 // m.fileTop, which followSidebar keeps in step with the selected file, the
-// same way m.top keeps the diff pane's cursor on screen.
+// same way m.top keeps the diff pane's cursor on screen, and it stops once
+// it has built as many lines as the pane can show.
 func (m Model) sidebarLines() []string {
 	if len(m.files) == 0 {
 		return nil
 	}
-	lines := make([]string, 0, (len(m.files)-m.fileTop)*2)
-	for i := m.fileTop; i < len(m.files); i++ {
+	// body only draws paneHeight lines, and a file takes two of them. Going
+	// past that built rows nobody sees -- two or three lipgloss renders and a
+	// walk of every review thread, per file, on every frame.
+	h := m.paneHeight()
+	lines := make([]string, 0, h+1)
+	for i := m.fileTop; i < len(m.files) && len(lines) < h; i++ {
 		f := m.files[i]
 		path := clip(f.Path, sidebarWidth)
 		plainSize := fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)
@@ -377,7 +382,11 @@ func (m Model) sidebarLines() []string {
 		}
 		lines = append(lines, path, size)
 	}
-	return lines
+	// A file takes two lines, so an odd paneHeight lets the loop above build
+	// one line past it -- the second line of the last, half-visible file.
+	// body only reads sidebar[0:h] anyway, so cut here rather than in the
+	// loop and lose that file's path line on an odd pane.
+	return lines[:min(len(lines), h)]
 }
 
 // threadCount reports how many review threads sit on a file, and whether any
@@ -482,21 +491,11 @@ func (m Model) diffTextLine(l domain.DiffLine, width int) string {
 // that separates it from the text.
 func (m Model) gutter() int { return 2*m.lineNumberWidth() + 3 }
 
-// lineNumberWidth is how many columns the widest line number in the file
-// currently shown needs, floored at gutterWidth's four digits. The format
-// that draws a line number pads to a minimum rather than truncating, so a
-// file whose numbers run past four digits must widen the gutter, or the row
-// it draws runs past the budget the rest of the layout assumes.
-func (m Model) lineNumberWidth() int {
-	w := (gutterWidth - 3) / 2
-	for _, r := range m.rows {
-		if r.kind != rowLine {
-			continue
-		}
-		w = max(w, len(strconv.Itoa(r.line.OldLine)), len(strconv.Itoa(r.line.NewLine)))
-	}
-	return w
-}
+// lineNumberWidth is the gutter's number field, counted when the rows were
+// built (countLineNumberWidth). The floor is applied here too, so a Model
+// whose rows have not been built yet still measures the same as an empty
+// file rather than zero.
+func (m Model) lineNumberWidth() int { return max(m.numWidth, (gutterWidth-3)/2) }
 
 // currentPath is the file the cursor is in, used to pick the syntax
 // highlighter's lexer.
