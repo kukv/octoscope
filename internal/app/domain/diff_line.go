@@ -34,10 +34,9 @@ const (
 // GitHub spells these LEFT and RIGHT; nothing outside the access layer sees
 // those words.
 //
-// DiffSide is which version of a file a line or a comment belongs to.
-// It lives beside DiffLine because Line below is the only place that decides
-// a side; ReviewThread and PendingComment carry that answer, they do not make
-// it.
+// It lives beside DiffLine, although ReviewThread and PendingComment carry a
+// side too, because Line above is the only place that decides one; the other
+// two carry that answer rather than making it.
 type DiffSide int
 
 const (
