@@ -25,7 +25,7 @@ var exported = []any{
 	domain.ItemRef{},
 	domain.CheckRun{},
 	domain.Checks{},
-	domain.Rerun{},
+	domain.RerunRequest{},
 	domain.WorkItem{},
 	domain.RepoCount{},
 	domain.RepoCandidate{},
