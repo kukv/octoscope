@@ -4,23 +4,7 @@
 // spelling into these values before anything reaches this package.
 package domain
 
-import (
-	"errors"
-	"time"
-)
-
-// ErrBackendUnavailable is returned when the backend that talks to GitHub
-// cannot be reached at all -- the gh binary missing is one backend's
-// problem, not a thing the application itself knows about.
-var ErrBackendUnavailable = errors.New("gh CLI not found; install it and run: gh auth login")
-
-// ErrTransient wraps a failure GitHub's front end produced rather than
-// answered -- 502, 503, 504. The request was well-formed, so asking again
-// is the right response.
-var ErrTransient = errors.New("GitHub did not answer")
-
-// ErrUnauthenticated is returned when gh has no usable credentials.
-var ErrUnauthenticated = errors.New("not authenticated; run: gh auth login")
+import "time"
 
 type Author struct {
 	Login string
@@ -241,34 +225,4 @@ type RepoCandidate struct {
 type SavedQuery struct {
 	Name  string
 	Query string
-}
-
-// classified is what gh said, kept apart from the sentinel that names what
-// kind of failure it is. errors.Is finds the sentinel through Unwrap, while
-// Error is gh's own text and nothing else: wrapping with fmt.Errorf would put
-// the sentinel's English sentence in front of it, and the UI shows this text
-// to a user who may have asked for another language (.claude/rules/errors.md
-// leaves only what GitHub said untranslated).
-type classified struct {
-	kind error
-	msg  string
-}
-
-func (e *classified) Error() string { return e.msg }
-func (e *classified) Unwrap() error { return e.kind }
-
-// Classify pairs what gh said with the sentinel that says what it was.
-func Classify(kind error, msg string) error {
-	return &classified{kind: kind, msg: msg}
-}
-
-// IsFatal reports whether the user has to act before anything can work. Every
-// other failure is worth a line above the key bar and another try.
-//
-// It lives here rather than in each view because the sentinels it asks about
-// are this package's own: a second copy of the list would be free to fall
-// behind the sentinels it names, and the Work board and the Repos list would
-// then disagree about what costs the user their screen.
-func IsFatal(err error) bool {
-	return errors.Is(err, ErrBackendUnavailable) || errors.Is(err, ErrUnauthenticated)
 }
