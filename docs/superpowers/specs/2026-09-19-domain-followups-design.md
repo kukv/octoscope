@@ -86,6 +86,31 @@ func (r ItemRef) IsIssue() bool { return r.Kind == ItemIssue }
 取りに行った当のアイテムなので、`m.ref` と同じものを指す。detail の他の
 4 箇所はすでに `m.ref.Kind` を見ているので、これで detail 内の表現が 1 つに揃う。
 
+#### `!=` の 10 箇所を数え落としていた
+
+**上の 14 箇所は `Kind ==` だけを数えたもので、`Kind !=` を見ていなかった。**
+全体レビューで指摘を受けて数え直すと、View にさらに 10 箇所ある。
+
+| ファイル | 箇所 |
+|---|---|
+| `tui/detail/keys.go` | 4 |
+| `tui/work/work.go` | 2 |
+| `tui/repo/repo.go` | 2 |
+| `tui/work/render.go` | 1 |
+| `tui/search/search.go` | 1 |
+
+同じファイルの中で綴りが分かれていた。`tui/work/render.go` は
+`stateMarker()` を `IsIssue()` に直しながら、その 30 行手前の
+`Kind != domain.ItemPR` を残していた。
+
+**この 10 箇所も `!IsPR()` に置き換える。** 残すと `architecture.md` の
+「`domain.ItemRef.Kind` を View で `switch` しない」が半分しか解消せず、
+同じパッケージの中に 2 通りの綴りが並ぶ。置き換えは `==` の 14 箇所と
+同じく機械的で、`!ok || ref.Kind != domain.ItemPR` は
+`!ok || !ref.IsPR()` になる。
+
+置き換え後、`Kind ==` と `Kind !=` の非テスト参照は**どちらも 0 件**になる。
+
 ### 4.3 `WorkItem.Author` を消す
 
 | 変更 | 場所 |
@@ -157,8 +182,9 @@ detail が `m.ref` からも同じことを知れるからにすぎない。`arc
 
 1. `make check` が終了コード 0 → 検証: 終了コード
 2. `testdata/*.golden` の変更が 0 件 → 検証: `git diff --stat` に `.golden` が出ない
-3. `grep -rn 'Kind == domain.Item' --include='*.go' internal | grep -v _test` が 0 件
-   → 検証: 出力が空
+3. `grep -rn 'Kind [!=]= domain.Item' --include='*.go' internal | grep -v _test`
+   が 0 件 → 検証: 出力が空。**`==` だけでなく `!=` も数える**（§4.2 で
+   一度これを落としている）
 4. `grep -rn 'WorkItem' --include='*.go' internal | grep Author` が 0 件
    → 検証: 出力が空
 5. 実際に起動して Work board と詳細画面を見る（既定と `--lang ja`）
@@ -171,6 +197,13 @@ detail が `m.ref` からも同じことを知れるからにすぎない。`arc
 ## 7. この先
 
 この spec の範囲外として残るもの。
+
+- `internal/github/gql/work.graphql` が `author { login }` を 2 箇所で
+  選択したままになっている。`WorkItem.Author` を消したことで読み手が
+  ゼロになり、GitHub に投げて捨てているだけになった。
+  `TestTheQueryAsksForEveryFieldWeParse` は「クエリ ⊇ パースする項目」の
+  一方向しか見ないので検出されない。録ったフィクスチャの差し替えを伴うため
+  別件にする
 
 - `internal/app/usecase` の名前と境界（`Usecase` が何も指していない、
   29 メソッド中 21 個が 1 行の委譲）

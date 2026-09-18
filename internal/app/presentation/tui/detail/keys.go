@@ -10,7 +10,6 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
 )
 
@@ -43,14 +42,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.openWeb(m.ref, m.url)
 	case "d":
 		// An issue has no diff.
-		if m.ref.Kind != domain.ItemPR {
+		if !m.ref.IsPR() {
 			return m, nil
 		}
 		ref := m.ref
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "s":
 		// An issue has no checks.
-		if m.ref.Kind != domain.ItemPR {
+		if !m.ref.IsPR() {
 			return m, nil
 		}
 		ref := m.ref
@@ -80,7 +79,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // UNKNOWN for a merged one, so the popup would say it is still working the
 // answer out, for ever.
 func (m Model) openMerge() (Model, tea.Cmd) {
-	if m.ref.Kind != domain.ItemPR {
+	if !m.ref.IsPR() {
 		return m, nil
 	}
 	if m.phase == phaseLoading {
@@ -137,7 +136,7 @@ func (m Model) openSubmit() (Model, tea.Cmd) {
 	if m.phase == phaseLoading {
 		return m.stillLoading(), nil
 	}
-	if m.ref.Kind != domain.ItemPR {
+	if !m.ref.IsPR() {
 		return m, nil
 	}
 	m.mode, m.phase = modeSubmit, phaseLoading

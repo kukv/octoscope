@@ -547,14 +547,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ref, ok := m.SelectedRef()
 		// An issue has no diff. Opening an empty diff view would be a worse
 		// answer than doing nothing.
-		if !ok || ref.Kind != domain.ItemPR {
+		if !ok || !ref.IsPR() {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
 	case "s":
 		ref, ok := m.SelectedRef()
 		// An issue has no checks.
-		if !ok || ref.Kind != domain.ItemPR {
+		if !ok || !ref.IsPR() {
 			return m, nil
 		}
 		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }

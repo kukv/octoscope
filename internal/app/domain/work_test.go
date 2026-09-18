@@ -58,10 +58,14 @@ func TestEverySectionConstantIsASlotInWork(t *testing.T) {
 	if got := len(domain.WorkSections()); got != len(sections) {
 		t.Errorf("WorkSections() returns %d, %d sections are declared", got, len(sections))
 	}
+
+	// Ask the board for each section rather than comparing counts. Work keeps
+	// its columns unexported, so the count above compares two declarations to
+	// each other and would still agree if the array behind them were the wrong
+	// width; this reaches the array, and a section past its end panics here.
+	var w domain.Work
 	for _, s := range sections {
-		if int(s) < 0 || int(s) >= domain.WorkSectionCount {
-			t.Errorf("section %d is not an index into Work (len %d)", s, domain.WorkSectionCount)
-		}
+		_ = w.Section(s)
 	}
 }
 
