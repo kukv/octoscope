@@ -16,3 +16,9 @@ type ItemRef struct {
 	Repo   string
 	Number int
 }
+
+// IsPR reports whether this reference names a pull request. Views ask the
+// reference rather than comparing Kind themselves: the comparison is the
+// closest thing in this package to the API's own spelling, and it had spread
+// to fourteen places by 2026-09-19.
+func (r ItemRef) IsPR() bool { return r.Kind == ItemPR }
