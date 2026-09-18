@@ -116,7 +116,7 @@ func bodyLines(body string, w, budget int) []string {
 // which.
 func (m Model) checksPane(it domain.WorkItem, w int) []string {
 	// Issues have no checks at all, so they get no pane.
-	if it.Ref.Kind == domain.ItemIssue {
+	if it.Ref.IsIssue() {
 		return nil
 	}
 	c := it.Checks

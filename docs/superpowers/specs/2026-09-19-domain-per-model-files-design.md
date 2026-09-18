@@ -135,7 +135,9 @@ PR・WorkItem・MergeContext が共有する。
 | `handle.go` | `PullRequestHandle` / `ReviewHandle` / `JobHandle` / `RunHandle` |
 | `error.go` | `ErrBackendUnavailable` / `ErrUnauthenticated` / `ErrTransient` / `classified` / `Classify()` / `IsFatal()` |
 
-最大は `merge_context.go` の約 118 行。300 行の合図に触るファイルは残らない。
+最大は `diff_parser.go` の 171 行（`diff_parse.go` からのリネームで、元から
+この長さ）。次が `merge_context.go` の 118 行。300 行の合図に触るファイルは
+残らない。
 
 ## 5. 制約が衝突する 4 箇所
 
@@ -285,8 +287,8 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 1. `make check` が通る → 検証: 終了コード 0
 2. `git diff --stat` で `internal/app/domain` 以外の変更が §7 の 2 つに
    限られている → 検証: 差分に出るパスを目で確認
-3. `wc -l internal/app/domain/*.go` でどのファイルも 150 行以下
-   → 検証: `merge_context.go` が最大で約 118 行
+3. `wc -l internal/app/domain/*.go` でどのファイルも 180 行以下
+   → 検証: `diff_parser.go` が最大で 171 行、次が `merge_context.go` の 118 行
 4. `go run ./cmd/octoscope` と `go run ./cmd/octoscope --lang ja` が
    従来どおり動く → 検証: Work board・diff・checks・merge を開いて見る
 

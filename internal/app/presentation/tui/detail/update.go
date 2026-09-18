@@ -9,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
 	"github.com/kukv/octoscope/internal/i18n"
@@ -105,7 +104,7 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.assignees = authorLogins(it.Assignees)
 	m.url = it.URL
 	m.item, m.loaded = it, true
-	if it.Kind == domain.ItemPR {
+	if m.ref.IsPR() {
 		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
 	} else {
 		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})

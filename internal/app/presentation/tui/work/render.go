@@ -339,7 +339,7 @@ func (m Model) cardMeta(it domain.WorkItem, at time.Time, w int) string {
 // reviewWord is what a pull request with no checks says instead of a bar.
 // Issues say nothing: they have neither checks nor a review.
 func reviewWord(it domain.WorkItem) string {
-	if it.Ref.Kind != domain.ItemPR {
+	if !it.Ref.IsPR() {
 		return ""
 	}
 	style := theme.Review(it.Review, it.IsDraft)
@@ -373,7 +373,7 @@ func badges(labels []domain.Label, room int) string {
 }
 
 func stateMarker(it domain.WorkItem) string {
-	if it.Ref.Kind == domain.ItemIssue {
+	if it.Ref.IsIssue() {
 		return theme.Issue().Render(icon.Issue())
 	}
 	return theme.Review(it.Review, it.IsDraft).Render(icon.Review(it.Review, it.IsDraft))

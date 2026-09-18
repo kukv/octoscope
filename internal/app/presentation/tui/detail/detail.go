@@ -299,7 +299,7 @@ func (m Model) stateAction() (closing bool, ok bool) {
 // can be merged, and until the item has arrived the state is not known.
 func (m Model) canMerge() bool {
 	closing, ok := m.stateAction()
-	return m.ref.Kind == domain.ItemPR && ok && closing
+	return m.ref.IsPR() && ok && closing
 }
 
 // relayout gives the body its width and height and lays the content out

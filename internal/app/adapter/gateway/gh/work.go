@@ -66,7 +66,6 @@ func toWorkItem(n gql.SearchItem) domain.WorkItem {
 		Title:     n.Title,
 		State:     parseItemState(n.State),
 		Body:      n.BodyText,
-		Author:    n.Author.Login,
 		Labels:    toLabels(n.Labels.Nodes),
 		UpdatedAt: n.UpdatedAt,
 		URL:       n.URL,

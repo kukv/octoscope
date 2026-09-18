@@ -63,7 +63,6 @@ func (f *scenarioSource) ListWorkSection(_ context.Context, s domain.WorkSection
 	return []domain.WorkItem{{
 		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: f.pr.Number},
 		Title:     f.pr.Title,
-		Author:    f.pr.Author.Login,
 		UpdatedAt: f.pr.UpdatedAt,
 	}}, nil
 }

@@ -57,4 +57,13 @@ func TestOnlyACheckRunWithARunBehindItHasAWorkflow(t *testing.T) {
 	if appRun.HasWorkflow() {
 		t.Error("a check run with no run id says it has a workflow")
 	}
+
+	// Both halves of the condition are load-bearing. GitHub does not report a
+	// StatusContext with a run id behind it, so this case is unreachable from
+	// the wire; it is here so that dropping the Kind test does not go
+	// unnoticed.
+	impossible := CheckRun{Name: "codecov", Kind: CheckKindStatus, WorkflowRun: RunHandle("R_1")}
+	if impossible.HasWorkflow() {
+		t.Error("a StatusContext with a run id says it has a workflow")
+	}
 }

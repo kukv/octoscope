@@ -5,7 +5,6 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
 	"github.com/kukv/octoscope/internal/i18n"
@@ -146,7 +145,7 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.detail.move"),
 		i18n.T("footer.detail.comment"),
 	}
-	if m.ref.Kind == domain.ItemPR {
+	if m.ref.IsPR() {
 		hints = append(hints, i18n.T("footer.detail.review"), i18n.T("footer.detail.diff"),
 			i18n.T("footer.detail.checks"))
 	}
@@ -225,9 +224,9 @@ func (m Model) confirmView() string {
 	closing, _ := m.stateAction()
 	var id string
 	switch {
-	case m.ref.Kind == domain.ItemPR && closing:
+	case m.ref.IsPR() && closing:
 		id = "confirm.close_pr"
-	case m.ref.Kind == domain.ItemPR:
+	case m.ref.IsPR():
 		id = "confirm.reopen_pr"
 	case closing:
 		id = "confirm.close_issue"

@@ -945,7 +945,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Files:** なし（確認のみ）
 
-- [ ] **Step 1: ファイルが 29 個、どれも 150 行以下であることを確かめる**
+- [ ] **Step 1: ファイルが 30 個、どれも 180 行以下であることを確かめる**
 
 ```bash
 ls internal/app/domain/*.go | grep -v _test | wc -l
@@ -1004,6 +1004,6 @@ go run ./cmd/octoscope --lang ja
 
 - [ ] `make check` が通る
 - [ ] `internal/app/domain` が 30 ファイル（非テスト）で、`domain.go` が無い
-- [ ] どのファイルも 150 行以下
+- [ ] どのファイルも 180 行以下（最大は `diff_parser.go` の 171 行）
 - [ ] `domain` の外の変更が `tui/checks` と `tui/work` と `tui/root` の 3 つだけ
 - [ ] `go run ./cmd/octoscope` と `--lang ja` で Work board が従来どおり動く

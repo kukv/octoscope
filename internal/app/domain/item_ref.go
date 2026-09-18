@@ -26,3 +26,9 @@ type ItemRef struct {
 // closest thing in this package to the API's own spelling, so it belongs
 // inside the domain type rather than scattered across views.
 func (r ItemRef) IsPR() bool { return r.Kind == ItemPR }
+
+// IsIssue reports whether this reference names an issue. It is not merely
+// the negation of IsPR at the call site: what asks is written around what an
+// issue does not have, and reading it as "if not a pull request" would put it
+// at odds with the comment above it.
+func (r ItemRef) IsIssue() bool { return r.Kind == ItemIssue }
