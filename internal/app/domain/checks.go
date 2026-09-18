@@ -22,11 +22,3 @@ type Checks struct {
 	State   CheckState
 	Runs    []CheckRun
 }
-
-// RerunScope is how much of a workflow run to start again.
-type RerunScope int
-
-const (
-	RerunFailed RerunScope = iota
-	RerunAll
-)
