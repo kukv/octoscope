@@ -30,13 +30,13 @@ func (f *fakeSource) ListWorkSection(ctx context.Context, s domain.WorkSection) 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return f.work[s], f.err
+	return f.work.Section(s), f.err
 }
 
 func sampleWork() domain.Work {
 	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 	var w domain.Work
-	w[domain.SectionReviewRequested] = []domain.WorkItem{
+	w.SetSection(domain.SectionReviewRequested, []domain.WorkItem{
 		{
 			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
 			Title: "fix the thing", UpdatedAt: now,
@@ -58,18 +58,18 @@ func sampleWork() domain.Work {
 			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3},
 			Title: "bump deps", UpdatedAt: now,
 		},
-	}
-	w[domain.SectionAssigned] = []domain.WorkItem{
+	})
+	w.SetSection(domain.SectionAssigned, []domain.WorkItem{
 		{
 			Ref:   domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7},
 			Title: "an issue", UpdatedAt: now,
 		},
-	}
+	})
 	return w
 }
 
 // sampleItems is the column sampleWork fills with cards.
-func sampleItems() []domain.WorkItem { return sampleWork()[domain.SectionReviewRequested] }
+func sampleItems() []domain.WorkItem { return sampleWork().Section(domain.SectionReviewRequested) }
 
 // loaded returns a model that already received its data.
 func loaded() Model {
@@ -87,7 +87,7 @@ func sized(m Model) Model {
 // four separate requests arrive.
 func answeredAll(m Model, w domain.Work) Model {
 	for _, s := range domain.WorkSections() {
-		m, _ = m.Update(workMsg{section: s, items: w[s]})
+		m, _ = m.Update(workMsg{section: s, items: w.Section(s)})
 	}
 	return m
 }

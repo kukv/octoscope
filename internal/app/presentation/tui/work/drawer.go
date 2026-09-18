@@ -31,7 +31,7 @@ func (m Model) drawer() []string {
 	if !ok {
 		return append([]string{rule}, blankLines(drawerRows)...)
 	}
-	it := m.work[m.section()][m.row]
+	it := m.work.Section(m.section())[m.row]
 
 	// The mockup gives the description the larger share; the checks are a
 	// short list of short names.

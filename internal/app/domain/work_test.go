@@ -30,12 +30,12 @@ func TestWorkIndexesBySection(t *testing.T) {
 	t.Parallel()
 
 	var w domain.Work
-	w[domain.SectionAssigned] = []domain.WorkItem{{Ref: domain.ItemRef{Number: 7}}}
+	w.SetSection(domain.SectionAssigned, []domain.WorkItem{{Ref: domain.ItemRef{Number: 7}}})
 
-	if n := len(w[domain.SectionAssigned]); n != 1 {
+	if n := len(w.Section(domain.SectionAssigned)); n != 1 {
 		t.Fatalf("assigned column holds %d items, want 1", n)
 	}
-	if got := w[domain.SectionAssigned][0].Ref.Number; got != 7 {
+	if got := w.Section(domain.SectionAssigned)[0].Ref.Number; got != 7 {
 		t.Errorf("got #%d, want #7", got)
 	}
 }
@@ -52,16 +52,33 @@ func TestEverySectionConstantIsASlotInWork(t *testing.T) {
 		domain.SectionMentioned,
 	}
 
-	var w domain.Work
-	if len(w) != len(sections) {
-		t.Fatalf("Work has %d slots, %d sections are declared", len(w), len(sections))
+	if domain.WorkSectionCount != len(sections) {
+		t.Fatalf("Work has %d slots, %d sections are declared", domain.WorkSectionCount, len(sections))
 	}
 	if got := len(domain.WorkSections()); got != len(sections) {
 		t.Errorf("WorkSections() returns %d, %d sections are declared", got, len(sections))
 	}
 	for _, s := range sections {
-		if int(s) < 0 || int(s) >= len(w) {
-			t.Errorf("section %d is not an index into Work (len %d)", s, len(w))
+		if int(s) < 0 || int(s) >= domain.WorkSectionCount {
+			t.Errorf("section %d is not an index into Work (len %d)", s, domain.WorkSectionCount)
 		}
+	}
+}
+
+func TestSectionGivesBackWhatSetSectionPutIn(t *testing.T) {
+	t.Parallel()
+
+	var w domain.Work
+	w.SetSection(domain.SectionAssigned, []domain.WorkItem{{Title: "assigned"}})
+	w.SetSection(domain.SectionMentioned, []domain.WorkItem{{Title: "mentioned"}})
+
+	if got := w.Section(domain.SectionAssigned); len(got) != 1 || got[0].Title != "assigned" {
+		t.Errorf("the assigned column holds %v", got)
+	}
+	if got := w.Section(domain.SectionMentioned); len(got) != 1 || got[0].Title != "mentioned" {
+		t.Errorf("the mentioned column holds %v", got)
+	}
+	if got := w.Section(domain.SectionReviewRequested); got != nil {
+		t.Errorf("a column nothing was put in holds %v", got)
 	}
 }

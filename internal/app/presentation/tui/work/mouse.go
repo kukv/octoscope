@@ -48,7 +48,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 			m.row--
 		}
 	case tea.MouseWheelDown:
-		if m.row+1 < len(m.work[m.section()]) {
+		if m.row+1 < len(m.work.Section(m.section())) {
 			m.row++
 		}
 	}
@@ -93,7 +93,7 @@ func (m Model) cardAt(x, y int) (col, row int, ok bool) {
 	}
 	section := domain.WorkSections()[col]
 	row = m.cardWindow(section, height) + y/cardHeight()
-	if row >= len(m.work[section]) {
+	if row >= len(m.work.Section(section)) {
 		return 0, 0, false
 	}
 	return col, row, true

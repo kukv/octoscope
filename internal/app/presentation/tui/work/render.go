@@ -195,7 +195,7 @@ func (m Model) board(height int) []string {
 // still waiting on its own request shows a spinner in the space its cards
 // will take, so the columns that have answered stay readable.
 func (m Model) columnLines(s domain.WorkSection, w, height int) []string {
-	items := m.work[s]
+	items := m.work.Section(s)
 	lines := []string{m.heading(s, len(items), w)}
 	if m.state[s] == colLoading {
 		// The spinner carries its own colour, so it is not wrapped in a style

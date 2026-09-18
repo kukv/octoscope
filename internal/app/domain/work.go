@@ -23,5 +23,17 @@ func WorkSections() []WorkSection {
 	return sections
 }
 
-// Work holds the items of each column, indexed by WorkSection.
-type Work [WorkSectionCount][]WorkItem
+// Work holds the items of each column. The columns are unexported so that
+// the range of a section index is this type's business rather than every
+// caller's: a WorkSection is the only way in, and there is no index to get
+// wrong.
+type Work struct {
+	sections [WorkSectionCount][]WorkItem
+}
+
+// Section is the items of one column, in the order they arrived.
+func (w Work) Section(s WorkSection) []WorkItem { return w.sections[s] }
+
+// SetSection replaces one column. A fetch answers for one column at a time,
+// and what the others hold is not its business.
+func (w *Work) SetSection(s WorkSection, items []WorkItem) { w.sections[s] = items }

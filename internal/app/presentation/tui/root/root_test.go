@@ -70,7 +70,16 @@ func (f *fakeSource) SearchItems(context.Context, string) ([]domain.WorkItem, er
 
 func (f *fakeSource) ListWorkSection(_ context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {
 	f.workSections = append(f.workSections, s)
-	return f.work[s], f.workErr
+	return f.work.Section(s), f.workErr
+}
+
+// workWith builds a board with only the review-requested column filled, the
+// one every test below reads from. Work keeps its columns unexported, so a
+// test has to go through SetSection rather than indexing.
+func workWith(items ...domain.WorkItem) domain.Work {
+	var w domain.Work
+	w.SetSection(domain.SectionReviewRequested, items)
+	return w
 }
 
 // refreshedTheBoard reports whether every column was asked for. A column left
@@ -1034,9 +1043,9 @@ func TestALateRepoMessageIsNotDropped(t *testing.T) {
 }
 
 func TestKeysReachTheTabUnderneath(t *testing.T) {
-	src := &fakeSource{work: domain.Work{
-		domain.SectionReviewRequested: {{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "first"}},
-	}}
+	src := &fakeSource{work: workWith(
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "first"},
+	)}
 	m := New(src, Options{}) // no --repo: the board is the first tab
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, next.(Model), cmd)
@@ -1056,12 +1065,10 @@ func TestKeysReachTheTabUnderneath(t *testing.T) {
 // puts it on screen.
 func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 	src := &fakeSource{
-		work: domain.Work{
-			domain.SectionReviewRequested: {{
-				Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 41},
-				Title: "add the work board",
-			}},
-		},
+		work: workWith(domain.WorkItem{
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 41},
+			Title: "add the work board",
+		}),
 		pr: domain.PR{Number: 41, Title: "add the work board", State: domain.StateOpen},
 	}
 	m := New(src, Options{}) // no --repo: the board is the first tab
@@ -1128,12 +1135,10 @@ const overlongTitle = "レンダリングのパイプラインをまるごと置
 // overlongSource fills every tab with content that overflows on its own.
 func overlongSource() *fakeSource {
 	return &fakeSource{
-		work: domain.Work{
-			domain.SectionReviewRequested: {{
-				Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/a-repository-nobody-would-name-this-way", Number: 1},
-				Title: overlongTitle,
-			}},
-		},
+		work: workWith(domain.WorkItem{
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/a-repository-nobody-would-name-this-way", Number: 1},
+			Title: overlongTitle,
+		}),
 		prs: []domain.PR{{
 			Number: 1, Title: overlongTitle,
 			Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},

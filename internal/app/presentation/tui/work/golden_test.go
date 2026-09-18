@@ -54,14 +54,16 @@ func goldenBoard(w domain.Work, width, height int) Model {
 // what happens when a column overflows — which is the ordinary case.
 func tallWork() domain.Work {
 	w := overlongWork()
-	base := w[domain.SectionReviewRequested][0]
+	base := w.Section(domain.SectionReviewRequested)[0]
+	requested := w.Section(domain.SectionReviewRequested)
 	for i := range 20 {
 		card := base
 		card.Ref = domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 100 + i}
 		card.Title = fmt.Sprintf("chore(deps): bump dependency number %d", i)
 		card.Labels = nil
-		w[domain.SectionReviewRequested] = append(w[domain.SectionReviewRequested], card)
+		requested = append(requested, card)
 	}
+	w.SetSection(domain.SectionReviewRequested, requested)
 	return w
 }
 
@@ -91,7 +93,7 @@ func TestGoldenFitsTheTerminal(t *testing.T) {
 func TestScrollingFollowsTheCursorDownALongColumn(t *testing.T) {
 	m := goldenBoard(tallWork(), 120, 24)
 	visible := m.visibleCards(m.boardHeight())
-	if visible >= len(m.work[domain.SectionReviewRequested]) {
+	if visible >= len(m.work.Section(domain.SectionReviewRequested)) {
 		t.Fatal("the fixture fits on screen; this test covers nothing")
 	}
 
@@ -102,7 +104,7 @@ func TestScrollingFollowsTheCursorDownALongColumn(t *testing.T) {
 	if !ok {
 		t.Fatal("nothing is selected")
 	}
-	if !strings.Contains(ansi.Strip(m.View()), m.work[m.section()][m.row].Title) {
+	if !strings.Contains(ansi.Strip(m.View()), m.work.Section(m.section())[m.row].Title) {
 		t.Errorf("the selected card %+v is not on screen:\n%s", ref, ansi.Strip(m.View()))
 	}
 }
@@ -137,7 +139,7 @@ func TestGoldenAPartiallyFilledBoard(t *testing.T) {
 
 			m, _ = m.Update(workMsg{
 				section: domain.SectionReviewRequested,
-				items:   overlongWork()[domain.SectionReviewRequested],
+				items:   overlongWork().Section(domain.SectionReviewRequested),
 			})
 			m.fetchedAt[domain.SectionReviewRequested] = goldenFetchedAt
 			golden.Assert(t, "work_partial_"+lang.name+"_120", m.View())
@@ -161,7 +163,7 @@ func failedBoard(width, height int) Model {
 		if s == domain.SectionYourPRs {
 			continue
 		}
-		m, _ = m.Update(workMsg{section: s, items: overlongWork()[s]})
+		m, _ = m.Update(workMsg{section: s, items: overlongWork().Section(s)})
 		m.fetchedAt[s] = goldenFetchedAt
 	}
 	m, _ = m.Update(errMsg{section: domain.SectionYourPRs, err: domain.Classify(domain.ErrTransient, goldenFailure)})
