@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime/debug"
 
 	"github.com/jeandeaual/go-locale"
 
@@ -21,8 +22,27 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// version is set by GoReleaser via -ldflags at release build time.
-var version = "dev"
+// version is what --version prints. GoReleaser sets it with -ldflags at
+// release build time; a build that did not go through GoReleaser leaves it
+// empty, and the module's own version is read back out of the binary
+// instead (see resolveVersion).
+var version string
+
+// resolveVersion picks what to call this build. injected is what -ldflags
+// put in, empty when nothing did. module is what the Go toolchain recorded
+// as the main module's version: a real version for a binary from
+// `go install module@version`, and "(devel)" for one built from a source
+// tree, which says nothing a user wants to read. Neither being any use
+// leaves "dev".
+func resolveVersion(injected, module string) string {
+	if injected != "" {
+		return injected
+	}
+	if module != "" && module != "(devel)" {
+		return module
+	}
+	return "dev"
+}
 
 func main() {
 	repoFlag := flag.String("repo", "",
@@ -36,7 +56,11 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("octoscope " + version)
+		module := ""
+		if info, ok := debug.ReadBuildInfo(); ok {
+			module = info.Main.Version
+		}
+		fmt.Println("octoscope " + resolveVersion(version, module))
 		return
 	}
 
