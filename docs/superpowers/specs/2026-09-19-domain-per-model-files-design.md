@@ -248,8 +248,16 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 
 | 変更 | 波及先 |
 |---|---|
-| `Work` の struct 化 | `Work` を添字で引いている箇所すべて |
-| `hasWorkflow()` の移設 | `internal/app/presentation/tui/checks` |
+| `Work` の struct 化 | `internal/app/presentation/tui/work`（9 箇所 + テスト）と `internal/app/presentation/tui/root` の**テスト 2 ファイル**（9 箇所） |
+| `hasWorkflow()` の移設 | `internal/app/presentation/tui/checks`（9 箇所） |
+
+`domain.Work` を参照するのは `domain` を除いて 21 箇所、2 パッケージである
+（2026-09-19 実測）。`root` は非テストコードでは `domain.Work` を使わず、
+テスト用の `fakeSource` だけが使う。
+
+**当初この表には `tui/work` しか書いていなかった。** 影響範囲を調べた
+`grep` の出力を途中で切って数えたためで、`root` のテストを見落としていた。
+波及先を数えるときは、テストファイルを含めて全件を見る。
 
 `IsPR()` と `RerunRequest` は**追加**なので、既存の呼び出しは壊れない。
 14 箇所の `Kind ==` を `IsPR()` に置き換えるかどうかは、この spec の

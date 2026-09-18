@@ -760,6 +760,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Modify: `internal/app/presentation/tui/work/drawer.go:34`
 - Modify: `internal/app/presentation/tui/work/mouse_test.go:223-225`
 - Modify: `internal/app/presentation/tui/work/golden_test.go:94,105`
+- Modify: `internal/app/presentation/tui/root/root_test.go:33,1037,1059,1131`
+- Modify: `internal/app/presentation/tui/root/mouse_test.go:39,136,157,176,192`
+
+`root` はテストだけが `domain.Work` を使う（`fakeSource.work`）。非テスト
+コードは触らない。root のテストはキー付き配列リテラル
+（`domain.Work{domain.SectionReviewRequested: {...}}`）を使っているので、
+struct 化すると書けない。テスト用のヘルパーを 1 つ置いて通す。
 
 - [ ] **Step 1: 落ちるテストを書く**
 
@@ -956,9 +963,10 @@ wc -l internal/app/domain/*.go | grep -v _test | sort -rn | head -5
 git diff --stat 1356952..HEAD -- . ':(exclude)internal/app/domain' ':(exclude)docs'
 ```
 
-期待: `internal/app/presentation/tui/checks/`（Task 5）と
-`internal/app/presentation/tui/work/`（Task 11）だけ。他が出たら、
-それは計画外の変更。
+期待: `internal/app/presentation/tui/checks/`（Task 5）、
+`internal/app/presentation/tui/work/` と
+`internal/app/presentation/tui/root/`（どちらも Task 11）の 3 つだけ。
+他が出たら、それは計画外の変更。
 
 - [ ] **Step 3: 実際に起動して見る**
 
@@ -997,5 +1005,5 @@ go run ./cmd/octoscope --lang ja
 - [ ] `make check` が通る
 - [ ] `internal/app/domain` が 30 ファイル（非テスト）で、`domain.go` が無い
 - [ ] どのファイルも 150 行以下
-- [ ] `domain` の外の変更が `tui/checks` と `tui/work` の 2 つだけ
+- [ ] `domain` の外の変更が `tui/checks` と `tui/work` と `tui/root` の 3 つだけ
 - [ ] `go run ./cmd/octoscope` と `--lang ja` で Work board が従来どおり動く
