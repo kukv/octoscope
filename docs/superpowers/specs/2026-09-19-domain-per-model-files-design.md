@@ -151,6 +151,22 @@ PR・WorkItem・MergeContext が共有する。
 
 つまり制約 2 の適用対象は「モデル」であって「型」ではない。
 
+#### 「所有者」の決め方
+
+複数の型が同じ enum を使うことは珍しくない。独立ファイルにするかどうかは
+**使う型の数ではなく、その概念の持ち主が言えるかどうか**で決める。
+
+| 基準 | 例 |
+|---|---|
+| 値を**決める**メソッドを持つ型があるなら、その型が所有者 | `DiffSide` → `diff_line.go`。`DiffLine.Line()` が唯一「どちら側か」を決め、`ReviewThread` と `PendingComment` はその答えを運ぶだけ |
+| 決めるメソッドは無いが、**その概念の本体**と言える型があるなら、その型が所有者 | `CheckState` → `checks.go`。`Checks` はチェック全体を 1 つの状態に畳んだものそのもので、`CheckRun.State` はその同じ語彙で 1 件を言ったもの |
+| 対等な型が並ぶだけで本体が無いなら、所有者なし → 独立ファイル | `ItemState`（`PR` / `Issue` / `WorkItem`）、`ReviewState`（`PR` / `WorkItem` / `MergeContext`） |
+
+`CheckState` と `ItemState` の違いは、使う型の数ではない。`Checks` と
+`CheckRun` は包含関係にあり（`Checks.Runs []CheckRun`）、どちらも同じ
+Checks のまとまりの中にいる。対して `PR` と `Issue` と `WorkItem` は
+対等で、しかも 3 つのまとまりにまたがる。
+
 ### ② `Work` が配列型
 
 今は `type Work [WorkSectionCount][]WorkItem` で、`w[SectionYourPRs]` と
@@ -177,9 +193,9 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 見えるが、**どちら側かを決めているのは `DiffLine.Line()` ただ 1 つ**で、
 他の 2 つはその答えを運んでいるだけである。
 
-**採る形:** 決定を持つ型が所有者、という基準で `diff_line.go` に置く。
-`ItemState` / `ReviewState` と扱いが違うのは、あちらには決定を持つ型が
-無いため。
+**採る形:** 決定を持つ型が所有者、という基準で `diff_line.go` に置く
+（§5 ① の「所有者の決め方」の 1 行目）。`ItemState` / `ReviewState` と
+扱いが違うのは、あちらには決定を持つ型も概念の本体も無いため。
 
 ### ④ 所有者のいない enum が 2 つ
 
