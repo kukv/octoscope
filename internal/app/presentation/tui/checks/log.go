@@ -44,6 +44,7 @@ func (m Model) logArrived(msg logMsg) Model {
 		return m
 	}
 	m.log = msg.lines
+	m.logLines = buildLogLines(msg.lines)
 	m.logPhase = phaseIdle
 	m.logRow = 0
 	m.hscroll = 0
@@ -105,6 +106,7 @@ func (m Model) maxHscroll() int {
 // asked for a job that may no longer be the one under it.
 func (m Model) clearLog() Model {
 	m.log = nil
+	m.logLines = nil
 	m.logJob = ""
 	m.logRow = 0
 	m.hscroll = 0

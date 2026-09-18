@@ -295,6 +295,45 @@ func TestSelectedLineFollowsTheBackground(t *testing.T) {
 	}
 }
 
+// benchSink keeps the compiler from optimising the benchmarked call away.
+var benchSink string
+
+// BenchmarkHighlightScreen is one screenful of diff: Highlight is called
+// once per visible row, so this is what a keypress costs before anything
+// else the view does.
+func BenchmarkHighlightScreen(b *testing.B) {
+	const code = "func (m Model) diffTextLine(l domain.DiffLine, width int) string {"
+	for b.Loop() {
+		for range 50 {
+			benchSink = theme.Highlight("internal/app/presentation/tui/diff/render.go", code)
+		}
+	}
+}
+
+// BenchmarkHighlightUnknownExt is a file chroma has no lexer for. It costs
+// more than a Go file, not less: lexers.Match only gives up after trying
+// every pattern it has.
+func BenchmarkHighlightUnknownExt(b *testing.B) {
+	const code = "the quick brown fox jumps over the lazy dog"
+	for b.Loop() {
+		benchSink = theme.Highlight("docs/notes.unknownext", code)
+	}
+}
+
+// TestHighlightUnknownExtension is a file chroma has no lexer for, asked
+// for twice: both calls must come back uncoloured, the same way a single
+// call does.
+func TestHighlightUnknownExtension(t *testing.T) {
+	const code = "the quick brown fox"
+	theme.Highlight("main.go", code)
+
+	for range 2 {
+		if got := theme.Highlight("docs/notes.unknownext", code); got != code {
+			t.Fatalf("Highlight coloured a file with no lexer: %q", got)
+		}
+	}
+}
+
 // TestDiffLineCarriesTheBackgroundPastAChromaReset is the same guarantee
 // SelectedLine has, for the second colour that now uses the same mechanism:
 // a diff line is full of chroma's resets, and each one would end the tint.
