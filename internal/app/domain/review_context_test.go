@@ -9,6 +9,10 @@ import (
 // PendingCount walks two loops -- threads, then the comments inside each --
 // so the case that matters is unsubmitted comments spread across more than
 // one thread. A single thread would only exercise the inner loop.
+//
+// The two counts are deliberately different (two unsent, three not): with an
+// equal number of each, inverting the condition would still answer two and
+// the test would pass on a broken sum.
 func TestPendingCountAddsUpAcrossThreads(t *testing.T) {
 	t.Parallel()
 
@@ -22,6 +26,7 @@ func TestPendingCountAddsUpAcrossThreads(t *testing.T) {
 		}},
 		{Comments: []domain.ThreadComment{
 			{Body: "all public", Pending: false},
+			{Body: "still public", Pending: false},
 		}},
 	}}
 
