@@ -1,23 +1,26 @@
 package domain
 
-import "time"
-
-// CheckKind separates the two shapes GitHub reports a check in. Only a check
-// run has a log to read and a workflow to rerun; a StatusContext is an
-// external service reporting a state and a link.
-type CheckKind int
+// CheckState is the rolled-up outcome of a pull request's checks.
+type CheckState int
 
 const (
-	CheckKindRun CheckKind = iota
-	CheckKindStatus
+	CheckNone CheckState = iota
+	CheckPending
+	CheckRunning
+	CheckSuccess
+	CheckFailure
 )
 
-// LogLine is one line of a job's log. Time is zero on a continuation line:
-// a step's output can wrap onto lines the runner did not stamp.
-type LogLine struct {
-	Step string
-	Time time.Time
-	Text string
+// Checks counts the check runs behind CheckState so a progress bar can be
+// drawn without a second request, and keeps them so the drawer can list them
+// without one either.
+type Checks struct {
+	Total   int
+	Passed  int
+	Failed  int
+	Running int
+	State   CheckState
+	Runs    []CheckRun
 }
 
 // RerunScope is how much of a workflow run to start again.
