@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `internal/app/domain` の 7 ファイル 792 行を、モデル単位の 29 ファイルに割り直す。振る舞いは変えない。
+**Goal:** `internal/app/domain` の 7 ファイル 792 行を、モデル単位の 30 ファイルに割り直す。振る舞いは変えない。
 
 **Architecture:** 宣言を移動するだけのタスクと、新しいコードを足すタスクを分ける。移動タスクは `make check` が通れば正しい（コンパイラが全部確かめる）。新規タスクだけ TDD で書く。まとまり（Item / Checks / Review / Diff / Merge / Work）ごとにコミットするので、途中で止めてもビルドは通る。
 
@@ -44,7 +44,7 @@ internal/app/domain/
   item_state.go       review_state.go
   checks.go           check_run.go        log_line.go        rerun_request.go
   review_context.go   review_thread.go    thread_comment.go
-  pending_comment.go  review_target.go
+  pending_comment.go  review_target.go    review_event.go
   file_diff.go        hunk.go             diff_line.go       diff_parser.go
   merge_context.go
   work.go             work_item.go
@@ -530,7 +530,8 @@ TUI 側の別の spec の仕事で、この計画の範囲外。
 | `thread_comment.go` | `ThreadComment` | `time` |
 | `review_thread.go` | `ReviewThread`、`Pending()`、`Collapsed()` | `slices` |
 | `pending_comment.go` | `PendingComment` | なし |
-| `review_target.go` | `ReviewTarget`、`ReviewEvent` と 3 つの定数（`EventComment` / `EventApprove` / `EventRequestChanges`） | なし |
+| `review_target.go` | `ReviewTarget` | なし |
+| `review_event.go` | `ReviewEvent` と 3 つの定数（`EventComment` / `EventApprove` / `EventRequestChanges`） | なし |
 | `review_context.go` | `ReviewContext`、`PendingCount()` | なし |
 
 `ReviewEvent` を `review_target.go` に置くのは、提出の宛先と一緒に渡る
@@ -944,7 +945,7 @@ ls internal/app/domain/*.go | grep -v _test | wc -l
 wc -l internal/app/domain/*.go | grep -v _test | sort -rn | head -5
 ```
 
-期待: 29。最大は `merge_context.go` の約 118 行。
+期待: 30。最大は `diff_parser.go` の 171 行、次が `merge_context.go` の 118 行。
 
 150 行を超えるファイルがあれば、責務が 1 つか確かめる。割らないなら
 理由を spec に書き足す。
@@ -994,7 +995,7 @@ go run ./cmd/octoscope --lang ja
 ## 完了条件
 
 - [ ] `make check` が通る
-- [ ] `internal/app/domain` が 29 ファイル（非テスト）で、`domain.go` が無い
+- [ ] `internal/app/domain` が 30 ファイル（非テスト）で、`domain.go` が無い
 - [ ] どのファイルも 150 行以下
 - [ ] `domain` の外の変更が `tui/checks` と `tui/work` の 2 つだけ
 - [ ] `go run ./cmd/octoscope` と `--lang ja` で Work board が従来どおり動く

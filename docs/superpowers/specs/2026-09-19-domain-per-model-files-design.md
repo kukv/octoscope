@@ -62,7 +62,7 @@ domain を先に直すのは、ここが**依存の葉**だからである。何
 
 ## 4. ファイル構成
 
-29 ファイル。ファイル名は struct 名の snake_case。
+30 ファイル。ファイル名は struct 名の snake_case。
 
 ### Item — 8 ファイル
 
@@ -90,7 +90,7 @@ PR・WorkItem・MergeContext が共有する。
 | `log_line.go` | `LogLine` | — | — |
 | `rerun_request.go` | `RerunRequest` **新** | `RerunScope` | — |
 
-### Review — 5 ファイル
+### Review — 6 ファイル
 
 | ファイル | 型 | 同居する語彙 | メソッド |
 |---|---|---|---|
@@ -98,7 +98,8 @@ PR・WorkItem・MergeContext が共有する。
 | `review_thread.go` | `ReviewThread` | — | `Pending()` / `Collapsed()` |
 | `thread_comment.go` | `ThreadComment` | — | — |
 | `pending_comment.go` | `PendingComment` | — | — |
-| `review_target.go` | `ReviewTarget` | `ReviewEvent` | — |
+| `review_target.go` | `ReviewTarget` | — | — |
+| `review_event.go` | `ReviewEvent` | — | — |
 
 ### Diff — 4 ファイル
 
@@ -204,8 +205,11 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 
 **採る形:**
 
-- `ReviewEvent` は `review_target.go` に同居させる。提出の宛先と一緒に
-  渡るもののため
+- `ReviewEvent` は `review_event.go` に単独で置く。当初は `review_target.go`
+  に同居させたが、`SubmitReview(t ReviewTarget, event ReviewEvent, body string)`
+  のように**引数として並ぶ**だけで、`ReviewTarget` のフィールドではない。
+  「同じ引数リストに並ぶ」は所有ではないので、§5 ① の基準では所有者なし
+  （`RerunScope` が `RerunRequest.Scope` として同居するのとは形が違う）
 - `RerunScope` は `RerunRequest{Run RunHandle; Scope RerunScope}` を新設して
   `rerun_request.go` に置く。宛先と組にすると型として意味を持つ。
   `run domain.RunHandle, scope domain.RerunScope` というペアは
