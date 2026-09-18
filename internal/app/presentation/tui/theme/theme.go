@@ -289,10 +289,8 @@ func Thread(pending bool) lipgloss.Style {
 //
 // lipgloss.LightDark chooses between two *colours*, so it cannot choose
 // between two style names. SetDark keeps the answer as a bool for this.
-func chromaStyle() string {
-	mu.RLock()
-	defer mu.RUnlock()
-	if isDark {
+func chromaStyle(dark bool) string {
+	if dark {
 		return "github-dark"
 	}
 	return "github"
@@ -321,6 +319,62 @@ func lexerFor(path string) chroma.Lexer {
 	return l
 }
 
+// highlightCacheMax is how many coloured lines are remembered before the
+// lot is dropped. Measured, an entry runs from 620 bytes for a mix of
+// ordinary lines to 1750 for a screen full of 160-column ones, so the
+// limit is five megabytes at typical widths and fourteen at the worst.
+// 8192 is two hundred screenfuls, far more than scrolling or moving
+// between files needs.
+const highlightCacheMax = 8192
+
+// highlightKey is what decides a coloured line: the palette the background
+// chose, the lexer the path chose, and the text itself. The caller clips
+// the text to the width it has, so a resize asks with a different key
+// rather than getting a line that no longer fits.
+type highlightKey struct {
+	dark bool
+	path string
+	code string
+}
+
+// highlightMu and highlightLines remember coloured lines. Colouring one
+// costs about 130 microseconds, of which chroma spends two thirds
+// rebuilding its style-to-escape-sequence table -- work that does not
+// depend on the line at all. View runs on every message, and scrolling a
+// line leaves all but one row of the screen the same as the frame before,
+// so the same lines are coloured again and again.
+//
+// When it fills it is dropped whole rather than evicted one at a time.
+// That does throw away the screen just drawn, so the next frame colours
+// its rows again -- which costs what every frame cost before any of this
+// existed, once, after eight thousand new lines have gone past. An LRU
+// would avoid that one frame and carry a list node per entry to do it.
+var (
+	highlightMu    sync.RWMutex
+	highlightLines = map[highlightKey]string{}
+)
+
+// cachedHighlight answers from the cache, colouring and remembering the
+// line on a miss.
+func cachedHighlight(key highlightKey, colour func() string) string {
+	highlightMu.RLock()
+	line, ok := highlightLines[key]
+	highlightMu.RUnlock()
+	if ok {
+		return line
+	}
+
+	line = colour()
+
+	highlightMu.Lock()
+	defer highlightMu.Unlock()
+	if len(highlightLines) >= highlightCacheMax {
+		highlightLines = map[highlightKey]string{}
+	}
+	highlightLines[key] = line
+	return line
+}
+
 // Highlight colours one line of source, chosen by the file's name.
 //
 // It is one line at a time because a diff is all we have: a string or a
@@ -335,7 +389,25 @@ func Highlight(path, code string) string {
 	if lexer == nil {
 		return code
 	}
-	style := styles.Get(chromaStyle())
+
+	mu.RLock()
+	dark := isDark
+	mu.RUnlock()
+
+	return cachedHighlight(highlightKey{dark: dark, path: path, code: code}, func() string {
+		return highlight(lexer, code, dark)
+	})
+}
+
+// highlight is Highlight without the cache in front of it: everything below
+// here is what colouring one line actually costs.
+//
+// The lexer and dark are both settled by Highlight and passed down rather
+// than looked up again here. dark especially: SetDark can run on another
+// goroutine, and reading it twice could pick a different background for
+// the colours than for the cache key they are stored under.
+func highlight(lexer chroma.Lexer, code string, dark bool) string {
+	style := styles.Get(chromaStyle(dark))
 	formatter := formatters.Get("terminal256")
 	if style == nil || formatter == nil {
 		return code

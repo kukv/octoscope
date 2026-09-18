@@ -24,7 +24,9 @@ func BenchmarkView(b *testing.B) {
 
 // hugeDiff is a pull request of the size that made the diff view feel slow:
 // many files, and a first file long enough that its line numbers run past
-// four digits, which is what widens the gutter.
+// four digits, which is what widens the gutter. Lines differ from each
+// other so a cache keyed on the line's text sees a real spread of keys
+// rather than the best case of one key repeated for every row.
 func hugeDiff(files, linesPerFile int) []domain.FileDiff {
 	out := make([]domain.FileDiff, 0, files)
 	for f := range files {
@@ -34,7 +36,7 @@ func hugeDiff(files, linesPerFile int) []domain.FileDiff {
 				Kind:    domain.LineContext,
 				OldLine: i + 1,
 				NewLine: i + 1,
-				Text:    "\tif err := walk(ctx, node, depth+1); err != nil {",
+				Text:    fmt.Sprintf("\tif err := walk(ctx, node%d, depth+1); err != nil {", i),
 			})
 		}
 		out = append(out, domain.FileDiff{
@@ -88,6 +90,27 @@ func BenchmarkViewHugeDiff(b *testing.B) {
 		b.Fatalf("the diff did not land: %d rows", len(m.rows))
 	}
 	for b.Loop() {
+		benchSink = m.View()
+	}
+}
+
+// BenchmarkScrollHugeDiff is what holding j down costs: one frame in which
+// the cursor has moved a line, so all but one of the rows on screen were
+// on screen a frame ago. It is the case the view is judged on -- a frame
+// that redraws with nothing changed is cheaper, and a first paint is rarer.
+func BenchmarkScrollHugeDiff(b *testing.B) {
+	m := hugeModel(5000)
+	if len(m.rows) < 5000 {
+		b.Fatalf("the diff did not land: %d rows", len(m.rows))
+	}
+	for b.Loop() {
+		// The cursor runs out of file long before the benchmark runs out
+		// of iterations; starting over costs one uncached frame, which is
+		// lost in the average.
+		if m.row >= len(m.rows)-1 {
+			m.row, m.top = 0, 0
+		}
+		m = m.moveRow(1)
 		benchSink = m.View()
 	}
 }

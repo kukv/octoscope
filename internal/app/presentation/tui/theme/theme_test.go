@@ -182,6 +182,34 @@ func TestHighlightFollowsTheBackground(t *testing.T) {
 	}
 }
 
+// TestHighlightIsStableForTheSameLine is the whole premise of remembering a
+// coloured line: the same input must always give the same output, or the
+// cache would be showing something the uncached call would not have.
+func TestHighlightIsStableForTheSameLine(t *testing.T) {
+	const code = "func Walk(ctx context.Context) error {"
+
+	first := theme.Highlight("walk.go", code)
+	second := theme.Highlight("walk.go", code)
+
+	if first != second {
+		t.Fatalf("the same line coloured two ways:\n%q\n%q", first, second)
+	}
+}
+
+// TestHighlightTellsPathsApart guards the cache key: two files with the
+// same text but different lexers must not answer for each other. A key
+// missing the path would colour a Makefile as Go.
+func TestHighlightTellsPathsApart(t *testing.T) {
+	const code = "install: build"
+
+	asMake := theme.Highlight("Makefile", code)
+	asGo := theme.Highlight("walk.go", code)
+
+	if asMake == asGo {
+		t.Fatalf("a Makefile and a Go file coloured the same: %q", asMake)
+	}
+}
+
 // TestHighlightKeepsTheWidth is what stops highlighting from breaking every
 // column downstream: ANSI escapes must not count towards the width, and the
 // text must come back rune for rune, not smuggling newlines or other characters.
@@ -298,9 +326,14 @@ func TestSelectedLineFollowsTheBackground(t *testing.T) {
 // benchSink keeps the compiler from optimising the benchmarked call away.
 var benchSink string
 
-// BenchmarkHighlightScreen is one screenful of diff: Highlight is called
-// once per visible row, so this is what a keypress costs before anything
-// else the view does.
+// BenchmarkHighlightScreen asks for the same line fifty times, which is
+// what a cache hit costs now that coloured lines are remembered -- not
+// what colouring one costs. It was the latter before the cache, and the
+// drop from tens of milliseconds to microseconds is the change, not a
+// screenful suddenly being free.
+//
+// What a real screenful costs is measured where a real screen is drawn:
+// BenchmarkViewHugeDiff and BenchmarkScrollHugeDiff in the diff package.
 func BenchmarkHighlightScreen(b *testing.B) {
 	const code = "func (m Model) diffTextLine(l domain.DiffLine, width int) string {"
 	for b.Loop() {
