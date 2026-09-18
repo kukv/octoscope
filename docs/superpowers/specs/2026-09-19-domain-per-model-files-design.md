@@ -88,7 +88,7 @@ PR・WorkItem・MergeContext が共有する。
 | `checks.go` | `Checks` | `CheckState` | — |
 | `check_run.go` | `CheckRun` | `CheckKind` | `Duration()` / `HasWorkflow()` **新** |
 | `log_line.go` | `LogLine` | — | — |
-| `rerun.go` | `Rerun` **新** | `RerunScope` | — |
+| `rerun_request.go` | `RerunRequest` **新** | `RerunScope` | — |
 
 ### Review — 5 ファイル
 
@@ -206,10 +206,13 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 
 - `ReviewEvent` は `review_target.go` に同居させる。提出の宛先と一緒に
   渡るもののため
-- `RerunScope` は `Rerun{Run RunHandle; Scope RerunScope}` を新設して
-  `rerun.go` に置く。宛先と組にすると型として意味を持つ
+- `RerunScope` は `RerunRequest{Run RunHandle; Scope RerunScope}` を新設して
+  `rerun_request.go` に置く。宛先と組にすると型として意味を持つ。
+  `run domain.RunHandle, scope domain.RerunScope` というペアは
+  `gh/checks.go` / `usecase.go` / `tui/checks/checks.go` の 3 つの
+  シグネチャに実在する（2026-09-19 実測）
 
-`Rerun` は新設なので、要らないと判断するなら `RerunScope` を
+`RerunRequest` は新設なので、要らないと判断するなら `RerunScope` を
 `check_run.go` に同居させるだけでも制約は満たす。その場合「再実行の
 宛先と範囲」は型にならず、呼ぶ側が 2 つの値を並べて持ち続ける。
 
@@ -227,7 +230,7 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 |---|---|---|
 | `ItemRef.IsPR() bool` | `Kind == ItemPR` を返す | 今この比較が 14 箇所に散っている（usecase 6・detail 5・work 2・search 1、2026-09-19 実測） |
 | `CheckRun.HasWorkflow() bool` | `WorkflowRun` が空でないかを返す | 今 `checks` パッケージの非公開関数 `hasWorkflow()`（`checks.go:331`）にある。判断の対象は `CheckRun` なので型に返す |
-| `Rerun` struct | 再実行の宛先と範囲 | `RerunScope` に所有者が無い（§5 ④） |
+| `RerunRequest` struct | 再実行の宛先と範囲 | `RerunScope` に所有者が無い（§5 ④） |
 | `Work.Section()` / `SetSection()` | 添字アクセスの代わり | `Work` の struct 化に伴う（§5 ②） |
 
 **`IsPR()` を足しても View の分岐は消えない。** PR と Issue の違いは
@@ -244,7 +247,7 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 | `Work` の struct 化 | `Work` を添字で引いている箇所すべて |
 | `hasWorkflow()` の移設 | `internal/app/presentation/tui/checks` |
 
-`IsPR()` と `Rerun` は**追加**なので、既存の呼び出しは壊れない。
+`IsPR()` と `RerunRequest` は**追加**なので、既存の呼び出しは壊れない。
 14 箇所の `Kind ==` を `IsPR()` に置き換えるかどうかは、この spec の
 範囲外とする（振る舞いを変えない移設と、呼び出し側の書き換えを
 1 つの変更に混ぜない）。
@@ -261,7 +264,7 @@ func (w *Work) SetSection(s WorkSection, items []WorkItem)
 - `CheckRun.HasWorkflow()` が `WorkflowRun` の有無で答える
 - `Work.Section()` / `SetSection()` が列を取り違えない
 
-`tags_test.go` の公開 struct 一覧に `Rerun` を足す。`Work` は struct に
+`tags_test.go` の公開 struct 一覧に `RerunRequest` を足す。`Work` は struct に
 なるので、一覧に載せるかどうかを実装時に判断する（`WorkItem` を経由して
 既に歩かれている可能性がある）。
 

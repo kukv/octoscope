@@ -42,7 +42,7 @@ internal/app/domain/
   author.go           comment.go          label.go
   item_ref.go         issue.go            pull_request.go
   item_state.go       review_state.go
-  checks.go           check_run.go        log_line.go        rerun.go
+  checks.go           check_run.go        log_line.go        rerun_request.go
   review_context.go   review_thread.go    thread_comment.go
   pending_comment.go  review_target.go
   file_diff.go        hunk.go             diff_line.go       diff_parser.go
@@ -283,7 +283,7 @@ import: `time`
 今 `checks.go` にあるもの（`CheckKind` / `LogLine` / `RerunScope`）を全部消し、
 `domain.go` から `CheckState`（と 5 つの定数）、`Checks` を移してくる。
 
-`RerunScope` は Task 6 で `rerun.go` へ行く。**それまでの置き場所として、
+`RerunScope` は Task 6 で `rerun_request.go` へ行く。**それまでの置き場所として、
 この Step では `checks.go` に残す**（消してしまうとビルドが通らない）。
 
 import: なし（`Checks` も `CheckState` も `time` を使わない）。`RerunScope` も使わない。
@@ -451,25 +451,25 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 6: `Rerun` と `rerun.go`
+## Task 6: `RerunRequest` と `rerun_request.go`
 
 `RerunScope` はモデルの属性ではなく操作の引数なので、単独では置き場所が無い。
 宛先と組にして型にする。
 
 **Files:**
-- Create: `internal/app/domain/rerun.go`
+- Create: `internal/app/domain/rerun_request.go`
 - Modify: `internal/app/domain/checks.go`（`RerunScope` を出す）
-- Modify: `internal/app/domain/tags_test.go`（一覧に `Rerun` を足す）
+- Modify: `internal/app/domain/tags_test.go`（一覧に `RerunRequest` を足す）
 
-- [ ] **Step 1: `rerun.go` を作る**
+- [ ] **Step 1: `rerun_request.go` を作る**
 
 ```go
 package domain
 
-// Rerun is what a rerun request names: the run to start again, and how much
+// RerunRequest is what a rerun request names: the run to start again, and how
 // of it. The two travel together -- a scope with no run names nothing -- so
 // they are one type rather than two arguments.
-type Rerun struct {
+type RerunRequest struct {
 	Run   RunHandle
 	Scope RerunScope
 }
@@ -482,10 +482,10 @@ type Rerun struct {
 
 この時点で `checks.go` に残るのは `CheckState` と `Checks` だけ。
 
-- [ ] **Step 3: `tags_test.go` の一覧に `Rerun` を足す**
+- [ ] **Step 3: `tags_test.go` の一覧に `RerunRequest` を足す**
 
 `tags_test.go` の公開 struct の一覧（`domain.PR{}` などが並んでいる箇所、
-23 行目あたり）に `domain.Rerun{},` を足す。
+23 行目あたり）に `domain.RerunRequest{},` を足す。
 
 - [ ] **Step 4: 検査**
 
@@ -494,7 +494,7 @@ make check
 ```
 
 期待: 終了コード 0。`TestTheTagListCoversEveryExportedStruct` が
-`Rerun` の追加を認めること。
+`RerunRequest` の追加を認めること。
 
 - [ ] **Step 5: コミット**
 
@@ -505,7 +505,7 @@ git commit -m "feat(domain): name what a rerun request targets
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```
 
-**注:** `Rerun` はまだ誰も使っていない。`checks.Model` が
+**注:** `RerunRequest` はまだ誰も使っていない。`checks.Model` が
 `rerunRun` / `rerunScope` として持っている 2 フィールドを差し替えるのは
 TUI 側の別の spec の仕事で、この計画の範囲外。
 
