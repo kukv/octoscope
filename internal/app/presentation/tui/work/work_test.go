@@ -38,8 +38,9 @@ func sampleWork() domain.Work {
 	var w domain.Work
 	w[domain.SectionReviewRequested] = []domain.WorkItem{
 		{
-			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
-			Title: "fix the thing", UpdatedAt: now,
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
+			Title:  "fix the thing",
+			Author: "kukv", UpdatedAt: now,
 			// CRLF on purpose: GitHub returns whatever line endings the author
 			// used, and a carriage return left in a drawn line shifts it.
 			Body:   "The renderer dropped every escape.\r\n\r\nThis puts them back.",

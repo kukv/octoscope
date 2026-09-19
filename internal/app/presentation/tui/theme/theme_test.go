@@ -460,3 +460,39 @@ func TestDiffLineFollowsTheBackground(t *testing.T) {
 		})
 	}
 }
+
+// TestBadgesDropsOneThatWouldBeCutInHalf is the rule the tabs drew labels by:
+// a badge is a block of colour, and half of one says nothing about the label
+// it came from.
+func TestBadgesDropsOneThatWouldBeCutInHalf(t *testing.T) {
+	dark(t)
+
+	labels := []domain.Label{{Name: "bug", Color: "d73a4a"}, {Name: "help", Color: "008672"}}
+	// " bug " and the space in front of it: room for the first badge alone.
+	got := ansi.Strip(theme.Badges(labels, 6))
+
+	if !strings.Contains(got, "bug") {
+		t.Errorf("the badge that fits was dropped: %q", got)
+	}
+	if strings.Contains(got, "help") {
+		t.Errorf("a badge that does not fit was drawn: %q", got)
+	}
+}
+
+// TestBadgesFitsTheRoomItWasGiven guards the budget the caller worked out.
+// Japanese takes two columns per character, so a label written in it costs
+// twice what counting its runes would say.
+func TestBadgesFitsTheRoomItWasGiven(t *testing.T) {
+	dark(t)
+
+	labels := []domain.Label{
+		{Name: "バグ", Color: "d73a4a"},
+		{Name: "ドキュメント", Color: "0075ca"},
+		{Name: "help wanted", Color: "008672"},
+	}
+	for _, room := range []int{0, 5, 10, 20, 40} {
+		if got := ansi.StringWidth(theme.Badges(labels, room)); got > room {
+			t.Errorf("room %d: the badges are %d columns wide", room, got)
+		}
+	}
+}
