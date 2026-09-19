@@ -273,18 +273,28 @@ func TestSingleItemDocumentsSelectTheBodyAndTheConversation(t *testing.T) {
 	}
 }
 
-// The Repos tab ends in a drawer that previews the selected item's body, so
-// the list documents have to carry one. A fixture cannot notice the field
-// being dropped -- the recording has the data whatever the document asks for
-// -- so the document text is what is read. One occurrence is right: neither
-// list document selects comments.
-func TestListDocumentsSelectTheBody(t *testing.T) {
+// wordBodyText matches the field name "bodyText" and nothing else. \b does
+// not match between "body" and "Text", so wordBody above never counts one of
+// these.
+var wordBodyText = regexp.MustCompile(`\bbodyText\b`)
+
+// The Repos tab ends in a drawer that previews the selected item's body as
+// plain text, the way the board's does. A document that asked for "body"
+// instead would put raw markdown -- headings, the comment markers of a pull
+// request template -- into the preview on one tab and clean prose on the
+// other. A fixture cannot notice the field being dropped -- the recording has
+// the data whatever the document asks for -- so the document text is read.
+func TestListDocumentsSelectTheBodyAsText(t *testing.T) {
 	t.Parallel()
 
 	docs := map[string]string{"repo_prs.graphql": repoPRsQuery, "repo_issues.graphql": repoIssuesQuery}
 	for name, doc := range docs {
-		if n := len(wordBody.FindAllString(stripComments(doc), -1)); n != 1 {
-			t.Errorf("%s selects body %d times, want 1", name, n)
+		clean := stripComments(doc)
+		if n := len(wordBodyText.FindAllString(clean, -1)); n != 1 {
+			t.Errorf("%s selects bodyText %d times, want 1", name, n)
+		}
+		if n := len(wordBody.FindAllString(clean, -1)); n != 0 {
+			t.Errorf("%s selects the markdown body %d times, want 0", name, n)
 		}
 	}
 }
