@@ -236,9 +236,9 @@ func (m Model) hasHeading(i int) bool {
 		return true
 	}
 	prev := m.order[i-1]
-	if !hasWorkflow(r) {
+	if !r.HasWorkflow() {
 		// The first of them opens the group; the rest continue it.
-		return hasWorkflow(prev)
+		return prev.HasWorkflow()
 	}
 	return prev.Workflow != r.Workflow
 }
@@ -258,7 +258,7 @@ func (m Model) cursorLine() int {
 // workflowTitle names the group a check belongs to. A check with no workflow
 // run behind it has no name to take, so they share one heading.
 func (m Model) workflowTitle(r domain.CheckRun) string {
-	if !hasWorkflow(r) {
+	if !r.HasWorkflow() {
 		return i18n.T("checks.other")
 	}
 	if r.RunNumber > 0 {

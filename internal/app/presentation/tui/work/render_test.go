@@ -20,10 +20,10 @@ import (
 // test would pass even with the truncation removed.
 func overlongWork() domain.Work {
 	w := sampleWork()
-	long := w[domain.SectionReviewRequested][0]
+	long := w.Section(domain.SectionReviewRequested)[0]
 	long.Ref = domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/a-repository-with-a-name-nobody-would-choose", Number: 999}
 	long.Title = "レンダリングのパイプラインをまるごと置き換える refactor that nobody asked for"
-	w[domain.SectionReviewRequested] = append(w[domain.SectionReviewRequested], long)
+	w.SetSection(domain.SectionReviewRequested, append(w.Section(domain.SectionReviewRequested), long))
 	return w
 }
 
@@ -188,7 +188,7 @@ func boardOf(width int) Model {
 func TestABoxedCardIsSixLines(t *testing.T) {
 	const w = 34
 	m := boardOf(160)
-	it := sampleWork()[domain.SectionReviewRequested][0] // a PR with failing checks
+	it := sampleWork().Section(domain.SectionReviewRequested)[0] // a PR with failing checks
 
 	lines := m.card(it, boardClock, w, false)
 	if len(lines) != cardHeight() || len(lines) != titleLines+4 {
@@ -216,7 +216,7 @@ func TestABoxedCardIsSixLines(t *testing.T) {
 // board gives up a column before a column gets narrow enough for a border to
 // matter, and the box is what marks the selection.
 func TestEveryCardHasABox(t *testing.T) {
-	it := sampleWork()[domain.SectionReviewRequested][0]
+	it := sampleWork().Section(domain.SectionReviewRequested)[0]
 	for _, width := range []int{50, 80, 110, 160} {
 		m := boardOf(width)
 		w := m.columnWidth(m.columnsFor())
@@ -246,7 +246,7 @@ func TestEveryCardHasABox(t *testing.T) {
 // board gathers work from every repository the user touches, and half of them
 // are not theirs.
 func TestTheCardHeadNamesTheRepositoryInFull(t *testing.T) {
-	it := sampleWork()[domain.SectionReviewRequested][0] // kukv/octoscope#12
+	it := sampleWork().Section(domain.SectionReviewRequested)[0] // kukv/octoscope#12
 
 	head := ansi.Strip(cardHead(it, 36))
 	if !strings.Contains(head, "kukv/octoscope") {
@@ -286,7 +286,7 @@ func TestANarrowCardHeadKeepsTheNumberWhole(t *testing.T) {
 // TestTheTitleLinesCarryOnlyTheTitle pins what moved to the head line: a
 // title line that still spelled the number would spend the columns twice.
 func TestTheTitleLinesCarryOnlyTheTitle(t *testing.T) {
-	it := sampleWork()[domain.SectionReviewRequested][0]
+	it := sampleWork().Section(domain.SectionReviewRequested)[0]
 
 	for i, line := range cardTitle(it, 36, false) {
 		got := ansi.Strip(line)
@@ -300,7 +300,7 @@ func TestTheTitleLinesCarryOnlyTheTitle(t *testing.T) {
 // line. The repository left it for the head line.
 func TestTheCardMetaIsTheBarThenTheAgeThenTheLabels(t *testing.T) {
 	m := boardOf(160)
-	it := sampleWork()[domain.SectionReviewRequested][0] // failing checks, two labels
+	it := sampleWork().Section(domain.SectionReviewRequested)[0] // failing checks, two labels
 
 	meta := ansi.Strip(m.cardMeta(it, boardClock, 60))
 	if strings.Contains(meta, "octoscope") {
@@ -442,7 +442,7 @@ func TestACardIsDatedByItsOwnColumnsAnswer(t *testing.T) {
 	}
 	m.fetchedAt[domain.SectionAssigned] = boardClock.Add(48 * time.Hour)
 
-	it := sampleWork()[domain.SectionAssigned][0]
+	it := sampleWork().Section(domain.SectionAssigned)[0]
 	own := i18n.RelTime(boardClock.Add(48*time.Hour), it.UpdatedAt)
 	other := i18n.RelTime(boardClock, it.UpdatedAt)
 	if own == other {
@@ -490,7 +490,7 @@ func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
 // the meta line, beside the repository.
 func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {
 	m := boardOf(160)
-	it := sampleWork()[domain.SectionReviewRequested][0] // carries "bug" and "ci"
+	it := sampleWork().Section(domain.SectionReviewRequested)[0] // carries "bug" and "ci"
 
 	line := m.cardMeta(it, boardClock, 60)
 	for _, l := range it.Labels {
@@ -737,11 +737,11 @@ func alignedWork() domain.Work {
 	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 	var w domain.Work
 	for i, s := range domain.WorkSections() {
-		w[s] = []domain.WorkItem{{
+		w.SetSection(s, []domain.WorkItem{{
 			Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: fmt.Sprintf("repo-%d", i), Number: i},
 			Title:     fmt.Sprintf("title-%d", i),
 			UpdatedAt: now,
-		}}
+		}})
 	}
 	return w
 }

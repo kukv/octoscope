@@ -221,12 +221,14 @@ func TestASingleColumnBoardStillHitTests(t *testing.T) {
 // exactly when the board is worth scrolling.
 func TestClickingACardInAScrolledColumn(t *testing.T) {
 	var w domain.Work
+	var requested []domain.WorkItem
 	for i := range 40 {
-		w[domain.SectionReviewRequested] = append(w[domain.SectionReviewRequested], domain.WorkItem{
+		requested = append(requested, domain.WorkItem{
 			Ref:   domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: i + 1},
 			Title: fmt.Sprintf("card-%d", i),
 		})
 	}
+	w.SetSection(domain.SectionReviewRequested, requested)
 	m := New(&fakeSource{work: w})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = answeredAll(m, w)

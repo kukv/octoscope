@@ -167,7 +167,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.state[msg.section] = colLoaded
 		m.notice[msg.section] = ""
 		m.releaseFetch()
-		m.work[msg.section] = msg.items
+		m.work.SetSection(msg.section, msg.items)
 		m.fetchedAt[msg.section] = time.Now()
 		m.clampCursor()
 	case errMsg:
@@ -197,7 +197,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.col = wrapColumn(m.col+1, m.columns())
 		m.clampCursor()
 	case "j", "down":
-		if m.row+1 < len(m.work[m.section()]) {
+		if m.row+1 < len(m.work.Section(m.section())) {
 			m.row++
 		}
 	case "k", "up":
@@ -248,7 +248,7 @@ func wrapColumn(i, n int) int {
 // data was replaced. It takes a pointer because it is only ever called on the
 // local copy handleKey and Update are about to return.
 func (m *Model) clampCursor() {
-	n := len(m.work[m.section()])
+	n := len(m.work.Section(m.section()))
 	if m.row >= n {
 		m.row = max(n-1, 0)
 	}
@@ -269,8 +269,9 @@ type Summary struct {
 // Failing is every pull request whose checks are red, wherever it sits.
 func (m Model) Summary() Summary {
 	s := Summary{FetchedAt: m.oldestFetch(), Ready: m.ready()}
-	s.Attention = len(m.work[domain.SectionReviewRequested])
-	for _, items := range m.work {
+	s.Attention = len(m.work.Section(domain.SectionReviewRequested))
+	for _, sec := range domain.WorkSections() {
+		items := m.work.Section(sec)
 		for _, it := range items {
 			if it.Checks.State == domain.CheckFailure {
 				s.Failing++
@@ -312,7 +313,7 @@ func (m Model) oldestFetch() time.Time {
 // SelectedRef names the card under the cursor. ok is false when the column is
 // empty.
 func (m Model) SelectedRef() (domain.ItemRef, bool) {
-	items := m.work[m.section()]
+	items := m.work.Section(m.section())
 	if m.row >= len(items) {
 		return domain.ItemRef{}, false
 	}

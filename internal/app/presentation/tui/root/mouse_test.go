@@ -36,10 +36,10 @@ func TestTheTabRowReportsOnTheBoard(t *testing.T) {
 		Title:  "a broken one",
 		Checks: domain.Checks{Total: 1, Failed: 1, State: domain.CheckFailure},
 	}
-	src := &fakeSource{work: domain.Work{
-		domain.SectionReviewRequested: {failing, failing},
-		domain.SectionYourPRs:         {failing},
-	}}
+	var w domain.Work
+	w.SetSection(domain.SectionReviewRequested, []domain.WorkItem{failing, failing})
+	w.SetSection(domain.SectionYourPRs, []domain.WorkItem{failing})
+	src := &fakeSource{work: w}
 
 	m := loadedApp(t, src, Options{})
 	m.now = m.work.Summary().FetchedAt.Add(90 * time.Second)
@@ -133,10 +133,10 @@ func TestClickingTheGapBetweenTabsDoesNothing(t *testing.T) {
 // meet at: the root draws a tab row above the child, and a child that was
 // handed the screen's own row numbers would select the wrong card.
 func TestAClickReachesTheActiveTabAtItsOwnCoordinates(t *testing.T) {
-	src := &fakeSource{work: domain.Work{domain.SectionReviewRequested: {
-		{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, Title: "first card"},
-		{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 2}, Title: "second card"},
-	}}}
+	src := &fakeSource{work: workWith(
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, Title: "first card"},
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 2}, Title: "second card"},
+	)}
 	m := loadedApp(t, src, Options{})
 
 	x, y := tokenAt(t, m, "second card")
@@ -154,10 +154,10 @@ func TestAClickReachesTheActiveTabAtItsOwnCoordinates(t *testing.T) {
 // board must not move the repository list's cursor as well.
 func TestAClickIsNotBroadcast(t *testing.T) {
 	src := &fakeSource{
-		work: domain.Work{domain.SectionReviewRequested: {
-			{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
-			{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
-		}},
+		work: workWith(
+			domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
+			domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
+		),
 		prs: []domain.PR{{Number: 10, Title: "first pr"}, {Number: 11, Title: "second pr"}},
 	}
 	m := press(loadedApp(t, src, Options{Repo: "kukv/demo"}), "1") // --repo lands on Repos
@@ -173,10 +173,10 @@ func TestAClickIsNotBroadcast(t *testing.T) {
 // TestTheWheelReachesTheActiveTab covers the other half of the translation:
 // the wheel is forwarded with the same row shift a click gets.
 func TestTheWheelReachesTheActiveTab(t *testing.T) {
-	src := &fakeSource{work: domain.Work{domain.SectionReviewRequested: {
-		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
-		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
-	}}}
+	src := &fakeSource{work: workWith(
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
+	)}
 	m := loadedApp(t, src, Options{})
 
 	_, y := tokenAt(t, m, "a card")
@@ -189,10 +189,10 @@ func TestTheWheelReachesTheActiveTab(t *testing.T) {
 // TestADragOrAReleaseIsDropped keeps every child from carrying a case for a
 // message none of them acts on.
 func TestADragOrAReleaseIsDropped(t *testing.T) {
-	src := &fakeSource{work: domain.Work{domain.SectionReviewRequested: {
-		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
-		{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
-	}}}
+	src := &fakeSource{work: workWith(
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
+		domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
+	)}
 	m := loadedApp(t, src, Options{})
 	x, y := tokenAt(t, m, "another card")
 
