@@ -29,6 +29,18 @@ func Notice(text string, width int) string {
 	return ClipLines(text, width)
 }
 
+// PadLines appends blank lines until the block is n tall, so that whatever is
+// drawn under it lands on the same row however few lines there were to draw.
+// A block already taller than n is returned as it is: n is a budget for what
+// fits, not a length to cut to, and an empty state that runs past it is still
+// worth reading (repo.visibleRows bottoms out at one).
+func PadLines(lines []string, n int) []string {
+	for len(lines) < n {
+		lines = append(lines, "")
+	}
+	return lines
+}
+
 // FitKeyBar joins hints in order and drops from the low-priority end (the
 // tail of the slice) until the joined line fits width. No ellipsis: a bar
 // that shows fewer hints cleanly beats one that shows more but cuts one off

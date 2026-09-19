@@ -71,3 +71,29 @@ func TestNoticeFitsTheWidth(t *testing.T) {
 		}
 	}
 }
+
+// TestPadLinesFillsUpToTheBudget is what pins a key bar: the block above it
+// has to be as tall as the budget the height was divided into, however few
+// rows there were to draw.
+func TestPadLinesFillsUpToTheBudget(t *testing.T) {
+	got := layout.PadLines([]string{"a"}, 3)
+	if len(got) != 3 {
+		t.Fatalf("the block is %d lines, want 3: %q", len(got), got)
+	}
+	if got[0] != "a" {
+		t.Errorf("the drawn line was lost: %q", got)
+	}
+	if got[1] != "" || got[2] != "" {
+		t.Errorf("the padding is not blank: %q", got)
+	}
+}
+
+// TestPadLinesKeepsWhatOverflows guards the empty states. repo.visibleRows
+// bottoms out at one, and a helper that cut to the budget would drop two of
+// the three lines that tell the user there is no repository yet.
+func TestPadLinesKeepsWhatOverflows(t *testing.T) {
+	got := layout.PadLines([]string{"a", "b", "c"}, 1)
+	if len(got) != 3 {
+		t.Errorf("the block is %d lines, want 3: %q", len(got), got)
+	}
+}
