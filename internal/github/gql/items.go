@@ -33,7 +33,8 @@ type Author struct {
 
 // PullRequest is one pull request as the documents in this package select
 // it. The list document leaves Body, Comments and Assignees unselected and
-// they decode as zero values; the single-item document fills them.
+// they decode as zero values; the single-item document fills them. BodyText
+// goes the other way: only the list selects it.
 type PullRequest struct {
 	Number         int       `json:"number"`
 	Title          string    `json:"title"`
@@ -47,6 +48,7 @@ type PullRequest struct {
 	Additions      int       `json:"additions"`
 	Deletions      int       `json:"deletions"`
 	Body           string    `json:"body"`
+	BodyText       string    `json:"bodyText"`
 	Author         Author    `json:"author"`
 	Labels         struct {
 		Nodes []Label `json:"nodes"`
@@ -80,7 +82,8 @@ func (n PullRequest) StatusCheckContexts() []CheckContext {
 	return nodes
 }
 
-// Issue is one issue as the documents in this package select it.
+// Issue is one issue as the documents in this package select it. Body and
+// BodyText come from different documents, as PullRequest's do.
 type Issue struct {
 	Number    int       `json:"number"`
 	Title     string    `json:"title"`
@@ -88,6 +91,7 @@ type Issue struct {
 	URL       string    `json:"url"`
 	UpdatedAt time.Time `json:"updatedAt"`
 	Body      string    `json:"body"`
+	BodyText  string    `json:"bodyText"`
 	Author    Author    `json:"author"`
 	Labels    struct {
 		Nodes []Label `json:"nodes"`

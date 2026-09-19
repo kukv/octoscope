@@ -81,7 +81,9 @@ func (m Model) drawerLines() []string {
 
 // selectedItem is the row under the cursor as the drawer wants it. Both tabs
 // draw the same block, so the pull request and the issue are put into the
-// shape the board already had for them.
+// shape the board already had for them. WorkItem.Body is the preview's plain
+// text everywhere it is drawn, so the listed item's BodyText goes there and
+// its markdown does not.
 func (m Model) selectedItem() (domain.WorkItem, bool) {
 	if m.itemCount() == 0 || m.loading[m.tab] {
 		return domain.WorkItem{}, false
@@ -92,7 +94,7 @@ func (m Model) selectedItem() (domain.WorkItem, bool) {
 		return domain.WorkItem{
 			Ref:       domain.ItemRef{Kind: domain.ItemIssue, Repo: repo, Number: issue.Number},
 			Title:     issue.Title,
-			Body:      issue.Body,
+			Body:      issue.BodyText,
 			Author:    issue.Author.Login,
 			State:     issue.State,
 			Labels:    issue.Labels,
@@ -104,7 +106,7 @@ func (m Model) selectedItem() (domain.WorkItem, bool) {
 	return domain.WorkItem{
 		Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: repo, Number: pr.Number},
 		Title:     pr.Title,
-		Body:      pr.Body,
+		Body:      pr.BodyText,
 		Author:    pr.Author.Login,
 		IsDraft:   pr.IsDraft,
 		State:     pr.State,

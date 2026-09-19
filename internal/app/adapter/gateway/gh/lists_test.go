@@ -66,6 +66,39 @@ func TestListIssuesTranslatesEveryNode(t *testing.T) {
 	}
 }
 
+// TestAListedItemCarriesItsBodyAsText is what the Repos drawer previews. The
+// list asks for bodyText and not the markdown body, so the two travel in
+// fields of their own: a conversion that dropped this one would leave the
+// preview empty with nothing to notice.
+func TestAListedItemCarriesItsBodyAsText(t *testing.T) {
+	t.Parallel()
+
+	g := New(fakeLister{
+		listPRs: func(context.Context, string) ([]gql.PullRequest, error) {
+			return []gql.PullRequest{{Number: 1, BodyText: "what it changes"}}, nil
+		},
+		listIssues: func(context.Context, string) ([]gql.Issue, error) {
+			return []gql.Issue{{Number: 2, BodyText: "what is wrong"}}, nil
+		},
+	})
+
+	prs, err := g.ListPRs(context.Background(), "kukv/octoscope")
+	if err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+	if prs[0].BodyText != "what it changes" {
+		t.Errorf("the pull request's body text is %q", prs[0].BodyText)
+	}
+
+	issues, err := g.ListIssues(context.Background(), "kukv/octoscope")
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	if issues[0].BodyText != "what is wrong" {
+		t.Errorf("the issue's body text is %q", issues[0].BodyText)
+	}
+}
+
 func TestListLabelsTranslatesEveryLabel(t *testing.T) {
 	t.Parallel()
 

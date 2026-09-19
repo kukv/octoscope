@@ -18,9 +18,12 @@ fragment IssueListFields on Issue {
   state
   url
   updatedAt
-  # The drawer under the list previews the body, so the list carries one. The
-  # conversation is not asked for here: opening the item fetches that.
-  body
+  # The drawer under the list previews the body as plain text, the way the
+  # board's does; bodyText is that same field with the markdown stripped, so a
+  # heading or a template's comment markers do not fill the preview. The
+  # markdown body and the conversation are not asked for here: opening the
+  # issue fetches those.
+  bodyText
   author {
     login
   }

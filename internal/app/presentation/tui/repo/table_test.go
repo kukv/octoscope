@@ -224,6 +224,28 @@ func TestTheDrawerIsTheOneTheBoardDraws(t *testing.T) {
 	}
 }
 
+// TestTheDrawerPreviewsTheBodyAsText is the last piece of "the same drawer on
+// both tabs". The board previews plain text, so this tab must too, or a pull
+// request template's comment markers and headings would fill three lines here
+// and read as prose there.
+func TestTheDrawerPreviewsTheBodyAsText(t *testing.T) {
+	f := &fakeSource{prs: []domain.PR{{
+		Number: 1, Title: "a change",
+		Body:     "<!-- tell us why -->\n## Why\nBecause it was broken.",
+		BodyText: "Why Because it was broken.",
+	}}}
+	got := ansi.Strip(strings.Join(currentModel(f, 120).drawerLines(), "\n"))
+
+	if !strings.Contains(got, "Because it was broken.") {
+		t.Errorf("the drawer does not preview the body:\n%s", got)
+	}
+	for _, markup := range []string{"<!--", "## "} {
+		if strings.Contains(got, markup) {
+			t.Errorf("the preview carries the markdown %q:\n%s", markup, got)
+		}
+	}
+}
+
 // TestTheDrawerSpansTheWholeWidth is what "the same as the board" means: the
 // rule runs under the sidebar too, rather than starting at the table's edge.
 func TestTheDrawerSpansTheWholeWidth(t *testing.T) {
