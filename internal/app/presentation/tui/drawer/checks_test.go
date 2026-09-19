@@ -10,6 +10,33 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
+// TestTheMetaLineLeavesRoomForItsBadges is why it measures what is left
+// rather than what it has spent: the caller clips the line to the pane, and a
+// line that overran would be cut through a badge — a block of colour with
+// half a name in it, which reads as a smear rather than a label.
+func TestTheMetaLineLeavesRoomForItsBadges(t *testing.T) {
+	it := domain.WorkItem{
+		Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12},
+		Author: "kukv",
+		Head:   "feat/graph", Base: "main", Additions: 218, Deletions: 31,
+		Labels: []domain.Label{{Name: "bug", Color: "d73a4a"}, {Name: "ci", Color: "d4c5f9"}},
+	}
+	// A line whose parts alone overrun is the caller's to cut, and cutting
+	// through a branch name costs nothing. What must never happen is a badge
+	// added on top of a line with no room for it. Every width from there up
+	// to where both badges fit is walked: the budget has to be right at each
+	// one, not just at the roomy end.
+	bare := it
+	bare.Labels = nil
+	base := ansi.StringWidth(metaLine(bare, 200))
+
+	for w := base; w <= base+30; w++ {
+		if got := ansi.StringWidth(metaLine(it, w)); got > w {
+			t.Errorf("width %d: the meta line is %d columns: %q", w, got, ansi.Strip(metaLine(it, w)))
+		}
+	}
+}
+
 // TestFailingChecksComeFirst is why the drawer sorts: a failure is the reason
 // to look at the list at all, and the budget cuts the tail off.
 func TestFailingChecksComeFirst(t *testing.T) {

@@ -78,7 +78,7 @@ func rule(width int) string {
 func summaryPane(it domain.WorkItem, w int) []string {
 	lines := []string{
 		clip(theme.Title().Render(it.Title), w),
-		clip(metaLine(it), w),
+		clip(metaLine(it, w), w),
 	}
 	return append(lines, bodyLines(it.Body, w, rows-len(lines))...)
 }
@@ -87,7 +87,7 @@ func summaryPane(it domain.WorkItem, w int) []string {
 // and the labels, in the order the mockup puts them. A part with nothing to
 // say is left out rather than drawn empty: an account that has been deleted
 // carries no login.
-func metaLine(it domain.WorkItem) string {
+func metaLine(it domain.WorkItem, w int) string {
 	parts := []string{theme.Dim().Render(fmt.Sprintf("%s #%d", it.Ref.Repo, it.Ref.Number))}
 	if it.Author != "" {
 		parts = append(parts, theme.Dim().Render("@"+it.Author))
@@ -100,10 +100,15 @@ func metaLine(it domain.WorkItem) string {
 		parts = append(parts, theme.Added().Render(fmt.Sprintf("+%d", it.Additions))+
 			" "+theme.Removed().Render(fmt.Sprintf("−%d", it.Deletions)))
 	}
-	if b := theme.Badges(it.Labels, ansi.StringWidth(strings.Join(parts, " · "))); b != "" {
+	// Labels are offered whatever the rest of the line has not already spent,
+	// separator included. Measuring anything else lets the clip above cut a
+	// badge in half, which reads as a coloured smear rather than a label.
+	const sep = " · "
+	spent := ansi.StringWidth(strings.Join(parts, sep)) + ansi.StringWidth(sep)
+	if b := theme.Badges(it.Labels, w-spent); b != "" {
 		parts = append(parts, strings.TrimSpace(b))
 	}
-	return strings.Join(parts, theme.Dim().Render(" · "))
+	return strings.Join(parts, theme.Dim().Render(sep))
 }
 
 // bodyLines is the beginning of the item's body, wrapped and cut to the lines
