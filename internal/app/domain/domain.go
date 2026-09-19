@@ -59,7 +59,12 @@ type PR struct {
 	UpdatedAt time.Time
 	Review    ReviewState
 	URL       string
+	// Body is the markdown the author wrote, which the detail view renders.
+	// BodyText is the same text with the markdown stripped, which the drawer
+	// previews. They come from different queries: a listed item carries only
+	// BodyText, and one fetched on its own only Body.
 	Body      string
+	BodyText  string
 	Comments  []Comment
 	Labels    []Label
 	Assignees []Author
@@ -79,7 +84,9 @@ type Issue struct {
 	State     ItemState
 	UpdatedAt time.Time
 	URL       string
+	// Body and BodyText come from different queries, as a PR's do.
 	Body      string
+	BodyText  string
 	Comments  []Comment
 	Labels    []Label
 	Assignees []Author

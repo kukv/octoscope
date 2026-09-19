@@ -207,22 +207,33 @@ gh api graphql -F query=@internal/github/gql/work.graphql \
 
 ## `repo_prs.json`
 
-`repo_prs.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
-`kukv/octoscope`。録った時点で開いている PR が #81 の 1 件あり、review decision
-（`REVIEW_REQUIRED`）・check roll-up・additions/deletions のすべてが埋まって
-いたため、それをそのまま残している。
+`repo_prs.graphql` に対する実レスポンス。録った日: 2026-09-20、対象:
+`kukv/portfolio`。開いている PR は #86 の 1 件で、review decision
+（`REVIEW_REQUIRED`）・ラベル・check roll-up（8 件）・additions/deletions・
+`bodyText` のすべてが埋まっている。
+
+**`kukv/octoscope` から対象を変えた理由**: 文書が `bodyText` を選ぶように
+なったので録り直す必要があったが、その時点で octoscope に開いている PR が
+1 件も無く、ノードが空のレスポンスしか録れなかった。公開リポジトリのうち
+review decision と check roll-up が両方埋まっているものを選んだ
+（`gh repo view kukv/<name> --json isPrivate` で公開を確認済み）。
+
+ファイルが 38 KB あるのは、renovate が書いた PR 本文にリリースノートが
+丸ごと入っているため。GitHub がそう返すものであり、**短くするための編集はしない**。
 
 ```bash
 D=internal/github/gql/testdata
 gh api graphql -F query=@internal/github/gql/repo_prs.graphql \
-  -f owner=kukv -f name=octoscope | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
+  -f owner=kukv -f name=portfolio | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
 ```
 
 ## `repo_issues.json`
 
-`repo_issues.graphql` に対する実レスポンス。録った日: 2026-09-12、対象:
+`repo_issues.graphql` に対する実レスポンス。録った日: 2026-09-20、対象:
 `kukv/octoscope`。開いている Issue が #50 と #14（renovate の Dependency
 Dashboard）の 2 件で、両方をそのまま残している。
+
+2026-09-20 に文書が `bodyText` を選ぶようになったのに合わせて録り直した。
 
 ```bash
 D=internal/github/gql/testdata
