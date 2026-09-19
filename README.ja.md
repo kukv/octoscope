@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/logo.png" width="200" alt="octoscope"></p>
+<p align="center"><img src="docs/assets/logo.png" width="420" alt="octoscope"></p>
 
 # octoscope
 
