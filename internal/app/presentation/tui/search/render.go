@@ -311,25 +311,36 @@ func filterLabelID(id FilterID) string {
 }
 
 // resultPane draws the heading and the table of items, or what stands in
-// for it while there is nothing to show.
+// for it while there is nothing to show. The pane is padded out to the rows
+// its budget allows, however few of them there were to fill: the key bar
+// hangs off the bottom of this pane, and an unpadded one would carry the
+// hints up the screen with every query that found less.
+//
+// The padding happens here rather than after JoinPanes so that the rule
+// between the panes runs to the bottom of the screen rather than stopping
+// where the results ran out.
 func (m Model) resultPane() []string {
 	width := m.resultWidth()
 	heading := theme.Heading().Render(i18n.T("search.results")) + " " + m.countBadge()
 	lines := []string{layout.Clip(heading, width)}
 
-	if m.loading {
-		return append(lines, layout.Clip(m.spin.View()+" "+i18n.T("common.loading"), width))
-	}
-	if len(m.items) == 0 {
-		return append(lines, theme.Dim().Render(layout.Clip(i18n.T("search.no_results"), width)))
+	switch {
+	case m.loading:
+		lines = append(lines, layout.Clip(m.spin.View()+" "+i18n.T("common.loading"), width))
+	case len(m.items) == 0:
+		lines = append(lines, theme.Dim().Render(layout.Clip(i18n.T("search.no_results"), width)))
+	default:
+		rows := m.resultRows()
+		first := m.resultWindow(rows)
+		for i := first; i < min(first+rows, len(m.items)); i++ {
+			lines = append(lines, m.resultRow(i, width))
+		}
 	}
 
-	rows := m.resultRows()
-	first := m.resultWindow(rows)
-	for i := first; i < min(first+rows, len(m.items)); i++ {
-		lines = append(lines, m.resultRow(i, width))
+	if m.height <= 0 {
+		return lines // no budget yet: nothing to pad out to
 	}
-	return lines
+	return layout.PadLines(lines, 1+m.resultRows()) // 1: the pane's own heading
 }
 
 // resultRows is how many item rows fit under the result pane's heading.

@@ -79,6 +79,20 @@ func TestTheViewFitsTheHeight(t *testing.T) {
 	}
 }
 
+// TestTheKeyBarSitsOnTheLastRow is the complaint this change answers: the bar
+// used to ride up with the results, so the hints moved every time a query
+// found a different number of things. The board's bar has always been pinned.
+func TestTheKeyBarSitsOnTheLastRow(t *testing.T) {
+	t.Parallel()
+
+	for _, n := range []int{0, 1, 3, 60} {
+		m := sized(t, 120, make([]domain.WorkItem, n))
+		if got := len(strings.Split(m.View(), "\n")); got != 40 {
+			t.Errorf("%d results: the view is %d rows, want 40", n, got)
+		}
+	}
+}
+
 // Fifty is the cap the search asks for, so a full page may have been cut
 // short. Saying "50" would claim there are exactly fifty.
 func TestAFullPageSaysItMayHaveBeenCutShort(t *testing.T) {
