@@ -83,11 +83,15 @@ func summaryPane(it domain.WorkItem, w int) []string {
 	return append(lines, bodyLines(it.Body, w, rows-len(lines))...)
 }
 
-// metaLine is the reference, the branches, the size of the change and the
-// labels, in the order the mockup puts them. A part with nothing to say is
-// left out rather than drawn empty.
+// metaLine is the reference, the author, the branches, the size of the change
+// and the labels, in the order the mockup puts them. A part with nothing to
+// say is left out rather than drawn empty: an account that has been deleted
+// carries no login.
 func metaLine(it domain.WorkItem) string {
 	parts := []string{theme.Dim().Render(fmt.Sprintf("%s #%d", it.Ref.Repo, it.Ref.Number))}
+	if it.Author != "" {
+		parts = append(parts, theme.Dim().Render("@"+it.Author))
+	}
 	if it.Head != "" && it.Base != "" {
 		parts = append(parts, theme.Accent().Render(it.Head)+
 			theme.Dim().Render(" → ")+theme.Accent().Render(it.Base))

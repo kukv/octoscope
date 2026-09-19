@@ -87,6 +87,28 @@ func TestRenderFitsTheWidth(t *testing.T) {
 	}
 }
 
+// TestTheMetaLineNamesTheAuthor is what the Repos block said and the board's
+// drawer did not: who opened it is the first thing asked of an item someone
+// else wrote.
+func TestTheMetaLineNamesTheAuthor(t *testing.T) {
+	got := ansi.Strip(strings.Join(drawer.Render(item(), 120), "\n"))
+	if !strings.Contains(got, "@kukv") {
+		t.Errorf("the drawer does not name the author:\n%s", got)
+	}
+}
+
+// TestTheMetaLineLeavesOutAnAuthorItDoesNotHave keeps the separator from
+// opening onto nothing: a deleted account carries no login.
+func TestTheMetaLineLeavesOutAnAuthorItDoesNotHave(t *testing.T) {
+	it := item()
+	it.Author = ""
+
+	got := ansi.Strip(strings.Join(drawer.Render(it, 120), "\n"))
+	if strings.Contains(got, "@") {
+		t.Errorf("the drawer draws an author it does not have:\n%s", got)
+	}
+}
+
 // TestTheRuleSpansTheWholeWidth is what separates the drawer from what is
 // above it: a rule that stopped short would read as a pane's edge.
 func TestTheRuleSpansTheWholeWidth(t *testing.T) {
