@@ -273,6 +273,22 @@ func TestSingleItemDocumentsSelectTheBodyAndTheConversation(t *testing.T) {
 	}
 }
 
+// The Repos tab ends in a drawer that previews the selected item's body, so
+// the list documents have to carry one. A fixture cannot notice the field
+// being dropped -- the recording has the data whatever the document asks for
+// -- so the document text is what is read. One occurrence is right: neither
+// list document selects comments.
+func TestListDocumentsSelectTheBody(t *testing.T) {
+	t.Parallel()
+
+	docs := map[string]string{"repo_prs.graphql": repoPRsQuery, "repo_issues.graphql": repoIssuesQuery}
+	for name, doc := range docs {
+		if n := len(wordBody.FindAllString(stripComments(doc), -1)); n != 1 {
+			t.Errorf("%s selects body %d times, want 1", name, n)
+		}
+	}
+}
+
 func TestGetPRFillsTheBodyAndTheConversation(t *testing.T) {
 	t.Parallel()
 

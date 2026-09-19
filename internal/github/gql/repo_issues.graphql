@@ -18,6 +18,9 @@ fragment IssueListFields on Issue {
   state
   url
   updatedAt
+  # The drawer under the list previews the body, so the list carries one. The
+  # conversation is not asked for here: opening the item fetches that.
+  body
   author {
     login
   }
