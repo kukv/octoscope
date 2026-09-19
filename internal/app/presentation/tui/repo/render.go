@@ -237,7 +237,7 @@ func (m Model) row(i int) string {
 	}
 
 	titleWidth := max(m.bodyWidth()-stateColumn-numberColumn-checksColumn-ageColumn, 1)
-	title += badges(labels, titleWidth-ansi.StringWidth(title)-1)
+	title += theme.Badges(labels, titleWidth-ansi.StringWidth(title)-1)
 	line := layout.Pad(state, stateColumn) +
 		layout.Pad(theme.Dim().Render(number), numberColumn) +
 		layout.Pad(title, titleWidth) +
@@ -297,22 +297,6 @@ func checksBar(c domain.Checks) string {
 		return ""
 	}
 	return theme.Check(c.State).Render(done) + theme.Dim().Render(rest)
-}
-
-// badges draws the labels that fit in room columns, in the colours GitHub
-// gave them. A label that would be cut in half is left out altogether.
-func badges(labels []domain.Label, room int) string {
-	var b strings.Builder
-	for _, l := range labels {
-		text := " " + l.Name + " "
-		cost := ansi.StringWidth(text) + 1
-		if cost > room {
-			break
-		}
-		b.WriteString(" " + theme.Badge(l.Color).Render(text))
-		room -= cost
-	}
-	return b.String()
 }
 
 // subTabLabels names the sub-tabs in display order. The hit-test walks the

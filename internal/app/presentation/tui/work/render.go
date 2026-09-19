@@ -330,7 +330,7 @@ func (m Model) cardMeta(it domain.WorkItem, at time.Time, w int) string {
 	// whole width would let the clip below cut one in half, which reads as a
 	// coloured smear rather than a label.
 	spent := ansi.StringWidth(strings.Join(parts, " ")) + 1
-	if b := badges(it.Labels, w-spent); b != "" {
+	if b := theme.Badges(it.Labels, w-spent); b != "" {
 		parts = append(parts, strings.TrimSpace(b))
 	}
 	return clip(strings.Join(parts, " "), w)
@@ -353,23 +353,6 @@ func reviewWord(it domain.WorkItem) string {
 	default:
 		return ""
 	}
-}
-
-// badges draws the labels that fit in room columns, in the colours GitHub
-// gave them. A label that would be cut in half is left out altogether rather
-// than shown as a coloured fragment.
-func badges(labels []domain.Label, room int) string {
-	var b strings.Builder
-	for _, l := range labels {
-		text := " " + l.Name + " "
-		cost := ansi.StringWidth(text) + 1 // the space that separates badges
-		if cost > room {
-			break
-		}
-		b.WriteString(" " + theme.Badge(l.Color).Render(text))
-		room -= cost
-	}
-	return b.String()
 }
 
 func stateMarker(it domain.WorkItem) string {

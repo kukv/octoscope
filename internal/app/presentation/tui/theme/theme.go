@@ -236,6 +236,23 @@ func Badge(hex string) lipgloss.Style {
 		Foreground(lipgloss.Color(textOn(r, g, b)))
 }
 
+// Badges draws the labels that fit in room columns, in the colours GitHub
+// gave them. A label that would be cut in half is left out altogether rather
+// than shown as a coloured fragment.
+func Badges(labels []domain.Label, room int) string {
+	var b strings.Builder
+	for _, l := range labels {
+		text := " " + l.Name + " "
+		cost := ansi.StringWidth(text) + 1 // the space that separates badges
+		if cost > room {
+			break
+		}
+		b.WriteString(" " + Badge(l.Color).Render(text))
+		room -= cost
+	}
+	return b.String()
+}
+
 func rgb(hex string) (r, g, b int, ok bool) {
 	if len(hex) != 6 {
 		return 0, 0, 0, false

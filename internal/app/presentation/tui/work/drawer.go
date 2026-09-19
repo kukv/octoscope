@@ -79,7 +79,7 @@ func (m Model) metaLine(ref domain.ItemRef, it domain.WorkItem) string {
 		parts = append(parts, theme.Added().Render(fmt.Sprintf("+%d", it.Additions))+
 			" "+theme.Removed().Render(fmt.Sprintf("−%d", it.Deletions)))
 	}
-	if b := badges(it.Labels, ansi.StringWidth(strings.Join(parts, " · "))); b != "" {
+	if b := theme.Badges(it.Labels, ansi.StringWidth(strings.Join(parts, " · "))); b != "" {
 		parts = append(parts, strings.TrimSpace(b))
 	}
 	return strings.Join(parts, theme.Dim().Render(" · "))
