@@ -151,3 +151,52 @@ func TestTheListFitsTheTerminal(t *testing.T) {
 		t.Errorf("the selected row is not on screen:\n%s", ansi.Strip(m.View()))
 	}
 }
+
+// TestTheKeyBarSitsOnTheLastRow is the complaint this change answers: with
+// two open pull requests the bar used to sit halfway up the terminal, and
+// switching between here and the board moved the hints under the user's eyes.
+func TestTheKeyBarSitsOnTheLastRow(t *testing.T) {
+	for _, count := range []int{0, 2, 60} {
+		prs := make([]domain.PR, count)
+		for i := range prs {
+			prs[i] = domain.PR{Number: i + 1, Title: "a pull request"}
+		}
+		m := currentModel(&fakeSource{prs: prs}, 120)
+
+		if got := len(strings.Split(m.View(), "\n")); got != 40 {
+			t.Errorf("%d pull requests: the view is %d rows, want 40", count, got)
+		}
+	}
+}
+
+// TestTheSummaryBlockSitsAboveTheKeyBar is the other half of that: the block
+// is anchored to the bottom the way the board's drawer is, so neither it nor
+// the table above it moves as rows arrive.
+func TestTheSummaryBlockSitsAboveTheKeyBar(t *testing.T) {
+	const height = 40
+	want := height - footerHeight - summaryHeight
+
+	for _, count := range []int{2, 20} {
+		prs := make([]domain.PR, count)
+		for i := range prs {
+			prs[i] = domain.PR{Number: i + 1, Title: "a pull request", Head: "topic", Base: "main"}
+		}
+		m := currentModel(&fakeSource{prs: prs}, 120)
+
+		// The view has the sidebar and its rule in front of every line of the
+		// right pane, so the summary's first line is matched by its tail.
+		first := strings.TrimRight(ansi.Strip(m.summary()[0]), " ")
+		lines := strings.Split(ansi.Strip(m.View()), "\n")
+		got := -1
+		for i, line := range lines {
+			if strings.HasSuffix(strings.TrimRight(line, " "), first) {
+				got = i
+				break
+			}
+		}
+		if got != want {
+			t.Errorf("%d pull requests: the summary starts on row %d, want %d:\n%s",
+				count, got, want, strings.Join(lines, "\n"))
+		}
+	}
+}

@@ -39,10 +39,7 @@ func (m Model) View() string {
 		return m.dlg.View() + "\n" +
 			theme.Dim().Render(layout.FitKeyBar(addDialogHints(), m.width))
 	}
-	lines := append(m.header(), m.body()...)
-	if m.itemCount() > 0 && !m.loading[m.tab] {
-		lines = append(lines, m.summary()...)
-	}
+	lines := append(m.header(), m.padBody()...)
 	if m.sidebarCols() > 0 {
 		lines = layout.JoinPanes(m.sidebar(), lines, sidebarWidth)
 	}
@@ -51,6 +48,34 @@ func (m Model) View() string {
 		lines = append(lines, n)
 	}
 	return strings.Join(append(lines, m.keyBar()), "\n")
+}
+
+// padBody is the table and the summary block under it, each padded out to
+// the height it was budgeted, so that the key bar under them lands on the
+// last row of the terminal however few rows there were to draw. The summary
+// keeps its four lines even where there is nothing to summarise — while the
+// tab is loading, or on an empty one — for the same reason the board's
+// drawer has a fixed height: a block that came and went would move the bar.
+//
+// The padding happens here rather than after JoinPanes so that the rule
+// beside the sidebar runs to the bottom of the screen rather than stopping
+// where the rows ran out.
+func (m Model) padBody() []string {
+	if m.height <= 0 {
+		// No budget yet: draw what there is, as the rest of this tab does.
+		lines := m.body()
+		if m.itemCount() > 0 && !m.loading[m.tab] {
+			lines = append(lines, m.summary()...)
+		}
+		return lines
+	}
+
+	lines := layout.PadLines(m.body(), m.visibleRows())
+	var summary []string
+	if m.itemCount() > 0 && !m.loading[m.tab] {
+		summary = m.summary()
+	}
+	return append(lines, layout.PadLines(summary, summaryHeight)...)
 }
 
 // noticeLine is what went wrong, above the key bar. It spans the whole
