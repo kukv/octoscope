@@ -1,4 +1,8 @@
-package work
+// Package drawer draws the block under a list: the selected item in full, so
+// that it can be read without pressing enter. The Work board and the Repos
+// list both end in one, and they are the same block rather than two that
+// resemble each other.
+package drawer
 
 import (
 	"fmt"
@@ -14,35 +18,38 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// The drawer is two panes side by side: what the item is on the left, how its
-// checks are doing on the right. Its height is fixed — see drawerHeight — so
-// the panes are cut to a budget rather than allowed to grow.
+// Height is how many lines the drawer occupies. It is fixed: the drawer sits
+// below a list whose length depends on its contents, and one that changed
+// height would move the key bar under the user's eyes.
+//
+// MinColumns is where the drawer folds away. It is two panes side by side,
+// and a hundred columns leaves them fifty-eight and thirty-nine.
 const (
-	drawerRows   = drawerHeight - 1 // the rule above it takes the other line
-	drawerGap    = 3
-	drawerChecks = 3
+	Height     = 6
+	MinColumns = 100
 )
 
-// drawer shows the selected card in full, so that it can be read without
-// pressing enter.
-func (m Model) drawer() []string {
-	rule := theme.Rule().Render(strings.Repeat("─", m.width))
-	ref, ok := m.SelectedRef()
-	if !ok {
-		return append([]string{rule}, blankLines(drawerRows)...)
-	}
-	it := m.work[m.section()][m.row]
+// The drawer is two panes side by side: what the item is on the left, how its
+// checks are doing on the right. Its height is fixed, so the panes are cut to
+// a budget rather than allowed to grow.
+const (
+	rows   = Height - 1 // the rule above them takes the other line
+	gap    = 3
+	checks = 3
+)
 
+// Render draws the selected item.
+func Render(it domain.WorkItem, width int) []string {
 	// The mockup gives the description the larger share; the checks are a
 	// short list of short names.
-	leftWidth := m.width * 7 / 12
-	rightWidth := m.width - leftWidth - drawerGap
+	leftWidth := width * 7 / 12
+	rightWidth := width - leftWidth - gap
 
-	left := m.summaryPane(ref, it, leftWidth)
-	right := m.checksPane(it, rightWidth)
+	left := summaryPane(it, leftWidth)
+	right := checksPane(it, rightWidth)
 
-	lines := []string{rule}
-	for row := range drawerRows {
+	lines := []string{rule(width)}
+	for row := range rows {
 		l, r := "", ""
 		if row < len(left) {
 			l = left[row]
@@ -51,26 +58,36 @@ func (m Model) drawer() []string {
 			r = right[row]
 		}
 		lines = append(lines, strings.TrimRight(
-			layout.Fill(l, leftWidth)+strings.Repeat(" ", drawerGap)+layout.Fill(r, rightWidth), " "))
+			layout.Fill(l, leftWidth)+strings.Repeat(" ", gap)+layout.Fill(r, rightWidth), " "))
 	}
 	return lines
 }
 
+// Empty is the drawer with nothing selected: the rule, and the same height
+// of blank lines, so that what is drawn under it does not move.
+func Empty(width int) []string {
+	return append([]string{rule(width)}, make([]string, rows)...)
+}
+
+func rule(width int) string {
+	return theme.Rule().Render(strings.Repeat("─", max(width, 0)))
+}
+
 // summaryPane is the left half: the title, one line of where the item came
 // from and what it changes, and the beginning of its body.
-func (m Model) summaryPane(ref domain.ItemRef, it domain.WorkItem, w int) []string {
+func summaryPane(it domain.WorkItem, w int) []string {
 	lines := []string{
 		clip(theme.Title().Render(it.Title), w),
-		clip(m.metaLine(ref, it), w),
+		clip(metaLine(it), w),
 	}
-	return append(lines, bodyLines(it.Body, w, drawerRows-len(lines))...)
+	return append(lines, bodyLines(it.Body, w, rows-len(lines))...)
 }
 
 // metaLine is the reference, the branches, the size of the change and the
 // labels, in the order the mockup puts them. A part with nothing to say is
 // left out rather than drawn empty.
-func (m Model) metaLine(ref domain.ItemRef, it domain.WorkItem) string {
-	parts := []string{theme.Dim().Render(fmt.Sprintf("%s #%d", ref.Repo, ref.Number))}
+func metaLine(it domain.WorkItem) string {
+	parts := []string{theme.Dim().Render(fmt.Sprintf("%s #%d", it.Ref.Repo, it.Ref.Number))}
 	if it.Head != "" && it.Base != "" {
 		parts = append(parts, theme.Accent().Render(it.Head)+
 			theme.Dim().Render(" → ")+theme.Accent().Render(it.Base))
@@ -112,9 +129,9 @@ func bodyLines(body string, w, budget int) []string {
 }
 
 // checksPane is the right half: every check by name, then the same ratio as a
-// bar. The card only has room for the bar, which says how many passed but not
+// bar. A row only has room for the bar, which says how many passed but not
 // which.
-func (m Model) checksPane(it domain.WorkItem, w int) []string {
+func checksPane(it domain.WorkItem, w int) []string {
 	// Issues have no checks at all, so they get no pane.
 	if it.Ref.Kind == domain.ItemIssue {
 		return nil
@@ -129,11 +146,11 @@ func (m Model) checksPane(it domain.WorkItem, w int) []string {
 		return checkOrder(a.State) - checkOrder(b.State)
 	})
 	var lines []string
-	for _, run := range runs[:min(len(runs), drawerChecks)] {
+	for _, run := range runs[:min(len(runs), checks)] {
 		lines = append(lines, clip(
 			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, w))
 	}
-	if rest := len(runs) - drawerChecks; rest > 0 {
+	if rest := len(runs) - checks; rest > 0 {
 		lines = append(lines, theme.Dim().Render(clip(i18n.Tn("work.checks_more", rest), w)))
 	}
 
@@ -155,4 +172,9 @@ func checkOrder(s domain.CheckState) int {
 	}
 }
 
-func blankLines(n int) []string { return make([]string, max(n, 0)) }
+// clip cuts s to w display columns. layout.Clip is a different thing: it
+// reserves a column of margin, which a pane already fitted to its own width
+// does not want.
+func clip(s string, w int) string {
+	return ansi.Truncate(s, w, "…")
+}

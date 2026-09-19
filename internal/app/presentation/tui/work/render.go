@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/drawer"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
@@ -28,18 +29,8 @@ const (
 	twoColumnsBelow   = 120
 	singleColumnBelow = 80
 
-	// drawerMinColumns is the drawer's own threshold rather than the column
-	// count's: it is two panes side by side, and a hundred columns leaves
-	// them fifty-eight and thirty-nine.
-	drawerMinColumns = 100
-
 	// footerHeight is the blank line and the key bar under the board.
 	footerHeight = 2
-
-	// drawerHeight is fixed: the drawer sits below a board whose length
-	// depends on whichever column holds the most cards, and a drawer that
-	// changed height would move the key bar under the user's eyes.
-	drawerHeight = 6
 
 	// gutter indents what is drawn outside a card — the heading, the spinner,
 	// the empty-column note — by as much as a card's own border and padding,
@@ -72,7 +63,7 @@ func (m Model) View() string {
 	}
 	lines = append(lines, m.board(m.boardHeight())...)
 	if m.drawerShown() {
-		lines = append(lines, m.drawer()...)
+		lines = append(lines, m.drawerLines()...)
 	}
 	lines = append(lines, "")
 	if n := m.noticeLine(); n != "" {
@@ -108,7 +99,17 @@ func (m Model) keyBar() string {
 	return theme.Dim().Render(clip(i18n.T("footer.work"), m.width))
 }
 
-func (m Model) drawerShown() bool { return m.width >= drawerMinColumns }
+func (m Model) drawerShown() bool { return m.width >= drawer.MinColumns }
+
+// drawerLines is the drawer for whatever the cursor is on. An empty column
+// has nothing to show and still takes the same height, or the key bar would
+// move as the cursor crossed into it.
+func (m Model) drawerLines() []string {
+	if _, ok := m.SelectedRef(); !ok {
+		return drawer.Empty(m.width)
+	}
+	return drawer.Render(m.work[m.section()][m.row], m.width)
+}
 
 // titleLines is fixed rather than fitted to the title. visibleCards,
 // cardWindow and the mouse hit-test all divide by the card height, so a card
@@ -129,7 +130,7 @@ func (m Model) boardHeight() int {
 	}
 	h := m.height - m.boardTop() - footerHeight
 	if m.drawerShown() {
-		h -= drawerHeight
+		h -= drawer.Height
 	}
 	if m.hasNotice() {
 		h--

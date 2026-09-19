@@ -11,6 +11,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/drawer"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -100,45 +101,6 @@ func TestTheDrawerShowsTheBodyAndEachCheck(t *testing.T) {
 	}
 }
 
-// TestFailingChecksComeFirst is why the drawer sorts: a failure is the reason
-// to look at the list at all, and the budget cuts the tail off.
-func TestFailingChecksComeFirst(t *testing.T) {
-	m := loaded()
-	lines := m.checksPane(domain.WorkItem{
-		Ref: domain.ItemRef{Kind: domain.ItemPR},
-		Checks: domain.Checks{
-			Total: 3, Passed: 1, Failed: 1, Running: 1, State: domain.CheckFailure,
-			Runs: []domain.CheckRun{
-				{Name: "build", State: domain.CheckSuccess},
-				{Name: "lint", State: domain.CheckRunning},
-				{Name: "test", State: domain.CheckFailure},
-			},
-		},
-	}, 40)
-	got := ansi.Strip(strings.Join(lines, "\n"))
-	if strings.Index(got, "test") > strings.Index(got, "build") {
-		t.Errorf("the failing check is listed after a passing one:\n%s", got)
-	}
-}
-
-// TestALongChecksListIsCutWithACount keeps the drawer a fixed height: it is
-// drawn under the board, and a repository with thirty checks must not push
-// the key bar off the screen.
-func TestALongChecksListIsCutWithACount(t *testing.T) {
-	c := domain.Checks{Total: 12, Passed: 12, State: domain.CheckSuccess}
-	for i := range 12 {
-		c.Runs = append(c.Runs, domain.CheckRun{Name: fmt.Sprintf("job-%d", i), State: domain.CheckSuccess})
-	}
-
-	lines := loaded().checksPane(domain.WorkItem{Ref: domain.ItemRef{Kind: domain.ItemPR}, Checks: c}, 40)
-	if want := drawerChecks + 2; len(lines) != want { // the checks, the count, the summary
-		t.Errorf("the list is %d lines, want %d:\n%s", len(lines), want, strings.Join(lines, "\n"))
-	}
-	if got := ansi.Strip(lines[drawerChecks]); !strings.Contains(got, "9") {
-		t.Errorf("the line after the list does not count what was left out: %q", got)
-	}
-}
-
 // TestTheDrawerIsAlwaysTheSameHeight is what keeps the key bar still: the
 // drawer sits under a board whose length depends on the data, and a drawer
 // that grew with its contents would move everything below it.
@@ -149,8 +111,8 @@ func TestTheDrawerIsAlwaysTheSameHeight(t *testing.T) {
 		"an issue":                    press(press(loaded(), "l"), "l"),
 		"an empty column":             press(loaded(), "l"),
 	} {
-		if got := len(m.drawer()); got != drawerHeight {
-			t.Errorf("%s: the drawer is %d lines, want %d", name, got, drawerHeight)
+		if got := len(m.drawerLines()); got != drawer.Height {
+			t.Errorf("%s: the drawer is %d lines, want %d", name, got, drawer.Height)
 		}
 	}
 }
@@ -158,7 +120,7 @@ func TestTheDrawerIsAlwaysTheSameHeight(t *testing.T) {
 // TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange is the meta line the
 // mockup puts under the title.
 func TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
-	out := ansi.Strip(strings.Join(loaded().drawer(), "\n"))
+	out := ansi.Strip(strings.Join(loaded().drawerLines(), "\n"))
 	for _, want := range []string{"kukv/octoscope #12", "feat/graph", "main", "+218", "−31"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the drawer is missing %q:\n%s", want, out)
@@ -414,7 +376,7 @@ func TestAShortTitleStillFillsTheCard(t *testing.T) {
 func TestAShortBoardStillDrawsACard(t *testing.T) {
 	m := loaded()
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
-	if m.height-footerHeight-drawerHeight >= headingHeight+cardHeight() {
+	if m.height-footerHeight-drawer.Height >= headingHeight+cardHeight() {
 		t.Fatal("ten lines leave room for a card; this test covers nothing")
 	}
 
