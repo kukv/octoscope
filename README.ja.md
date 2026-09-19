@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/logo.png" width="420" alt="octoscope"></p>
+
 # octoscope
 
 [English](README.md)
