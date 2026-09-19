@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 
+	"github.com/kukv/octoscope/internal/app/presentation/tui/drawer"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
 	"github.com/kukv/octoscope/internal/i18n"
@@ -69,7 +70,12 @@ func (m Model) sidebarRows() int {
 	if m.height <= 0 {
 		return len(m.rows)
 	}
-	return max(m.height-sidebarTop-addButtonHeight-footerHeight, 1)
+	rows := m.height - sidebarTop - addButtonHeight - footerHeight
+	// The drawer is laid under both panes, so the sidebar pays for it too.
+	if m.drawerShown() {
+		rows -= drawer.Height
+	}
+	return max(rows, 1)
 }
 
 func (m Model) sidebarWindow() int {

@@ -11,6 +11,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/drawer"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -81,9 +82,9 @@ func TestTheColumnsLineUpDownThePage(t *testing.T) {
 	}
 }
 
-// TestTheSummaryBlockIsAlwaysTheSameHeight keeps the table still: the block is
+// TestTheDrawerIsAlwaysTheSameHeight keeps the table still: the block is
 // drawn under it, and one that grew with the selection would move the key bar.
-func TestTheSummaryBlockIsAlwaysTheSameHeight(t *testing.T) {
+func TestTheDrawerIsAlwaysTheSameHeight(t *testing.T) {
 	f := &fakeSource{
 		prs: []domain.PR{
 			{Number: 1, Title: "with checks", Head: "a", Base: "main", Additions: 2, Deletions: 1, Checks: domain.Checks{
@@ -99,15 +100,15 @@ func TestTheSummaryBlockIsAlwaysTheSameHeight(t *testing.T) {
 		"a PR with checks": m,
 		"a PR without":     next(m, "j"),
 	} {
-		if got := len(model.summary()); got != summaryHeight {
-			t.Errorf("%s: the summary is %d lines, want %d", name, got, summaryHeight)
+		if got := len(model.drawerLines()); got != drawer.Height {
+			t.Errorf("%s: the drawer is %d lines, want %d", name, got, drawer.Height)
 		}
 	}
 }
 
-// TestTheSummaryNamesTheBranchesAndTheSizeOfTheChange is the line the mockup
+// TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange is the line the mockup
 // puts under the table.
-func TestTheSummaryNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
+func TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
 	f := &fakeSource{prs: []domain.PR{{
 		Number: 1, Title: "a change", Author: domain.Author{Login: "kukv"},
 		Head: "feat/graph", Base: "main", Additions: 218, Deletions: 31,
@@ -116,10 +117,10 @@ func TestTheSummaryNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
 			Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
 		},
 	}}}
-	got := ansi.Strip(strings.Join(sized(loadedModel(f), 120).summary(), "\n"))
+	got := ansi.Strip(strings.Join(sized(loadedModel(f), 120).drawerLines(), "\n"))
 	for _, want := range []string{"@kukv", "feat/graph", "main", "+218", "−31", "lint"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("the summary is missing %q:\n%s", want, got)
+			t.Errorf("the drawer is missing %q:\n%s", want, got)
 		}
 	}
 }
@@ -169,34 +170,99 @@ func TestTheKeyBarSitsOnTheLastRow(t *testing.T) {
 	}
 }
 
-// TestTheSummaryBlockSitsAboveTheKeyBar is the other half of that: the block
-// is anchored to the bottom the way the board's drawer is, so neither it nor
-// the table above it moves as rows arrive.
-func TestTheSummaryBlockSitsAboveTheKeyBar(t *testing.T) {
+// TestTheDrawerSitsAboveTheKeyBar is the other half of that: the block is
+// anchored to the bottom the way the board's is, so neither it nor the table
+// above it moves as rows arrive.
+func TestTheDrawerSitsAboveTheKeyBar(t *testing.T) {
 	const height = 40
-	want := height - footerHeight - summaryHeight
+	want := height - footerHeight - drawer.Height
 
 	for _, count := range []int{2, 20} {
-		prs := make([]domain.PR, count)
-		for i := range prs {
-			prs[i] = domain.PR{Number: i + 1, Title: "a pull request", Head: "topic", Base: "main"}
-		}
-		m := currentModel(&fakeSource{prs: prs}, 120)
+		m := currentModel(&fakeSource{prs: somePRs(count)}, 120)
 
-		// The view has the sidebar and its rule in front of every line of the
-		// right pane, so the summary's first line is matched by its tail.
-		first := strings.TrimRight(ansi.Strip(m.summary()[0]), " ")
+		rule := strings.TrimRight(ansi.Strip(m.drawerLines()[0]), " ")
 		lines := strings.Split(ansi.Strip(m.View()), "\n")
 		got := -1
 		for i, line := range lines {
-			if strings.HasSuffix(strings.TrimRight(line, " "), first) {
+			if strings.TrimRight(line, " ") == rule {
 				got = i
 				break
 			}
 		}
 		if got != want {
-			t.Errorf("%d pull requests: the summary starts on row %d, want %d:\n%s",
+			t.Errorf("%d pull requests: the drawer starts on row %d, want %d:\n%s",
 				count, got, want, strings.Join(lines, "\n"))
 		}
 	}
+}
+
+// TestTheDrawerIsTheOneTheBoardDraws is the point of the change: the same
+// lines, in the same colours, under both tabs.
+func TestTheDrawerIsTheOneTheBoardDraws(t *testing.T) {
+	f := &fakeSource{prs: []domain.PR{{
+		Number: 1, Title: "a change", Author: domain.Author{Login: "kukv"},
+		Body: "What this changes and why.",
+		Head: "feat/graph", Base: "main", Additions: 218, Deletions: 31,
+		Checks: domain.Checks{
+			Total: 1, Passed: 1, State: domain.CheckSuccess,
+			Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
+		},
+	}}}
+	m := currentModel(f, 120)
+
+	it, ok := m.selectedItem()
+	if !ok {
+		t.Fatal("nothing is selected in a list with one pull request")
+	}
+	want := drawer.Render(it, 120)
+	lines := strings.Split(m.View(), "\n")
+	got := lines[len(lines)-footerHeight-drawer.Height : len(lines)-footerHeight]
+
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("the block under the list is not the board's drawer:\n--- got ---\n%s\n--- want ---\n%s",
+			ansi.Strip(strings.Join(got, "\n")), ansi.Strip(strings.Join(want, "\n")))
+	}
+}
+
+// TestTheDrawerSpansTheWholeWidth is what "the same as the board" means: the
+// rule runs under the sidebar too, rather than starting at the table's edge.
+func TestTheDrawerSpansTheWholeWidth(t *testing.T) {
+	m := currentModel(&fakeSource{prs: somePRs(3)}, 120)
+
+	rule := ansi.Strip(m.drawerLines()[0])
+	if got := ansi.StringWidth(rule); got != 120 {
+		t.Errorf("the rule is %d columns, want 120: %q", got, rule)
+	}
+	if !strings.Contains(ansi.Strip(m.View()), rule) {
+		t.Errorf("the full-width rule is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+// TestTheDrawerFoldsAwayWhenNarrow is the third step of the spec's
+// degradation: under a hundred columns there is no room for two panes side by
+// side, so the block goes and the table takes the rows back.
+func TestTheDrawerFoldsAwayWhenNarrow(t *testing.T) {
+	f := &fakeSource{prs: somePRs(60)}
+	wide := currentModel(f, 120)
+	narrow := currentModel(f, 80)
+
+	if narrow.drawerShown() {
+		t.Fatal("the drawer is still drawn at eighty columns")
+	}
+	if got, want := narrow.visibleRows(), wide.visibleRows()+drawer.Height; got != want {
+		t.Errorf("the narrow table draws %d rows, want %d", got, want)
+	}
+	if got := len(strings.Split(narrow.View(), "\n")); got != 40 {
+		t.Errorf("the narrow view is %d rows, want 40", got)
+	}
+}
+
+// somePRs is a list long enough to scroll, with branches so the drawer has
+// something to say about whichever is selected.
+func somePRs(n int) []domain.PR {
+	prs := make([]domain.PR, n)
+	for i := range prs {
+		prs[i] = domain.PR{Number: i + 1, Title: "a pull request", Head: "topic", Base: "main"}
+	}
+	return prs
 }

@@ -1,13 +1,13 @@
 package repo
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/drawer"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
@@ -22,11 +22,6 @@ const (
 	checksColumn = 8
 	ageColumn    = 8
 
-	// summaryHeight is the block under the table: what the selected item
-	// changes, then its checks. Fixed, so the table above it does not move as
-	// the selection travels down it.
-	summaryHeight = 4
-
 	// footerHeight is the blank line and the key bar.
 	footerHeight = 2
 )
@@ -39,9 +34,14 @@ func (m Model) View() string {
 		return m.dlg.View() + "\n" +
 			theme.Dim().Render(layout.FitKeyBar(addDialogHints(), m.width))
 	}
-	lines := append(m.header(), m.padBody()...)
+	lines := append(m.header(), m.tableLines()...)
 	if m.sidebarCols() > 0 {
 		lines = layout.JoinPanes(m.sidebar(), lines, sidebarWidth)
+	}
+	// The drawer spans the terminal, sidebar included, so it is laid under
+	// both panes rather than inside the right one.
+	if m.drawerShown() {
+		lines = append(lines, m.drawerLines()...)
 	}
 	lines = append(lines, "")
 	if n := m.noticeLine(); n != "" {
@@ -50,32 +50,74 @@ func (m Model) View() string {
 	return strings.Join(append(lines, m.keyBar()), "\n")
 }
 
-// padBody is the table and the summary block under it, each padded out to
-// the height it was budgeted, so that the key bar under them lands on the
-// last row of the terminal however few rows there were to draw. The summary
-// keeps its four lines even where there is nothing to summarise — while the
-// tab is loading, or on an empty one — for the same reason the board's
-// drawer has a fixed height: a block that came and went would move the bar.
+// tableLines is the table, padded out to the rows it was budgeted so that
+// what is drawn under it lands on the same line however few rows there were.
 //
 // The padding happens here rather than after JoinPanes so that the rule
 // beside the sidebar runs to the bottom of the screen rather than stopping
 // where the rows ran out.
-func (m Model) padBody() []string {
+func (m Model) tableLines() []string {
 	if m.height <= 0 {
-		// No budget yet: draw what there is, as the rest of this tab does.
-		lines := m.body()
-		if m.itemCount() > 0 && !m.loading[m.tab] {
-			lines = append(lines, m.summary()...)
-		}
-		return lines
+		return m.body() // no budget yet: draw what there is
 	}
+	return layout.PadLines(m.body(), m.visibleRows())
+}
 
-	lines := layout.PadLines(m.body(), m.visibleRows())
-	var summary []string
-	if m.itemCount() > 0 && !m.loading[m.tab] {
-		summary = m.summary()
+// drawerShown folds the drawer away on a narrow terminal, as the board does:
+// it is two panes side by side, and under a hundred columns there is no room
+// for both. The table takes the rows back.
+func (m Model) drawerShown() bool { return m.width >= drawer.MinColumns }
+
+// drawerLines is the drawer for the selected item. A tab that is loading or
+// has nothing in it still spends the same height on it, or the key bar would
+// move as the rows arrived.
+func (m Model) drawerLines() []string {
+	it, ok := m.selectedItem()
+	if !ok {
+		return drawer.Empty(m.width)
 	}
-	return append(lines, layout.PadLines(summary, summaryHeight)...)
+	return drawer.Render(it, m.width)
+}
+
+// selectedItem is the row under the cursor as the drawer wants it. Both tabs
+// draw the same block, so the pull request and the issue are put into the
+// shape the board already had for them.
+func (m Model) selectedItem() (domain.WorkItem, bool) {
+	if m.itemCount() == 0 || m.loading[m.tab] {
+		return domain.WorkItem{}, false
+	}
+	repo := m.selectedRepo()
+	if m.tab == tabIssues {
+		issue := m.issues[m.cursors[tabIssues]]
+		return domain.WorkItem{
+			Ref:       domain.ItemRef{Kind: domain.ItemIssue, Repo: repo, Number: issue.Number},
+			Title:     issue.Title,
+			Body:      issue.Body,
+			Author:    issue.Author.Login,
+			State:     issue.State,
+			Labels:    issue.Labels,
+			UpdatedAt: issue.UpdatedAt,
+			URL:       issue.URL,
+		}, true
+	}
+	pr := m.prs[m.cursors[tabPRs]]
+	return domain.WorkItem{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: repo, Number: pr.Number},
+		Title:     pr.Title,
+		Body:      pr.Body,
+		Author:    pr.Author.Login,
+		IsDraft:   pr.IsDraft,
+		State:     pr.State,
+		Labels:    pr.Labels,
+		Review:    pr.Review,
+		Head:      pr.Head,
+		Base:      pr.Base,
+		Additions: pr.Additions,
+		Deletions: pr.Deletions,
+		Checks:    pr.Checks,
+		UpdatedAt: pr.UpdatedAt,
+		URL:       pr.URL,
+	}, true
 }
 
 // noticeLine is what went wrong, above the key bar. It spans the whole
@@ -201,7 +243,10 @@ func (m Model) visibleRows() int {
 	if m.height <= 0 {
 		return m.itemCount() // no budget yet: draw them all
 	}
-	rows := m.height - listTop - summaryHeight - footerHeight
+	rows := m.height - listTop - footerHeight
+	if m.drawerShown() {
+		rows -= drawer.Height
+	}
 	if m.notice[m.tab].text != "" {
 		rows--
 	}
@@ -250,45 +295,6 @@ func (m Model) row(i int) string {
 	return layout.Clip(line, m.bodyWidth())
 }
 
-// summary is the block under the table: what the selected item changes, and
-// how its checks are doing.
-func (m Model) summary() []string {
-	lines := []string{theme.Rule().Render(strings.Repeat("─", m.bodyWidth()))}
-	if m.tab == tabIssues {
-		issue := m.issues[m.cursors[tabIssues]]
-		return fill(append(lines, layout.Clip(theme.Dim().Render(
-			fmt.Sprintf("@%s · %s", issue.Author.Login, i18n.DateTime(issue.UpdatedAt))),
-			m.bodyWidth())), summaryHeight)
-	}
-
-	pr := m.prs[m.cursors[tabPRs]]
-	parts := []string{theme.Dim().Render("@" + pr.Author.Login)}
-	if pr.Head != "" && pr.Base != "" {
-		parts = append(parts, theme.Accent().Render(pr.Head)+
-			theme.Dim().Render(" → ")+theme.Accent().Render(pr.Base))
-	}
-	if pr.Additions > 0 || pr.Deletions > 0 {
-		parts = append(parts, theme.Added().Render(fmt.Sprintf("+%d", pr.Additions))+
-			" "+theme.Removed().Render(fmt.Sprintf("−%d", pr.Deletions)))
-	}
-	lines = append(lines, layout.Clip(strings.Join(parts, theme.Dim().Render(" · ")), m.bodyWidth()))
-
-	// The rest of the block lists the checks by name: the bar on the row says
-	// how many passed, but not which.
-	if pr.Checks.Total == 0 {
-		return fill(append(lines,
-			theme.Dim().Render(layout.Clip(i18n.T("work.no_checks"), m.bodyWidth()))), summaryHeight)
-	}
-	for _, run := range pr.Checks.Runs {
-		if len(lines) >= summaryHeight {
-			break
-		}
-		lines = append(lines, layout.Clip(
-			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, m.bodyWidth()))
-	}
-	return fill(lines, summaryHeight)
-}
-
 // checksBar colours the two halves of the bar apart: what has passed takes the
 // colour of the roll-up, what has not stays muted.
 func checksBar(c domain.Checks) string {
@@ -304,13 +310,4 @@ func checksBar(c domain.Checks) string {
 // the other.
 func subTabLabels() []string {
 	return []string{i18n.T("list.tab_prs"), i18n.T("list.tab_issues")}
-}
-
-// fill pads a block out to exactly n lines, so what is drawn under it stays
-// where it was.
-func fill(lines []string, n int) []string {
-	for len(lines) < n {
-		lines = append(lines, "")
-	}
-	return lines[:n]
 }
