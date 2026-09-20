@@ -40,7 +40,13 @@ type fakeSource struct {
 	searchErr error
 	seed      []domain.RepoCandidate
 	seedErr   error
+
+	rejectName bool // ValidRepoName says no to everything
 }
+
+// ValidRepoName answers what the test asked for. The rule itself lives in
+// the gateway; copying it here would be the duplication this replaced.
+func (f *fakeSource) ValidRepoName(string) bool { return !f.rejectName }
 
 func (f *fakeSource) SaveRepositories(repos []string) error {
 	f.saved = repos

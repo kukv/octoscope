@@ -125,6 +125,8 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 	return nil
 }
 
+func (f *fakeSource) ValidRepoName(string) bool { return true }
+
 func (f *fakeSource) SaveQueries([]domain.SavedQuery) error { return nil }
 
 func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (domain.Item, error) {

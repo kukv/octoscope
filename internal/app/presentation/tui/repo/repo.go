@@ -36,6 +36,7 @@ type repoEditor interface {
 	SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error)
 	SeedCandidates(ctx context.Context) ([]domain.RepoCandidate, error)
 	SaveRepositories(repos []string) error
+	ValidRepoName(name string) bool
 }
 
 // Source is what the repository list needs from the GitHub layer. A command

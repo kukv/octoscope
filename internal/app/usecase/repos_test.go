@@ -39,6 +39,8 @@ func (f *fakeRepoFinder) ListOrgs(context.Context) ([]string, error) {
 	return f.orgs, f.orgsErr
 }
 
+func (f *fakeRepoFinder) ValidRepoName(string) bool { return true }
+
 type fakeRepoStore struct {
 	saved []string
 	err   error
