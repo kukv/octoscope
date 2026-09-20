@@ -41,7 +41,7 @@ func sized(t *testing.T, f *fakeSource, width int) Model {
 // review has not been given yet.
 func mergeCleanModel(t *testing.T, width int) Model {
 	c := mergeable()
-	c.State = domain.MergeStateClean
+	c.Clean = true
 	c.Review = domain.ReviewRequired
 	c.DeleteBranchOnMerge = true
 	c.AutoMergeAllowed = true
@@ -73,8 +73,7 @@ func mergeAutoOnModel(t *testing.T, width int) Model {
 // auto-merge turned off.
 func mergeBlockedModel(t *testing.T, width int) Model {
 	c := mergeable()
-	c.Mergeable = domain.MergeableConflicting
-	c.State = domain.MergeStateDirty
+	c.Block = domain.BlockConflicting
 	return sized(t, &fakeSource{ctx: c}, width)
 }
 
@@ -88,8 +87,7 @@ func mergeAdminModel(t *testing.T, width int) Model {
 // for yet, which is the longest of the reasons in both languages.
 func mergeComputingModel(t *testing.T, width int) Model {
 	c := mergeable()
-	c.Mergeable = domain.MergeableUnknown
-	c.State = domain.MergeStateUnknown
+	c.Block = domain.BlockComputing
 	return sized(t, &fakeSource{ctx: c}, width)
 }
 

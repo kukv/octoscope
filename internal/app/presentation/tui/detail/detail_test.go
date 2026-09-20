@@ -1062,8 +1062,6 @@ func TestTheMergePopupGetsItsOwnAnswer(t *testing.T) {
 		pr: firstPR(),
 		mergeCtx: domain.MergeContext{
 			PullRequest: "PR_1",
-			Mergeable:   domain.MergeableYes,
-			State:       domain.MergeStateUnstable,
 			Methods:     []domain.MergeMethod{domain.MergeSquash},
 		},
 	}
@@ -1127,8 +1125,6 @@ func TestAnAutoMergeChangeKeepsTheDetailViewOpen(t *testing.T) {
 		pr: firstPR(),
 		mergeCtx: domain.MergeContext{
 			PullRequest:              "PR_1",
-			Mergeable:                domain.MergeableYes,
-			State:                    domain.MergeStateUnstable,
 			Methods:                  []domain.MergeMethod{domain.MergeSquash},
 			AutoMergeAllowed:         true,
 			ViewerCanEnableAutoMerge: true,

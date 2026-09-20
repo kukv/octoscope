@@ -9,32 +9,9 @@ const (
 	MergeRebase
 )
 
-// Mergeable is GitHub's answer to "can this be merged". Unknown is an
-// ordinary state, not a failure: GitHub returns it while it is still
-// working the answer out.
-type Mergeable int
-
-const (
-	MergeableUnknown Mergeable = iota
-	MergeableYes
-	MergeableConflicting
-)
-
-// MergeState is the finer answer, translated out of the GraphQL
-// mergeStateStatus enum so the UI never switches on API spelling.
-type MergeState int
-
-const (
-	MergeStateUnknown MergeState = iota
-	MergeStateClean
-	MergeStateBlocked
-	MergeStateBehind
-	MergeStateDirty
-	MergeStateUnstable
-	MergeStateHasHooks
-)
-
 // MergeBlock is why merging is refused right now. BlockNone means it is not.
+// The gateway decides which one applies: reading a service's own answer into
+// this is translation, not a rule of this application.
 type MergeBlock int
 
 const (
@@ -51,10 +28,17 @@ const (
 // repository allows, and what state this pull request is in.
 type MergeContext struct {
 	PullRequest PullRequestHandle
-	IsDraft     bool
-	Mergeable   Mergeable
-	State       MergeState
-	Review      ReviewState
+
+	// Block is why merging is refused right now, as the gateway read it out
+	// of what the service reported. BlockNone means nothing refuses it.
+	Block MergeBlock
+
+	// Clean says there is nothing left to wait for. That is not the same as
+	// "not blocked": checks still running refuse nothing, and auto-merge is
+	// exactly the thing to offer then.
+	Clean bool
+
+	Review ReviewState
 
 	// Methods holds only the methods the repository allows, in the order
 	// the popup lists them: squash, merge commit, rebase.
@@ -75,31 +59,11 @@ type MergeContext struct {
 	ViewerIsAdmin bool
 }
 
-// Block says why merging is refused. Draft comes first: GitHub reports a
-// draft as BLOCKED, and "it is a draft" is the more useful of the two.
-func (c MergeContext) Block() MergeBlock {
-	switch {
-	case c.IsDraft:
-		return BlockDraft
-	case c.Mergeable == MergeableConflicting:
-		return BlockConflicting
-	case c.Mergeable == MergeableUnknown:
-		return BlockComputing
-	case c.State == MergeStateBlocked:
-		return BlockProtected
-	case c.State == MergeStateBehind:
-		return BlockBehind
-	case c.State == MergeStateDirty:
-		return BlockDirty
-	}
-	return BlockNone
-}
-
 // CanAutoMerge reports whether auto-merge can be turned on. GitHub refuses
 // it on a pull request that is already clean: there is nothing left to wait
 // for, so it wants an ordinary merge instead.
 func (c MergeContext) CanAutoMerge() bool {
-	return c.AutoMergeAllowed && c.ViewerCanEnableAutoMerge && c.State != MergeStateClean
+	return c.AutoMergeAllowed && c.ViewerCanEnableAutoMerge && !c.Clean
 }
 
 // CanMergeAsAdmin reports whether the viewer can push the merge through what
@@ -110,7 +74,7 @@ func (c MergeContext) CanMergeAsAdmin() bool {
 	if !c.ViewerIsAdmin {
 		return false
 	}
-	switch c.Block() {
+	switch c.Block {
 	case BlockProtected, BlockBehind:
 		return true
 	}

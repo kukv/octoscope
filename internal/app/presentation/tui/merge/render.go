@@ -108,7 +108,7 @@ func (m Model) deleteBranchText() string {
 // past carries a second line saying so: the key bar alone names the key but
 // not that it is a protection being broken.
 func (m Model) reason() string {
-	if text := blockText(m.ctx.Block()); text != "" {
+	if text := blockText(m.ctx.Block); text != "" {
 		line := theme.Error().Render(icon.Warning() + " " + text)
 		if m.ctx.CanMergeAsAdmin() {
 			line += "\n" + theme.Dim().Render("  "+i18n.T("merge.admin_offer"))
@@ -167,7 +167,7 @@ func (m Model) hints() []string {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		hints = append(hints, i18n.T("merge.key_auto_off"))
-	case !m.answered() || m.ctx.Block() != domain.BlockNone:
+	case !m.answered() || m.ctx.Block != domain.BlockNone:
 		// enter sends nothing: there is no answer, or something refuses it.
 		// a does, where the viewer may push past what refuses it.
 		if m.ctx.CanMergeAsAdmin() {

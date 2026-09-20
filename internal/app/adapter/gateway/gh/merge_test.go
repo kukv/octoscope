@@ -54,9 +54,7 @@ func TestToMergeContextTranslatesEveryField(t *testing.T) {
 	got := toMergeContext(c)
 	want := domain.MergeContext{
 		PullRequest:              "PR_kwDOTVXF-M8AAAABCd9eQA",
-		IsDraft:                  true,
-		Mergeable:                domain.MergeableConflicting,
-		State:                    domain.MergeStateDirty,
+		Block:                    domain.BlockDraft,
 		Review:                   domain.ReviewApproved,
 		Methods:                  []domain.MergeMethod{domain.MergeSquash, domain.MergeRebase},
 		DeleteBranchOnMerge:      true,
@@ -69,58 +67,71 @@ func TestToMergeContextTranslatesEveryField(t *testing.T) {
 	}
 }
 
-// TestParseMergeableCoversEveryValue guards every domain.Mergeable value.
-// A value this switch does not recognise reads as MergeableUnknown, which
-// the popup treats as "still computing" rather than a fetch failure.
-func TestParseMergeableCoversEveryValue(t *testing.T) {
+// TestToMergeBlockReadsWhatTheServiceReported is the table that used to live
+// on domain.MergeContext.Block. It moved here with the translation it does:
+// draft-first exists because GitHub reports a draft as BLOCKED, which is a
+// fact about GitHub and not a rule of this application.
+func TestToMergeBlockReadsWhatTheServiceReported(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		name      string
+		isDraft   bool
 		mergeable string
-		want      domain.Mergeable
+		state     string
+		want      domain.MergeBlock
 	}{
-		{"UNKNOWN", domain.MergeableUnknown},
-		{"MERGEABLE", domain.MergeableYes},
-		{"CONFLICTING", domain.MergeableConflicting},
-		{"a word we do not know is not a failure", domain.MergeableUnknown},
+		{"clean", false, "MERGEABLE", "CLEAN", domain.BlockNone},
+		{"draft outranks the state GitHub reports for it", true, "MERGEABLE", "BLOCKED", domain.BlockDraft},
+		{"conflicting", false, "CONFLICTING", "DIRTY", domain.BlockConflicting},
+		{"still computing", false, "UNKNOWN", "UNKNOWN", domain.BlockComputing},
+		{"protected", false, "MERGEABLE", "BLOCKED", domain.BlockProtected},
+		{"behind", false, "MERGEABLE", "BEHIND", domain.BlockBehind},
+		{"dirty", false, "MERGEABLE", "DIRTY", domain.BlockDirty},
+		{"failing checks do not block: GitHub allows the merge", false, "MERGEABLE", "UNSTABLE", domain.BlockNone},
+		{"hooks do not block either", false, "MERGEABLE", "HAS_HOOKS", domain.BlockNone},
+		{"a mergeable word we do not know means the answer is not in yet", false, "NEW_WORD", "CLEAN", domain.BlockComputing},
+		{"a state word we do not know refuses nothing", false, "MERGEABLE", "NEW_WORD", domain.BlockNone},
 	}
 	for _, tt := range tests {
-		t.Run(tt.mergeable, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := parseMergeable(tt.mergeable); got != tt.want {
-				t.Errorf("parseMergeable(%q) = %v, want %v", tt.mergeable, got, tt.want)
+			got := toMergeBlock(tt.isDraft, tt.mergeable, tt.state)
+			if got != tt.want {
+				t.Errorf("toMergeBlock(%v, %q, %q) = %v, want %v",
+					tt.isDraft, tt.mergeable, tt.state, got, tt.want)
 			}
 		})
 	}
 }
 
-// TestParseMergeStateCoversEveryValue guards every domain.MergeState value,
-// including the ones a mergeStateStatus enum a stray string does not know:
-// misreading BLOCKED as CLEAN is the difference between telling a user
-// their pull request is ready and telling them it is blocked.
-func TestParseMergeStateCoversEveryValue(t *testing.T) {
+// Clean is not the same question as Block: UNSTABLE refuses nothing, but
+// there is still something to wait for, and that is exactly when auto-merge
+// is worth offering.
+func TestCleanIsOnlyGitHubsCleanState(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		state string
-		want  domain.MergeState
+		want  bool
 	}{
-		{"UNKNOWN", domain.MergeStateUnknown},
-		{"CLEAN", domain.MergeStateClean},
-		{"BLOCKED", domain.MergeStateBlocked},
-		{"BEHIND", domain.MergeStateBehind},
-		{"DIRTY", domain.MergeStateDirty},
-		{"UNSTABLE", domain.MergeStateUnstable},
-		{"HAS_HOOKS", domain.MergeStateHasHooks},
-		{"a word we do not know is not a failure", domain.MergeStateUnknown},
+		{"CLEAN", true},
+		{"UNSTABLE", false},
+		{"HAS_HOOKS", false},
+		{"BLOCKED", false},
+		{"UNKNOWN", false},
+		{"NEW_WORD", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.state, func(t *testing.T) {
 			t.Parallel()
 
-			if got := parseMergeState(tt.state); got != tt.want {
-				t.Errorf("parseMergeState(%q) = %v, want %v", tt.state, got, tt.want)
+			got := toMergeContext(gql.MergeContext{
+				Mergeable: "MERGEABLE", MergeStateStatus: tt.state,
+			}).Clean
+			if got != tt.want {
+				t.Errorf("Clean for %q = %v, want %v", tt.state, got, tt.want)
 			}
 		})
 	}
@@ -192,7 +203,7 @@ func TestPRMergeContextTranslatesWhatTheBackendReturns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PRMergeContext: %v", err)
 	}
-	want := domain.MergeContext{PullRequest: "PR_1", Mergeable: domain.MergeableYes, State: domain.MergeStateClean}
+	want := domain.MergeContext{PullRequest: "PR_1", Clean: true}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("PRMergeContext() = %+v, want %+v", got, want)
 	}
