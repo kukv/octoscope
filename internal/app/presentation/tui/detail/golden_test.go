@@ -28,19 +28,19 @@ var goldenLanguages = []struct {
 // a recording made against the wall clock would go stale immediately.
 var goldenAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 
-func goldenPR() domain.PR {
-	return domain.PR{
-		Number: 12, Title: "レンダリングのパイプラインを置き換える",
-		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen,
-		Review: domain.ReviewApproved, UpdatedAt: goldenAt,
-		Body:   "This replaces the renderer.\n\n- one\n- two",
-		Labels: []domain.Label{{Name: "enhancement", Color: "a2eeef"}},
+func goldenPR() domain.Item {
+	return domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 12},
+		Title:     "レンダリングのパイプラインを置き換える",
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		UpdatedAt: goldenAt,
+		Body:      "This replaces the renderer.\n\n- one\n- two",
+		Labels:    []domain.Label{{Name: "enhancement", Color: "a2eeef"}},
 		// Everything the meta pane can draw is filled in: a recording made
 		// against an item with no branches, no checks and no assignee would
 		// never show those rows at all.
 		Assignees: []domain.Author{{Login: "alice"}},
-		Checks:    domain.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1},
-		Head:      "feat/graph", Base: "main", Additions: 218, Deletions: 31,
 		Comments: []domain.Comment{
 			{Author: domain.Author{Login: "bob"}, Body: "見た目が良い", CreatedAt: goldenAt},
 			// A second comment is what shows the bar starting over.
@@ -50,13 +50,21 @@ func goldenPR() domain.PR {
 				CreatedAt: goldenAt,
 			},
 		},
+		Change: &domain.Change{
+			Review:    domain.ReviewApproved,
+			Checks:    domain.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1},
+			Head:      "feat/graph",
+			Base:      "main",
+			Additions: 218,
+			Deletions: 31,
+		},
 	}
 }
 
 // goldenMentionPR is the same item with the reader named in two places: the
 // description and the first comment. The second comment names nobody, which
 // is what makes the recording show the difference rather than only a colour.
-func goldenMentionPR() domain.PR {
+func goldenMentionPR() domain.Item {
 	pr := goldenPR()
 	pr.Body = "This replaces the renderer.\n\n- one\n- two\n\ncc @kukv"
 	pr.Comments[0].Body = "@kukv 見てもらえますか"

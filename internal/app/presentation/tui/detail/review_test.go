@@ -28,7 +28,7 @@ func typeInto(m Model, s string) Model {
 // the reviewer what they already wrote (.claude/rules/errors.md).
 func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	f := &fakeSource{
-		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		pr:        firstPR(),
 		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())
@@ -67,7 +67,7 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 // shows a different one -- the worst failure in this phase, since the
 // review would go to the wrong pull request.
 func TestAStaleReviewContextIsDropped(t *testing.T) {
-	f := &fakeSource{pr: domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen}}
+	f := &fakeSource{pr: firstPR()}
 	other := domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 999}
 
 	t.Run("reviewContextMsg", func(t *testing.T) {
@@ -99,7 +99,7 @@ func TestAStaleReviewContextIsDropped(t *testing.T) {
 // review popup: esc must not leave the failure printed under the body.
 func TestLeavingTheSubmitPopupTakesItsErrorWithIt(t *testing.T) {
 	f := &fakeSource{
-		pr:        domain.PR{Number: 1, Title: "first pr", State: domain.StateOpen},
+		pr:        firstPR(),
 		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
 	m := loaded(f, prRef())

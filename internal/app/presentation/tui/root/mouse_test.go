@@ -158,7 +158,18 @@ func TestAClickIsNotBroadcast(t *testing.T) {
 			{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}, Title: "a card"},
 			{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}, Title: "another card"},
 		}},
-		prs: []domain.PR{{Number: 10, Title: "first pr"}, {Number: 11, Title: "second pr"}},
+		prs: []domain.Item{
+			{
+				Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 10},
+				Title:  "first pr",
+				Change: &domain.Change{},
+			},
+			{
+				Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 11},
+				Title:  "second pr",
+				Change: &domain.Change{},
+			},
+		},
 	}
 	m := press(loadedApp(t, src, Options{Repo: "kukv/demo"}), "1") // --repo lands on Repos
 

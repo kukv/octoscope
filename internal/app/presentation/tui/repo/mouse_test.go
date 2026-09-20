@@ -98,7 +98,7 @@ func TestClickingASubTabSwitchesToIt(t *testing.T) {
 }
 
 func TestClickingOutsideTheRowsChangesNothing(t *testing.T) {
-	m := sized(loadedModel(&fakeSource{prs: samplePRs(), issues: []domain.Issue{}}), 120)
+	m := sized(loadedModel(&fakeSource{prs: samplePRs(), issues: []domain.Item{}}), 120)
 	before, _ := m.SelectedRef()
 
 	for name, point := range map[string][2]int{
@@ -212,7 +212,7 @@ func TestClickingBelowTheDrawnSidebarRowsSelectsNothing(t *testing.T) {
 	}
 	f := &fakeSource{prs: samplePRs()}
 	m := sized(New(f, Options{Repositories: many}), 120)
-	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
+	m, _ = m.Update(prListMsg{prs: f.prs})
 
 	m, cmd := m.Update(click(2, sidebarTop+m.sidebarRows()))
 	if cmd != nil {
@@ -242,9 +242,13 @@ func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
 // and a hit-test that ignored the offset would select the wrong one exactly
 // when the list is long enough to be worth scrolling.
 func TestClickingARowInAScrolledList(t *testing.T) {
-	var prs []domain.PR
+	var prs []domain.Item
 	for i := range 60 {
-		prs = append(prs, domain.PR{Number: i + 1, Title: fmt.Sprintf("pr-%d", i)})
+		prs = append(prs, domain.Item{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: i + 1},
+			Title:  fmt.Sprintf("pr-%d", i),
+			Change: &domain.Change{},
+		})
 	}
 	m := loadedModel(&fakeSource{prs: prs})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})

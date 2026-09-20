@@ -20,8 +20,6 @@ var exported = []any{
 	domain.Author{},
 	domain.Label{},
 	domain.Comment{},
-	domain.PR{},
-	domain.Issue{},
 	domain.ItemRef{},
 	domain.Item{},
 	domain.Change{},
