@@ -379,6 +379,11 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 **成功条件:** golden 354 枚が 1 バイトも変わらないこと。ここが本 PR の唯一かつ最強の検査である。
 
+**完了: 2026-09-20。** ポート対 14 本が 6 本になり、`internal/app/presentation` の非テストコードから
+`domain.PR` / `domain.Issue` が消えた。repo ビューのモデルは `prs` / `issues` の 2 スライスのまま
+（要素が `domain.Item` になっただけ）で、`items [2][]domain.Item` に畳む案は採らなかった——
+ビューの構造変更は本 PR の範囲ではない。
+
 ### PR 5: 旧型と旧ポートの削除、規約の更新
 
 - `domain.PR` / `domain.Issue` を削除、`tags_test.go` の `exported` から除去（24 → 22）
