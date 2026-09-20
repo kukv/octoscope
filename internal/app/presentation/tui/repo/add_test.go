@@ -14,31 +14,6 @@ import (
 
 var errSaveFailed = errors.New("open config.yaml: permission denied")
 
-func TestIsOwnerSlashName(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		in   string
-		want bool
-	}{
-		{"owner and name", "kukv/octoscope", true},
-		{"no slash", "octoscope", false},
-		{"empty owner", "/octoscope", false},
-		{"empty name", "kukv/", false},
-		{"three parts", "github.com/kukv/octoscope", false},
-		{"surrounding space", " kukv/octoscope ", false},
-		{"empty", "", false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := isOwnerSlashName(c.in); got != c.want {
-				t.Errorf("isOwnerSlashName(%q) = %v, want %v", c.in, got, c.want)
-			}
-		})
-	}
-}
-
 func backspace() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyBackspace} }
 
 func TestAOpensTheAddDialog(t *testing.T) {
@@ -119,9 +94,10 @@ func TestAddedRowsSurviveTheRepositoryLookup(t *testing.T) {
 }
 
 // The settings file is hand-editable, and a malformed entry there is already
-// read as an uncountable row. Writing one on purpose would be worse.
-func TestAddingRefusesANameThatIsNotOwnerSlashName(t *testing.T) {
-	f := &fakeSource{}
+// read as an uncountable row. Writing one on purpose would be worse. What
+// counts as malformed is the source's answer, not a rule kept here.
+func TestAddingRefusesTheNameTheSourceRejects(t *testing.T) {
+	f := &fakeSource{rejectName: true}
 	m := sized(New(f, Options{}), 120)
 	m, _ = m.Update(key("a"))
 	m = typeInto(m, "octoscope")

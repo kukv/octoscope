@@ -65,3 +65,32 @@ func TestListOwnReposTranslatesEveryField(t *testing.T) {
 		t.Errorf("ListOwnRepos() = %+v, want %+v", got, want)
 	}
 }
+
+// ValidRepoName is the add dialog's guard. The table is the one place the
+// shape of a name is written down for the view's sake; gql.SplitRepo holds
+// the rule itself and has its own table.
+func TestValidRepoNameAcceptsOwnerSlashNameAndNothingElse(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"owner and name", "kukv/octoscope", true},
+		{"no slash", "octoscope", false},
+		{"empty owner", "/octoscope", false},
+		{"empty name", "kukv/", false},
+		{"three parts", "github.com/kukv/octoscope", false},
+		{"surrounding space", " kukv/octoscope ", false},
+		{"empty", "", false},
+	}
+	g := New(fakeRepoFinder{})
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := g.ValidRepoName(c.in); got != c.want {
+				t.Errorf("ValidRepoName(%q) = %v, want %v", c.in, got, c.want)
+			}
+		})
+	}
+}

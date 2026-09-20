@@ -5,6 +5,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/github"
+	"github.com/kukv/octoscope/internal/github/gql"
 )
 
 // SearchRepos looks for repositories matching query.
@@ -32,6 +33,15 @@ func (g *Gateway) ListOwnRepos(ctx context.Context, owner string, limit int) ([]
 		repos[i] = toRepoCandidate(f)
 	}
 	return repos, nil
+}
+
+// ValidRepoName reports whether name is one this service could have. The
+// shape is GitHub's -- "owner/name", no second slash -- so the rule lives
+// here rather than in the domain: another service spells it differently
+// (GitLab nests groups) and the view must not have to know which.
+func (g *Gateway) ValidRepoName(name string) bool {
+	_, _, ok := gql.SplitRepo(name)
+	return ok
 }
 
 func toRepoCandidate(r github.Repository) domain.RepoCandidate {

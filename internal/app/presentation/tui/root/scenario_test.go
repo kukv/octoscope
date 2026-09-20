@@ -53,6 +53,8 @@ func (f *scenarioSource) SaveRepositories(repos []string) error {
 	return nil
 }
 
+func (f *scenarioSource) ValidRepoName(string) bool { return true }
+
 func (f *scenarioSource) SaveQueries([]domain.SavedQuery) error { return nil }
 
 func (f *scenarioSource) ListWorkSection(_ context.Context, s domain.WorkSection) ([]domain.WorkItem, error) {

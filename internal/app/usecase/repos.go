@@ -13,6 +13,7 @@ type repoFinder interface {
 	SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error)
 	ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error)
 	ListOrgs(ctx context.Context) ([]string, error)
+	ValidRepoName(name string) bool
 }
 
 // repoStore is where the sidebar's list survives a restart.
@@ -34,6 +35,13 @@ func (u *Usecase) SaveRepositories(repos []string) error {
 // typed into.
 func (u *Usecase) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
 	return u.repos.SearchRepos(ctx, query, limit)
+}
+
+// ValidRepoName reports whether the add dialog's input could name a
+// repository. The shape belongs to the service, so the answer comes from
+// the gateway rather than from a rule written in the view.
+func (u *Usecase) ValidRepoName(name string) bool {
+	return u.repos.ValidRepoName(name)
 }
 
 // SeedCandidates is what a first run has to offer: the user's own
