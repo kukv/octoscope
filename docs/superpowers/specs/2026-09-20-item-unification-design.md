@@ -319,6 +319,8 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 **成功条件:** `make check`。golden 無変更。
 `git diff --stat` 以外に意味のある差分が無いこと（`git diff -M` で移動として検出される）。
 
+**完了: 2026-09-20。**
+
 ### PR 2: `domain.Item` と新ポートの追加（旧は残す）
 
 - `domain.Item` / `domain.Change` を足す
