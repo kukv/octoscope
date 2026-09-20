@@ -12,7 +12,6 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -86,24 +85,18 @@ func (f *scenarioSource) RepoCounts(context.Context, []string) ([]domain.RepoCou
 	return nil, nil
 }
 
-func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (usecase.Item, error) {
-	pr := f.pr
-	return usecase.Item{
-		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
-		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
-		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
-		PR: &pr,
-	}, nil
+func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (domain.Item, error) {
+	return itemFromPR(f.pr), nil
 }
 
-func (f *scenarioSource) AddComment(_ domain.ItemRef, body string) error {
+func (f *scenarioSource) AddComment(_ context.Context, _ domain.ItemRef, body string) error {
 	f.pr.Comments = append(f.pr.Comments, domain.Comment{
 		Author: domain.Author{Login: "kukv"}, Body: body, CreatedAt: scenarioAt,
 	})
 	return nil
 }
 
-func (f *scenarioSource) SetState(_ domain.ItemRef, closing bool) error {
+func (f *scenarioSource) SetState(_ context.Context, _ domain.ItemRef, closing bool) error {
 	if closing {
 		f.pr.State = domain.StateClosed
 	} else {
@@ -112,7 +105,7 @@ func (f *scenarioSource) SetState(_ domain.ItemRef, closing bool) error {
 	return nil
 }
 
-func (f *scenarioSource) EditLabels(_ domain.ItemRef, add, remove []string) error {
+func (f *scenarioSource) EditLabels(_ context.Context, _ domain.ItemRef, add, remove []string) error {
 	for _, name := range add {
 		f.pr.Labels = append(f.pr.Labels, domain.Label{Name: name})
 	}
@@ -128,7 +121,9 @@ func (f *scenarioSource) EditLabels(_ domain.ItemRef, add, remove []string) erro
 	return nil
 }
 
-func (f *scenarioSource) EditAssignees(domain.ItemRef, []string, []string) error { return nil }
+func (f *scenarioSource) EditAssignees(context.Context, domain.ItemRef, []string, []string) error {
+	return nil
+}
 
 func (f *scenarioSource) ListLabels(context.Context, string) ([]domain.Label, error) {
 	return f.labels, nil

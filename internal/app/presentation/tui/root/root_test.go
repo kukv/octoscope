@@ -22,7 +22,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/work"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -122,27 +121,36 @@ func (f *fakeSource) SaveRepositories(repos []string) error {
 
 func (f *fakeSource) SaveQueries([]domain.SavedQuery) error { return nil }
 
-func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (usecase.Item, error) {
+func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (domain.Item, error) {
 	if ref.Kind == domain.ItemIssue {
-		return usecase.Item{Kind: domain.ItemIssue}, nil
+		return domain.Item{Ref: domain.ItemRef{Kind: domain.ItemIssue}}, nil
 	}
-	pr := f.pr
-	return usecase.Item{
-		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
-		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
-		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
-		PR: &pr,
-	}, f.prErr
+	return itemFromPR(f.pr), f.prErr
 }
 
-func (f *fakeSource) AddComment(domain.ItemRef, string) error { return nil }
-func (f *fakeSource) SetState(domain.ItemRef, bool) error     { return nil }
-func (f *fakeSource) EditLabels(domain.ItemRef, []string, []string) error {
+func (f *fakeSource) AddComment(context.Context, domain.ItemRef, string) error { return nil }
+func (f *fakeSource) SetState(context.Context, domain.ItemRef, bool) error     { return nil }
+func (f *fakeSource) EditLabels(context.Context, domain.ItemRef, []string, []string) error {
 	return nil
 }
 
-func (f *fakeSource) EditAssignees(domain.ItemRef, []string, []string) error {
+func (f *fakeSource) EditAssignees(context.Context, domain.ItemRef, []string, []string) error {
 	return nil
+}
+
+// itemFromPR is what the gateway builds out of a pull request: the fixtures
+// stay domain.PR, and the views are handed the conversion.
+func itemFromPR(pr domain.PR) domain.Item {
+	return domain.Item{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: pr.Number},
+		Title: pr.Title, Author: pr.Author, State: pr.State, Body: pr.Body,
+		URL: pr.URL, Labels: pr.Labels, Assignees: pr.Assignees,
+		Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
+		Change: &domain.Change{
+			IsDraft: pr.IsDraft, Review: pr.Review, Head: pr.Head, Base: pr.Base,
+			Additions: pr.Additions, Deletions: pr.Deletions, Checks: pr.Checks,
+		},
+	}
 }
 
 func (f *fakeSource) ListLabels(context.Context, string) ([]domain.Label, error) {

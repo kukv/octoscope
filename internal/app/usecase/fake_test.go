@@ -7,10 +7,7 @@ import (
 )
 
 type fakeSource struct {
-	pr     domain.PR
-	issue  domain.Issue
-	err    error
-	called []string
+	err error
 
 	viewer    string
 	viewerErr error
@@ -34,16 +31,6 @@ type fakeSource struct {
 	autoMergeID         domain.PullRequestHandle
 	autoMergeMethod     domain.MergeMethod
 	disabledAutoMergeID domain.PullRequestHandle
-}
-
-func (f *fakeSource) GetPR(_ context.Context, _ string, _ int) (domain.PR, error) {
-	f.called = append(f.called, "GetPR")
-	return f.pr, f.err
-}
-
-func (f *fakeSource) GetIssue(_ context.Context, _ string, _ int) (domain.Issue, error) {
-	f.called = append(f.called, "GetIssue")
-	return f.issue, f.err
 }
 
 func (f *fakeSource) Viewer(context.Context) (string, error) { return f.viewer, f.viewerErr }
