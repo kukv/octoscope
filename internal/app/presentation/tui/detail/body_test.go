@@ -8,10 +8,9 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
-	"github.com/kukv/octoscope/internal/app/usecase"
 )
 
-func withComments() usecase.Item {
+func withComments() domain.Item {
 	it := fullPRItem()
 	it.Body = "This replaces the renderer.\n\n- one\n- two"
 	it.Comments = []domain.Comment{

@@ -48,7 +48,7 @@ func (m Model) openWeb(ref domain.ItemRef, url string) tea.Cmd {
 
 func postComment(src Source, ref domain.ItemRef, body string) tea.Cmd {
 	return func() tea.Msg {
-		if err := src.AddComment(ref, body); err != nil {
+		if err := src.AddComment(context.Background(), ref, body); err != nil {
 			return commentErrorMsg{ref: ref, err: err}
 		}
 		return commentPostedMsg{ref: ref}
@@ -57,7 +57,7 @@ func postComment(src Source, ref domain.ItemRef, body string) tea.Cmd {
 
 func setState(src Source, ref domain.ItemRef, closing bool) tea.Cmd {
 	return func() tea.Msg {
-		if err := src.SetState(ref, closing); err != nil {
+		if err := src.SetState(context.Background(), ref, closing); err != nil {
 			return stateErrorMsg{ref: ref, err: err}
 		}
 		return stateChangedMsg{ref: ref}
@@ -88,9 +88,9 @@ func applyPicker(src Source, ref domain.ItemRef, kind pickerKind, add, remove []
 	return func() tea.Msg {
 		var err error
 		if kind == pickLabels {
-			err = src.EditLabels(ref, add, remove)
+			err = src.EditLabels(context.Background(), ref, add, remove)
 		} else {
-			err = src.EditAssignees(ref, add, remove)
+			err = src.EditAssignees(context.Background(), ref, add, remove)
 		}
 		if err != nil {
 			return pickErrorMsg{ref: ref, err: err}

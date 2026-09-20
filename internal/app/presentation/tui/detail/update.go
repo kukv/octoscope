@@ -105,10 +105,10 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.assignees = authorLogins(it.Assignees)
 	m.url = it.URL
 	m.item, m.loaded = it, true
-	if it.Kind == domain.ItemPR {
-		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Number, "Title": it.Title})
+	if it.Ref.Kind == domain.ItemPR {
+		m.title = i18n.Tf("detail.pr_title", map[string]any{"Number": it.Ref.Number, "Title": it.Title})
 	} else {
-		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Number, "Title": it.Title})
+		m.title = i18n.Tf("detail.issue_title", map[string]any{"Number": it.Ref.Number, "Title": it.Title})
 	}
 	m.relayout()
 	m.body.GotoTop()

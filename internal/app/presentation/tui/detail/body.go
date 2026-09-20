@@ -11,7 +11,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -54,7 +53,7 @@ func sectionHeading(name string, w int, mine bool) string {
 // bodyLines is what scrolls: the description under its heading, then every
 // comment behind its own bar. viewer is the reader's login, or "" when it is
 // not known, which highlights nothing.
-func bodyLines(it usecase.Item, w int, viewer string) []string {
+func bodyLines(it domain.Item, w int, viewer string) []string {
 	// The mention is looked for in what GitHub sent, not in the placeholder
 	// that stands in for an empty description.
 	lines := []string{sectionHeading(i18n.T("detail.section.description"), w,

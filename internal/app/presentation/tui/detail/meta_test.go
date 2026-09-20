@@ -10,13 +10,12 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
 func metaAt() time.Time { return time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC) }
 
-func fullPRItem() usecase.Item {
+func fullPRItem() domain.Item {
 	pr := domain.PR{
 		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
 		State: domain.StateOpen, Review: domain.ReviewApproved, UpdatedAt: metaAt(),
@@ -25,11 +24,7 @@ func fullPRItem() usecase.Item {
 		Checks:    domain.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1},
 		Head:      "feat/x", Base: "main", Additions: 218, Deletions: 31,
 	}
-	return usecase.Item{
-		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
-		State: pr.State, Labels: pr.Labels, Assignees: pr.Assignees,
-		UpdatedAt: pr.UpdatedAt, PR: &pr,
-	}
+	return prItem(pr)
 }
 
 func fullRef() domain.ItemRef {
@@ -59,10 +54,10 @@ func TestAPullRequestGetsEveryRow(t *testing.T) {
 }
 
 func TestAnIssueHasNoPullRequestRows(t *testing.T) {
-	it := usecase.Item{
-		Kind: domain.ItemIssue, Number: 7, Title: "an issue",
+	it := issueItem(domain.Issue{
+		Number: 7, Title: "an issue",
 		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen, UpdatedAt: metaAt(),
-	}
+	})
 	ref := domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7}
 
 	for _, gone := range []string{"review", "checks", "branch", "changes"} {
@@ -81,10 +76,7 @@ func TestAnEmptyValueTakesNoRow(t *testing.T) {
 		Number: 3, Author: domain.Author{Login: "kukv"}, State: domain.StateOpen,
 		Review: domain.ReviewNone, UpdatedAt: metaAt(),
 	}
-	it := usecase.Item{
-		Kind: domain.ItemPR, Number: pr.Number, Author: pr.Author,
-		State: pr.State, UpdatedAt: pr.UpdatedAt, PR: &pr,
-	}
+	it := prItem(pr)
 
 	want := []string{"repository", "author", "state", "updated"}
 	got := labelsOf(metaRows(fullRef(), it))
@@ -121,10 +113,9 @@ func TestTheInlineMetaNamesTheAssignees(t *testing.T) {
 
 // spacedLabelItem carries the two facts that hold a space of their own: a
 // label whose name is three words, and a branch pair with arrows around it.
-func spacedLabelItem() usecase.Item {
+func spacedLabelItem() domain.Item {
 	it := fullPRItem()
 	it.Labels = []domain.Label{{Name: "good first issue", Color: "d73a4a"}}
-	it.PR.Labels = it.Labels
 	return it
 }
 
@@ -199,7 +190,7 @@ func valueOf(rows []metaRow, label string) string {
 // too. An issue is never a draft, so its state carries nothing extra.
 func TestADraftSaysSoInItsState(t *testing.T) {
 	draft := fullPRItem()
-	draft.PR.IsDraft = true
+	draft.Change.IsDraft = true
 
 	got := valueOf(metaRows(fullRef(), draft), i18n.T("detail.meta.state"))
 	want := i18n.T("state.open") + i18n.T("state.draft_suffix")
@@ -207,10 +198,10 @@ func TestADraftSaysSoInItsState(t *testing.T) {
 		t.Errorf("the draft's state = %q, want %q", got, want)
 	}
 
-	issue := usecase.Item{
-		Kind: domain.ItemIssue, Number: 7, Title: "an issue",
+	issue := issueItem(domain.Issue{
+		Number: 7, Title: "an issue",
 		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen, UpdatedAt: metaAt(),
-	}
+	})
 	ref := domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7}
 	if got := valueOf(metaRows(ref, issue), i18n.T("detail.meta.state")); got != i18n.T("state.open") {
 		t.Errorf("the issue's state = %q, want %q", got, i18n.T("state.open"))

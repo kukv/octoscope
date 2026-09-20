@@ -12,7 +12,6 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -45,27 +44,34 @@ type fakeSource struct {
 	mergeErr error
 }
 
-func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (usecase.Item, error) {
+func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (domain.Item, error) {
 	if ref.Kind == domain.ItemPR {
 		return prItem(f.pr), f.err
 	}
 	return issueItem(f.issue), f.err
 }
 
-func prItem(pr domain.PR) usecase.Item {
-	return usecase.Item{
-		Kind: domain.ItemPR, Number: pr.Number, Title: pr.Title, Author: pr.Author,
-		State: pr.State, Body: pr.Body, URL: pr.URL, Labels: pr.Labels,
-		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
-		PR: &pr,
+// prItem is what the gateway builds out of a pull request. The fixtures stay
+// domain.PR: what the view is handed is the conversion, not the wire type.
+func prItem(pr domain.PR) domain.Item {
+	return domain.Item{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: pr.Number},
+		Title: pr.Title, Author: pr.Author, State: pr.State, Body: pr.Body,
+		URL: pr.URL, Labels: pr.Labels, Assignees: pr.Assignees,
+		Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
+		Change: &domain.Change{
+			IsDraft: pr.IsDraft, Review: pr.Review, Head: pr.Head, Base: pr.Base,
+			Additions: pr.Additions, Deletions: pr.Deletions, Checks: pr.Checks,
+		},
 	}
 }
 
-func issueItem(issue domain.Issue) usecase.Item {
-	return usecase.Item{
-		Kind: domain.ItemIssue, Number: issue.Number, Title: issue.Title, Author: issue.Author,
-		State: issue.State, Body: issue.Body, URL: issue.URL, Labels: issue.Labels,
-		Assignees: issue.Assignees, Comments: issue.Comments, UpdatedAt: issue.UpdatedAt,
+func issueItem(issue domain.Issue) domain.Item {
+	return domain.Item{
+		Ref:   domain.ItemRef{Kind: domain.ItemIssue, Number: issue.Number},
+		Title: issue.Title, Author: issue.Author, State: issue.State, Body: issue.Body,
+		URL: issue.URL, Labels: issue.Labels, Assignees: issue.Assignees,
+		Comments: issue.Comments, UpdatedAt: issue.UpdatedAt,
 	}
 }
 
@@ -76,12 +82,12 @@ func kindName(ref domain.ItemRef) string {
 	return "issue"
 }
 
-func (f *fakeSource) AddComment(ref domain.ItemRef, body string) error {
+func (f *fakeSource) AddComment(_ context.Context, ref domain.ItemRef, body string) error {
 	f.commentCalls = append(f.commentCalls, kindName(ref)+":"+ref.Repo+":"+itoa(ref.Number)+":"+body)
 	return f.commentErr
 }
 
-func (f *fakeSource) SetState(ref domain.ItemRef, closing bool) error {
+func (f *fakeSource) SetState(_ context.Context, ref domain.ItemRef, closing bool) error {
 	action := "reopen"
 	if closing {
 		action = "close"
@@ -98,12 +104,12 @@ func (f *fakeSource) ListAssignees(ctx context.Context, repo string) ([]string, 
 	return f.users, f.usersErr
 }
 
-func (f *fakeSource) EditLabels(ref domain.ItemRef, add, remove []string) error {
+func (f *fakeSource) EditLabels(_ context.Context, ref domain.ItemRef, add, remove []string) error {
 	f.editCalls = append(f.editCalls, kindName(ref)+":labels:"+ref.Repo+":"+itoa(ref.Number)+editSuffix(add, remove))
 	return f.editErr
 }
 
-func (f *fakeSource) EditAssignees(ref domain.ItemRef, add, remove []string) error {
+func (f *fakeSource) EditAssignees(_ context.Context, ref domain.ItemRef, add, remove []string) error {
 	f.editCalls = append(f.editCalls, kindName(ref)+":assignees:"+ref.Repo+":"+itoa(ref.Number)+editSuffix(add, remove))
 	return f.editErr
 }
@@ -1219,10 +1225,10 @@ func TestTheModelKeepsTheItem(t *testing.T) {
 		Head: "feat/x", Base: "main", Additions: 10, Deletions: 2,
 	}}
 	m := loaded(f, prRef())
-	if m.item.PR == nil {
+	if m.item.Change == nil {
 		t.Fatal("the model did not keep the pull request")
 	}
-	if got := m.item.PR.Head; got != "feat/x" {
+	if got := m.item.Change.Head; got != "feat/x" {
 		t.Errorf("Head = %q, want %q", got, "feat/x")
 	}
 }

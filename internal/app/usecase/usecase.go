@@ -18,6 +18,7 @@ type source interface {
 	lister
 	viewerFetcher
 	crossRepoLister
+	itemSearcher
 	repoFinder
 	reviewFetcher
 	reviewer
@@ -35,6 +36,7 @@ type Usecase struct {
 	lists      lister
 	viewer     viewerFetcher
 	crossRepo  crossRepoLister
+	search     itemSearcher
 	repos      repoFinder
 	repoStore  repoStore
 	queryStore queryStore
@@ -56,6 +58,7 @@ func New(src source, store settingsStore) *Usecase {
 		lists:      src,
 		viewer:     src,
 		crossRepo:  src,
+		search:     src,
 		repos:      src,
 		repoStore:  store,
 		queryStore: store,

@@ -1,16 +1,51 @@
 package usecase
 
 import (
+	"context"
 	"slices"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
+// fakeChecks is the checks port: what the Checks pane asks for, and the one
+// thing it asks the GitHub layer to do.
+type fakeChecks struct {
+	err error
+
+	checks       domain.Checks
+	checksRepo   string
+	checksNumber int
+
+	logLines  []domain.LogLine
+	logRepo   string
+	logJobID  domain.JobHandle
+	logFailed bool
+
+	rerunRepo  string
+	rerunRunID domain.RunHandle
+	rerunScope domain.RerunScope
+}
+
+func (f *fakeChecks) PRChecks(_ context.Context, repo string, number int) (domain.Checks, error) {
+	f.checksRepo, f.checksNumber = repo, number
+	return f.checks, f.err
+}
+
+func (f *fakeChecks) JobLog(_ context.Context, repo string, jobID domain.JobHandle, failedOnly bool) ([]domain.LogLine, error) {
+	f.logRepo, f.logJobID, f.logFailed = repo, jobID, failedOnly
+	return f.logLines, f.err
+}
+
+func (f *fakeChecks) RerunWorkflow(_ context.Context, repo string, runID domain.RunHandle, scope domain.RerunScope) error {
+	f.rerunRepo, f.rerunRunID, f.rerunScope = repo, runID, scope
+	return f.err
+}
+
 func TestPRChecksReachesTheBackend(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{checks: domain.Checks{Total: 3}}
+	f := &fakeChecks{checks: domain.Checks{Total: 3}}
 	u := &Usecase{checks: f}
 
 	got, err := u.PRChecks(t.Context(), "kukv/octoscope", 61)
@@ -28,7 +63,7 @@ func TestPRChecksReachesTheBackend(t *testing.T) {
 func TestJobLogReachesTheBackend(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{logLines: []domain.LogLine{{Text: "hi"}}}
+	f := &fakeChecks{logLines: []domain.LogLine{{Text: "hi"}}}
 	u := &Usecase{checks: f}
 
 	got, err := u.JobLog(t.Context(), "kukv/octoscope", "61", true)
@@ -47,7 +82,7 @@ func TestJobLogReachesTheBackend(t *testing.T) {
 func TestRerunWorkflowReachesTheBackend(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeSource{}
+	f := &fakeChecks{}
 	u := &Usecase{checks: f}
 
 	if err := u.RerunWorkflow(t.Context(), "kukv/octoscope", "61", domain.RerunAll); err != nil {

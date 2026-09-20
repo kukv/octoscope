@@ -11,7 +11,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/icon"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -42,43 +41,43 @@ type metaRow struct {
 // metaRows is everything the meta pane says about the item, in the order the
 // design puts it. A row whose value is empty is left out rather than drawn
 // with nothing after its label.
-func metaRows(ref domain.ItemRef, it usecase.Item) []metaRow {
+func metaRows(ref domain.ItemRef, it domain.Item) []metaRow {
 	var rows []metaRow
 	if ref.Repo != "" {
 		rows = append(rows, metaRow{
 			label: i18n.T("detail.meta.repo"),
-			value: theme.Dim().Render(fmt.Sprintf("%s #%d", ref.Repo, it.Number)),
+			value: theme.Dim().Render(fmt.Sprintf("%s #%d", ref.Repo, it.Ref.Number)),
 		})
 	}
 	rows = append(rows,
 		metaRow{label: i18n.T("detail.meta.author"), value: "@" + it.Author.Login},
 		metaRow{label: i18n.T("detail.meta.state"), value: itemStateText(it)},
 	)
-	if pr := it.PR; pr != nil {
-		if pr.Review != domain.ReviewNone {
+	if ch := it.Change; ch != nil {
+		if ch.Review != domain.ReviewNone {
 			rows = append(rows, metaRow{
 				label: i18n.T("detail.meta.review"),
-				value: theme.Review(pr.Review, pr.IsDraft).Render(reviewText(pr.Review)),
+				value: theme.Review(ch.Review, ch.IsDraft).Render(reviewText(ch.Review)),
 			})
 		}
-		if pr.Checks.Total > 0 {
+		if ch.Checks.Total > 0 {
 			rows = append(rows, metaRow{
 				label: i18n.T("detail.meta.checks"),
-				value: checksText(pr.Checks),
+				value: checksText(ch.Checks),
 			})
 		}
-		if pr.Head != "" && pr.Base != "" {
+		if ch.Head != "" && ch.Base != "" {
 			rows = append(rows, metaRow{
 				label: i18n.T("detail.meta.branch"),
-				value: theme.Accent().Render(pr.Head) +
-					theme.Dim().Render(" → ") + theme.Accent().Render(pr.Base),
+				value: theme.Accent().Render(ch.Head) +
+					theme.Dim().Render(" → ") + theme.Accent().Render(ch.Base),
 			})
 		}
-		if pr.Additions > 0 || pr.Deletions > 0 {
+		if ch.Additions > 0 || ch.Deletions > 0 {
 			rows = append(rows, metaRow{
 				label: i18n.T("detail.meta.changes"),
-				value: theme.Added().Render("+"+strconv.Itoa(pr.Additions)) + " " +
-					theme.Removed().Render("−"+strconv.Itoa(pr.Deletions)),
+				value: theme.Added().Render("+"+strconv.Itoa(ch.Additions)) + " " +
+					theme.Removed().Render("−"+strconv.Itoa(ch.Deletions)),
 			})
 		}
 	}
@@ -111,9 +110,9 @@ func metaRows(ref domain.ItemRef, it usecase.Item) []metaRow {
 
 // itemStateText names the state, with the draft suffix a pull request can
 // carry. A draft is open, and the state word alone would not say so.
-func itemStateText(it usecase.Item) string {
+func itemStateText(it domain.Item) string {
 	s := stateText(it.State)
-	if it.PR != nil && it.PR.IsDraft {
+	if it.Change != nil && it.Change.IsDraft {
 		s += i18n.T("state.draft_suffix")
 	}
 	return s

@@ -14,7 +14,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
-	"github.com/kukv/octoscope/internal/app/usecase"
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -26,11 +25,11 @@ import (
 const chromeLines = 4
 
 type itemSource interface {
-	GetItem(ctx context.Context, ref domain.ItemRef) (usecase.Item, error)
-	AddComment(ref domain.ItemRef, body string) error
-	SetState(ref domain.ItemRef, closing bool) error
-	EditLabels(ref domain.ItemRef, add, remove []string) error
-	EditAssignees(ref domain.ItemRef, add, remove []string) error
+	GetItem(ctx context.Context, ref domain.ItemRef) (domain.Item, error)
+	AddComment(ctx context.Context, ref domain.ItemRef, body string) error
+	SetState(ctx context.Context, ref domain.ItemRef, closing bool) error
+	EditLabels(ctx context.Context, ref domain.ItemRef, add, remove []string) error
+	EditAssignees(ctx context.Context, ref domain.ItemRef, add, remove []string) error
 }
 
 // candidateSource lists what a picker offers. Labels and assignees belong to
@@ -71,7 +70,7 @@ type (
 	// just left is still running, and its answer must not land here.
 	itemMsg struct {
 		ref  domain.ItemRef
-		item usecase.Item
+		item domain.Item
 	}
 	errMsg struct {
 		ref domain.ItemRef
@@ -212,7 +211,7 @@ type Model struct {
 	// value only once it is true, and every reader of item -- rows,
 	// headerLines, setBodyContent -- draws nothing until then, rather than
 	// drawing the zero item as an unnamed, unauthored, never-updated one.
-	item   usecase.Item
+	item   domain.Item
 	loaded bool
 
 	textarea textarea.Model

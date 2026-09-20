@@ -255,7 +255,8 @@ Issue の一覧を別々のペインに描くので、呼ぶ側は最初から�
 これは `.claude/rules/go-style.md` の「同期的な 1 回の呼び出ししかない箇所に、
 将来のために context だけ通しておくことはしない」に正面から当たる、期限付きの逸脱である。
 承認したのは F-07 のとおり署名をどうせ書き直すため——通さないと同じ行を二度触ることになる。
-PR 3 で `backend` の書き込みメソッドに `ctx` を通せば解消する（§8 PR 3 への申し送り）。
+`backend` の書き込みメソッドに `ctx` を通せば解消するが、それは cli / api 両クライアントに及び
+Item 統合とは独立なので、**独立した PR で片付ける**（利用者判断、2026-09-20）。
 
 ## 6. usecase に残すもの
 
@@ -316,6 +317,12 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 5 つの PR に分ける。**各段階で `make check` が通り、golden 354 枚と `testdata/` 全体が無変更であること**を条件にする。
 
+**PR 3 と PR 4 は層ではなく機能で割る**（2026-09-20 に変更、利用者承認済み）。当初は
+「PR 3 = usecase 層、PR 4 = ビュー層」としていたが成立しない——`detail/detail.go` の
+`itemSource` がアイテム操作 5 メソッドを現署名で宣言しているため、`usecase.GetItem` の
+戻り値を変えると detail の 5 ファイルが同じコミットで壊れる。コンパイルの境界が層と一致しない。
+一方 repo ビューの依存は `ListPRs` / `ListIssues` だけで、アイテム操作と無関係なので切り離せる。
+
 どこかで `OCTOSCOPE_UPDATE_GOLDEN` が要るなら、それは作業ではなく**画面出力を変えてしまった証拠**である。
 その段階を止めて原因を調べる。
 
@@ -345,43 +352,28 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 **完了: 2026-09-20。**
 
-### PR 3: usecase を新ポートへ
+### PR 3: アイテム操作と detail ビュー
 
-- usecase のポート宣言を §5 の形に差し替える
+- アイテム操作 5 本（`GetItem` `AddComment` `SetState` `EditLabels` `EditAssignees`）の
+  ポート宣言を §5 の形に差し替える。書き込み 4 本も `ctx` を取るようになる
 - `usecase.Item` を削除し、`GetItem` は `domain.Item` を返す
-- 振り分け 5 本（`GetItem` `AddComment` `SetState` `EditLabels` `EditAssignees`）から
-  `Kind` の分岐を削除する
+- 5 本から `Kind` の分岐を削除する
 - usecase にあった振り分けのテストを消す（PR 2 で gateway 側に置いた分が代わりになる）
+- **detail ビュー 5 ファイル**（`detail.go` `commands.go` `meta.go` `body.go` `update.go`）を
+  同じコミットで `domain.Item` に移す。PR 固有の値は `Change` 経由になる
 
 **成功条件:** `make check`。golden 無変更。usecase に `Kind` の `switch` が 0 箇所。
 
-**PR 1 からの申し送り（2026-09-20、最終レビューで挙がった 3 件）。**
-どれも PR 1 の欠陥ではなく、PR 3 がどのみち同じファイルを触るので、そのときに片付くもの。
+**`GetItem` の失敗から `get pr: ` / `get issue: ` の接頭辞が落ちた。** 保つには `Kind` の分岐が要り、
+上の成功条件と両立しない。golden には現れない（detail / root のテストフェイクは usecase より
+上にいてこの経路を通らない）ので、ここに記録する。
 
-- **`crossRepoLister` の `SearchItems` を `search.go` へ。**
-  この interface は `work.go` にあるが、唯一の呼び出し元 `Usecase.SearchItems` は
-  `search.go` にある。§4.4 の「ポートの interface は、それを使うメソッドと同じファイルに置く」に
-  唯一背く箇所で、PR 1 では「interface を分割しない（移動ではなく変更になる）」として
-  意図的に残した。PR 3 はポート宣言を書き換えるので、そこで 1 メソッドの独立ポートとして切り出す
-- **`fake_test.go` の `fakeSource` をポート単位に割る。**
-  item / viewer / checks / merge の 4 ポートにまたがる 10 メソッドを持ち、
-  `architecture.md` の「呼ばないメソッドのスタブを何本書かされたか」判定に引っかかる大きさ。
-  分割前からの姿で PR 1 が作ったものではない。PR 3 で `GetPR` / `GetIssue` が抜けるのが割る機会
-- **`usecase/item_test.go` がちょうど 300 行。** 計画の行数チェックはテストを対象外にしているので
-  違反ではないが、PR 2 / PR 3 はこのファイルを書き換える。これ以上太らせない
-- **`ctx` を `backend` の書き込みメソッドに通す。** 新ポート 6 本は `ctx` を取るが、
-  gateway の書き込み 4 本は受け取って使っていない（`writes.go` の `_ = ctx`）。
-  `internal/github` の `AddPRComment` などが `ctx` を取らないためで、PR 2 の範囲外とした。
-  書き残さないと `ctx` は飾りのまま残る
-- **`presentation` が 1 行だけ PR 3 に食い込む。** `detail/detail.go` の `Source` は
-  `GetItem(ctx, ref) (usecase.Item, error)` を宣言しており、`usecase.GetItem` の戻り値が
-  `domain.Item` に変わった瞬間にコンパイルが通らなくなる。ビューの移行は PR 4 だが、
-  この 1 行と `commands.go` の受け側は PR 3 で動かすことになる
+**完了: 2026-09-20。**
 
-### PR 4: ビューの移行
+### PR 4: 一覧と repo ビュー
 
-- `domain.PR` / `domain.Issue` / `usecase.Item` を参照する presentation の 4 ファイル
-  （`detail/detail.go` `detail/body.go` `detail/meta.go` `repo/repo.go`）を `domain.Item` に移す
+- `ListPRs` / `ListIssues` を `ListItems(ctx, repo, kind)` に差し替える
+- `domain.PR` / `domain.Issue` を参照する `repo/repo.go` を `domain.Item` に移す
 - PR 固有の読み出しは `item.Change.X` になる。`Change == nil` の分岐は
   「Issue には無い」の意味で、種別の分岐ではない
 
