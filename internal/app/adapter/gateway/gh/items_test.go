@@ -210,6 +210,179 @@ func TestGetIssueTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	}
 }
 
+// TestGetItemTranslatesTheWireShapeIntoTheDomain gives every field of
+// gql.PullRequest and of gql.Issue a distinct, non-zero value and compares
+// the whole resulting domain.Item against a fully written-out expectation,
+// for the same reason as TestGetPRTranslatesTheWireShapeIntoTheDomain above:
+// a field toItemFromPR or toItemFromIssue forgot to copy is left at its zero
+// value, which a struct-wide comparison catches and a handful of field
+// assertions would not. The issue case's struct-wide comparison also covers
+// Change staying nil.
+func TestGetItemTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
+	t.Parallel()
+
+	t.Run("pull request", func(t *testing.T) {
+		t.Parallel()
+
+		updatedAt := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+		commentedAt := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+
+		node := gql.PullRequest{
+			Number:         59,
+			Title:          "add the gateway",
+			State:          "OPEN",
+			URL:            "https://github.com/kukv/octoscope/pull/59",
+			IsDraft:        true,
+			UpdatedAt:      updatedAt,
+			ReviewDecision: "APPROVED",
+			HeadRefName:    "refactor/pr2b-gateway",
+			BaseRefName:    "main",
+			Additions:      42,
+			Deletions:      7,
+			Body:           "this adds the gateway",
+			BodyText:       "this adds the gateway (text)",
+			Author:         gql.Author{Login: "kukv"},
+		}
+		node.Labels.Nodes = []gql.Label{
+			{Name: "bug", Color: "d73a4a"},
+			{Name: "wip", Color: "ededed"},
+		}
+		node.Assignees.Nodes = []gql.Author{
+			{Login: "octocat"},
+			{Login: "reviewer"},
+		}
+		node.Comments.Nodes = []gql.Comment{
+			{Author: gql.Author{Login: "octocat"}, Body: "lgtm", CreatedAt: commentedAt},
+		}
+		// node.Commits.Nodes is an anonymous struct too deeply nested to build
+		// field by field, so it is filled the way the real client fills it: by
+		// decoding it out of JSON in the shape the roll-up query returns.
+		const commits = `[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+			{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS"},
+			{"__typename":"StatusContext","context":"ci/deploy","state":"FAILURE"}
+		]}}}}]`
+		if err := json.Unmarshal([]byte(commits), &node.Commits.Nodes); err != nil {
+			t.Fatalf("build commits fixture: %v", err)
+		}
+
+		g := New(fakeBackend{getPR: func(context.Context, string, int) (gql.PullRequest, error) {
+			return node, nil
+		}})
+
+		item, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 59})
+		if err != nil {
+			t.Fatalf("GetItem: %v", err)
+		}
+
+		want := domain.Item{
+			Ref:      domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 59},
+			Title:    "add the gateway",
+			Author:   domain.Author{Login: "kukv"},
+			State:    domain.StateOpen,
+			URL:      "https://github.com/kukv/octoscope/pull/59",
+			Body:     "this adds the gateway",
+			BodyText: "this adds the gateway (text)",
+			Comments: []domain.Comment{
+				{Author: domain.Author{Login: "octocat"}, Body: "lgtm", CreatedAt: commentedAt},
+			},
+			Labels: []domain.Label{
+				{Name: "bug", Color: "d73a4a"},
+				{Name: "wip", Color: "ededed"},
+			},
+			Assignees: []domain.Author{
+				{Login: "octocat"},
+				{Login: "reviewer"},
+			},
+			UpdatedAt: updatedAt,
+			Change: &domain.Change{
+				IsDraft:   true,
+				Review:    domain.ReviewApproved,
+				Head:      "refactor/pr2b-gateway",
+				Base:      "main",
+				Additions: 42,
+				Deletions: 7,
+				Checks: domain.Checks{
+					Total:  2,
+					Passed: 1,
+					Failed: 1,
+					State:  domain.CheckFailure,
+					Runs: []domain.CheckRun{
+						{Name: "build", State: domain.CheckSuccess, Kind: domain.CheckKindRun},
+						{Name: "ci/deploy", State: domain.CheckFailure, Kind: domain.CheckKindStatus},
+					},
+				},
+			},
+		}
+		if !reflect.DeepEqual(item, want) {
+			t.Errorf("GetItem() = %+v, want %+v", item, want)
+		}
+	})
+
+	t.Run("issue", func(t *testing.T) {
+		t.Parallel()
+
+		updatedAt := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+		commentedAt := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+
+		node := gql.Issue{
+			Number:    54,
+			Title:     "track the conversion",
+			State:     "CLOSED",
+			URL:       "https://github.com/kukv/octoscope/issues/54",
+			UpdatedAt: updatedAt,
+			Body:      "conversion tests only check a handful of fields",
+			BodyText:  "conversion tests only check a handful of fields (text)",
+			Author:    gql.Author{Login: "kukv"},
+		}
+		node.Labels.Nodes = []gql.Label{
+			{Name: "docs", Color: "0075ca"},
+			{Name: "wip", Color: "ededed"},
+		}
+		node.Assignees.Nodes = []gql.Author{
+			{Login: "octocat"},
+			{Login: "reviewer"},
+		}
+		node.Comments.Nodes = []gql.Comment{
+			{Author: gql.Author{Login: "octocat"}, Body: "done", CreatedAt: commentedAt},
+		}
+
+		g := New(fakeBackend{getIssue: func(context.Context, string, int) (gql.Issue, error) {
+			return node, nil
+		}})
+
+		item, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 54})
+		if err != nil {
+			t.Fatalf("GetItem: %v", err)
+		}
+
+		want := domain.Item{
+			Ref:      domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 54},
+			Title:    "track the conversion",
+			Author:   domain.Author{Login: "kukv"},
+			State:    domain.StateClosed,
+			URL:      "https://github.com/kukv/octoscope/issues/54",
+			Body:     "conversion tests only check a handful of fields",
+			BodyText: "conversion tests only check a handful of fields (text)",
+			Comments: []domain.Comment{
+				{Author: domain.Author{Login: "octocat"}, Body: "done", CreatedAt: commentedAt},
+			},
+			Labels: []domain.Label{
+				{Name: "docs", Color: "0075ca"},
+				{Name: "wip", Color: "ededed"},
+			},
+			Assignees: []domain.Author{
+				{Login: "octocat"},
+				{Login: "reviewer"},
+			},
+			UpdatedAt: updatedAt,
+			Change:    nil,
+		}
+		if !reflect.DeepEqual(item, want) {
+			t.Errorf("GetItem() = %+v, want %+v", item, want)
+		}
+	})
+}
+
 func TestParseItemState(t *testing.T) {
 	t.Parallel()
 
