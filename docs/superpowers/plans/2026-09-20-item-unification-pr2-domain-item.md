@@ -998,7 +998,7 @@ git commit -m "docs: mark PR 2 done and carry the ctx question to PR 3" \
 - `wrap` が文言を変えないことにテストがある
 - **旧ポート 14 本と `domain.PR` / `domain.Issue` / `toPR` / `toIssue` がすべて残っている**
 - **`usecase` / `presentation` / `cmd` の差分が 0 行**
-- golden 386 枚と testdata が無変更
+- golden 354 枚と `testdata/` 全体（386 枚）が無変更
 - `make check` と `make release-check` が通る
 
 ## 次の PR

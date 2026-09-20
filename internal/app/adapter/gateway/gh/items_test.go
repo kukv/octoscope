@@ -48,6 +48,9 @@ type fakeBackend struct {
 	editIssueLabels    func(repo string, number int, add, remove []string) error
 	editPRAssignees    func(repo string, number int, add, remove []string) error
 	editIssueAssignees func(repo string, number int, add, remove []string) error
+
+	discardReview    func(reviewID string) error
+	disableAutoMerge func(pullRequestID string) error
 }
 
 func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error) {
@@ -80,6 +83,14 @@ func (f fakeBackend) CloseIssue(repo string, number int) error {
 
 func (f fakeBackend) ReopenIssue(repo string, number int) error {
 	return f.reopenIssue(repo, number)
+}
+
+func (f fakeBackend) DiscardReview(reviewID string) error {
+	return f.discardReview(reviewID)
+}
+
+func (f fakeBackend) DisableAutoMerge(pullRequestID string) error {
+	return f.disableAutoMerge(pullRequestID)
 }
 
 func (f fakeBackend) EditPRLabels(repo string, number int, add, remove []string) error {

@@ -116,7 +116,7 @@ func (f fakeBackend) RepoCounts(ctx context.Context, repos []string) ([]gql.Repo
 }
 
 // TestEveryOverrideKeepsFatalErrorsFatal drives every one of the gateway's
-// 21 overrides through a backend that answers the way cli.Client's classify
+// 28 overrides through a backend that answers the way cli.Client's classify
 // does, to the exact check the fatal-error screen makes. A missed wrap on
 // any single override would pass this same shape of error through
 // unclassified, and domain.IsFatal would stop seeing it for that one method
@@ -128,26 +128,38 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 	authErr := github.Classify(github.ErrUnauthenticated, "gh: Bad credentials")
 
 	g := New(fakeBackend{
-		getPR:           func(context.Context, string, int) (gql.PullRequest, error) { return gql.PullRequest{}, authErr },
-		getIssue:        func(context.Context, string, int) (gql.Issue, error) { return gql.Issue{}, authErr },
-		prDiff:          func(context.Context, string, int) (github.Diff, error) { return github.Diff{}, authErr },
-		prReviewContext: func(context.Context, string, int) (gql.ReviewContext, error) { return gql.ReviewContext{}, authErr },
-		addReviewThread: func(string, gql.PendingComment) error { return authErr },
-		submitReview:    func(string, gql.ReviewEvent, string) error { return authErr },
-		submitNewReview: func(string, gql.ReviewEvent, string) error { return authErr },
-		prChecks:        func(context.Context, string, int) ([]gql.CheckRun, error) { return nil, authErr },
-		jobLog:          func(context.Context, string, int64, bool) ([]github.LogLine, error) { return nil, authErr },
-		rerunWorkflow:   func(context.Context, string, int64, github.RerunScope) error { return authErr },
-		listPRs:         func(context.Context, string) ([]gql.PullRequest, error) { return nil, authErr },
-		listIssues:      func(context.Context, string) ([]gql.Issue, error) { return nil, authErr },
-		listLabels:      func(context.Context, string) ([]gql.Label, error) { return nil, authErr },
-		prMergeContext:  func(context.Context, string, int) (gql.MergeContext, error) { return gql.MergeContext{}, authErr },
-		mergePR:         func(string, gql.MergeMethod) error { return authErr },
-		enableAutoMerge: func(string, gql.MergeMethod) error { return authErr },
-		searchRepos:     func(context.Context, string, int) ([]github.Repository, error) { return nil, authErr },
-		listOwnRepos:    func(context.Context, string, int) ([]github.Repository, error) { return nil, authErr },
-		searchItems:     func(context.Context, string) ([]gql.SearchItem, error) { return nil, authErr },
-		repoCounts:      func(context.Context, []string) ([]gql.RepoCount, error) { return nil, authErr },
+		getPR:              func(context.Context, string, int) (gql.PullRequest, error) { return gql.PullRequest{}, authErr },
+		getIssue:           func(context.Context, string, int) (gql.Issue, error) { return gql.Issue{}, authErr },
+		prDiff:             func(context.Context, string, int) (github.Diff, error) { return github.Diff{}, authErr },
+		prReviewContext:    func(context.Context, string, int) (gql.ReviewContext, error) { return gql.ReviewContext{}, authErr },
+		addReviewThread:    func(string, gql.PendingComment) error { return authErr },
+		submitReview:       func(string, gql.ReviewEvent, string) error { return authErr },
+		submitNewReview:    func(string, gql.ReviewEvent, string) error { return authErr },
+		discardReview:      func(string) error { return authErr },
+		prChecks:           func(context.Context, string, int) ([]gql.CheckRun, error) { return nil, authErr },
+		jobLog:             func(context.Context, string, int64, bool) ([]github.LogLine, error) { return nil, authErr },
+		rerunWorkflow:      func(context.Context, string, int64, github.RerunScope) error { return authErr },
+		listPRs:            func(context.Context, string) ([]gql.PullRequest, error) { return nil, authErr },
+		listIssues:         func(context.Context, string) ([]gql.Issue, error) { return nil, authErr },
+		listLabels:         func(context.Context, string) ([]gql.Label, error) { return nil, authErr },
+		prMergeContext:     func(context.Context, string, int) (gql.MergeContext, error) { return gql.MergeContext{}, authErr },
+		mergePR:            func(string, gql.MergeMethod) error { return authErr },
+		enableAutoMerge:    func(string, gql.MergeMethod) error { return authErr },
+		disableAutoMerge:   func(string) error { return authErr },
+		searchRepos:        func(context.Context, string, int) ([]github.Repository, error) { return nil, authErr },
+		listOwnRepos:       func(context.Context, string, int) ([]github.Repository, error) { return nil, authErr },
+		searchItems:        func(context.Context, string) ([]gql.SearchItem, error) { return nil, authErr },
+		repoCounts:         func(context.Context, []string) ([]gql.RepoCount, error) { return nil, authErr },
+		addPRComment:       func(string, int, string) error { return authErr },
+		addIssueComment:    func(string, int, string) error { return authErr },
+		closePR:            func(string, int) error { return authErr },
+		reopenPR:           func(string, int) error { return authErr },
+		closeIssue:         func(string, int) error { return authErr },
+		reopenIssue:        func(string, int) error { return authErr },
+		editPRLabels:       func(string, int, []string, []string) error { return authErr },
+		editIssueLabels:    func(string, int, []string, []string) error { return authErr },
+		editPRAssignees:    func(string, int, []string, []string) error { return authErr },
+		editIssueAssignees: func(string, int, []string, []string) error { return authErr },
 	})
 
 	tests := []struct {
@@ -182,6 +194,39 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		{"ListWorkSection", func() error { _, err := g.ListWorkSection(context.Background(), domain.SectionYourPRs); return err }},
 		{"SearchItems", func() error { _, err := g.SearchItems(context.Background(), "is:open"); return err }},
 		{"RepoCounts", func() error { _, err := g.RepoCounts(context.Background(), []string{"kukv/octoscope"}); return err }},
+		{"DiscardReview", func() error { return g.DiscardReview(domain.ReviewHandle("review-id")) }},
+		{"DisableAutoMerge", func() error { return g.DisableAutoMerge(domain.PullRequestHandle("pr-id")) }},
+		{"GetItem (PR)", func() error {
+			_, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1})
+			return err
+		}},
+		{"GetItem (issue)", func() error {
+			_, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 1})
+			return err
+		}},
+		{"ListItems (PR)", func() error {
+			_, err := g.ListItems(context.Background(), "kukv/octoscope", domain.ItemPR)
+			return err
+		}},
+		{"ListItems (issue)", func() error {
+			_, err := g.ListItems(context.Background(), "kukv/octoscope", domain.ItemIssue)
+			return err
+		}},
+		{"AddComment", func() error {
+			return g.AddComment(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, "hello")
+		}},
+		{"SetState (close)", func() error {
+			return g.SetState(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, true)
+		}},
+		{"SetState (reopen)", func() error {
+			return g.SetState(context.Background(), domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 1}, false)
+		}},
+		{"EditLabels", func() error {
+			return g.EditLabels(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, nil, nil)
+		}},
+		{"EditAssignees", func() error {
+			return g.EditAssignees(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1}, nil, nil)
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

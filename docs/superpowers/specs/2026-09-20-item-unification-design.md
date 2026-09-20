@@ -151,7 +151,8 @@ type Change struct {
 `Number` は `Ref` の中にあるので `Item` は持たない。
 
 **不変条件:** `Change != nil` ⟺ `Ref.Kind == ItemPR`。
-これは gateway が保証し、`domain` にその旨のテストを置く。
+これは gateway が保証し、テストも gateway に置く——`domain` には `Item` を
+組み立てる関数が無く、不変条件を駆動できないため。
 octoscope が自前で守るルールは少ないが（§10 参照）、これはその 1 つである。
 
 `Item` に共通フィールドを足してよい条件は現行規約のまま維持する
@@ -249,6 +250,12 @@ Issue の一覧を別々のペインに描くので、呼ぶ側は最初から�
 
 **新ポートは全部 `ctx` を取る。** 現在は読み取りだけが `ctx` を持ち、書き込みは持たない
 （違和感 F-07）。どうせ署名を書き直すので、ここで揃える。揃えないと同じ行を二度触ることになる。
+
+書き込み 4 本は `ctx` を受け取るだけで使わない（`gateway/gh/writes.go` の `_ = ctx`）。
+これは `.claude/rules/go-style.md` の「同期的な 1 回の呼び出ししかない箇所に、
+将来のために context だけ通しておくことはしない」に正面から当たる、期限付きの逸脱である。
+承認したのは F-07 のとおり署名をどうせ書き直すため——通さないと同じ行を二度触ることになる。
+PR 3 で `backend` の書き込みメソッドに `ctx` を通せば解消する（§8 PR 3 への申し送り）。
 
 ## 6. usecase に残すもの
 
@@ -366,6 +373,10 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
   gateway の書き込み 4 本は受け取って使っていない（`writes.go` の `_ = ctx`）。
   `internal/github` の `AddPRComment` などが `ctx` を取らないためで、PR 2 の範囲外とした。
   書き残さないと `ctx` は飾りのまま残る
+- **`presentation` が 1 行だけ PR 3 に食い込む。** `detail/detail.go` の `Source` は
+  `GetItem(ctx, ref) (usecase.Item, error)` を宣言しており、`usecase.GetItem` の戻り値が
+  `domain.Item` に変わった瞬間にコンパイルが通らなくなる。ビューの移行は PR 4 だが、
+  この 1 行と `commands.go` の受け側は PR 3 で動かすことになる
 
 ### PR 4: ビューの移行
 
