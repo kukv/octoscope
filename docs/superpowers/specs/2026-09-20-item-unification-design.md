@@ -172,6 +172,61 @@ ref 自身が何を指すか知っている必要がある。
 | `domain.ReviewContext` / `domain.MergeContext` | 別クエリで取得し、独自の `PullRequestHandle` を持ち、diff / merge ビューは安定している。`Change` に畳み込むと F-01 が全面書き直しになる |
 | F-11 / F-12 / F-13（横断） | §3 のとおり対象外 |
 
+### 4.4 ファイル構成
+
+現在 `domain` と `usecase` はどちらも 1 ファイルに全部を書く形になっており、読みにくい。
+
+- `domain/domain.go` は **281 行に 8 概念**が同居する。しかも兄弟が離れている——
+  `checks.go` があるのに `Checks` / `CheckRun` / `CheckState` は `domain.go` 側、
+  `review.go` があるのに `ReviewState` は `domain.go` 側
+- `usecase/usecase.go` は **315 行**で、`architecture.md` の「300 行を超えたら責務を疑う」を
+  既に超えている。ポートの interface 13 種とメソッド 23 本が 1 ファイルに並ぶ
+
+**概念単位で分ける。** 一緒に使う型を 1 ファイルにまとめる粒度で、
+Go の標準ライブラリと同じ（`net/http` の `request.go` / `response.go` / `cookie.go`）。
+1 struct = 1 ファイルにはしない——`Author` のような 3 行の型までファイルになり、
+一緒に読むべき型（`Item` と `Change`、`Checks` と `CheckRun`）が分断されるため。
+
+```
+internal/app/domain/
+  doc.go        パッケージ doc のみ
+  item.go       Item, Change, ItemRef, ItemKind, ItemState, Author, Label, Comment
+  work.go       Work, WorkItem, WorkSection, WorkSections()
+  checks.go     CheckState, CheckRun, Checks, CheckKind, LogLine, RerunScope
+  review.go     ReviewState, ReviewContext, ReviewTarget, ReviewThread,
+                ThreadComment, PendingComment, ReviewEvent
+  merge.go      （現状のまま）
+  diff.go       （現状のまま）
+  diff_parse.go （現状のまま）
+  handle.go     （現状のまま）
+  repo.go       RepoCount, RepoCandidate
+  query.go      SavedQuery
+  errors.go     sentinel 3 つ, classified, Classify, IsFatal
+```
+
+`domain.go` は無くなる。各ファイルは 100 行前後に収まる。
+
+```
+internal/app/usecase/
+  usecase.go    Usecase, New, source, settingsStore
+  item.go       アイテム操作の port とメソッド（GetItem, AddComment, SetState,
+                EditLabels, EditAssignees, ListItems）
+  lists.go      RepoName, ListLabels, ListAssignees, Viewer
+  work.go       ListWorkSection, RepoCounts
+  search.go     （現状のまま）
+  repos.go      （現状のまま）
+  review.go     PRDiff, PRReviewContext, PostLineComment, SubmitReview, DiscardReview
+  checks.go     PRChecks, JobLog, RerunWorkflow
+  merge.go      PRMergeContext, MergePR, EnableAutoMerge, DisableAutoMerge
+```
+
+**ポートの interface は、それを使うメソッドと同じファイルに置く。**
+「この操作が何を必要としているか」がファイル 1 つを読めば分かる形にする。
+これは既存の規約（「interface は利用側で定義する」「interface は小さく保つ」）の
+置き場所を具体化したもので、規約の変更ではない。
+
+この分割は**振る舞いを一切変えない純粋な移動**なので、他の変更と混ぜず独立した PR にする（§8 PR 1）。
+
 ## 5. ポートの形
 
 ポート対 14 本を 6 本にする。宣言する場所は現行どおり利用側（usecase）。
@@ -248,12 +303,23 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 ## 8. 移行
 
-4 つの PR に分ける。**各段階で `make check` が通り、golden 386 枚が無変更であること**を条件にする。
+5 つの PR に分ける。**各段階で `make check` が通り、golden 386 枚が無変更であること**を条件にする。
 
 どこかで `OCTOSCOPE_UPDATE_GOLDEN` が要るなら、それは作業ではなく**画面出力を変えてしまった証拠**である。
 その段階を止めて原因を調べる。
 
-### PR 1: `domain.Item` と新ポートの追加（旧は残す）
+### PR 1: ファイル分割（振る舞いの変更なし）
+
+§4.4 のとおり `domain` と `usecase` を概念単位のファイルに割る。**型も関数も 1 行も書き換えない。**
+移動と、移動に伴う import の整理だけ。この時点ではまだ `domain.PR` / `domain.Issue` のままである。
+
+2026-09-13 の再構成でも同じ順序を採った（PR 1 が「機械的な移動とリネーム」）。
+先に割っておくと、以降の PR の差分が「何が変わったか」だけになる。
+
+**成功条件:** `make check`。golden 無変更。
+`git diff --stat` 以外に意味のある差分が無いこと（`git diff -M` で移動として検出される）。
+
+### PR 2: `domain.Item` と新ポートの追加（旧は残す）
 
 - `domain.Item` / `domain.Change` を足す
 - `tags_test.go` の `exported` に 2 型を追加（22 → 24）
@@ -264,17 +330,17 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 **成功条件:** `make check`。golden 無変更。新旧どちらのテストも通る。
 
-### PR 2: usecase を新ポートへ
+### PR 3: usecase を新ポートへ
 
 - usecase のポート宣言を §5 の形に差し替える
 - `usecase.Item` を削除し、`GetItem` は `domain.Item` を返す
 - 振り分け 5 本（`GetItem` `AddComment` `SetState` `EditLabels` `EditAssignees`）から
   `Kind` の分岐を削除する
-- usecase にあった振り分けのテストを消す（PR 1 で gateway 側に置いた分が代わりになる）
+- usecase にあった振り分けのテストを消す（PR 2 で gateway 側に置いた分が代わりになる）
 
 **成功条件:** `make check`。golden 無変更。usecase に `Kind` の `switch` が 0 箇所。
 
-### PR 3: ビューの移行
+### PR 4: ビューの移行
 
 - `domain.PR` / `domain.Issue` / `usecase.Item` を参照する presentation の 4 ファイル
   （`detail/detail.go` `detail/body.go` `detail/meta.go` `repo/repo.go`）を `domain.Item` に移す
@@ -283,7 +349,7 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 **成功条件:** golden 386 枚が 1 バイトも変わらないこと。ここが本 PR の唯一かつ最強の検査である。
 
-### PR 4: 旧型と旧ポートの削除、規約の更新
+### PR 5: 旧型と旧ポートの削除、規約の更新
 
 - `domain.PR` / `domain.Issue` を削除、`tags_test.go` の `exported` から除去（24 → 22）
 - gateway の旧ポート 14 本を削除
@@ -294,6 +360,8 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 ## 9. 完了条件
 
+- `domain/domain.go` が存在せず、`domain` と `usecase` が §4.4 のファイル構成になっている
+- `domain` と `usecase` に 300 行を超えるファイルが無い
 - `domain.PR` と `domain.Issue` が存在しない
 - `usecase.Item` が存在しない
 - ポート対 14 本が 6 本になっている
@@ -325,4 +393,6 @@ Issue を閉じられるか——決めるのは GitHub であって octoscope �
 | **一括 1 PR** | 参照数（13 + 12 + 6）だけ見れば収まるが、7 ファイル + golden 386 枚 + 規約 3 節 + ポート 14 本の削除が 1 回のレビューに乗る。見落としが混ざる形 |
 | **`ItemID` を新設** | `ItemRef` 83 参照を意味なく動かすことになる。`ItemRef` 自体を値オブジェクトと位置づければ足りる |
 | **`WorkItem` も統合** | §4.3 のとおり、分かれている正当な理由がある |
+| **厳密に struct 単位のファイル分割**（1 型 = 1 ファイル） | `domain` だけで 20 ファイル前後になる。`Author` のような 3 行の型までファイルになり、一緒に読むべき型（`Item` と `Change`、`Checks` と `CheckRun`）が分断される。Go の標準ライブラリにも無い粒度 |
+| **ファイル分割を他の PR に混ぜる** | 移動と書き換えが同じ差分に乗ると、レビューで「何が変わったか」が読めなくなる。§8 PR 1 として独立させる |
 | **横断（F-11 / F-12）を同時に入れる** | 利用者の判断で保留。ただし `ItemRef` に同一性を閉じ込めることで、後から足すときの変更点は 1 箇所に収まる |
