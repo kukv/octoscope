@@ -10,6 +10,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -66,9 +67,9 @@ func TestClickingARowSelectsItAndClickingAgainOpensIt(t *testing.T) {
 			if cmd == nil {
 				t.Fatalf("lang %s width %d: clicking the selected row did not open it", lang, width)
 			}
-			open, ok := cmd().(OpenDetailMsg)
+			open, ok := cmd().(nav.OpenDetailMsg)
 			if !ok || open.Ref.Number != 2 {
-				t.Errorf("lang %s width %d: got %v, want OpenDetailMsg for #2", lang, width, cmd())
+				t.Errorf("lang %s width %d: got %v, want nav.OpenDetailMsg for #2", lang, width, cmd())
 			}
 		}
 	}

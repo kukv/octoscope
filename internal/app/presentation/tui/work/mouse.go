@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 )
 
 // The mouse handling below reads the same geometry View draws with —
@@ -26,7 +27,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	// Update; select-then-open needs neither.
 	if col == m.col && row == m.row {
 		if ref, ok := m.SelectedRef(); ok {
-			return m, func() tea.Msg { return OpenDetailMsg{ref} }
+			return m, func() tea.Msg { return nav.OpenDetailMsg{Ref: ref} }
 		}
 		return m, nil
 	}

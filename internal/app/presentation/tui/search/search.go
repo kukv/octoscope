@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -35,12 +36,6 @@ type Source interface {
 	candidateSource
 	queryStore
 }
-
-// OpenDetailMsg asks the parent to show the detail view for one item.
-type OpenDetailMsg struct{ Ref domain.ItemRef }
-
-// OpenDiffMsg asks the parent to show the diff of the selected pull request.
-type OpenDiffMsg struct{ Ref domain.ItemRef }
 
 // FatalMsg carries a failure the parent shows on its error screen. Only what
 // the user has to act on travels this way; a rejected query stays here as a
@@ -450,7 +445,7 @@ func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if !ok {
 			return m, nil
 		}
-		return m, func() tea.Msg { return OpenDetailMsg{Ref: ref} }
+		return m, func() tea.Msg { return nav.OpenDetailMsg{Ref: ref} }
 	case "d":
 		ref, ok := m.selectedRef()
 		// An issue has no diff. Opening an empty diff view would be a worse
@@ -458,7 +453,7 @@ func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
-		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
+		return m, func() tea.Msg { return nav.OpenDiffMsg{Ref: ref} }
 	case "o":
 		if len(m.items) == 0 {
 			return m, nil

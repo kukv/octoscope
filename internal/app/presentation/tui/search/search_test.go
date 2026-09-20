@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -317,9 +318,9 @@ func TestEnterOnAResultOpensIt(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("enter on a result did nothing")
 	}
-	msg, ok := cmd().(OpenDetailMsg)
+	msg, ok := cmd().(nav.OpenDetailMsg)
 	if !ok {
-		t.Fatalf("sent %T, want OpenDetailMsg", cmd())
+		t.Fatalf("sent %T, want nav.OpenDetailMsg", cmd())
 	}
 	if msg.Ref.Number != 41 {
 		t.Errorf("opened #%d, want #41", msg.Ref.Number)
@@ -460,8 +461,8 @@ func TestNarrowWidthKeepsTheCursorOnWhatIsDrawn(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("enter did nothing; the cursor is stuck on the folded filter pane")
 	}
-	if _, ok := cmd().(OpenDetailMsg); !ok {
-		t.Errorf("sent %T, want OpenDetailMsg", cmd())
+	if _, ok := cmd().(nav.OpenDetailMsg); !ok {
+		t.Errorf("sent %T, want nav.OpenDetailMsg", cmd())
 	}
 }
 

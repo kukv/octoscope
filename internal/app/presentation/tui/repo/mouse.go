@@ -3,6 +3,8 @@ package repo
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 )
 
 // The list's own geometry, read by both View and the hit-test below: the
@@ -54,7 +56,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	// and measuring the gap between two would put a clock in Update.
 	if row == m.cursors[m.tab] {
 		if ref, ok := m.SelectedRef(); ok {
-			return m, func() tea.Msg { return OpenDetailMsg{ref} }
+			return m, func() tea.Msg { return nav.OpenDetailMsg{Ref: ref} }
 		}
 		return m, nil
 	}
