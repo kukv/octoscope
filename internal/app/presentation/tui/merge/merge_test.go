@@ -91,8 +91,6 @@ func autoMergeable() domain.MergeContext {
 func mergeable() domain.MergeContext {
 	return domain.MergeContext{
 		PullRequest: "PR_1",
-		Mergeable:   domain.MergeableYes,
-		State:       domain.MergeStateUnstable,
 		Methods:     []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase},
 	}
 }
@@ -135,8 +133,7 @@ func TestEnterIsRefusedWhileGitHubIsStillWorkingItOut(t *testing.T) {
 	t.Parallel()
 
 	computing := mergeable()
-	computing.Mergeable = domain.MergeableUnknown
-	computing.State = domain.MergeStateUnknown
+	computing.Block = domain.BlockComputing
 	f := &fakeSource{ctx: computing}
 	m := loaded(t, f)
 	_, cmd := enter(m)
@@ -173,7 +170,7 @@ func TestAutoMergeCannotBeChosenOnAPullRequestWithNothingToWaitFor(t *testing.T)
 	t.Parallel()
 
 	clean := mergeable()
-	clean.State = domain.MergeStateClean
+	clean.Clean = true
 	clean.AutoMergeAllowed = true
 	clean.ViewerCanEnableAutoMerge = true
 	f := &fakeSource{ctx: clean}
@@ -214,7 +211,7 @@ func TestAQueuedMergeCanBeCancelledEvenWhenMergingIsBlocked(t *testing.T) {
 	t.Parallel()
 
 	stuck := mergeable()
-	stuck.Mergeable = domain.MergeableConflicting
+	stuck.Block = domain.BlockConflicting
 	stuck.AutoMergeAllowed = true
 	stuck.ViewerCanEnableAutoMerge = true
 	stuck.AutoMergeEnabled = true
@@ -443,7 +440,7 @@ func TestAStaleFailureIsNotThePopupsOwn(t *testing.T) {
 // to push past it.
 func blocked() domain.MergeContext {
 	c := mergeable()
-	c.State = domain.MergeStateBlocked
+	c.Block = domain.BlockProtected
 	c.ViewerIsAdmin = true
 	return c
 }
@@ -485,15 +482,13 @@ func TestAIsRefusedWhereNoPermissionWouldHelp(t *testing.T) {
 	t.Parallel()
 
 	draft := blocked()
-	draft.IsDraft = true
+	draft.Block = domain.BlockDraft
 
 	conflicting := blocked()
-	conflicting.Mergeable = domain.MergeableConflicting
-	conflicting.State = domain.MergeStateDirty
+	conflicting.Block = domain.BlockConflicting
 
 	computing := blocked()
-	computing.Mergeable = domain.MergeableUnknown
-	computing.State = domain.MergeStateUnknown
+	computing.Block = domain.BlockComputing
 
 	notAdmin := blocked()
 	notAdmin.ViewerIsAdmin = false

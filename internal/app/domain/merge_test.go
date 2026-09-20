@@ -2,42 +2,6 @@ package domain
 
 import "testing"
 
-func TestBlockNamesWhyMergingIsRefused(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		ctx  MergeContext
-		want MergeBlock
-	}{
-		{"clean", MergeContext{Mergeable: MergeableYes, State: MergeStateClean}, BlockNone},
-		{
-			"draft outranks the state GitHub reports for it",
-			MergeContext{IsDraft: true, Mergeable: MergeableYes, State: MergeStateBlocked},
-			BlockDraft,
-		},
-		{"conflicting", MergeContext{Mergeable: MergeableConflicting, State: MergeStateDirty}, BlockConflicting},
-		{"still computing", MergeContext{Mergeable: MergeableUnknown, State: MergeStateUnknown}, BlockComputing},
-		{"protected", MergeContext{Mergeable: MergeableYes, State: MergeStateBlocked}, BlockProtected},
-		{"behind", MergeContext{Mergeable: MergeableYes, State: MergeStateBehind}, BlockBehind},
-		{"dirty", MergeContext{Mergeable: MergeableYes, State: MergeStateDirty}, BlockDirty},
-		{
-			"failing checks do not block: GitHub allows the merge",
-			MergeContext{Mergeable: MergeableYes, State: MergeStateUnstable},
-			BlockNone,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := tt.ctx.Block(); got != tt.want {
-				t.Errorf("Block() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestOnlyTwoBlocksGiveWayToAnAdmin(t *testing.T) {
 	t.Parallel()
 
@@ -55,31 +19,31 @@ func TestOnlyTwoBlocksGiveWayToAnAdmin(t *testing.T) {
 		want bool
 	}{
 		{"protected: this is what the key is for", admin(MergeContext{
-			Mergeable: MergeableYes, State: MergeStateBlocked,
+			Block: BlockProtected,
 		}), true},
 		{"behind: gh's --admin bypasses this one too", admin(MergeContext{
-			Mergeable: MergeableYes, State: MergeStateBehind,
+			Block: BlockBehind,
 		}), true},
 		{"clean: nothing to push past", admin(MergeContext{
-			Mergeable: MergeableYes, State: MergeStateClean,
+			Block: BlockNone, Clean: true,
 		}), false},
 		{"unstable: GitHub allows the merge already", admin(MergeContext{
-			Mergeable: MergeableYes, State: MergeStateUnstable,
+			Block: BlockNone,
 		}), false},
 		{"draft: not a rule, unfinished work", admin(MergeContext{
-			IsDraft: true, Mergeable: MergeableYes, State: MergeStateBlocked,
+			Block: BlockDraft,
 		}), false},
 		{"conflicting: no permission resolves a conflict", admin(MergeContext{
-			Mergeable: MergeableConflicting, State: MergeStateDirty,
+			Block: BlockConflicting,
 		}), false},
 		{"computing: the answer is not in yet", admin(MergeContext{
-			Mergeable: MergeableUnknown, State: MergeStateUnknown,
+			Block: BlockComputing,
 		}), false},
 		{"dirty: GitHub will not merge it at all", admin(MergeContext{
-			Mergeable: MergeableYes, State: MergeStateDirty,
+			Block: BlockDirty,
 		}), false},
 		{"blocked, but the viewer is no admin", MergeContext{
-			Mergeable: MergeableYes, State: MergeStateBlocked,
+			Block: BlockProtected,
 		}, false},
 	}
 	for _, tt := range tests {
@@ -102,16 +66,16 @@ func TestAutoMergeNeedsSomethingToWaitFor(t *testing.T) {
 		want bool
 	}{
 		{"waiting on checks", MergeContext{
-			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, State: MergeStateUnstable,
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Clean: false,
 		}, true},
 		{"nothing to wait for: GitHub refuses auto-merge on a clean pull request", MergeContext{
-			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, State: MergeStateClean,
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Clean: true,
 		}, false},
 		{"repository has it turned off", MergeContext{
-			AutoMergeAllowed: false, ViewerCanEnableAutoMerge: true, State: MergeStateUnstable,
+			AutoMergeAllowed: false, ViewerCanEnableAutoMerge: true, Clean: false,
 		}, false},
 		{"viewer may not", MergeContext{
-			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: false, State: MergeStateUnstable,
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: false, Clean: false,
 		}, false},
 	}
 	for _, tt := range tests {

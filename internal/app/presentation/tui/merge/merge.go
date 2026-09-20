@@ -192,7 +192,7 @@ func (m Model) send() (Model, tea.Cmd) {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		return m.sendCmd(false, func() error { return m.src.DisableAutoMerge(m.ctx.PullRequest) })
-	case m.ctx.Block() != domain.BlockNone:
+	case m.ctx.Block != domain.BlockNone:
 		return m, nil
 	case m.auto:
 		method := m.method()

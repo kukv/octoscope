@@ -45,9 +45,8 @@ func (g *Gateway) DisableAutoMerge(pr domain.PullRequestHandle) error {
 func toMergeContext(c gql.MergeContext) domain.MergeContext {
 	return domain.MergeContext{
 		PullRequest:              domain.PullRequestHandle(c.PullRequestID),
-		IsDraft:                  c.IsDraft,
-		Mergeable:                parseMergeable(c.Mergeable),
-		State:                    parseMergeState(c.MergeStateStatus),
+		Block:                    toMergeBlock(c.IsDraft, c.Mergeable, c.MergeStateStatus),
+		Clean:                    c.MergeStateStatus == "CLEAN",
 		Review:                   parseReviewDecision(c.ReviewDecision),
 		Methods:                  allowedMethods(c.SquashMergeAllowed, c.MergeCommitAllowed, c.RebaseMergeAllowed),
 		DeleteBranchOnMerge:      c.DeleteBranchOnMerge,
@@ -79,34 +78,30 @@ func allowedMethods(squash, commit, rebase bool) []domain.MergeMethod {
 	return methods
 }
 
-// A value neither of these knows is read as "unknown" rather than failing
-// the fetch: GitHub adds values to these enums.
-func parseMergeable(s string) domain.Mergeable {
-	switch s {
-	case "MERGEABLE":
-		return domain.MergeableYes
-	case "CONFLICTING":
-		return domain.MergeableConflicting
+// toMergeBlock reads what the service reported into the one thing the
+// application asks: why is this refused right now. Draft comes first
+// because GitHub reports a draft as BLOCKED, and "it is a draft" is the
+// more useful of the two.
+//
+// A spelling this does not know is not a failure -- GitHub adds values to
+// these enums. An unknown mergeable means the answer is not worked out yet;
+// an unknown state refuses nothing.
+func toMergeBlock(isDraft bool, mergeable, state string) domain.MergeBlock {
+	switch {
+	case isDraft:
+		return domain.BlockDraft
+	case mergeable == "CONFLICTING":
+		return domain.BlockConflicting
+	case mergeable != "MERGEABLE":
+		return domain.BlockComputing
+	case state == "BLOCKED":
+		return domain.BlockProtected
+	case state == "BEHIND":
+		return domain.BlockBehind
+	case state == "DIRTY":
+		return domain.BlockDirty
 	}
-	return domain.MergeableUnknown
-}
-
-func parseMergeState(s string) domain.MergeState {
-	switch s {
-	case "CLEAN":
-		return domain.MergeStateClean
-	case "BLOCKED":
-		return domain.MergeStateBlocked
-	case "BEHIND":
-		return domain.MergeStateBehind
-	case "DIRTY":
-		return domain.MergeStateDirty
-	case "UNSTABLE":
-		return domain.MergeStateUnstable
-	case "HAS_HOOKS":
-		return domain.MergeStateHasHooks
-	}
-	return domain.MergeStateUnknown
+	return domain.BlockNone
 }
 
 // fromMergeMethod spells a method the way the GraphQL
