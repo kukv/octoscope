@@ -18,9 +18,9 @@ import (
 func (g *Gateway) AddComment(ctx context.Context, ref domain.ItemRef, body string) error {
 	_ = ctx
 	if ref.Kind == domain.ItemPR {
-		return wrap(g.AddPRComment(ref.Repo, ref.Number, body))
+		return wrap(g.backend.AddPRComment(ref.Repo, ref.Number, body))
 	}
-	return wrap(g.AddIssueComment(ref.Repo, ref.Number, body))
+	return wrap(g.backend.AddIssueComment(ref.Repo, ref.Number, body))
 }
 
 // SetState closes the item when closing is true and reopens it otherwise.
@@ -28,13 +28,13 @@ func (g *Gateway) SetState(ctx context.Context, ref domain.ItemRef, closing bool
 	_ = ctx
 	switch {
 	case ref.Kind == domain.ItemPR && closing:
-		return wrap(g.ClosePR(ref.Repo, ref.Number))
+		return wrap(g.backend.ClosePR(ref.Repo, ref.Number))
 	case ref.Kind == domain.ItemPR:
-		return wrap(g.ReopenPR(ref.Repo, ref.Number))
+		return wrap(g.backend.ReopenPR(ref.Repo, ref.Number))
 	case closing:
-		return wrap(g.CloseIssue(ref.Repo, ref.Number))
+		return wrap(g.backend.CloseIssue(ref.Repo, ref.Number))
 	default:
-		return wrap(g.ReopenIssue(ref.Repo, ref.Number))
+		return wrap(g.backend.ReopenIssue(ref.Repo, ref.Number))
 	}
 }
 
@@ -42,16 +42,16 @@ func (g *Gateway) SetState(ctx context.Context, ref domain.ItemRef, closing bool
 func (g *Gateway) EditLabels(ctx context.Context, ref domain.ItemRef, add, remove []string) error {
 	_ = ctx
 	if ref.Kind == domain.ItemPR {
-		return wrap(g.EditPRLabels(ref.Repo, ref.Number, add, remove))
+		return wrap(g.backend.EditPRLabels(ref.Repo, ref.Number, add, remove))
 	}
-	return wrap(g.EditIssueLabels(ref.Repo, ref.Number, add, remove))
+	return wrap(g.backend.EditIssueLabels(ref.Repo, ref.Number, add, remove))
 }
 
 // EditAssignees adds and removes assignees in one call.
 func (g *Gateway) EditAssignees(ctx context.Context, ref domain.ItemRef, add, remove []string) error {
 	_ = ctx
 	if ref.Kind == domain.ItemPR {
-		return wrap(g.EditPRAssignees(ref.Repo, ref.Number, add, remove))
+		return wrap(g.backend.EditPRAssignees(ref.Repo, ref.Number, add, remove))
 	}
-	return wrap(g.EditIssueAssignees(ref.Repo, ref.Number, add, remove))
+	return wrap(g.backend.EditIssueAssignees(ref.Repo, ref.Number, add, remove))
 }

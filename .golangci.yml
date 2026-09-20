@@ -316,12 +316,15 @@ linters:
         linters:
           - gosec
         text: "G304"
-      # staticcheck QF1008 wants g.backend.StartReview / g.backend.SubmitNewReview
-      # simplified to the promoted g.StartReview / g.SubmitNewReview. Those two
-      # calls are deliberately explicit: they are the gateway calling its own
-      # backend, not a caller reaching through promotion (see the package
-      # comment in backend.go).
-      - path: internal/app/adapter/gateway/gh/review\.go
+      # staticcheck QF1008 wants g.backend.X simplified to the promoted g.X
+      # for calls that are not overridden elsewhere in the package (in
+      # review.go: StartReview, SubmitNewReview; in writes.go: the ten old
+      # AddPRComment/AddIssueComment/ClosePR/ReopenPR/CloseIssue/ReopenIssue/
+      # EditPRLabels/EditIssueLabels/EditPRAssignees/EditIssueAssignees pairs
+      # writes.go dispatches between). Those calls are deliberately explicit:
+      # they are the gateway calling its own backend, not a caller reaching
+      # through promotion (see the package comment in backend.go).
+      - path: internal/app/adapter/gateway/gh/(review|writes)\.go
         linters:
           - staticcheck
         text: "QF1008"
