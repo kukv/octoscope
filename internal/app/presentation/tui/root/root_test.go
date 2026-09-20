@@ -30,8 +30,8 @@ import (
 // only exercise the root's routing, so most methods return zero values.
 type fakeSource struct {
 	work      domain.Work
-	prs       []domain.PR
-	pr        domain.PR
+	prs       []domain.Item
+	pr        domain.Item
 	prErr     error
 	labels    []domain.Label
 	files     []domain.FileDiff
@@ -92,15 +92,11 @@ func (f *fakeSource) ListItems(_ context.Context, repo string, kind domain.ItemK
 	}
 	f.prCalls++
 	f.prRepos = append(f.prRepos, repo)
-	return itemsFromPRs(f.prs), nil
+	return f.prs, nil
 }
 
-func itemsFromPRs(prs []domain.PR) []domain.Item {
-	items := make([]domain.Item, len(prs))
-	for i, pr := range prs {
-		items[i] = itemFromPR(pr)
-	}
-	return items
+func (f *fakeSource) ListLabels(context.Context, string) ([]domain.Label, error) {
+	return f.labels, nil
 }
 
 func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
@@ -135,7 +131,7 @@ func (f *fakeSource) GetItem(_ context.Context, ref domain.ItemRef) (domain.Item
 	if ref.Kind == domain.ItemIssue {
 		return domain.Item{Ref: domain.ItemRef{Kind: domain.ItemIssue}}, nil
 	}
-	return itemFromPR(f.pr), f.prErr
+	return f.pr, f.prErr
 }
 
 func (f *fakeSource) AddComment(context.Context, domain.ItemRef, string) error { return nil }
@@ -148,24 +144,6 @@ func (f *fakeSource) EditAssignees(context.Context, domain.ItemRef, []string, []
 	return nil
 }
 
-// itemFromPR is what the gateway builds out of a pull request: the fixtures
-// stay domain.PR, and the views are handed the conversion.
-func itemFromPR(pr domain.PR) domain.Item {
-	return domain.Item{
-		Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: pr.Number},
-		Title: pr.Title, Author: pr.Author, State: pr.State, Body: pr.Body,
-		BodyText: pr.BodyText, URL: pr.URL, Labels: pr.Labels, Assignees: pr.Assignees,
-		Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
-		Change: &domain.Change{
-			IsDraft: pr.IsDraft, Review: pr.Review, Head: pr.Head, Base: pr.Base,
-			Additions: pr.Additions, Deletions: pr.Deletions, Checks: pr.Checks,
-		},
-	}
-}
-
-func (f *fakeSource) ListLabels(context.Context, string) ([]domain.Label, error) {
-	return f.labels, nil
-}
 func (f *fakeSource) ListAssignees(context.Context, string) ([]string, error) { return nil, nil }
 
 func (f *fakeSource) PRDiff(context.Context, string, int) ([]domain.FileDiff, error) {
@@ -503,12 +481,15 @@ func TestTheFirstWindowSizeStartsTheFetches(t *testing.T) {
 // would.
 func TestALateRepositoryStillGetsTheTerminalWidth(t *testing.T) {
 	const width = 120
-	src := &fakeSource{prs: []domain.PR{{
-		Number: 1,
-		Title: "レンダリングのパイプラインをまるごと置き換える " +
-			"refactor with an English clause long enough to run off any screen",
-		Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},
-	}}}
+	src := &fakeSource{prs: []domain.Item{
+		{
+			Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title: "レンダリングのパイプラインをまるごと置き換える " +
+				"refactor with an English clause long enough to run off any screen",
+			Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},
+			Change: &domain.Change{},
+		},
+	}}
 
 	next, cmd := New(src, Options{}).Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	m := resolve(t, next.(Model), cmd)
@@ -728,7 +709,12 @@ func TestAMergeRefreshesSearchToo(t *testing.T) {
 // after the WindowSizeMsg has already been seen: without handing it the stored
 // size, its viewport would wrap at its own 80-column default forever.
 func TestTheDetailViewGetsTheCurrentSize(t *testing.T) {
-	src := &fakeSource{pr: domain.PR{Number: 3, Title: "wide", Body: strings.Repeat("word ", 200)}}
+	src := &fakeSource{pr: domain.Item{
+		Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 3},
+		Title:  "wide",
+		Body:   strings.Repeat("word ", 200),
+		Change: &domain.Change{},
+	}}
 	// Not 80: that is the viewport's own default, so a detail view that never
 	// heard the size would look right there by accident. Not narrower either,
 	// because the detail footer is 73 columns of key bindings and does not
@@ -1003,7 +989,12 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 	for name, busy := range tests {
 		t.Run(name, func(t *testing.T) {
 			src := &fakeSource{
-				pr:     domain.PR{Number: 1, Title: "a pr", State: domain.StateOpen},
+				pr: domain.Item{
+					Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+					Title:  "a pr",
+					State:  domain.StateOpen,
+					Change: &domain.Change{},
+				},
 				labels: []domain.Label{{Name: "bug", Color: "d73a4a"}},
 			}
 			m := newTestModelWith(src, Options{Repo: "kukv/demo"})
@@ -1080,7 +1071,12 @@ func TestEnterOnTheBoardOpensTheDetailView(t *testing.T) {
 				Title: "add the work board",
 			}},
 		},
-		pr: domain.PR{Number: 41, Title: "add the work board", State: domain.StateOpen},
+		pr: domain.Item{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 41},
+			Title:  "add the work board",
+			State:  domain.StateOpen,
+			Change: &domain.Change{},
+		},
 	}
 	m := New(src, Options{}) // no --repo: the board is the first tab
 	next, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -1152,11 +1148,20 @@ func overlongSource() *fakeSource {
 				Title: overlongTitle,
 			}},
 		},
-		prs: []domain.PR{{
-			Number: 1, Title: overlongTitle,
-			Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},
-		}},
-		pr: domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen},
+		prs: []domain.Item{
+			{
+				Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+				Title:  overlongTitle,
+				Author: domain.Author{Login: "a-contributor-with-a-very-long-handle"},
+				Change: &domain.Change{},
+			},
+		},
+		pr: domain.Item{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:  overlongTitle,
+			State:  domain.StateOpen,
+			Change: &domain.Change{},
+		},
 	}
 }
 

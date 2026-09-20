@@ -19,7 +19,7 @@ import (
 // next fetch sees it. app_test.go's fakeSource returns fixed values, which
 // cannot show a scenario reaching its end.
 type scenarioSource struct {
-	pr      domain.PR
+	pr      domain.Item
 	files   []domain.FileDiff
 	labels  []domain.Label
 	threads []domain.ReviewThread
@@ -60,7 +60,7 @@ func (f *scenarioSource) ListWorkSection(_ context.Context, s domain.WorkSection
 		return nil, nil
 	}
 	return []domain.WorkItem{{
-		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: f.pr.Number},
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: f.pr.Ref.Number},
 		Title:     f.pr.Title,
 		Author:    f.pr.Author.Login,
 		UpdatedAt: f.pr.UpdatedAt,
@@ -73,7 +73,7 @@ func (f *scenarioSource) ListItems(_ context.Context, repo string, kind domain.I
 		return nil, nil
 	}
 	f.prRepos = append(f.prRepos, repo)
-	return []domain.Item{itemFromPR(f.pr)}, nil
+	return []domain.Item{f.pr}, nil
 }
 
 func (f *scenarioSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
@@ -85,7 +85,7 @@ func (f *scenarioSource) RepoCounts(context.Context, []string) ([]domain.RepoCou
 }
 
 func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (domain.Item, error) {
-	return itemFromPR(f.pr), nil
+	return f.pr, nil
 }
 
 func (f *scenarioSource) AddComment(_ context.Context, _ domain.ItemRef, body string) error {
@@ -184,11 +184,15 @@ func (f *scenarioSource) DisableAutoMerge(domain.PullRequestHandle) error { retu
 
 var scenarioAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 
-func scenarioPR() domain.PR {
-	return domain.PR{
-		Number: 12, Title: "replace the renderer",
-		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen,
-		UpdatedAt: scenarioAt, Body: "body",
+func scenarioPR() domain.Item {
+	return domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 12},
+		Title:     "replace the renderer",
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		UpdatedAt: scenarioAt,
+		Body:      "body",
+		Change:    &domain.Change{},
 	}
 }
 

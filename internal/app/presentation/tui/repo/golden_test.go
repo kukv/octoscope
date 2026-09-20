@@ -31,43 +31,59 @@ var (
 	goldenFetchedAt = time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
 )
 
-func goldenPRs() []domain.PR {
-	return []domain.PR{
+func goldenPRs() []domain.Item {
+	return []domain.Item{
 		{
-			Number: 1, Title: "first pr", Author: domain.Author{Login: "kukv"},
-			UpdatedAt: goldenUpdatedAt, Review: domain.ReviewApproved,
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:     "first pr",
+			Author:    domain.Author{Login: "kukv"},
+			UpdatedAt: goldenUpdatedAt,
+			Change: &domain.Change{
+				Review: domain.ReviewApproved,
+			},
 		},
 		{
-			Number: 2, Title: "second pr", Author: domain.Author{Login: "bob"},
-			UpdatedAt: goldenUpdatedAt, IsDraft: true,
-			Labels: []domain.Label{{Name: "bug", Color: "d73a4a"}},
-			Head:   "fix/thing", Base: "main", Additions: 12, Deletions: 3,
-			Checks: domain.Checks{
-				Total: 2, Passed: 1, Failed: 1, State: domain.CheckFailure,
-				Runs: []domain.CheckRun{
-					{Name: "lint", State: domain.CheckSuccess},
-					{Name: "test", State: domain.CheckFailure},
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 2},
+			Title:     "second pr",
+			Author:    domain.Author{Login: "bob"},
+			UpdatedAt: goldenUpdatedAt,
+			Labels:    []domain.Label{{Name: "bug", Color: "d73a4a"}},
+			Change: &domain.Change{
+				IsDraft:   true,
+				Head:      "fix/thing",
+				Base:      "main",
+				Additions: 12,
+				Deletions: 3,
+				Checks: domain.Checks{
+					Total: 2, Passed: 1, Failed: 1, State: domain.CheckFailure,
+					Runs: []domain.CheckRun{
+						{Name: "lint", State: domain.CheckSuccess},
+						{Name: "test", State: domain.CheckFailure},
+					},
 				},
 			},
 		},
 		{
-			Number: 9,
+			Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 9},
 			Title: "レンダリングのパイプラインをまるごと置き換える " +
 				"refactor that nobody asked for",
 			Author:    domain.Author{Login: "a-contributor-with-a-very-long-handle"},
 			UpdatedAt: goldenUpdatedAt,
+			Change:    &domain.Change{},
 		},
 	}
 }
 
-func goldenIssues() []domain.Issue {
-	return []domain.Issue{{
-		Number: 7,
-		Title: "ラベルの一覧が横に伸びつづける問題 " +
-			"and an English clause long enough to run off the screen",
-		Author:    domain.Author{Login: "another-contributor-with-a-long-handle"},
-		UpdatedAt: goldenUpdatedAt,
-	}}
+func goldenIssues() []domain.Item {
+	return []domain.Item{
+		{
+			Ref: domain.ItemRef{Kind: domain.ItemIssue, Number: 7},
+			Title: "ラベルの一覧が横に伸びつづける問題 " +
+				"and an English clause long enough to run off the screen",
+			Author:    domain.Author{Login: "another-contributor-with-a-long-handle"},
+			UpdatedAt: goldenUpdatedAt,
+		},
+	}
 }
 
 // goldenCandidates are suggestions of the shape the search really returns:
@@ -87,7 +103,7 @@ func goldenModel(width int) Model {
 		Repositories: []string{"kukv/octoscope", "kukv/koto"},
 		Current:      "kukv/octoscope",
 	}), width)
-	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
+	m, _ = m.Update(prListMsg{prs: f.prs})
 	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{
 		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
 		{Repo: "kukv/koto", Unavailable: true},

@@ -27,17 +27,43 @@ func TestARowShowsTheStateTheNumberAndTheAge(t *testing.T) {
 	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
 	cases := []struct {
 		name string
-		pr   domain.PR
+		pr   domain.Item
 		want []string
 	}{
-		{"draft", domain.PR{Number: 1, IsDraft: true, UpdatedAt: now.Add(-30 * time.Second)}, []string{"◌", "#1", "now"}},
-		{"approved", domain.PR{Number: 2, Review: domain.ReviewApproved, UpdatedAt: now.Add(-5 * time.Minute)}, []string{"✓", "#2", "5m ago"}},
-		{"changes requested", domain.PR{Number: 3, Review: domain.ReviewChangesRequested, UpdatedAt: now.Add(-3 * time.Hour)}, []string{"×", "#3", "3h ago"}},
-		{"review required", domain.PR{Number: 4, Review: domain.ReviewRequired, UpdatedAt: now.Add(-49 * time.Hour)}, []string{"•", "#4", "2d ago"}},
+		{"draft", domain.Item{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			UpdatedAt: now.Add(-30 * time.Second),
+			Change: &domain.Change{
+				IsDraft: true,
+			},
+		}, []string{"◌", "#1", "now"}},
+		{"approved", domain.Item{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 2},
+			UpdatedAt: now.Add(-5 * time.Minute),
+			Change: &domain.Change{
+				Review: domain.ReviewApproved,
+			},
+		}, []string{"✓", "#2", "5m ago"}},
+		{"changes requested", domain.Item{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 3},
+			UpdatedAt: now.Add(-3 * time.Hour),
+			Change: &domain.Change{
+				Review: domain.ReviewChangesRequested,
+			},
+		}, []string{"×", "#3", "3h ago"}},
+		{"review required", domain.Item{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 4},
+			UpdatedAt: now.Add(-49 * time.Hour),
+			Change: &domain.Change{
+				Review: domain.ReviewRequired,
+			},
+		}, []string{"•", "#4", "2d ago"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			m := sized(loadedModel(&fakeSource{prs: []domain.PR{c.pr}}), 120)
+			m := sized(loadedModel(&fakeSource{prs: []domain.Item{
+				c.pr,
+			}}), 120)
 			m.fetchedAt = [2]time.Time{now, now}
 			got := ansi.Strip(m.row(0))
 			for _, want := range c.want {
@@ -56,10 +82,25 @@ func TestTheColumnsLineUpDownThePage(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
 	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
-	prs := []domain.PR{
-		{Number: 1, Title: "short", UpdatedAt: now.Add(-time.Hour)},
-		{Number: 22, Title: "レンダリングのパイプラインをまるごと置き換える", UpdatedAt: now.Add(-time.Hour)},
-		{Number: 333, Title: "a middling sort of title", UpdatedAt: now.Add(-time.Hour)},
+	prs := []domain.Item{
+		{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:     "short",
+			UpdatedAt: now.Add(-time.Hour),
+			Change:    &domain.Change{},
+		},
+		{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 22},
+			Title:     "レンダリングのパイプラインをまるごと置き換える",
+			UpdatedAt: now.Add(-time.Hour),
+			Change:    &domain.Change{},
+		},
+		{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 333},
+			Title:     "a middling sort of title",
+			UpdatedAt: now.Add(-time.Hour),
+			Change:    &domain.Change{},
+		},
 	}
 	for _, lang := range []language.Tag{language.English, language.Japanese} {
 		i18n.SetLanguage(lang)
@@ -86,14 +127,34 @@ func TestTheColumnsLineUpDownThePage(t *testing.T) {
 // drawn under it, and one that grew with the selection would move the key bar.
 func TestTheDrawerIsAlwaysTheSameHeight(t *testing.T) {
 	f := &fakeSource{
-		prs: []domain.PR{
-			{Number: 1, Title: "with checks", Head: "a", Base: "main", Additions: 2, Deletions: 1, Checks: domain.Checks{
-				Total: 2, Passed: 2, State: domain.CheckSuccess,
-				Runs: []domain.CheckRun{{Name: "lint"}, {Name: "test"}},
-			}},
-			{Number: 2, Title: "without"},
+		prs: []domain.Item{
+			{
+				Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+				Title: "with checks",
+				Change: &domain.Change{
+					Head:      "a",
+					Base:      "main",
+					Additions: 2,
+					Deletions: 1,
+					Checks: domain.Checks{
+						Total: 2, Passed: 2, State: domain.CheckSuccess,
+						Runs: []domain.CheckRun{{Name: "lint"}, {Name: "test"}},
+					},
+				},
+			},
+			{
+				Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 2},
+				Title:  "without",
+				Change: &domain.Change{},
+			},
 		},
-		issues: []domain.Issue{{Number: 9, Title: "an issue", Author: domain.Author{Login: "bob"}}},
+		issues: []domain.Item{
+			{
+				Ref:    domain.ItemRef{Kind: domain.ItemIssue, Number: 9},
+				Title:  "an issue",
+				Author: domain.Author{Login: "bob"},
+			},
+		},
 	}
 	m := sized(loadedModel(f), 120)
 	for name, model := range map[string]Model{
@@ -109,14 +170,23 @@ func TestTheDrawerIsAlwaysTheSameHeight(t *testing.T) {
 // TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange is the line the mockup
 // puts under the table.
 func TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
-	f := &fakeSource{prs: []domain.PR{{
-		Number: 1, Title: "a change", Author: domain.Author{Login: "kukv"},
-		Head: "feat/graph", Base: "main", Additions: 218, Deletions: 31,
-		Checks: domain.Checks{
-			Total: 1, Passed: 1, State: domain.CheckSuccess,
-			Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
+	f := &fakeSource{prs: []domain.Item{
+		{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:  "a change",
+			Author: domain.Author{Login: "kukv"},
+			Change: &domain.Change{
+				Head:      "feat/graph",
+				Base:      "main",
+				Additions: 218,
+				Deletions: 31,
+				Checks: domain.Checks{
+					Total: 1, Passed: 1, State: domain.CheckSuccess,
+					Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
+				},
+			},
 		},
-	}}}
+	}}
 	got := ansi.Strip(strings.Join(sized(loadedModel(f), 120).drawerLines(), "\n"))
 	for _, want := range []string{"@kukv", "feat/graph", "main", "+218", "−31", "lint"} {
 		if !strings.Contains(got, want) {
@@ -129,9 +199,13 @@ func TestTheDrawerNamesTheBranchesAndTheSizeOfTheChange(t *testing.T) {
 // drawn has to be on screen, so a repository with a hundred pull requests
 // scrolls rather than pushing the key bar off the bottom.
 func TestTheListFitsTheTerminal(t *testing.T) {
-	var prs []domain.PR
+	var prs []domain.Item
 	for i := range 60 {
-		prs = append(prs, domain.PR{Number: i + 1, Title: "a pull request"})
+		prs = append(prs, domain.Item{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: i + 1},
+			Title:  "a pull request",
+			Change: &domain.Change{},
+		})
 	}
 	m := loadedModel(&fakeSource{prs: prs})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
@@ -158,9 +232,13 @@ func TestTheListFitsTheTerminal(t *testing.T) {
 // switching between here and the board moved the hints under the user's eyes.
 func TestTheKeyBarSitsOnTheLastRow(t *testing.T) {
 	for _, count := range []int{0, 2, 60} {
-		prs := make([]domain.PR, count)
+		prs := make([]domain.Item, count)
 		for i := range prs {
-			prs[i] = domain.PR{Number: i + 1, Title: "a pull request"}
+			prs[i] = domain.Item{
+				Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: i + 1},
+				Title:  "a pull request",
+				Change: &domain.Change{},
+			}
 		}
 		m := currentModel(&fakeSource{prs: prs}, 120)
 
@@ -199,15 +277,24 @@ func TestTheDrawerSitsAboveTheKeyBar(t *testing.T) {
 // TestTheDrawerIsTheOneTheBoardDraws is the point of the change: the same
 // lines, in the same colours, under both tabs.
 func TestTheDrawerIsTheOneTheBoardDraws(t *testing.T) {
-	f := &fakeSource{prs: []domain.PR{{
-		Number: 1, Title: "a change", Author: domain.Author{Login: "kukv"},
-		Body: "What this changes and why.",
-		Head: "feat/graph", Base: "main", Additions: 218, Deletions: 31,
-		Checks: domain.Checks{
-			Total: 1, Passed: 1, State: domain.CheckSuccess,
-			Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
+	f := &fakeSource{prs: []domain.Item{
+		{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:  "a change",
+			Author: domain.Author{Login: "kukv"},
+			Body:   "What this changes and why.",
+			Change: &domain.Change{
+				Head:      "feat/graph",
+				Base:      "main",
+				Additions: 218,
+				Deletions: 31,
+				Checks: domain.Checks{
+					Total: 1, Passed: 1, State: domain.CheckSuccess,
+					Runs: []domain.CheckRun{{Name: "lint", State: domain.CheckSuccess}},
+				},
+			},
 		},
-	}}}
+	}}
 	m := currentModel(f, 120)
 
 	it, ok := m.selectedItem()
@@ -229,11 +316,15 @@ func TestTheDrawerIsTheOneTheBoardDraws(t *testing.T) {
 // request template's comment markers and headings would fill three lines here
 // and read as prose there.
 func TestTheDrawerPreviewsTheBodyAsText(t *testing.T) {
-	f := &fakeSource{prs: []domain.PR{{
-		Number: 1, Title: "a change",
-		Body:     "<!-- tell us why -->\n## Why\nBecause it was broken.",
-		BodyText: "Why Because it was broken.",
-	}}}
+	f := &fakeSource{prs: []domain.Item{
+		{
+			Ref:      domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:    "a change",
+			Body:     "<!-- tell us why -->\n## Why\nBecause it was broken.",
+			BodyText: "Why Because it was broken.",
+			Change:   &domain.Change{},
+		},
+	}}
 	got := ansi.Strip(strings.Join(currentModel(f, 120).drawerLines(), "\n"))
 
 	if !strings.Contains(got, "Because it was broken.") {
@@ -281,10 +372,17 @@ func TestTheDrawerFoldsAwayWhenNarrow(t *testing.T) {
 
 // somePRs is a list long enough to scroll, with branches so the drawer has
 // something to say about whichever is selected.
-func somePRs(n int) []domain.PR {
-	prs := make([]domain.PR, n)
+func somePRs(n int) []domain.Item {
+	prs := make([]domain.Item, n)
 	for i := range prs {
-		prs[i] = domain.PR{Number: i + 1, Title: "a pull request", Head: "topic", Base: "main"}
+		prs[i] = domain.Item{
+			Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: i + 1},
+			Title: "a pull request",
+			Change: &domain.Change{
+				Head: "topic",
+				Base: "main",
+			},
+		}
 	}
 	return prs
 }
