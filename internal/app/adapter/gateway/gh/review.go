@@ -21,7 +21,7 @@ func (g *Gateway) PRDiff(ctx context.Context, repo string, number int) ([]domain
 		}
 		return files, nil
 	}
-	return domain.ParseDiff(d.Raw), nil
+	return parseDiff(d.Raw), nil
 }
 
 // PRReviewContext returns everything the diff view needs to draw and change
@@ -123,7 +123,7 @@ func toFileDiff(f github.PRFile) domain.FileDiff {
 		fd.PatchOmitted = true
 		return fd
 	}
-	fd.Hunks = domain.ParseBarePatch(*f.Patch)
+	fd.Hunks = parseBarePatch(*f.Patch)
 	return fd
 }
 

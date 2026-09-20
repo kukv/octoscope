@@ -183,8 +183,8 @@ func TestPRDiffFromRawParsesTheDiffText(t *testing.T) {
 // resulting domain.FileDiff against a fully written-out expectation. Binary
 // is not settable here: the files API has no way to say a file is binary,
 // so it stays false in both fixtures -- 7 of FileDiff's 8 fields are guarded
-// by this test, and Binary is guarded instead by domain.ParseDiff's own
-// tests.
+// by this test, and Binary is guarded instead by parseDiff's own tests in
+// diff_parse_test.go.
 func TestPRDiffFromFilesTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	t.Parallel()
 

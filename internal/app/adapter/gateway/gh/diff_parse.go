@@ -1,10 +1,12 @@
-package domain
+package gh
 
 import (
 	"bufio"
 	"bytes"
 	"strconv"
 	"strings"
+
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 const (
@@ -18,11 +20,15 @@ const (
 	hunkHeaderFields = 3
 )
 
-// ParseDiff reads a unified diff. It never fails: a line it does not
+// parseDiff reads a unified diff. It never fails: a line it does not
 // recognise inside a hunk is dropped, and one outside a hunk is a header we
 // have no use for. A diff that half-parses shows a file short; a parser that
 // returns an error shows nothing at all, which is worse.
-func ParseDiff(b []byte) []FileDiff {
+//
+// It lives here rather than in the domain because reading a text format is
+// translation: the domain owns the shape of a diff (domain.FileDiff), not
+// the spelling git writes it in.
+func parseDiff(b []byte) []domain.FileDiff {
 	p := &diffParser{}
 	s := bufio.NewScanner(bytes.NewReader(b))
 	s.Buffer(make([]byte, 0, scanBufInit), scanBufMax)
@@ -32,13 +38,13 @@ func ParseDiff(b []byte) []FileDiff {
 	return p.done()
 }
 
-// ParseBarePatch reads the hunks out of a files-API patch: unified diff
+// parseBarePatch reads the hunks out of a files-API patch: unified diff
 // hunks with no "diff --git" header and no ---/+++ lines. It walks the same
 // diffParser used for a full gh pr diff, entering it already "inside" a
 // file, so the hunk-header parsing (hunkStarts, with its function-context
 // fix) is shared rather than duplicated.
-func ParseBarePatch(patch string) []Hunk {
-	p := &diffParser{file: &FileDiff{}}
+func parseBarePatch(patch string) []domain.Hunk {
+	p := &diffParser{file: &domain.FileDiff{}}
 	s := bufio.NewScanner(strings.NewReader(patch))
 	s.Buffer(make([]byte, 0, scanBufInit), scanBufMax)
 	for s.Scan() {
@@ -51,9 +57,9 @@ func ParseBarePatch(patch string) []Hunk {
 // diffParser holds the walk's position: which file and hunk are open, and
 // how far down each side of the file the next line falls.
 type diffParser struct {
-	files        []FileDiff
-	file         *FileDiff
-	hunk         *Hunk
+	files        []domain.FileDiff
+	file         *domain.FileDiff
+	hunk         *domain.Hunk
 	oldNo, newNo int
 }
 
@@ -72,7 +78,7 @@ func (p *diffParser) closeFile() {
 	p.file = nil
 }
 
-func (p *diffParser) done() []FileDiff {
+func (p *diffParser) done() []domain.FileDiff {
 	p.closeFile()
 	return p.files
 }
@@ -81,44 +87,44 @@ func (p *diffParser) line(line string) {
 	switch {
 	case strings.HasPrefix(line, "diff --git "):
 		p.closeFile()
-		p.file = &FileDiff{Status: FileModified, Path: pathFromGitHeader(line)}
+		p.file = &domain.FileDiff{Status: domain.FileModified, Path: pathFromGitHeader(line)}
 	case p.file == nil:
 		// Anything before the first "diff --git" is not ours.
 	case strings.HasPrefix(line, "new file mode"):
-		p.file.Status = FileAdded
+		p.file.Status = domain.FileAdded
 	case strings.HasPrefix(line, "deleted file mode"):
-		p.file.Status = FileDeleted
+		p.file.Status = domain.FileDeleted
 	case strings.HasPrefix(line, "rename from "):
-		p.file.Status = FileRenamed
+		p.file.Status = domain.FileRenamed
 		p.file.OldPath = strings.TrimPrefix(line, "rename from ")
 	case strings.HasPrefix(line, "rename to "):
-		p.file.Status = FileRenamed
+		p.file.Status = domain.FileRenamed
 		p.file.Path = strings.TrimPrefix(line, "rename to ")
 	case strings.HasPrefix(line, "Binary files "), strings.HasPrefix(line, "GIT binary patch"):
 		p.file.Binary = true
 	case strings.HasPrefix(line, "@@"):
 		p.closeHunk()
 		p.oldNo, p.newNo = hunkStarts(line)
-		p.hunk = &Hunk{Header: line}
+		p.hunk = &domain.Hunk{Header: line}
 	case p.hunk == nil:
 		// --- / +++ / index, and anything else before the first hunk.
 	case strings.HasPrefix(line, `\`):
 		// "\ No newline at end of file" annotates the line above it; it is
 		// not a line of the file.
 	case strings.HasPrefix(line, "+"):
-		p.add(DiffLine{Kind: LineAdded, NewLine: p.newNo, Text: line[1:]})
+		p.add(domain.DiffLine{Kind: domain.LineAdded, NewLine: p.newNo, Text: line[1:]})
 		p.newNo++
 		p.file.Additions++
 	case strings.HasPrefix(line, "-"):
-		p.add(DiffLine{Kind: LineRemoved, OldLine: p.oldNo, Text: line[1:]})
+		p.add(domain.DiffLine{Kind: domain.LineRemoved, OldLine: p.oldNo, Text: line[1:]})
 		p.oldNo++
 		p.file.Deletions++
 	default:
 		// A context line starts with a space. An empty line in the file can
 		// arrive as the empty string when the trailing space was stripped in
 		// transit, which is why this is the default rather than a " " case.
-		p.add(DiffLine{
-			Kind: LineContext, OldLine: p.oldNo, NewLine: p.newNo,
+		p.add(domain.DiffLine{
+			Kind: domain.LineContext, OldLine: p.oldNo, NewLine: p.newNo,
 			Text: strings.TrimPrefix(line, " "),
 		})
 		p.oldNo++
@@ -126,7 +132,7 @@ func (p *diffParser) line(line string) {
 	}
 }
 
-func (p *diffParser) add(l DiffLine) { p.hunk.Lines = append(p.hunk.Lines, l) }
+func (p *diffParser) add(l domain.DiffLine) { p.hunk.Lines = append(p.hunk.Lines, l) }
 
 // pathFromGitHeader reads the new path out of `diff --git a/x b/y`. A path
 // containing a space makes the two halves ambiguous, so the b/ half is taken

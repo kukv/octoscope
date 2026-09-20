@@ -1,10 +1,12 @@
-package domain
+package gh
 
 import (
 	"bytes"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/kukv/octoscope/internal/app/domain"
 )
 
 func readSample(t *testing.T) []byte {
@@ -16,9 +18,9 @@ func readSample(t *testing.T) []byte {
 	return b
 }
 
-func sampleFiles(t *testing.T) []FileDiff {
+func sampleFiles(t *testing.T) []domain.FileDiff {
 	t.Helper()
-	return ParseDiff(readSample(t))
+	return parseDiff(readSample(t))
 }
 
 func TestPRDiffParsesEveryShape(t *testing.T) {
@@ -29,22 +31,22 @@ func TestPRDiffParsesEveryShape(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		file      FileDiff
+		file      domain.FileDiff
 		path      string
 		oldPath   string
-		status    FileStatus
+		status    domain.FileStatus
 		additions int
 		deletions int
 		binary    bool
 		hunks     int
 	}{
-		{"modified", files[0], "graph/walk.go", "", FileModified, 4, 1, false, 2},
-		{"added", files[1], "graph/new.go", "", FileAdded, 2, 0, false, 1},
-		{"deleted", files[2], "graph/old.go", "", FileDeleted, 0, 1, false, 1},
-		{"renamed", files[3], "docs/b.md", "docs/a.md", FileRenamed, 1, 1, false, 1},
-		{"binary", files[4], "logo.png", "", FileModified, 0, 0, true, 0},
-		{"no trailing newline", files[5], "noeol.txt", "", FileModified, 1, 1, false, 1},
-		{"hunk header with function context", files[6], "mathutil/add.go", "", FileModified, 3, 1, false, 1},
+		{"modified", files[0], "graph/walk.go", "", domain.FileModified, 4, 1, false, 2},
+		{"added", files[1], "graph/new.go", "", domain.FileAdded, 2, 0, false, 1},
+		{"deleted", files[2], "graph/old.go", "", domain.FileDeleted, 0, 1, false, 1},
+		{"renamed", files[3], "docs/b.md", "docs/a.md", domain.FileRenamed, 1, 1, false, 1},
+		{"binary", files[4], "logo.png", "", domain.FileModified, 0, 0, true, 0},
+		{"no trailing newline", files[5], "noeol.txt", "", domain.FileModified, 1, 1, false, 1},
+		{"hunk header with function context", files[6], "mathutil/add.go", "", domain.FileModified, 3, 1, false, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,14 +81,14 @@ func TestLineNumbersRunDownBothSides(t *testing.T) {
 		got = append(got, [3]int{int(l.Kind), l.OldLine, l.NewLine})
 	}
 	want := [][3]int{
-		{int(LineContext), 12, 12},
-		{int(LineContext), 13, 13},
-		{int(LineRemoved), 14, 0},
-		{int(LineAdded), 0, 14},
-		{int(LineAdded), 0, 15},
-		{int(LineAdded), 0, 16},
-		{int(LineContext), 15, 17},
-		{int(LineContext), 16, 18},
+		{int(domain.LineContext), 12, 12},
+		{int(domain.LineContext), 13, 13},
+		{int(domain.LineRemoved), 14, 0},
+		{int(domain.LineAdded), 0, 14},
+		{int(domain.LineAdded), 0, 15},
+		{int(domain.LineAdded), 0, 16},
+		{int(domain.LineContext), 15, 17},
+		{int(domain.LineContext), 16, 18},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("%d lines, want %d: %v", len(got), len(want), got)
@@ -111,12 +113,12 @@ func TestHunkHeaderFunctionContextDoesNotShiftLineNumbers(t *testing.T) {
 		got = append(got, [3]int{int(l.Kind), l.OldLine, l.NewLine})
 	}
 	want := [][3]int{
-		{int(LineContext), 3, 3},
-		{int(LineContext), 4, 4},
-		{int(LineRemoved), 5, 0},
-		{int(LineAdded), 0, 5},
-		{int(LineAdded), 0, 6},
-		{int(LineAdded), 0, 7},
+		{int(domain.LineContext), 3, 3},
+		{int(domain.LineContext), 4, 4},
+		{int(domain.LineRemoved), 5, 0},
+		{int(domain.LineAdded), 0, 5},
+		{int(domain.LineAdded), 0, 6},
+		{int(domain.LineAdded), 0, 7},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("%d lines, want %d: %v", len(got), len(want), got)
@@ -142,7 +144,7 @@ func TestBarePatchParserMatchesTheFullDiffParser(t *testing.T) {
 	if i < 0 {
 		t.Fatal("testdata/sample.diff no longer has the mathutil/add.go fixture")
 	}
-	full := ParseDiff(sample[i:])
+	full := parseDiff(sample[i:])
 	if len(full) != 1 {
 		t.Fatalf("%d files from the full-diff parser, want 1", len(full))
 	}
@@ -151,7 +153,7 @@ func TestBarePatchParserMatchesTheFullDiffParser(t *testing.T) {
 	if j < 0 {
 		t.Fatal("no hunk header found after the diff --git line")
 	}
-	bare := ParseBarePatch(string(sample[i+j:]))
+	bare := parseBarePatch(string(sample[i+j:]))
 
 	if !reflect.DeepEqual(bare, full[0].Hunks) {
 		t.Errorf("bare-patch hunks = %+v, want the same as the full-diff parser: %+v", bare, full[0].Hunks)
