@@ -152,7 +152,7 @@ func TestRunErrorPassesThrough(t *testing.T) {
 
 func TestAddPRComment(t *testing.T) {
 	c, f := newTestClient("https://github.com/kukv/demo/pull/12#issuecomment-1\n", nil)
-	if err := c.AddPRComment("", 12, "hello"); err != nil {
+	if err := c.AddPRComment(t.Context(), "", 12, "hello"); err != nil {
 		t.Fatalf("AddPRComment: %v", err)
 	}
 	wantArgs := []string{"pr", "comment", "12", "--body", "hello"}
@@ -166,7 +166,7 @@ func TestAddPRComment(t *testing.T) {
 
 func TestAddIssueCommentWithRepoOverride(t *testing.T) {
 	c, f := newTestClient("", nil)
-	if err := c.AddIssueComment("octo/hello", 3, "hi there"); err != nil {
+	if err := c.AddIssueComment(t.Context(), "octo/hello", 3, "hi there"); err != nil {
 		t.Fatalf("AddIssueComment: %v", err)
 	}
 	wantArgs := []string{"issue", "comment", "3", "--body", "hi there", "--repo", "octo/hello"}
@@ -178,14 +178,14 @@ func TestAddIssueCommentWithRepoOverride(t *testing.T) {
 func TestAddCommentError(t *testing.T) {
 	wantErr := errors.New("gh pr: HTTP 403 forbidden")
 	c, _ := newTestClient("", wantErr)
-	if err := c.AddPRComment("", 12, "x"); !errors.Is(err, wantErr) {
+	if err := c.AddPRComment(t.Context(), "", 12, "x"); !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v", err, wantErr)
 	}
 }
 
 func TestClosePR(t *testing.T) {
 	c, f := newTestClient("", nil)
-	if err := c.ClosePR("", 12); err != nil {
+	if err := c.ClosePR(t.Context(), "", 12); err != nil {
 		t.Fatalf("ClosePR: %v", err)
 	}
 	wantArgs := []string{"pr", "close", "12"}
@@ -199,7 +199,7 @@ func TestClosePR(t *testing.T) {
 
 func TestReopenIssueWithRepoOverride(t *testing.T) {
 	c, f := newTestClient("", nil)
-	if err := c.ReopenIssue("octo/hello", 3); err != nil {
+	if err := c.ReopenIssue(t.Context(), "octo/hello", 3); err != nil {
 		t.Fatalf("ReopenIssue: %v", err)
 	}
 	wantArgs := []string{"issue", "reopen", "3", "--repo", "octo/hello"}
@@ -211,7 +211,7 @@ func TestReopenIssueWithRepoOverride(t *testing.T) {
 func TestStateChangeError(t *testing.T) {
 	wantErr := errors.New("gh pr: HTTP 403 forbidden")
 	c, _ := newTestClient("", wantErr)
-	if err := c.ClosePR("", 12); !errors.Is(err, wantErr) {
+	if err := c.ClosePR(t.Context(), "", 12); !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v", err, wantErr)
 	}
 }
@@ -259,7 +259,7 @@ func TestListAssigneesWithRepoOverride(t *testing.T) {
 
 func TestEditPRLabels(t *testing.T) {
 	c, f := newTestClient("", nil)
-	if err := c.EditPRLabels("", 12, []string{"bug"}, []string{"wip"}); err != nil {
+	if err := c.EditPRLabels(t.Context(), "", 12, []string{"bug"}, []string{"wip"}); err != nil {
 		t.Fatalf("EditPRLabels: %v", err)
 	}
 	wantArgs := []string{"pr", "edit", "12", "--add-label", "bug", "--remove-label", "wip"}
@@ -270,7 +270,7 @@ func TestEditPRLabels(t *testing.T) {
 
 func TestEditPRLabelsAddOnly(t *testing.T) {
 	c, f := newTestClient("", nil)
-	if err := c.EditPRLabels("", 12, []string{"a", "b"}, nil); err != nil {
+	if err := c.EditPRLabels(t.Context(), "", 12, []string{"a", "b"}, nil); err != nil {
 		t.Fatalf("EditPRLabels: %v", err)
 	}
 	wantArgs := []string{"pr", "edit", "12", "--add-label", "a", "--add-label", "b"}
@@ -281,7 +281,7 @@ func TestEditPRLabelsAddOnly(t *testing.T) {
 
 func TestEditIssueAssigneesWithRepoOverride(t *testing.T) {
 	c, f := newTestClient("", nil)
-	if err := c.EditIssueAssignees("octo/hello", 3, []string{"alice"}, []string{"bob"}); err != nil {
+	if err := c.EditIssueAssignees(t.Context(), "octo/hello", 3, []string{"alice"}, []string{"bob"}); err != nil {
 		t.Fatalf("EditIssueAssignees: %v", err)
 	}
 	wantArgs := []string{"issue", "edit", "3", "--add-assignee", "alice", "--remove-assignee", "bob", "--repo", "octo/hello"}
@@ -293,7 +293,7 @@ func TestEditIssueAssigneesWithRepoOverride(t *testing.T) {
 func TestEditItemsError(t *testing.T) {
 	wantErr := errors.New("gh pr: HTTP 403 forbidden")
 	c, _ := newTestClient("", wantErr)
-	if err := c.EditPRLabels("", 12, []string{"bug"}, nil); !errors.Is(err, wantErr) {
+	if err := c.EditPRLabels(t.Context(), "", 12, []string{"bug"}, nil); !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v", err, wantErr)
 	}
 }
@@ -501,23 +501,31 @@ func TestACancelledReadIsNotAskedAgain(t *testing.T) {
 // applied the change. Asking again could apply it twice.
 func TestWritesAreNeverAskedAgain(t *testing.T) {
 	writes := map[string]func(*Client) error{
-		"AddPRComment":       func(c *Client) error { return c.AddPRComment("kukv/demo", 1, "hi") },
-		"AddIssueComment":    func(c *Client) error { return c.AddIssueComment("kukv/demo", 1, "hi") },
-		"ClosePR":            func(c *Client) error { return c.ClosePR("kukv/demo", 1) },
-		"ReopenPR":           func(c *Client) error { return c.ReopenPR("kukv/demo", 1) },
-		"CloseIssue":         func(c *Client) error { return c.CloseIssue("kukv/demo", 1) },
-		"ReopenIssue":        func(c *Client) error { return c.ReopenIssue("kukv/demo", 1) },
-		"EditPRLabels":       func(c *Client) error { return c.EditPRLabels("kukv/demo", 1, []string{"bug"}, nil) },
-		"EditIssueLabels":    func(c *Client) error { return c.EditIssueLabels("kukv/demo", 1, []string{"bug"}, nil) },
-		"EditPRAssignees":    func(c *Client) error { return c.EditPRAssignees("kukv/demo", 1, []string{"kukv"}, nil) },
-		"EditIssueAssignees": func(c *Client) error { return c.EditIssueAssignees("kukv/demo", 1, []string{"kukv"}, nil) },
-		"MergePR":            func(c *Client) error { return c.MergePR("id", gql.MergeMethodSquash) },
-		"EnableAutoMerge":    func(c *Client) error { return c.EnableAutoMerge("id", gql.MergeMethodSquash) },
-		"DisableAutoMerge":   func(c *Client) error { return c.DisableAutoMerge("id") },
-		"AddReviewThread":    func(c *Client) error { return c.AddReviewThread("id", gql.PendingComment{}) },
-		"SubmitReview":       func(c *Client) error { return c.SubmitReview("id", gql.EventApprove, "") },
-		"SubmitNewReview":    func(c *Client) error { return c.SubmitNewReview("id", gql.EventApprove, "") },
-		"DiscardReview":      func(c *Client) error { return c.DiscardReview("id") },
+		"AddPRComment":    func(c *Client) error { return c.AddPRComment(context.Background(), "kukv/demo", 1, "hi") },
+		"AddIssueComment": func(c *Client) error { return c.AddIssueComment(context.Background(), "kukv/demo", 1, "hi") },
+		"ClosePR":         func(c *Client) error { return c.ClosePR(context.Background(), "kukv/demo", 1) },
+		"ReopenPR":        func(c *Client) error { return c.ReopenPR(context.Background(), "kukv/demo", 1) },
+		"CloseIssue":      func(c *Client) error { return c.CloseIssue(context.Background(), "kukv/demo", 1) },
+		"ReopenIssue":     func(c *Client) error { return c.ReopenIssue(context.Background(), "kukv/demo", 1) },
+		"EditPRLabels": func(c *Client) error {
+			return c.EditPRLabels(context.Background(), "kukv/demo", 1, []string{"bug"}, nil)
+		},
+		"EditIssueLabels": func(c *Client) error {
+			return c.EditIssueLabels(context.Background(), "kukv/demo", 1, []string{"bug"}, nil)
+		},
+		"EditPRAssignees": func(c *Client) error {
+			return c.EditPRAssignees(context.Background(), "kukv/demo", 1, []string{"kukv"}, nil)
+		},
+		"EditIssueAssignees": func(c *Client) error {
+			return c.EditIssueAssignees(context.Background(), "kukv/demo", 1, []string{"kukv"}, nil)
+		},
+		"MergePR":          func(c *Client) error { return c.MergePR("id", gql.MergeMethodSquash) },
+		"EnableAutoMerge":  func(c *Client) error { return c.EnableAutoMerge("id", gql.MergeMethodSquash) },
+		"DisableAutoMerge": func(c *Client) error { return c.DisableAutoMerge("id") },
+		"AddReviewThread":  func(c *Client) error { return c.AddReviewThread("id", gql.PendingComment{}) },
+		"SubmitReview":     func(c *Client) error { return c.SubmitReview("id", gql.EventApprove, "") },
+		"SubmitNewReview":  func(c *Client) error { return c.SubmitNewReview("id", gql.EventApprove, "") },
+		"DiscardReview":    func(c *Client) error { return c.DiscardReview("id") },
 		"RerunWorkflow": func(c *Client) error {
 			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), github.RerunFailed)
 		},

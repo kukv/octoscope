@@ -38,16 +38,16 @@ type fakeBackend struct {
 	searchItems     func(ctx context.Context, query string) ([]gql.SearchItem, error)
 	repoCounts      func(ctx context.Context, repos []string) ([]gql.RepoCount, error)
 
-	addPRComment       func(repo string, number int, body string) error
-	addIssueComment    func(repo string, number int, body string) error
-	closePR            func(repo string, number int) error
-	reopenPR           func(repo string, number int) error
-	closeIssue         func(repo string, number int) error
-	reopenIssue        func(repo string, number int) error
-	editPRLabels       func(repo string, number int, add, remove []string) error
-	editIssueLabels    func(repo string, number int, add, remove []string) error
-	editPRAssignees    func(repo string, number int, add, remove []string) error
-	editIssueAssignees func(repo string, number int, add, remove []string) error
+	addPRComment       func(ctx context.Context, repo string, number int, body string) error
+	addIssueComment    func(ctx context.Context, repo string, number int, body string) error
+	closePR            func(ctx context.Context, repo string, number int) error
+	reopenPR           func(ctx context.Context, repo string, number int) error
+	closeIssue         func(ctx context.Context, repo string, number int) error
+	reopenIssue        func(ctx context.Context, repo string, number int) error
+	editPRLabels       func(ctx context.Context, repo string, number int, add, remove []string) error
+	editIssueLabels    func(ctx context.Context, repo string, number int, add, remove []string) error
+	editPRAssignees    func(ctx context.Context, repo string, number int, add, remove []string) error
+	editIssueAssignees func(ctx context.Context, repo string, number int, add, remove []string) error
 
 	discardReview    func(reviewID string) error
 	disableAutoMerge func(pullRequestID string) error
@@ -61,28 +61,28 @@ func (f fakeBackend) GetIssue(ctx context.Context, repo string, number int) (gql
 	return f.getIssue(ctx, repo, number)
 }
 
-func (f fakeBackend) AddPRComment(repo string, number int, body string) error {
-	return f.addPRComment(repo, number, body)
+func (f fakeBackend) AddPRComment(ctx context.Context, repo string, number int, body string) error {
+	return f.addPRComment(ctx, repo, number, body)
 }
 
-func (f fakeBackend) AddIssueComment(repo string, number int, body string) error {
-	return f.addIssueComment(repo, number, body)
+func (f fakeBackend) AddIssueComment(ctx context.Context, repo string, number int, body string) error {
+	return f.addIssueComment(ctx, repo, number, body)
 }
 
-func (f fakeBackend) ClosePR(repo string, number int) error {
-	return f.closePR(repo, number)
+func (f fakeBackend) ClosePR(ctx context.Context, repo string, number int) error {
+	return f.closePR(ctx, repo, number)
 }
 
-func (f fakeBackend) ReopenPR(repo string, number int) error {
-	return f.reopenPR(repo, number)
+func (f fakeBackend) ReopenPR(ctx context.Context, repo string, number int) error {
+	return f.reopenPR(ctx, repo, number)
 }
 
-func (f fakeBackend) CloseIssue(repo string, number int) error {
-	return f.closeIssue(repo, number)
+func (f fakeBackend) CloseIssue(ctx context.Context, repo string, number int) error {
+	return f.closeIssue(ctx, repo, number)
 }
 
-func (f fakeBackend) ReopenIssue(repo string, number int) error {
-	return f.reopenIssue(repo, number)
+func (f fakeBackend) ReopenIssue(ctx context.Context, repo string, number int) error {
+	return f.reopenIssue(ctx, repo, number)
 }
 
 func (f fakeBackend) DiscardReview(reviewID string) error {
@@ -93,20 +93,20 @@ func (f fakeBackend) DisableAutoMerge(pullRequestID string) error {
 	return f.disableAutoMerge(pullRequestID)
 }
 
-func (f fakeBackend) EditPRLabels(repo string, number int, add, remove []string) error {
-	return f.editPRLabels(repo, number, add, remove)
+func (f fakeBackend) EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error {
+	return f.editPRLabels(ctx, repo, number, add, remove)
 }
 
-func (f fakeBackend) EditIssueLabels(repo string, number int, add, remove []string) error {
-	return f.editIssueLabels(repo, number, add, remove)
+func (f fakeBackend) EditIssueLabels(ctx context.Context, repo string, number int, add, remove []string) error {
+	return f.editIssueLabels(ctx, repo, number, add, remove)
 }
 
-func (f fakeBackend) EditPRAssignees(repo string, number int, add, remove []string) error {
-	return f.editPRAssignees(repo, number, add, remove)
+func (f fakeBackend) EditPRAssignees(ctx context.Context, repo string, number int, add, remove []string) error {
+	return f.editPRAssignees(ctx, repo, number, add, remove)
 }
 
-func (f fakeBackend) EditIssueAssignees(repo string, number int, add, remove []string) error {
-	return f.editIssueAssignees(repo, number, add, remove)
+func (f fakeBackend) EditIssueAssignees(ctx context.Context, repo string, number int, add, remove []string) error {
+	return f.editIssueAssignees(ctx, repo, number, add, remove)
 }
 
 // TestGetItemTranslatesTheWireShapeIntoTheDomain gives every field of

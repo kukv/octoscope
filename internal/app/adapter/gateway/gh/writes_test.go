@@ -19,6 +19,78 @@ func issueRef() domain.ItemRef {
 	return domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 9}
 }
 
+// TestTheWritesHandTheirContextToTheBackend is what the ctx in these
+// signatures is for. It used to stop at the gateway (writes.go carried a
+// "_ = ctx") because the clients made their own at the leaf; a write that
+// quietly dropped it again would leave the whole chain undone with nothing
+// to notice.
+func TestTheWritesHandTheirContextToTheBackend(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey struct{}
+	want := context.WithValue(context.Background(), ctxKey{}, "the caller's")
+
+	tests := []struct {
+		name string
+		call func(g *Gateway, ctx context.Context) error
+		fake func(got *context.Context) fakeBackend
+	}{
+		{
+			name: "AddComment",
+			call: func(g *Gateway, ctx context.Context) error { return g.AddComment(ctx, prRef(), "hi") },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{addPRComment: func(ctx context.Context, _ string, _ int, _ string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "SetState",
+			call: func(g *Gateway, ctx context.Context) error { return g.SetState(ctx, prRef(), true) },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{closePR: func(ctx context.Context, _ string, _ int) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "EditLabels",
+			call: func(g *Gateway, ctx context.Context) error { return g.EditLabels(ctx, prRef(), nil, nil) },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{editPRLabels: func(ctx context.Context, _ string, _ int, _, _ []string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "EditAssignees",
+			call: func(g *Gateway, ctx context.Context) error { return g.EditAssignees(ctx, prRef(), nil, nil) },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{editPRAssignees: func(ctx context.Context, _ string, _ int, _, _ []string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			var got context.Context
+			if err := c.call(New(c.fake(&got)), want); err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			if got != want {
+				t.Errorf("the backend was handed %v, not the context the caller passed", got)
+			}
+		})
+	}
+}
+
 // TestAddCommentPicksTheCallByKind is the dispatch that used to live in the
 // usecase layer. The fake leaves the other call unset, so reaching for it
 // panics rather than passing quietly.
@@ -28,7 +100,7 @@ func TestAddCommentPicksTheCallByKind(t *testing.T) {
 		t.Parallel()
 		var gotRepo, gotBody string
 		var gotNumber int
-		b := fakeBackend{addPRComment: func(repo string, number int, body string) error {
+		b := fakeBackend{addPRComment: func(_ context.Context, repo string, number int, body string) error {
 			gotRepo, gotNumber, gotBody = repo, number, body
 			return nil
 		}}
@@ -43,7 +115,7 @@ func TestAddCommentPicksTheCallByKind(t *testing.T) {
 		t.Parallel()
 		var gotRepo, gotBody string
 		var gotNumber int
-		b := fakeBackend{addIssueComment: func(repo string, number int, body string) error {
+		b := fakeBackend{addIssueComment: func(_ context.Context, repo string, number int, body string) error {
 			gotRepo, gotNumber, gotBody = repo, number, body
 			return nil
 		}}
@@ -70,25 +142,25 @@ func TestSetStatePicksTheCallByKindAndDirection(t *testing.T) {
 		{
 			name: "close a pull request", ref: prRef(), closing: true, want: "ClosePR",
 			set: func(called *string) fakeBackend {
-				return fakeBackend{closePR: func(string, int) error { *called = "ClosePR"; return nil }}
+				return fakeBackend{closePR: func(context.Context, string, int) error { *called = "ClosePR"; return nil }}
 			},
 		},
 		{
 			name: "reopen a pull request", ref: prRef(), closing: false, want: "ReopenPR",
 			set: func(called *string) fakeBackend {
-				return fakeBackend{reopenPR: func(string, int) error { *called = "ReopenPR"; return nil }}
+				return fakeBackend{reopenPR: func(context.Context, string, int) error { *called = "ReopenPR"; return nil }}
 			},
 		},
 		{
 			name: "close an issue", ref: issueRef(), closing: true, want: "CloseIssue",
 			set: func(called *string) fakeBackend {
-				return fakeBackend{closeIssue: func(string, int) error { *called = "CloseIssue"; return nil }}
+				return fakeBackend{closeIssue: func(context.Context, string, int) error { *called = "CloseIssue"; return nil }}
 			},
 		},
 		{
 			name: "reopen an issue", ref: issueRef(), closing: false, want: "ReopenIssue",
 			set: func(called *string) fakeBackend {
-				return fakeBackend{reopenIssue: func(string, int) error { *called = "ReopenIssue"; return nil }}
+				return fakeBackend{reopenIssue: func(context.Context, string, int) error { *called = "ReopenIssue"; return nil }}
 			},
 		},
 	}
@@ -113,7 +185,7 @@ func TestEditLabelsPicksTheCallByKind(t *testing.T) {
 	t.Run("pull request", func(t *testing.T) {
 		t.Parallel()
 		var add, remove []string
-		b := fakeBackend{editPRLabels: func(_ string, _ int, a, r []string) error {
+		b := fakeBackend{editPRLabels: func(_ context.Context, _ string, _ int, a, r []string) error {
 			add, remove = a, r
 			return nil
 		}}
@@ -127,7 +199,7 @@ func TestEditLabelsPicksTheCallByKind(t *testing.T) {
 	t.Run("issue", func(t *testing.T) {
 		t.Parallel()
 		var called bool
-		b := fakeBackend{editIssueLabels: func(string, int, []string, []string) error {
+		b := fakeBackend{editIssueLabels: func(context.Context, string, int, []string, []string) error {
 			called = true
 			return nil
 		}}
@@ -145,7 +217,7 @@ func TestEditAssigneesPicksTheCallByKind(t *testing.T) {
 	t.Run("pull request", func(t *testing.T) {
 		t.Parallel()
 		var add, remove []string
-		b := fakeBackend{editPRAssignees: func(_ string, _ int, a, r []string) error {
+		b := fakeBackend{editPRAssignees: func(_ context.Context, _ string, _ int, a, r []string) error {
 			add, remove = a, r
 			return nil
 		}}
@@ -159,7 +231,7 @@ func TestEditAssigneesPicksTheCallByKind(t *testing.T) {
 	t.Run("issue", func(t *testing.T) {
 		t.Parallel()
 		var called bool
-		b := fakeBackend{editIssueAssignees: func(string, int, []string, []string) error {
+		b := fakeBackend{editIssueAssignees: func(context.Context, string, int, []string, []string) error {
 			called = true
 			return nil
 		}}
@@ -177,7 +249,7 @@ func TestEditAssigneesPicksTheCallByKind(t *testing.T) {
 // keeps its own text, so what reaches the screen is unchanged.
 func TestAddCommentKeepsWhatTheClientSaid(t *testing.T) {
 	t.Parallel()
-	b := fakeBackend{addPRComment: func(string, int, string) error {
+	b := fakeBackend{addPRComment: func(context.Context, string, int, string) error {
 		return fmt.Errorf("gh: %w", github.ErrUnauthenticated)
 	}}
 	err := New(b).AddComment(context.Background(), prRef(), "hello")

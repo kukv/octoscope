@@ -137,33 +137,33 @@ func (c *Client) RepoName(ctx context.Context) (string, error) {
 	return c.Client.RepoName(ctx, c.repo)
 }
 
-func (c *Client) AddPRComment(repo string, number int, body string) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"pr", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
+func (c *Client) AddPRComment(ctx context.Context, repo string, number int, body string) error {
+	_, err := c.run(ctx, c.dir, appendRepo([]string{"pr", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
 	return err
 }
 
-func (c *Client) AddIssueComment(repo string, number int, body string) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"issue", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
+func (c *Client) AddIssueComment(ctx context.Context, repo string, number int, body string) error {
+	_, err := c.run(ctx, c.dir, appendRepo([]string{"issue", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
 	return err
 }
 
-func (c *Client) ClosePR(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"pr", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+func (c *Client) ClosePR(ctx context.Context, repo string, number int) error {
+	_, err := c.run(ctx, c.dir, appendRepo([]string{"pr", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
-func (c *Client) ReopenPR(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"pr", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+func (c *Client) ReopenPR(ctx context.Context, repo string, number int) error {
+	_, err := c.run(ctx, c.dir, appendRepo([]string{"pr", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
-func (c *Client) CloseIssue(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"issue", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+func (c *Client) CloseIssue(ctx context.Context, repo string, number int) error {
+	_, err := c.run(ctx, c.dir, appendRepo([]string{"issue", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
-func (c *Client) ReopenIssue(repo string, number int) error {
-	_, err := c.run(context.Background(), c.dir, appendRepo([]string{"issue", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+func (c *Client) ReopenIssue(ctx context.Context, repo string, number int) error {
+	_, err := c.run(ctx, c.dir, appendRepo([]string{"issue", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
@@ -207,7 +207,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	return logins, nil
 }
 
-func (c *Client) editItems(kindCmd, repo string, number int, add, remove []string, addFlag, removeFlag string) error {
+func (c *Client) editItems(ctx context.Context, kindCmd, repo string, number int, add, remove []string, addFlag, removeFlag string) error {
 	args := []string{kindCmd, "edit", strconv.Itoa(number)}
 	for _, v := range add {
 		args = append(args, addFlag, v)
@@ -215,24 +215,24 @@ func (c *Client) editItems(kindCmd, repo string, number int, add, remove []strin
 	for _, v := range remove {
 		args = append(args, removeFlag, v)
 	}
-	_, err := c.run(context.Background(), c.dir, appendRepo(args, c.effectiveRepo(repo))...)
+	_, err := c.run(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
 	return err
 }
 
-func (c *Client) EditPRLabels(repo string, number int, add, remove []string) error {
-	return c.editItems("pr", repo, number, add, remove, "--add-label", "--remove-label")
+func (c *Client) EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error {
+	return c.editItems(ctx, "pr", repo, number, add, remove, "--add-label", "--remove-label")
 }
 
-func (c *Client) EditIssueLabels(repo string, number int, add, remove []string) error {
-	return c.editItems("issue", repo, number, add, remove, "--add-label", "--remove-label")
+func (c *Client) EditIssueLabels(ctx context.Context, repo string, number int, add, remove []string) error {
+	return c.editItems(ctx, "issue", repo, number, add, remove, "--add-label", "--remove-label")
 }
 
-func (c *Client) EditPRAssignees(repo string, number int, add, remove []string) error {
-	return c.editItems("pr", repo, number, add, remove, "--add-assignee", "--remove-assignee")
+func (c *Client) EditPRAssignees(ctx context.Context, repo string, number int, add, remove []string) error {
+	return c.editItems(ctx, "pr", repo, number, add, remove, "--add-assignee", "--remove-assignee")
 }
 
-func (c *Client) EditIssueAssignees(repo string, number int, add, remove []string) error {
-	return c.editItems("issue", repo, number, add, remove, "--add-assignee", "--remove-assignee")
+func (c *Client) EditIssueAssignees(ctx context.Context, repo string, number int, add, remove []string) error {
+	return c.editItems(ctx, "issue", repo, number, add, remove, "--add-assignee", "--remove-assignee")
 }
 
 // ghArgs spells one document and its variables the way gh api graphql takes
