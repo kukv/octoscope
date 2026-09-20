@@ -418,6 +418,11 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 **成功条件:** `make check` と `make release-check`。golden 無変更。
 
+**完了: 2026-09-20。** 変換ヘルパー 6 つ（`prItem` `issueItem` `itemFromPR` `itemFromIssue`
+`itemsFromPRs` `itemsFromIssues`）も消えた——フィクスチャが最初からビューに渡る形になった以上、
+変換するものが無い。`detail` では同じリテラルが 57 回繰り返されていたので、
+`firstPR()` / `labelledPR()` の 2 つのビルダーにまとめた。
+
 ## 9. 完了条件
 
 - `domain/domain.go` が存在せず、`domain` と `usecase` が §4.4 のファイル構成になっている
@@ -431,6 +436,16 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 - golden 354 枚と `testdata/` 全体が無変更
 - `make check` / `make release-check` が通る
 - `.claude/rules/architecture.md` の 3 節が更新済み
+
+**2026-09-20 に全部満たした。** 実測値は次のとおり。
+
+| 条件 | 実測 |
+|---|---|
+| `domain.PR` / `domain.Issue` | リポジトリ全体で 0 参照 |
+| `usecase.Item` | 0 参照 |
+| `internal/app/usecase` の `ItemKind` 分岐（非テスト） | 0 箇所 |
+| `domain` / `usecase` の非テスト最大ファイル | `domain/diff_parse.go` 171 行 |
+| golden | 354 枚と `testdata/` 全体が無変更 |
 
 ## 10. この設計が DDD として何をしているか
 
