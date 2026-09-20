@@ -56,11 +56,22 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	t.Helper()
 	size := tea.WindowSizeMsg{Width: width, Height: 40}
 	f := &fakeSource{
-		pr:        domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen, Body: overlongBody},
+		pr: domain.Item{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:  overlongTitle,
+			State:  domain.StateOpen,
+			Body:   overlongBody,
+			Change: &domain.Change{},
+		},
 		labels:    []domain.Label{{Name: overlongLabel, Color: "ff0000"}},
 		reviewCtx: domain.ReviewContext{PullRequest: "PR_1"},
 	}
-	closed := &fakeSource{pr: domain.PR{Number: 2, Title: overlongTitle, State: domain.StateClosed}}
+	closed := &fakeSource{pr: domain.Item{
+		Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 2},
+		Title:  overlongTitle,
+		State:  domain.StateClosed,
+		Change: &domain.Change{},
+	}}
 
 	sized := func(m Model) Model {
 		m, _ = m.Update(size)
@@ -74,7 +85,12 @@ func renderEveryScreenSized(t *testing.T, width int) map[string]string {
 	submit, _ := opening.Update(cmd())
 
 	reviewErrSrc := &fakeSource{
-		pr:        domain.PR{Number: 1, Title: overlongTitle, State: domain.StateOpen},
+		pr: domain.Item{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+			Title:  overlongTitle,
+			State:  domain.StateOpen,
+			Change: &domain.Change{},
+		},
 		reviewErr: errors.New(overlongTitle),
 	}
 	reviewErrDetail := sized(loaded(reviewErrSrc, prRef()))
@@ -168,9 +184,13 @@ func TestTheNewMetaKeysResolve(t *testing.T) {
 // TestTheViewSplitsInTwoWhenItCan covers the threshold: the rule between the
 // panes is what tells the two layouts apart.
 func TestTheViewSplitsInTwoWhenItCan(t *testing.T) {
-	f := &fakeSource{pr: domain.PR{
-		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
-		State: domain.StateOpen, Body: "the description",
+	f := &fakeSource{pr: domain.Item{
+		Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 12},
+		Title:  "a pr",
+		Author: domain.Author{Login: "kukv"},
+		State:  domain.StateOpen,
+		Body:   "the description",
+		Change: &domain.Change{},
 	}}
 
 	for _, tc := range []struct {
@@ -199,12 +219,21 @@ func TestTheViewSplitsInTwoWhenItCan(t *testing.T) {
 // TestTheSingleColumnKeepsEveryFact is why the narrow layout joins the rows
 // rather than dropping them.
 func TestTheSingleColumnKeepsEveryFact(t *testing.T) {
-	pr := domain.PR{
-		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
-		State: domain.StateOpen, Review: domain.ReviewApproved, Body: "the description",
+	pr := domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 12},
+		Title:     "a pr",
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		Body:      "the description",
 		Assignees: []domain.Author{{Login: "alice"}},
-		Checks:    domain.Checks{Total: 2, Passed: 1, Failed: 1},
-		Head:      "feat/x", Base: "main", Additions: 218, Deletions: 31,
+		Change: &domain.Change{
+			Review:    domain.ReviewApproved,
+			Checks:    domain.Checks{Total: 2, Passed: 1, Failed: 1},
+			Head:      "feat/x",
+			Base:      "main",
+			Additions: 218,
+			Deletions: 31,
+		},
 	}
 	m := loaded(&fakeSource{pr: pr}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 12})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})

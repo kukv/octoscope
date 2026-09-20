@@ -15,10 +15,13 @@ func wheelDown() tea.MouseWheelMsg {
 
 // longPR has a body taller than the viewport: a wheel test against a body
 // that already fits proves nothing.
-func longPR() domain.PR {
-	return domain.PR{
-		Number: 1, Title: "a long one", State: domain.StateOpen,
-		Body: strings.Repeat("a paragraph of the description\n\n", 40),
+func longPR() domain.Item {
+	return domain.Item{
+		Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 1},
+		Title:  "a long one",
+		State:  domain.StateOpen,
+		Body:   strings.Repeat("a paragraph of the description\n\n", 40),
+		Change: &domain.Change{},
 	}
 }
 

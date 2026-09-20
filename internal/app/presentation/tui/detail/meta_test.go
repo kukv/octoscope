@@ -16,15 +16,24 @@ import (
 func metaAt() time.Time { return time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC) }
 
 func fullPRItem() domain.Item {
-	pr := domain.PR{
-		Number: 12, Title: "a pr", Author: domain.Author{Login: "kukv"},
-		State: domain.StateOpen, Review: domain.ReviewApproved, UpdatedAt: metaAt(),
+	pr := domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 12},
+		Title:     "a pr",
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		UpdatedAt: metaAt(),
 		Labels:    []domain.Label{{Name: "bug", Color: "d73a4a"}},
 		Assignees: []domain.Author{{Login: "alice"}},
-		Checks:    domain.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1},
-		Head:      "feat/x", Base: "main", Additions: 218, Deletions: 31,
+		Change: &domain.Change{
+			Review:    domain.ReviewApproved,
+			Checks:    domain.Checks{Total: 3, Passed: 1, Failed: 1, Running: 1},
+			Head:      "feat/x",
+			Base:      "main",
+			Additions: 218,
+			Deletions: 31,
+		},
 	}
-	return prItem(pr)
+	return pr
 }
 
 func fullRef() domain.ItemRef {
@@ -54,10 +63,13 @@ func TestAPullRequestGetsEveryRow(t *testing.T) {
 }
 
 func TestAnIssueHasNoPullRequestRows(t *testing.T) {
-	it := issueItem(domain.Issue{
-		Number: 7, Title: "an issue",
-		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen, UpdatedAt: metaAt(),
-	})
+	it := domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemIssue, Number: 7},
+		Title:     "an issue",
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		UpdatedAt: metaAt(),
+	}
 	ref := domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7}
 
 	for _, gone := range []string{"review", "checks", "branch", "changes"} {
@@ -72,11 +84,16 @@ func TestAnIssueHasNoPullRequestRows(t *testing.T) {
 // TestAnEmptyValueTakesNoRow keeps the pane from drawing labels with nothing
 // after them.
 func TestAnEmptyValueTakesNoRow(t *testing.T) {
-	pr := domain.PR{
-		Number: 3, Author: domain.Author{Login: "kukv"}, State: domain.StateOpen,
-		Review: domain.ReviewNone, UpdatedAt: metaAt(),
+	pr := domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: 3},
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		UpdatedAt: metaAt(),
+		Change: &domain.Change{
+			Review: domain.ReviewNone,
+		},
 	}
-	it := prItem(pr)
+	it := pr
 
 	want := []string{"repository", "author", "state", "updated"}
 	got := labelsOf(metaRows(fullRef(), it))
@@ -198,10 +215,13 @@ func TestADraftSaysSoInItsState(t *testing.T) {
 		t.Errorf("the draft's state = %q, want %q", got, want)
 	}
 
-	issue := issueItem(domain.Issue{
-		Number: 7, Title: "an issue",
-		Author: domain.Author{Login: "kukv"}, State: domain.StateOpen, UpdatedAt: metaAt(),
-	})
+	issue := domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemIssue, Number: 7},
+		Title:     "an issue",
+		Author:    domain.Author{Login: "kukv"},
+		State:     domain.StateOpen,
+		UpdatedAt: metaAt(),
+	}
 	ref := domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 7}
 	if got := valueOf(metaRows(ref, issue), i18n.T("detail.meta.state")); got != i18n.T("state.open") {
 		t.Errorf("the issue's state = %q, want %q", got, i18n.T("state.open"))
