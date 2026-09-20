@@ -80,11 +80,54 @@ const (
 	ItemIssue
 )
 
-// ItemRef names one pull request or issue. Repo is "owner/name": both the
-// Work board and the Repos tab can open an item from another repository, so
-// the reference carries its own.
+// ItemRef is an Item's identity: which repository it is in, and which number
+// it has there. Repo is "owner/name", and the reference carries its own
+// because both the Work board and the Repos tab can open an item from
+// another repository.
+//
+// Kind is part of the identity rather than of the Item because a reference
+// is held before the Item is fetched -- a card on the Work board sends one
+// to open a view, and what it points at has to be known by then.
 type ItemRef struct {
 	Kind   ItemKind
 	Repo   string
 	Number int
+}
+
+// Item is one pull request or issue: the thing this application is about.
+// A view that does not care which of the two it has holds an Item; one that
+// does asks Ref.Kind, or reads Change.
+type Item struct {
+	Ref    ItemRef
+	Title  string
+	Author Author
+	State  ItemState
+	URL    string
+	// Body is the markdown the author wrote, which the detail view renders.
+	// BodyText is the same text with the markdown stripped, which the drawer
+	// previews. They come from different queries: a listed item carries only
+	// BodyText, and one fetched on its own only Body.
+	Body      string
+	BodyText  string
+	Comments  []Comment
+	Labels    []Label
+	Assignees []Author
+	UpdatedAt time.Time
+
+	// Change is the part only a pull request has: it proposes a change to the
+	// repository. It is non-nil if and only if Ref.Kind is ItemPR, which the
+	// gateway guarantees when it builds an Item.
+	Change *Change
+}
+
+// Change is what a pull request adds to an item: the branches it moves
+// between, how big it is, and what review and CI have said about it.
+type Change struct {
+	IsDraft   bool
+	Review    ReviewState
+	Head      string
+	Base      string
+	Additions int
+	Deletions int
+	Checks    Checks
 }

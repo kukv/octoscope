@@ -23,6 +23,8 @@ var exported = []any{
 	domain.PR{},
 	domain.Issue{},
 	domain.ItemRef{},
+	domain.Item{},
+	domain.Change{},
 	domain.CheckRun{},
 	domain.Checks{},
 	domain.WorkItem{},

@@ -37,6 +37,20 @@ type fakeBackend struct {
 	listOwnRepos    func(ctx context.Context, owner string, limit int) ([]github.Repository, error)
 	searchItems     func(ctx context.Context, query string) ([]gql.SearchItem, error)
 	repoCounts      func(ctx context.Context, repos []string) ([]gql.RepoCount, error)
+
+	addPRComment       func(repo string, number int, body string) error
+	addIssueComment    func(repo string, number int, body string) error
+	closePR            func(repo string, number int) error
+	reopenPR           func(repo string, number int) error
+	closeIssue         func(repo string, number int) error
+	reopenIssue        func(repo string, number int) error
+	editPRLabels       func(repo string, number int, add, remove []string) error
+	editIssueLabels    func(repo string, number int, add, remove []string) error
+	editPRAssignees    func(repo string, number int, add, remove []string) error
+	editIssueAssignees func(repo string, number int, add, remove []string) error
+
+	discardReview    func(reviewID string) error
+	disableAutoMerge func(pullRequestID string) error
 }
 
 func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error) {
@@ -45,6 +59,54 @@ func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.Pu
 
 func (f fakeBackend) GetIssue(ctx context.Context, repo string, number int) (gql.Issue, error) {
 	return f.getIssue(ctx, repo, number)
+}
+
+func (f fakeBackend) AddPRComment(repo string, number int, body string) error {
+	return f.addPRComment(repo, number, body)
+}
+
+func (f fakeBackend) AddIssueComment(repo string, number int, body string) error {
+	return f.addIssueComment(repo, number, body)
+}
+
+func (f fakeBackend) ClosePR(repo string, number int) error {
+	return f.closePR(repo, number)
+}
+
+func (f fakeBackend) ReopenPR(repo string, number int) error {
+	return f.reopenPR(repo, number)
+}
+
+func (f fakeBackend) CloseIssue(repo string, number int) error {
+	return f.closeIssue(repo, number)
+}
+
+func (f fakeBackend) ReopenIssue(repo string, number int) error {
+	return f.reopenIssue(repo, number)
+}
+
+func (f fakeBackend) DiscardReview(reviewID string) error {
+	return f.discardReview(reviewID)
+}
+
+func (f fakeBackend) DisableAutoMerge(pullRequestID string) error {
+	return f.disableAutoMerge(pullRequestID)
+}
+
+func (f fakeBackend) EditPRLabels(repo string, number int, add, remove []string) error {
+	return f.editPRLabels(repo, number, add, remove)
+}
+
+func (f fakeBackend) EditIssueLabels(repo string, number int, add, remove []string) error {
+	return f.editIssueLabels(repo, number, add, remove)
+}
+
+func (f fakeBackend) EditPRAssignees(repo string, number int, add, remove []string) error {
+	return f.editPRAssignees(repo, number, add, remove)
+}
+
+func (f fakeBackend) EditIssueAssignees(repo string, number int, add, remove []string) error {
+	return f.editIssueAssignees(repo, number, add, remove)
 }
 
 // TestGetPRTranslatesTheWireShapeIntoTheDomain gives every field of
@@ -210,6 +272,179 @@ func TestGetIssueTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	}
 }
 
+// TestGetItemTranslatesTheWireShapeIntoTheDomain gives every field of
+// gql.PullRequest and of gql.Issue a distinct, non-zero value and compares
+// the whole resulting domain.Item against a fully written-out expectation,
+// for the same reason as TestGetPRTranslatesTheWireShapeIntoTheDomain above:
+// a field toItemFromPR or toItemFromIssue forgot to copy is left at its zero
+// value, which a struct-wide comparison catches and a handful of field
+// assertions would not. The issue case's struct-wide comparison also covers
+// Change staying nil.
+func TestGetItemTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
+	t.Parallel()
+
+	t.Run("pull request", func(t *testing.T) {
+		t.Parallel()
+
+		updatedAt := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+		commentedAt := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+
+		node := gql.PullRequest{
+			Number:         59,
+			Title:          "add the gateway",
+			State:          "OPEN",
+			URL:            "https://github.com/kukv/octoscope/pull/59",
+			IsDraft:        true,
+			UpdatedAt:      updatedAt,
+			ReviewDecision: "APPROVED",
+			HeadRefName:    "refactor/pr2b-gateway",
+			BaseRefName:    "main",
+			Additions:      42,
+			Deletions:      7,
+			Body:           "this adds the gateway",
+			BodyText:       "this adds the gateway (text)",
+			Author:         gql.Author{Login: "kukv"},
+		}
+		node.Labels.Nodes = []gql.Label{
+			{Name: "bug", Color: "d73a4a"},
+			{Name: "wip", Color: "ededed"},
+		}
+		node.Assignees.Nodes = []gql.Author{
+			{Login: "octocat"},
+			{Login: "reviewer"},
+		}
+		node.Comments.Nodes = []gql.Comment{
+			{Author: gql.Author{Login: "octocat"}, Body: "lgtm", CreatedAt: commentedAt},
+		}
+		// node.Commits.Nodes is an anonymous struct too deeply nested to build
+		// field by field, so it is filled the way the real client fills it: by
+		// decoding it out of JSON in the shape the roll-up query returns.
+		const commits = `[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+			{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS"},
+			{"__typename":"StatusContext","context":"ci/deploy","state":"FAILURE"}
+		]}}}}]`
+		if err := json.Unmarshal([]byte(commits), &node.Commits.Nodes); err != nil {
+			t.Fatalf("build commits fixture: %v", err)
+		}
+
+		g := New(fakeBackend{getPR: func(context.Context, string, int) (gql.PullRequest, error) {
+			return node, nil
+		}})
+
+		item, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 59})
+		if err != nil {
+			t.Fatalf("GetItem: %v", err)
+		}
+
+		want := domain.Item{
+			Ref:      domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 59},
+			Title:    "add the gateway",
+			Author:   domain.Author{Login: "kukv"},
+			State:    domain.StateOpen,
+			URL:      "https://github.com/kukv/octoscope/pull/59",
+			Body:     "this adds the gateway",
+			BodyText: "this adds the gateway (text)",
+			Comments: []domain.Comment{
+				{Author: domain.Author{Login: "octocat"}, Body: "lgtm", CreatedAt: commentedAt},
+			},
+			Labels: []domain.Label{
+				{Name: "bug", Color: "d73a4a"},
+				{Name: "wip", Color: "ededed"},
+			},
+			Assignees: []domain.Author{
+				{Login: "octocat"},
+				{Login: "reviewer"},
+			},
+			UpdatedAt: updatedAt,
+			Change: &domain.Change{
+				IsDraft:   true,
+				Review:    domain.ReviewApproved,
+				Head:      "refactor/pr2b-gateway",
+				Base:      "main",
+				Additions: 42,
+				Deletions: 7,
+				Checks: domain.Checks{
+					Total:  2,
+					Passed: 1,
+					Failed: 1,
+					State:  domain.CheckFailure,
+					Runs: []domain.CheckRun{
+						{Name: "build", State: domain.CheckSuccess, Kind: domain.CheckKindRun},
+						{Name: "ci/deploy", State: domain.CheckFailure, Kind: domain.CheckKindStatus},
+					},
+				},
+			},
+		}
+		if !reflect.DeepEqual(item, want) {
+			t.Errorf("GetItem() = %+v, want %+v", item, want)
+		}
+	})
+
+	t.Run("issue", func(t *testing.T) {
+		t.Parallel()
+
+		updatedAt := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+		commentedAt := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+
+		node := gql.Issue{
+			Number:    54,
+			Title:     "track the conversion",
+			State:     "CLOSED",
+			URL:       "https://github.com/kukv/octoscope/issues/54",
+			UpdatedAt: updatedAt,
+			Body:      "conversion tests only check a handful of fields",
+			BodyText:  "conversion tests only check a handful of fields (text)",
+			Author:    gql.Author{Login: "kukv"},
+		}
+		node.Labels.Nodes = []gql.Label{
+			{Name: "docs", Color: "0075ca"},
+			{Name: "wip", Color: "ededed"},
+		}
+		node.Assignees.Nodes = []gql.Author{
+			{Login: "octocat"},
+			{Login: "reviewer"},
+		}
+		node.Comments.Nodes = []gql.Comment{
+			{Author: gql.Author{Login: "octocat"}, Body: "done", CreatedAt: commentedAt},
+		}
+
+		g := New(fakeBackend{getIssue: func(context.Context, string, int) (gql.Issue, error) {
+			return node, nil
+		}})
+
+		item, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 54})
+		if err != nil {
+			t.Fatalf("GetItem: %v", err)
+		}
+
+		want := domain.Item{
+			Ref:      domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 54},
+			Title:    "track the conversion",
+			Author:   domain.Author{Login: "kukv"},
+			State:    domain.StateClosed,
+			URL:      "https://github.com/kukv/octoscope/issues/54",
+			Body:     "conversion tests only check a handful of fields",
+			BodyText: "conversion tests only check a handful of fields (text)",
+			Comments: []domain.Comment{
+				{Author: domain.Author{Login: "octocat"}, Body: "done", CreatedAt: commentedAt},
+			},
+			Labels: []domain.Label{
+				{Name: "docs", Color: "0075ca"},
+				{Name: "wip", Color: "ededed"},
+			},
+			Assignees: []domain.Author{
+				{Login: "octocat"},
+				{Login: "reviewer"},
+			},
+			UpdatedAt: updatedAt,
+			Change:    nil,
+		}
+		if !reflect.DeepEqual(item, want) {
+			t.Errorf("GetItem() = %+v, want %+v", item, want)
+		}
+	})
+}
+
 func TestParseItemState(t *testing.T) {
 	t.Parallel()
 
@@ -252,5 +487,56 @@ func TestParseReviewDecision(t *testing.T) {
 		if got := parseReviewDecision(tt.decision); got != tt.want {
 			t.Errorf("%q: got %v, want %v", tt.decision, got, tt.want)
 		}
+	}
+}
+
+// TestGetItemKeepsChangeAndKindInStep is the invariant domain.Item's doc
+// states: Change is non-nil exactly when the reference says ItemPR. The
+// gateway is what guarantees it, because the gateway is what builds an Item.
+func TestGetItemKeepsChangeAndKindInStep(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		ref        domain.ItemRef
+		backend    fakeBackend
+		wantKind   domain.ItemKind
+		wantChange bool
+	}{
+		{
+			name: "a pull request has a change",
+			ref:  domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 7},
+			backend: fakeBackend{getPR: func(context.Context, string, int) (gql.PullRequest, error) {
+				return gql.PullRequest{Number: 7, HeadRefName: "topic", BaseRefName: "main"}, nil
+			}},
+			wantKind:   domain.ItemPR,
+			wantChange: true,
+		},
+		{
+			name: "an issue has none",
+			ref:  domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 9},
+			backend: fakeBackend{getIssue: func(context.Context, string, int) (gql.Issue, error) {
+				return gql.Issue{Number: 9}, nil
+			}},
+			wantKind:   domain.ItemIssue,
+			wantChange: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := New(tt.backend).GetItem(context.Background(), tt.ref)
+			if err != nil {
+				t.Fatalf("GetItem: %v", err)
+			}
+			if got.Ref.Kind != tt.wantKind {
+				t.Errorf("Ref.Kind = %v, want %v", got.Ref.Kind, tt.wantKind)
+			}
+			if (got.Change != nil) != tt.wantChange {
+				t.Errorf("Change != nil = %v, want %v", got.Change != nil, tt.wantChange)
+			}
+			if got.Ref != tt.ref {
+				t.Errorf("Ref = %+v, want %+v", got.Ref, tt.ref)
+			}
+		})
 	}
 }

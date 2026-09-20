@@ -26,6 +26,32 @@ func (g *Gateway) GetIssue(ctx context.Context, repo string, number int) (domain
 	return toIssue(n), nil
 }
 
+// GetItem returns whichever of the two the reference names, with its body and
+// conversation. Which of GitHub's two queries that takes is this layer's
+// knowledge: nothing above it switches on the kind.
+func (g *Gateway) GetItem(ctx context.Context, ref domain.ItemRef) (domain.Item, error) {
+	if ref.Kind == domain.ItemPR {
+		return g.getPRItem(ctx, ref.Repo, ref.Number)
+	}
+	return g.getIssueItem(ctx, ref.Repo, ref.Number)
+}
+
+func (g *Gateway) getPRItem(ctx context.Context, repo string, number int) (domain.Item, error) {
+	n, err := g.backend.GetPR(ctx, repo, number)
+	if err != nil {
+		return domain.Item{}, wrap(err)
+	}
+	return toItemFromPR(n, repo), nil
+}
+
+func (g *Gateway) getIssueItem(ctx context.Context, repo string, number int) (domain.Item, error) {
+	n, err := g.backend.GetIssue(ctx, repo, number)
+	if err != nil {
+		return domain.Item{}, wrap(err)
+	}
+	return toItemFromIssue(n, repo), nil
+}
+
 func toPR(n gql.PullRequest) domain.PR {
 	return domain.PR{
 		Number:    n.Number,
@@ -62,6 +88,52 @@ func toIssue(n gql.Issue) domain.Issue {
 		Comments:  toComments(n.Comments.Nodes),
 		Labels:    toLabels(n.Labels.Nodes),
 		Assignees: toAuthors(n.Assignees.Nodes),
+	}
+}
+
+// toItemFromPR builds the domain's Item out of a pull request. Change is
+// always set here: that is the half of domain.Item's invariant this function
+// owns, and toItemFromIssue owns the other.
+func toItemFromPR(n gql.PullRequest, repo string) domain.Item {
+	return domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: repo, Number: n.Number},
+		Title:     n.Title,
+		Author:    domain.Author{Login: n.Author.Login},
+		State:     parseItemState(n.State),
+		URL:       n.URL,
+		Body:      n.Body,
+		BodyText:  n.BodyText,
+		Comments:  toComments(n.Comments.Nodes),
+		Labels:    toLabels(n.Labels.Nodes),
+		Assignees: toAuthors(n.Assignees.Nodes),
+		UpdatedAt: n.UpdatedAt,
+		Change: &domain.Change{
+			IsDraft:   n.IsDraft,
+			Review:    parseReviewDecision(n.ReviewDecision),
+			Head:      n.HeadRefName,
+			Base:      n.BaseRefName,
+			Additions: n.Additions,
+			Deletions: n.Deletions,
+			Checks:    toChecksFromContexts(n.StatusCheckContexts()),
+		},
+	}
+}
+
+// toItemFromIssue builds the domain's Item out of an issue. Change stays nil:
+// an issue proposes no change.
+func toItemFromIssue(n gql.Issue, repo string) domain.Item {
+	return domain.Item{
+		Ref:       domain.ItemRef{Kind: domain.ItemIssue, Repo: repo, Number: n.Number},
+		Title:     n.Title,
+		Author:    domain.Author{Login: n.Author.Login},
+		State:     parseItemState(n.State),
+		URL:       n.URL,
+		Body:      n.Body,
+		BodyText:  n.BodyText,
+		Comments:  toComments(n.Comments.Nodes),
+		Labels:    toLabels(n.Labels.Nodes),
+		Assignees: toAuthors(n.Assignees.Nodes),
+		UpdatedAt: n.UpdatedAt,
 	}
 }
 
