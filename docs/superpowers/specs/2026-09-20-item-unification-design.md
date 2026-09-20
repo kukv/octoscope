@@ -342,6 +342,21 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 **成功条件:** `make check`。golden 無変更。usecase に `Kind` の `switch` が 0 箇所。
 
+**PR 1 からの申し送り（2026-09-20、最終レビューで挙がった 3 件）。**
+どれも PR 1 の欠陥ではなく、PR 3 がどのみち同じファイルを触るので、そのときに片付くもの。
+
+- **`crossRepoLister` の `SearchItems` を `search.go` へ。**
+  この interface は `work.go` にあるが、唯一の呼び出し元 `Usecase.SearchItems` は
+  `search.go` にある。§4.4 の「ポートの interface は、それを使うメソッドと同じファイルに置く」に
+  唯一背く箇所で、PR 1 では「interface を分割しない（移動ではなく変更になる）」として
+  意図的に残した。PR 3 はポート宣言を書き換えるので、そこで 1 メソッドの独立ポートとして切り出す
+- **`fake_test.go` の `fakeSource` をポート単位に割る。**
+  item / viewer / checks / merge の 4 ポートにまたがる 10 メソッドを持ち、
+  `architecture.md` の「呼ばないメソッドのスタブを何本書かされたか」判定に引っかかる大きさ。
+  分割前からの姿で PR 1 が作ったものではない。PR 3 で `GetPR` / `GetIssue` が抜けるのが割る機会
+- **`usecase/item_test.go` がちょうど 300 行。** 計画の行数チェックはテストを対象外にしているので
+  違反ではないが、PR 2 / PR 3 はこのファイルを書き換える。これ以上太らせない
+
 ### PR 4: ビューの移行
 
 - `domain.PR` / `domain.Issue` / `usecase.Item` を参照する presentation の 4 ファイル
