@@ -4,16 +4,20 @@ import "errors"
 
 // ErrBackendUnavailable is returned when the backend that talks to GitHub
 // cannot be reached at all -- the gh binary missing is one backend's
-// problem, not a thing the application itself knows about.
-var ErrBackendUnavailable = errors.New("gh CLI not found; install it and run: gh auth login")
+// problem, not a thing the application itself knows about. The text names
+// only the kind: what the user should do about it is the UI's to say, in
+// their language (i18n error.gh_not_found).
+var ErrBackendUnavailable = errors.New("backend unavailable")
 
 // ErrTransient wraps a failure GitHub's front end produced rather than
 // answered -- 502, 503, 504. The request was well-formed, so asking again
 // is the right response.
 var ErrTransient = errors.New("GitHub did not answer")
 
-// ErrUnauthenticated is returned when gh has no usable credentials.
-var ErrUnauthenticated = errors.New("not authenticated; run: gh auth login")
+// ErrUnauthenticated is returned when the backend has no usable credentials
+// -- gh not signed in, or no token for the API client. Same rule as above:
+// the remedy is i18n error.unauthenticated, not this string.
+var ErrUnauthenticated = errors.New("not authenticated")
 
 // classified is what gh said, kept apart from the sentinel that names what
 // kind of failure it is. errors.Is finds the sentinel through Unwrap, while
