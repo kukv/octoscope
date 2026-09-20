@@ -37,6 +37,17 @@ type fakeBackend struct {
 	listOwnRepos    func(ctx context.Context, owner string, limit int) ([]github.Repository, error)
 	searchItems     func(ctx context.Context, query string) ([]gql.SearchItem, error)
 	repoCounts      func(ctx context.Context, repos []string) ([]gql.RepoCount, error)
+
+	addPRComment       func(repo string, number int, body string) error
+	addIssueComment    func(repo string, number int, body string) error
+	closePR            func(repo string, number int) error
+	reopenPR           func(repo string, number int) error
+	closeIssue         func(repo string, number int) error
+	reopenIssue        func(repo string, number int) error
+	editPRLabels       func(repo string, number int, add, remove []string) error
+	editIssueLabels    func(repo string, number int, add, remove []string) error
+	editPRAssignees    func(repo string, number int, add, remove []string) error
+	editIssueAssignees func(repo string, number int, add, remove []string) error
 }
 
 func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error) {
@@ -45,6 +56,46 @@ func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.Pu
 
 func (f fakeBackend) GetIssue(ctx context.Context, repo string, number int) (gql.Issue, error) {
 	return f.getIssue(ctx, repo, number)
+}
+
+func (f fakeBackend) AddPRComment(repo string, number int, body string) error {
+	return f.addPRComment(repo, number, body)
+}
+
+func (f fakeBackend) AddIssueComment(repo string, number int, body string) error {
+	return f.addIssueComment(repo, number, body)
+}
+
+func (f fakeBackend) ClosePR(repo string, number int) error {
+	return f.closePR(repo, number)
+}
+
+func (f fakeBackend) ReopenPR(repo string, number int) error {
+	return f.reopenPR(repo, number)
+}
+
+func (f fakeBackend) CloseIssue(repo string, number int) error {
+	return f.closeIssue(repo, number)
+}
+
+func (f fakeBackend) ReopenIssue(repo string, number int) error {
+	return f.reopenIssue(repo, number)
+}
+
+func (f fakeBackend) EditPRLabels(repo string, number int, add, remove []string) error {
+	return f.editPRLabels(repo, number, add, remove)
+}
+
+func (f fakeBackend) EditIssueLabels(repo string, number int, add, remove []string) error {
+	return f.editIssueLabels(repo, number, add, remove)
+}
+
+func (f fakeBackend) EditPRAssignees(repo string, number int, add, remove []string) error {
+	return f.editPRAssignees(repo, number, add, remove)
+}
+
+func (f fakeBackend) EditIssueAssignees(repo string, number int, add, remove []string) error {
+	return f.editIssueAssignees(repo, number, add, remove)
 }
 
 // TestGetPRTranslatesTheWireShapeIntoTheDomain gives every field of
