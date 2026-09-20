@@ -36,11 +36,18 @@ paths:
 利用側が種類で分岐する必要があるものだけ、パッケージ変数にする。
 
 ```go
-// ErrGhNotFound is returned when the gh binary is not on PATH.
-var ErrGhNotFound = errors.New("gh CLI not found; install it and run: gh auth login")
+// ErrBackendUnavailable is returned when the backend that talks to GitHub
+// cannot be reached at all.
+var ErrBackendUnavailable = errors.New("backend unavailable")
 ```
 
 判定は `errors.Is`。文字列比較しない。
+
+**ドメインのセンチネルの文言は、種別を名乗るだけにする。** 対処方法
+（「gh を入れて gh auth login を実行する」）は `internal/i18n` のカタログに置く——
+利用者の言語で案内を出すのは UI の仕事であり、センチネルに書くと、
+**どこにも表示されない英文をもう 1 つ抱える**ことになる。
+インフラ層（`internal/github`）のセンチネルは、そのサービスの言葉で書いてよい。
 
 **分岐に使わないエラーをセンチネルにしない。** 増やす前に、これを `errors.Is` で
 判定する箇所を実際に書くのかを確認する。書かないなら、その場で `fmt.Errorf` すればよい。
