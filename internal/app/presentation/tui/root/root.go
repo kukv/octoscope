@@ -14,6 +14,7 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/detail"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/diff"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/repo"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/search"
@@ -272,23 +273,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case viewerResolvedMsg:
 		m.viewer = msg.login
 		return m, nil
-	case work.OpenDetailMsg:
+	case nav.OpenDetailMsg:
 		return m.openDetail(msg.Ref)
-	case repo.OpenDetailMsg:
-		return m.openDetail(msg.Ref)
-	case search.OpenDetailMsg:
-		return m.openDetail(msg.Ref)
-	case work.OpenDiffMsg:
-		return m.openDiff(msg.Ref)
-	case repo.OpenDiffMsg:
-		return m.openDiff(msg.Ref)
-	case search.OpenDiffMsg:
+	case nav.OpenDiffMsg:
 		return m.openDiff(msg.Ref)
 	case detail.OpenDiffMsg:
 		return m.openDiffOverDetail(msg.Ref)
-	case work.OpenChecksMsg:
-		return m.openChecks(msg.Ref)
-	case repo.OpenChecksMsg:
+	case nav.OpenChecksMsg:
 		return m.openChecks(msg.Ref)
 	case detail.OpenChecksMsg:
 		return m.openChecksOverDetail(msg.Ref)

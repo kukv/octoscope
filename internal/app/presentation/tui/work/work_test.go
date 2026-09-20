@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -201,9 +202,9 @@ func TestEnterAsksTheParentToOpenTheDetail(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("enter produced no command")
 	}
-	msg, ok := cmd().(OpenDetailMsg)
+	msg, ok := cmd().(nav.OpenDetailMsg)
 	if !ok {
-		t.Fatalf("got %T, want OpenDetailMsg", cmd())
+		t.Fatalf("got %T, want nav.OpenDetailMsg", cmd())
 	}
 	if msg.Ref.Number != 12 {
 		t.Errorf("got #%d, want #12", msg.Ref.Number)
@@ -222,9 +223,9 @@ func TestDAsksForTheDiff(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("d produced no command")
 	}
-	msg, ok := cmd().(OpenDiffMsg)
+	msg, ok := cmd().(nav.OpenDiffMsg)
 	if !ok {
-		t.Fatalf("got %T, want OpenDiffMsg", cmd())
+		t.Fatalf("got %T, want nav.OpenDiffMsg", cmd())
 	}
 	want, _ := m.SelectedRef()
 	if msg.Ref != want {
@@ -252,9 +253,9 @@ func TestSAsksForTheChecks(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("s produced no command")
 	}
-	msg, ok := cmd().(OpenChecksMsg)
+	msg, ok := cmd().(nav.OpenChecksMsg)
 	if !ok {
-		t.Fatalf("got %T, want OpenChecksMsg", cmd())
+		t.Fatalf("got %T, want nav.OpenChecksMsg", cmd())
 	}
 	want, _ := m.SelectedRef()
 	if msg.Ref != want {

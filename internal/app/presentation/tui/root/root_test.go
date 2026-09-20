@@ -18,6 +18,7 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/detail"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/diff"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/merge"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/repo"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/review"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/theme"
@@ -528,9 +529,11 @@ func TestTheFirstSizeAsksWhichRepositoryThisIs(t *testing.T) {
 	}
 }
 
+// TestOpenDetailMsgShowsTheDetailView: any tab sends the same nav message,
+// so root's answer does not depend on which one the user was looking at.
 func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{
+	next, _ := m.Update(nav.OpenDetailMsg{
 		Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3},
 	})
 	m = next.(Model)
@@ -543,20 +546,11 @@ func TestOpenDetailMsgShowsTheDetailView(t *testing.T) {
 	}
 }
 
-func TestRepoOpenDetailMsgShowsTheDetailView(t *testing.T) {
-	next, _ := newTestModel(Options{Repo: "kukv/demo"}).Update(repo.OpenDetailMsg{
-		Ref: domain.ItemRef{Kind: domain.ItemIssue, Number: 7},
-	})
-	if !next.(Model).has(overlayDetail) {
-		t.Error("the detail view did not open")
-	}
-}
-
 var someRef = domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 3}
 
 func TestDFromTheBoardOpensTheDiffOnItsOwn(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDiffMsg{Ref: someRef})
 	got := next.(Model)
 	if len(got.stack) != 1 || got.stack[0] != overlayDiff {
 		t.Errorf("stack = %v, want just the diff", got.stack)
@@ -565,7 +559,7 @@ func TestDFromTheBoardOpensTheDiffOnItsOwn(t *testing.T) {
 
 func TestDOpensTheDiffOverTheDetailView(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
 	got := next.(Model)
 	if len(got.stack) != 2 {
@@ -578,7 +572,7 @@ func TestDOpensTheDiffOverTheDetailView(t *testing.T) {
 
 func TestEscTakesTheDiffOffAndLeavesTheDetailView(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenDiffMsg{Ref: someRef})
 	next, _ = next.(Model).Update(diff.ClosedMsg{})
 	got := next.(Model)
@@ -589,7 +583,7 @@ func TestEscTakesTheDiffOffAndLeavesTheDetailView(t *testing.T) {
 
 func TestSFromTheBoardOpensTheChecksOnItsOwn(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenChecksMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenChecksMsg{Ref: someRef})
 	got := next.(Model)
 	if len(got.stack) != 1 || got.stack[0] != overlayChecks {
 		t.Errorf("stack = %v, want just the checks", got.stack)
@@ -598,7 +592,7 @@ func TestSFromTheBoardOpensTheChecksOnItsOwn(t *testing.T) {
 
 func TestEscTakesTheChecksOffAndLeavesTheDetailView(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.OpenChecksMsg{Ref: someRef})
 	next, _ = next.(Model).Update(checks.ClosedMsg{})
 	got := next.(Model)
@@ -613,7 +607,7 @@ func TestEscTakesTheChecksOffAndLeavesTheDetailView(t *testing.T) {
 // tabs instead of nothing.
 func TestAStaleClosedMsgDoesNotPopTwice(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: someRef})
 	next, _ = next.(Model).Update(detail.ClosedMsg{})
 	next, _ = next.(Model).Update(detail.ClosedMsg{})
 	got := next.(Model)
@@ -727,7 +721,7 @@ func TestTheDetailViewGetsTheCurrentSize(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 24})
 	m = next.(Model)
 
-	next, cmd := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 3}})
+	next, cmd := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 3}})
 	m = resolve(t, next.(Model), cmd)
 
 	for _, line := range strings.Split(content(m), "\n") {
@@ -751,7 +745,7 @@ func TestErrorMsgShowsTheErrorScreen(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := newTestModel(Options{Repo: "kukv/demo"})
 			if tc.open {
-				opened, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+				opened, _ := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 				m = opened.(Model)
 			}
 			next, _ := m.Update(tc.msg)
@@ -816,7 +810,7 @@ func TestErrorScreenKeysQuit(t *testing.T) {
 // rather than quitting the whole session (the bug the user hit).
 func TestEscGoesBackFromAnErrorOverAnOverlay(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(diff.ErrorMsg{Err: errors.New("boom")})
 	m = next.(Model)
@@ -842,7 +836,7 @@ func TestEscGoesBackFromAnErrorOverAnOverlay(t *testing.T) {
 // view, not on the tabs.
 func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
@@ -866,7 +860,7 @@ func TestEscGoesBackToTheDetailViewFromAnErrorOverIt(t *testing.T) {
 // clear it without discarding a diff that never failed.
 func TestEscLeavesAnUnrelatedOverlayStanding(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: someRef})
 	m = next.(Model)
 	next, _ = m.Update(detail.OpenDiffMsg{Ref: someRef})
 	m = next.(Model)
@@ -906,7 +900,7 @@ func TestEscStillQuitsWithNoOverlay(t *testing.T) {
 // esc:back only when there is something to go back to.
 func TestErrorScreenKeyBarNamesWhatIsAvailable(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDiffMsg{Ref: someRef})
+	next, _ := m.Update(nav.OpenDiffMsg{Ref: someRef})
 	next, _ = next.(Model).Update(diff.ErrorMsg{Err: errors.New("boom")})
 
 	view := content(next.(Model))
@@ -938,7 +932,7 @@ func TestQGoesBackInTheDetailView(t *testing.T) {
 	for _, k := range []string{"q", "esc"} {
 		t.Run(k, func(t *testing.T) {
 			m := newTestModel(Options{Repo: "kukv/demo"})
-			next, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+			next, _ := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 			m, cmd := pressCmd(next.(Model), k)
 			if isQuit(cmd) {
 				t.Fatalf("%s quit the app instead of leaving the detail view", k)
@@ -1000,7 +994,7 @@ func TestCtrlCQuitsWhileTheDetailViewIsBusy(t *testing.T) {
 				labels: []domain.Label{{Name: "bug", Color: "d73a4a"}},
 			}
 			m := newTestModelWith(src, Options{Repo: "kukv/demo"})
-			next, cmd := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+			next, cmd := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 			m = resolve(t, next.(Model), cmd)
 
 			m = busy(t, m)
@@ -1023,7 +1017,7 @@ func TestALateRepoMessageIsNotDropped(t *testing.T) {
 		t.Fatal("r did not refresh the list")
 	}
 
-	next, _ := m.Update(repo.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	m = next.(Model)
 
 	m = resolve(t, m, refresh) // the list arrives while the detail view is front
@@ -1129,7 +1123,7 @@ func TestTheTabRowIsQuietWhenTheSettingsFileIsFine(t *testing.T) {
 
 func TestTheDetailViewHasNoTabRow(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	if strings.Contains(content(next.(Model)), i18n.T("tab.repos")) {
 		t.Error("the detail view is drawn under the tab row")
 	}
@@ -1189,7 +1183,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 	// just q:quit) from the board/Repos-list case above, and that bar's IDs
 	// (footer.error.esc in particular) are only ever exercised through this
 	// state — nothing else in this function opens an overlay and fails it.
-	overlayFailed, cmd := board.Update(work.OpenDiffMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1}})
+	overlayFailed, cmd := board.Update(nav.OpenDiffMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1}})
 	overlayFailed = resolve(t, overlayFailed.(Model), cmd)
 	overlayFailed, _ = overlayFailed.(Model).Update(diff.ErrorMsg{Err: errors.New(overlongTitle)})
 
@@ -1232,7 +1226,7 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 // failure has nowhere to go but away.
 func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
 	m := newTestModel(Options{Repo: "kukv/demo"})
-	next, _ := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+	next, _ := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
 	m = resolve(t, m, cmd)
 	if m.has(overlayDetail) {
@@ -1252,11 +1246,11 @@ func TestAClosedDetailViewDoesNotShowItsError(t *testing.T) {
 func TestAStaleDetailErrorDoesNotReplaceTheOpenOne(t *testing.T) {
 	m := newTestModelWith(&fakeSource{prErr: errors.New("boom")}, Options{Repo: "kukv/demo"})
 
-	next, first := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
+	next, first := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 1}})
 	m, cmd := pressCmd(next.(Model), "q")
 	m = resolve(t, m, cmd)
 
-	next, second := m.Update(work.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}})
+	next, second := m.Update(nav.OpenDetailMsg{Ref: domain.ItemRef{Kind: domain.ItemPR, Number: 2}})
 	m = next.(Model)
 
 	m = resolve(t, m, first) // the first item's failure lands on the second

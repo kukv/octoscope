@@ -12,6 +12,7 @@ import (
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/dialog"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/browser"
 )
 
@@ -47,16 +48,6 @@ type Source interface {
 	repoCounter
 	repoEditor
 }
-
-// OpenDetailMsg asks the parent to show the detail view for one item.
-type OpenDetailMsg struct{ Ref domain.ItemRef }
-
-// OpenDiffMsg asks the parent to show the diff of the selected pull request.
-type OpenDiffMsg struct{ Ref domain.ItemRef }
-
-// OpenChecksMsg asks the parent to show the checks of the selected pull
-// request.
-type OpenChecksMsg struct{ Ref domain.ItemRef }
 
 // FatalMsg carries a failure the parent shows on its error screen. Only what
 // the user has to act on travels this way; everything else stays on the list
@@ -532,7 +523,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.Refresh()
 	case "enter":
 		if ref, ok := m.SelectedRef(); ok {
-			return m, func() tea.Msg { return OpenDetailMsg{ref} }
+			return m, func() tea.Msg { return nav.OpenDetailMsg{Ref: ref} }
 		}
 		return m, nil
 	case "o":
@@ -547,14 +538,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
-		return m, func() tea.Msg { return OpenDiffMsg{Ref: ref} }
+		return m, func() tea.Msg { return nav.OpenDiffMsg{Ref: ref} }
 	case "s":
 		ref, ok := m.SelectedRef()
 		// An issue has no checks.
 		if !ok || ref.Kind != domain.ItemPR {
 			return m, nil
 		}
-		return m, func() tea.Msg { return OpenChecksMsg{Ref: ref} }
+		return m, func() tea.Msg { return nav.OpenChecksMsg{Ref: ref} }
 	}
 	return m, nil
 }

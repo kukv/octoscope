@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 	"github.com/kukv/octoscope/internal/browser"
 	"github.com/kukv/octoscope/internal/i18n"
 )
@@ -567,11 +568,11 @@ func TestEnterAsksTheParentForTheDetail(t *testing.T) {
 	m, _ = m.Update(key("j")) // second PR
 	_, cmd := m.Update(key("enter"))
 	if cmd == nil {
-		t.Fatal("cmd = nil, want OpenDetailMsg cmd")
+		t.Fatal("cmd = nil, want nav.OpenDetailMsg cmd")
 	}
-	msg, ok := cmd().(OpenDetailMsg)
+	msg, ok := cmd().(nav.OpenDetailMsg)
 	if !ok {
-		t.Fatalf("msg = %T, want OpenDetailMsg", cmd())
+		t.Fatalf("msg = %T, want nav.OpenDetailMsg", cmd())
 	}
 	if msg.Ref != (domain.ItemRef{Kind: domain.ItemPR, Number: 2}) {
 		t.Errorf("Ref = %+v, want the PR under the cursor", msg.Ref)
@@ -590,11 +591,11 @@ func TestEnterOnAnIssueCarriesTheIssueKind(t *testing.T) {
 	m, _ = m.Update(cmd())
 	_, cmd = m.Update(key("enter"))
 	if cmd == nil {
-		t.Fatal("cmd = nil, want OpenDetailMsg cmd")
+		t.Fatal("cmd = nil, want nav.OpenDetailMsg cmd")
 	}
-	msg, ok := cmd().(OpenDetailMsg)
+	msg, ok := cmd().(nav.OpenDetailMsg)
 	if !ok {
-		t.Fatalf("msg = %T, want OpenDetailMsg", cmd())
+		t.Fatalf("msg = %T, want nav.OpenDetailMsg", cmd())
 	}
 	if msg.Ref != (domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 3}) {
 		t.Errorf("Ref = %+v, want the issue under the cursor", msg.Ref)
@@ -617,9 +618,9 @@ func TestDAsksForTheDiff(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("d produced no command")
 	}
-	msg, ok := cmd().(OpenDiffMsg)
+	msg, ok := cmd().(nav.OpenDiffMsg)
 	if !ok {
-		t.Fatalf("got %T, want OpenDiffMsg", cmd())
+		t.Fatalf("got %T, want nav.OpenDiffMsg", cmd())
 	}
 	want, _ := m.SelectedRef()
 	if msg.Ref != want {
@@ -652,9 +653,9 @@ func TestSAsksForTheChecks(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("s produced no command")
 	}
-	msg, ok := cmd().(OpenChecksMsg)
+	msg, ok := cmd().(nav.OpenChecksMsg)
 	if !ok {
-		t.Fatalf("got %T, want OpenChecksMsg", cmd())
+		t.Fatalf("got %T, want nav.OpenChecksMsg", cmd())
 	}
 	want, _ := m.SelectedRef()
 	if msg.Ref != want {

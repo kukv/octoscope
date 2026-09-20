@@ -182,6 +182,31 @@ linters:
               desc: sibling views communicate through the app model, not directly
             - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/root
               desc: a child view must not import its parent
+        # nav is the vocabulary the views share for asking to open a screen.
+        # It must not know a view, or nav would no longer be shared
+        # vocabulary.
+        tui-nav:
+          files:
+            - "**/internal/app/presentation/tui/nav/**"
+          deny:
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/work
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/repo
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/search
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/detail
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/diff
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/review
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/checks
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/merge
+              desc: nav is the vocabulary the views share; it must not know a view
+            - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/root
+              desc: a child view must not import its parent
         # review is a popup, not a view: work, repo and their siblings have no
         # reason to reach into it, and it must never import the views that
         # hold it (see internal/app/presentation/tui/review's own package comment).

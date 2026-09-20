@@ -57,9 +57,12 @@ type Source interface {
 type ClosedMsg struct{}
 
 // OpenDiffMsg asks the parent to show the diff of the shown pull request.
+// It is not nav.OpenDiffMsg: root answers this one with openDiffOverDetail.
 type OpenDiffMsg struct{ Ref domain.ItemRef }
 
-// OpenChecksMsg asks the parent to show the checks of the shown pull request.
+// OpenChecksMsg asks the parent to show the checks of the shown pull
+// request. It is not nav.OpenChecksMsg: root answers this one with
+// openChecksOverDetail.
 type OpenChecksMsg struct{ Ref domain.ItemRef }
 
 // ErrorMsg carries a failure the parent shows on its error screen.
