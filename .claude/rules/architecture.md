@@ -103,6 +103,20 @@ const (
 - depguard で `internal/app/domain` の `encoding/json` import と、
   `internal/github/**` の `internal/app/` import を禁止する
 
+**テキスト形式の解釈も同じ側にある。** unified diff を読む `parseDiff` /
+`parseBarePatch` は `internal/app/adapter/gateway/gh` にあり、domain には無い
+（2026-09-21 に移した。それ以前は `domain.ParseDiff` だった）。
+**domain が持つのは差分の形**——`FileDiff` / `Hunk` / `DiffLine` と
+「削除された行には新側の行番号が無い」といった型が負うルール——**であって、
+git がそれをどう綴るかではない。** #124 の線（翻訳は ACL、政策はドメイン）では、
+テキスト形式の読み取りは翻訳にあたる。
+
+**共有パッケージを作らなかった。** unified diff は git の形式であって GitHub の
+形式ではないので、2 つ目の gateway があれば再利用できる。それでも
+`gateway/gh` の中に非公開で置いたのは、横断（F-11〜F-13）が保留中で
+**利用者が 1 つしかない抽象を先に作らない**ためである。2 つ目が現れた時点で
+中立なパッケージに切り出す——そのとき動かすのは 1 ファイルとそのテストだけで済む。
+
 ## 複数の API 呼び出しは `internal/app/usecase` に置く
 
 **`tea.Cmd` のクロージャの中に、2 つ以上の API 呼び出しを並べない。**
