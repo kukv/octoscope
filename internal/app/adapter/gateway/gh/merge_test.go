@@ -34,6 +34,9 @@ func (f fakeMerger) EnableAutoMerge(pullRequestID string, method gql.MergeMethod
 // TestToMergeContextTranslatesEveryField gives every field of
 // gql.MergeContext a distinct, non-zero value and compares the whole
 // resulting domain.MergeContext against a fully written-out expectation.
+// Because this fixture's IsDraft is true, Block's draft short-circuits
+// Mergeable and MergeStateStatus, so this test does not exercise how those
+// two combine; TestToMergeBlockReadsWhatTheServiceReported covers that.
 func TestToMergeContextTranslatesEveryField(t *testing.T) {
 	t.Parallel()
 

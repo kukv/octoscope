@@ -83,7 +83,7 @@ func allowedMethods(squash, commit, rebase bool) []domain.MergeMethod {
 // because GitHub reports a draft as BLOCKED, and "it is a draft" is the
 // more useful of the two.
 //
-// A spelling neither switch knows is not a failure -- GitHub adds values to
+// A spelling this does not know is not a failure -- GitHub adds values to
 // these enums. An unknown mergeable means the answer is not worked out yet;
 // an unknown state refuses nothing.
 func toMergeBlock(isDraft bool, mergeable, state string) domain.MergeBlock {
