@@ -46,7 +46,10 @@ func (g *Gateway) RerunWorkflow(ctx context.Context, repo string, run domain.Run
 	if err != nil {
 		return fmt.Errorf("run handle %q: %w", run, err)
 	}
-	return wrap(g.backend.RerunWorkflow(ctx, repo, id, fromRerunScope(scope)))
+	if err := g.backend.RerunWorkflow(ctx, repo, id, fromRerunScope(scope)); err != nil {
+		return wrap(err)
+	}
+	return nil
 }
 
 // toChecks counts every check run once: each one increments Total and
