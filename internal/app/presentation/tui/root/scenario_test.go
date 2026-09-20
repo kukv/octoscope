@@ -67,14 +67,13 @@ func (f *scenarioSource) ListWorkSection(_ context.Context, s domain.WorkSection
 	}}, nil
 }
 
-func (f *scenarioSource) ListPRs(_ context.Context, repo string) ([]domain.PR, error) {
+func (f *scenarioSource) ListItems(_ context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+	if kind == domain.ItemIssue {
+		f.issueRepos = append(f.issueRepos, repo)
+		return nil, nil
+	}
 	f.prRepos = append(f.prRepos, repo)
-	return []domain.PR{f.pr}, nil
-}
-
-func (f *scenarioSource) ListIssues(_ context.Context, repo string) ([]domain.Issue, error) {
-	f.issueRepos = append(f.issueRepos, repo)
-	return nil, nil
+	return []domain.Item{itemFromPR(f.pr)}, nil
 }
 
 func (f *scenarioSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }

@@ -29,7 +29,7 @@ type fakeSource struct {
 	countErr   error
 	countCalls [][]string
 
-	prRepos    []string // the repositories ListPRs was asked for, in call order
+	prRepos    []string // the repositories the PR pane asked for, in call order
 	issueRepos []string
 
 	saved     []string // the list handed to SaveRepositories, most recent last
@@ -66,14 +66,57 @@ func typeInto(m Model, s string) Model {
 	return m
 }
 
-func (f *fakeSource) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
-	f.prRepos = append(f.prRepos, repo)
-	return f.prs, f.err
+// ListItems records the two kinds apart so the tests can still say which
+// pane asked for which repository. That is this fake's bookkeeping, not a
+// branch the view has.
+func (f *fakeSource) ListItems(_ context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+	if kind == domain.ItemPR {
+		f.prRepos = append(f.prRepos, repo)
+		return itemsFromPRs(f.prs), f.err
+	}
+	f.issueRepos = append(f.issueRepos, repo)
+	return itemsFromIssues(f.issues), f.err
 }
 
-func (f *fakeSource) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
-	f.issueRepos = append(f.issueRepos, repo)
-	return f.issues, f.err
+// itemFromPR and itemFromIssue are what the gateway builds out of the two:
+// the fixtures stay domain.PR and domain.Issue, and the view is handed the
+// conversion.
+func itemFromPR(pr domain.PR) domain.Item {
+	return domain.Item{
+		Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: pr.Number},
+		Title: pr.Title, Author: pr.Author, State: pr.State, Body: pr.Body,
+		BodyText: pr.BodyText, URL: pr.URL, Labels: pr.Labels,
+		Assignees: pr.Assignees, Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
+		Change: &domain.Change{
+			IsDraft: pr.IsDraft, Review: pr.Review, Head: pr.Head, Base: pr.Base,
+			Additions: pr.Additions, Deletions: pr.Deletions, Checks: pr.Checks,
+		},
+	}
+}
+
+func itemFromIssue(issue domain.Issue) domain.Item {
+	return domain.Item{
+		Ref:   domain.ItemRef{Kind: domain.ItemIssue, Number: issue.Number},
+		Title: issue.Title, Author: issue.Author, State: issue.State, Body: issue.Body,
+		BodyText: issue.BodyText, URL: issue.URL, Labels: issue.Labels,
+		Assignees: issue.Assignees, Comments: issue.Comments, UpdatedAt: issue.UpdatedAt,
+	}
+}
+
+func itemsFromPRs(prs []domain.PR) []domain.Item {
+	items := make([]domain.Item, len(prs))
+	for i, pr := range prs {
+		items[i] = itemFromPR(pr)
+	}
+	return items
+}
+
+func itemsFromIssues(issues []domain.Issue) []domain.Item {
+	items := make([]domain.Item, len(issues))
+	for i, issue := range issues {
+		items[i] = itemFromIssue(issue)
+	}
+	return items
 }
 
 // open stands in for browser.Open in tests: it is wired onto a Model's open
@@ -119,7 +162,7 @@ func key(s string) tea.KeyPressMsg {
 // unsized one draws nothing at all.
 func loadedModel(f *fakeSource) Model {
 	m := sized(New(f, Options{}), 120)
-	m, _ = m.Update(prListMsg{prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
 	return m
 }
 
@@ -128,7 +171,7 @@ func loadedModel(f *fakeSource) Model {
 // fetch (TestRefreshWithNoRowsFetchesNothing, TestSwitchingTabWithNoRowsFetchesNothing).
 func currentModel(f *fakeSource, width int) Model {
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), width)
-	m, _ = m.Update(prListMsg{prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
 	return m
 }
 
@@ -140,7 +183,7 @@ func sidebarModel(f *fakeSource, width int) Model {
 		Repositories: []string{"kukv/octoscope", "kukv/koto"},
 		Current:      "kukv/octoscope",
 	}), width)
-	m, _ = m.Update(prListMsg{prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
 	return m
 }
 
@@ -168,7 +211,7 @@ func TestRepoNameShownInHeader(t *testing.T) {
 func TestEmptyPRList(t *testing.T) {
 	f := &fakeSource{}
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
-	m, _ = m.Update(prListMsg{prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
 	if !strings.Contains(m.View(), "No open pull requests") {
 		t.Errorf("view missing empty state:\n%s", m.View())
 	}
@@ -315,7 +358,7 @@ func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
 	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
-	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: itemsFromPRs(f.prs)})
 	if strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
 		t.Errorf("the notice outlived the failure:\n%s", ansi.Strip(m.View()))
 	}
@@ -373,7 +416,7 @@ func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
 	}
 
 	m, _ = m.Update(key("tab")) // back to the pull requests
-	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: itemsFromPRs(f.prs)})
 	m, _ = m.Update(key("tab")) // and back to Issues, which never recovered
 
 	if !strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
@@ -388,7 +431,7 @@ func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
 func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
-	m, _ = m.Update(issueListMsg{gen: m.gen, issues: f.issues})
+	m, _ = m.Update(issueListMsg{gen: m.gen, issues: itemsFromIssues(f.issues)})
 	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
 
 	m, cmd := m.Update(key("tab"))
@@ -454,7 +497,7 @@ func TestAFetchDoesNotClearTheBrowsersNotice(t *testing.T) {
 	}
 
 	m, _ = m.Update(key("r")) // the list is asked again and answers
-	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: itemsFromPRs(f.prs)})
 
 	if !strings.Contains(ansi.Strip(m.View()), url) {
 		t.Errorf("a fetch took away the address nothing could open:\n%s", ansi.Strip(m.View()))
@@ -473,7 +516,7 @@ func TestAListWithANoticeStillFitsTheTerminal(t *testing.T) {
 	f := &fakeSource{prs: prs}
 	m := New(f, Options{Current: "kukv/octoscope"})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
-	m, _ = m.Update(prListMsg{gen: m.gen, prs: prs})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: itemsFromPRs(prs)})
 	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
 
 	out := m.View()
@@ -639,7 +682,7 @@ func TestTheSelectedRefCarriesTheRepositoryName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 			m := sized(New(f, Options{Current: "kukv/demo"}), 120)
-			m, _ = m.Update(prListMsg{prs: f.prs})
+			m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
 			if tt.toIssues {
 				var cmd tea.Cmd
 				m, cmd = m.Update(key("tab"))
@@ -729,7 +772,7 @@ func TestRefreshWithNoRowsFetchesNothing(t *testing.T) {
 func TestRefreshThenTabSwitchClearsCorrectLoading(t *testing.T) {
 	f := &fakeSource{prs: samplePRs(), issues: []domain.Issue{{Number: 3, Title: "an issue"}}}
 	m := currentModel(f, 120)
-	m, _ = m.Update(issueListMsg{issues: f.issues}) // Issues tab already loaded once before
+	m, _ = m.Update(issueListMsg{issues: itemsFromIssues(f.issues)}) // Issues tab already loaded once before
 
 	m, refreshCmd := m.Update(key("r")) // refresh PRs; fetch is still "in flight"
 	if refreshCmd == nil {
@@ -764,7 +807,7 @@ func TestCursorClampsWhenTheListShrinks(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := loadedModel(f)
 	m, _ = m.Update(key("j")) // cursor on the second PR
-	m, _ = m.Update(prListMsg{prs: samplePRs()[:1]})
+	m, _ = m.Update(prListMsg{prs: itemsFromPRs(samplePRs()[:1])})
 	if m.cursors[tabPRs] != 0 {
 		t.Errorf("cursor = %d after the list shrank, want 0", m.cursors[tabPRs])
 	}
@@ -889,7 +932,7 @@ func TestRenamedRowDoesNotStrandAPendingFetch(t *testing.T) {
 	if m.rows[0].name != "kukv/octoscope" {
 		t.Fatalf("setup: row name = %q, want the resolved spelling", m.rows[0].name)
 	}
-	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: itemsFromPRs(f.prs)})
 	if m.loading[tabPRs] {
 		t.Error("the spinner is stuck: the answer was dropped because the row's name changed under it")
 	}
@@ -986,7 +1029,7 @@ func TestMovingTheSidebarFetchesThatRepository(t *testing.T) {
 	_, cmd := m.Update(key("j")) // onto kukv/koto
 	drain(t, cmd)
 	if len(f.prRepos) != 1 || f.prRepos[0] != "kukv/koto" {
-		t.Errorf("ListPRs got %v, want the row the cursor moved onto", f.prRepos)
+		t.Errorf("ListItems got %v, want the row the cursor moved onto", f.prRepos)
 	}
 }
 
@@ -1010,7 +1053,7 @@ func TestAnAnswerForAnotherRepositoryIsDropped(t *testing.T) {
 	m, _ = m.Update(key("h"))
 	m, _ = m.Update(key("j")) // now on kukv/koto
 	stale := m.gen - 1        // the generation kukv/octoscope's own fetch started in
-	m, _ = m.Update(prListMsg{gen: stale, prs: samplePRs()})
+	m, _ = m.Update(prListMsg{gen: stale, prs: itemsFromPRs(samplePRs())})
 	if strings.Contains(m.View(), "first pr") {
 		t.Errorf("a stale answer was shown:\n%s", m.View())
 	}
@@ -1024,7 +1067,7 @@ func TestSelectedRefNamesTheSelectedRepository(t *testing.T) {
 	m, _ = m.Update(key("h"))
 	m, cmd := m.Update(key("j"))
 	drain(t, cmd)
-	m, _ = m.Update(prListMsg{gen: m.gen, prs: samplePRs()})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: itemsFromPRs(samplePRs())})
 	ref, ok := m.SelectedRef()
 	if !ok || ref.Repo != "kukv/koto" {
 		t.Errorf("ref = %+v, want kukv/koto", ref)
@@ -1044,7 +1087,7 @@ func TestSetCurrentClearsAndRefetches(t *testing.T) {
 		t.Error("an item from the previous repository can still be selected")
 	}
 	if len(f.prRepos) != 1 || f.prRepos[0] != "kukv/elsewhere" {
-		t.Errorf("ListPRs got %v, want the new row", f.prRepos)
+		t.Errorf("ListItems got %v, want the new row", f.prRepos)
 	}
 }
 

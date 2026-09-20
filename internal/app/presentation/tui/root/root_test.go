@@ -82,15 +82,25 @@ func (f *fakeSource) refreshedTheBoard() bool {
 	return len(seen) == domain.WorkSectionCount
 }
 
-func (f *fakeSource) ListPRs(_ context.Context, repo string) ([]domain.PR, error) {
+// ListItems records the two kinds apart so the tests can still say which
+// pane asked for which repository. That is this fake's bookkeeping, not a
+// branch the view has.
+func (f *fakeSource) ListItems(_ context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+	if kind == domain.ItemIssue {
+		f.issueRepos = append(f.issueRepos, repo)
+		return nil, nil
+	}
 	f.prCalls++
 	f.prRepos = append(f.prRepos, repo)
-	return f.prs, nil
+	return itemsFromPRs(f.prs), nil
 }
 
-func (f *fakeSource) ListIssues(_ context.Context, repo string) ([]domain.Issue, error) {
-	f.issueRepos = append(f.issueRepos, repo)
-	return nil, nil
+func itemsFromPRs(prs []domain.PR) []domain.Item {
+	items := make([]domain.Item, len(prs))
+	for i, pr := range prs {
+		items[i] = itemFromPR(pr)
+	}
+	return items
 }
 
 func (f *fakeSource) RepoName(context.Context) (string, error) { return "kukv/demo", nil }
@@ -144,7 +154,7 @@ func itemFromPR(pr domain.PR) domain.Item {
 	return domain.Item{
 		Ref:   domain.ItemRef{Kind: domain.ItemPR, Number: pr.Number},
 		Title: pr.Title, Author: pr.Author, State: pr.State, Body: pr.Body,
-		URL: pr.URL, Labels: pr.Labels, Assignees: pr.Assignees,
+		BodyText: pr.BodyText, URL: pr.URL, Labels: pr.Labels, Assignees: pr.Assignees,
 		Comments: pr.Comments, UpdatedAt: pr.UpdatedAt,
 		Change: &domain.Change{
 			IsDraft: pr.IsDraft, Review: pr.Review, Head: pr.Head, Base: pr.Base,
@@ -434,11 +444,11 @@ func TestResolvedRepositoryFetchesCounts(t *testing.T) {
 	}
 }
 
-// TestSidebarMoveAsksListPRsForTheNewRow covers the argument fetchList hands
+// TestSidebarMoveAsksListItemsForTheNewRow covers the argument fetchList hands
 // down through the routing that reaches this package's Source: moving the
 // Repos sidebar's cursor here, not just inside internal/app/presentation/tui/repo, must ask
-// ListPRs for the row the cursor landed on.
-func TestSidebarMoveAsksListPRsForTheNewRow(t *testing.T) {
+// ListItems for the row the cursor landed on.
+func TestSidebarMoveAsksListItemsForTheNewRow(t *testing.T) {
 	f := &fakeSource{}
 	next, cmd := New(f, Options{
 		Repo:         "kukv/octoscope",
@@ -452,7 +462,7 @@ func TestSidebarMoveAsksListPRsForTheNewRow(t *testing.T) {
 	resolve(t, moved, moveCmd)
 
 	if got := f.prRepos; len(got) != 1 || got[0] != "kukv/koto" {
-		t.Errorf("ListPRs got %v, want the row the cursor moved onto", got)
+		t.Errorf("ListItems got %v, want the row the cursor moved onto", got)
 	}
 }
 

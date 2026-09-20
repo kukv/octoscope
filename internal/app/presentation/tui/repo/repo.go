@@ -15,14 +15,11 @@ import (
 	"github.com/kukv/octoscope/internal/browser"
 )
 
-// prSource is the pull-request half of what the list needs.
-type prSource interface {
-	ListPRs(ctx context.Context, repo string) ([]domain.PR, error)
-}
-
-// issueSource mirrors prSource for issues.
-type issueSource interface {
-	ListIssues(ctx context.Context, repo string) ([]domain.Issue, error)
+// itemLister is what the table needs: one repository's open items of the
+// kind the visible tab draws. The kind is a parameter of the query, not a
+// branch -- the two tabs are separate panes, and each knows what it wants.
+type itemLister interface {
+	ListItems(ctx context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error)
 }
 
 // repoCounter is how many pull requests and issues are open in each
@@ -45,8 +42,7 @@ type repoEditor interface {
 // that acts on one kind takes that half; the ones that pick the kind at run
 // time take the whole.
 type Source interface {
-	prSource
-	issueSource
+	itemLister
 	repoCounter
 	repoEditor
 }
@@ -69,11 +65,11 @@ type FatalMsg struct{ Err error }
 type (
 	prListMsg struct {
 		gen int
-		prs []domain.PR
+		prs []domain.Item
 	}
 	issueListMsg struct {
 		gen    int
-		issues []domain.Issue
+		issues []domain.Item
 	}
 	repoCountsMsg []domain.RepoCount
 
@@ -210,8 +206,8 @@ type Model struct {
 
 	tab     tabID
 	cursors [2]int
-	prs     []domain.PR
-	issues  []domain.Issue
+	prs     []domain.Item
+	issues  []domain.Item
 	loaded  [2]bool
 	loading [2]bool
 
@@ -343,18 +339,18 @@ func (m Model) rowNames() []string {
 func fetchList(src Source, t tabID, repo string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		if t == tabPRs {
-			prs, err := src.ListPRs(ctx, repo)
-			if err != nil {
-				return errMsg{gen: gen, tab: t, err: err}
-			}
-			return prListMsg{gen: gen, prs: prs}
+		kind := domain.ItemPR
+		if t == tabIssues {
+			kind = domain.ItemIssue
 		}
-		issues, err := src.ListIssues(ctx, repo)
+		items, err := src.ListItems(ctx, repo, kind)
 		if err != nil {
 			return errMsg{gen: gen, tab: t, err: err}
 		}
-		return issueListMsg{gen: gen, issues: issues}
+		if t == tabPRs {
+			return prListMsg{gen: gen, prs: items}
+		}
+		return issueListMsg{gen: gen, issues: items}
 	}
 }
 
@@ -592,10 +588,10 @@ func (m Model) SelectedRef() (domain.ItemRef, bool) {
 		if len(m.prs) == 0 {
 			return domain.ItemRef{}, false
 		}
-		return domain.ItemRef{Kind: domain.ItemPR, Repo: m.selectedRepo(), Number: m.prs[m.cursors[tabPRs]].Number}, true
+		return domain.ItemRef{Kind: domain.ItemPR, Repo: m.selectedRepo(), Number: m.prs[m.cursors[tabPRs]].Ref.Number}, true
 	}
 	if len(m.issues) == 0 {
 		return domain.ItemRef{}, false
 	}
-	return domain.ItemRef{Kind: domain.ItemIssue, Repo: m.selectedRepo(), Number: m.issues[m.cursors[tabIssues]].Number}, true
+	return domain.ItemRef{Kind: domain.ItemIssue, Repo: m.selectedRepo(), Number: m.issues[m.cursors[tabIssues]].Ref.Number}, true
 }

@@ -16,6 +16,7 @@ type source interface {
 	labelEditor
 	assigneeEditor
 	lister
+	itemLister
 	viewerFetcher
 	crossRepoLister
 	itemSearcher
@@ -34,6 +35,7 @@ type Usecase struct {
 	labels     labelEditor
 	assignees  assigneeEditor
 	lists      lister
+	itemLists  itemLister
 	viewer     viewerFetcher
 	crossRepo  crossRepoLister
 	search     itemSearcher
@@ -56,6 +58,7 @@ func New(src source, store settingsStore) *Usecase {
 		labels:     src,
 		assignees:  src,
 		lists:      src,
+		itemLists:  src,
 		viewer:     src,
 		crossRepo:  src,
 		search:     src,
