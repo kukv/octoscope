@@ -35,6 +35,17 @@ tea "charm.land/bubbletea/v2"
 サブモデルが必要とするデータ取得の interface は、**そのサブモデルのファイルで宣言する**
 （`.claude/rules/architecture.md`）。
 
+**画面遷移の信号は `presentation/tui/nav` にある。** タブ（work / repo / search）が
+「これを開いてほしい」と言うための型は `nav.OpenDetailMsg` / `nav.OpenDiffMsg` /
+`nav.OpenChecksMsg` の 3 つで、タブごとに定義しない（2026-09-21 に畳んだ。
+それ以前は 3 パッケージが同じ型を別々に持ち、root が 10 本の case で受けていた）。
+
+**ただし `detail` は自分の `OpenDiffMsg` / `OpenChecksMsg` を持つ。これは重複ではない。**
+root はタブからのものを `openDiff` に、detail からのものを `openDiffOverDetail` に回す——
+**どのパッケージが送ったかが「詳細の上に重ねるか」を意味している。** 畳むと、
+コンパイラが保証しているこの区別が実行時の bool になる。同じ形の struct が 2 つ
+並んでいるのを見て 1 つにしたくなったら、root の `switch` の答えが同じかを先に見ること。
+
 ## UI の状態は enum
 
 **並行する bool でモードを表現しない。**
