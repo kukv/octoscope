@@ -212,7 +212,7 @@ func TestClickingBelowTheDrawnSidebarRowsSelectsNothing(t *testing.T) {
 	}
 	f := &fakeSource{prs: samplePRs()}
 	m := sized(New(f, Options{Repositories: many}), 120)
-	m, _ = m.Update(prListMsg{prs: f.prs})
+	m, _ = m.Update(prListMsg{prs: itemsFromPRs(f.prs)})
 
 	m, cmd := m.Update(click(2, sidebarTop+m.sidebarRows()))
 	if cmd != nil {

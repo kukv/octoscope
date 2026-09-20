@@ -52,7 +52,7 @@ func (m Model) bodyWidth() int {
 // selectedRepo is the repository under the sidebar's cursor: what fetchList
 // asks for and what the ref in SelectedRef names. It is empty before the
 // settings file's list and the working directory's own repository are both
-// known, which fetchList passes straight to ListPRs/ListIssues: an empty
+// known, which fetchList passes straight to ListItems: an empty
 // repository there falls back to the client's own. header substitutes its
 // own placeholder for that case; this one must not.
 func (m Model) selectedRepo() string {

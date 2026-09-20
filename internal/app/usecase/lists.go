@@ -7,11 +7,16 @@ import (
 )
 
 type lister interface {
-	ListPRs(ctx context.Context, repo string) ([]domain.PR, error)
-	ListIssues(ctx context.Context, repo string) ([]domain.Issue, error)
 	RepoName(ctx context.Context) (string, error)
 	ListLabels(ctx context.Context, repo string) ([]domain.Label, error)
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
+}
+
+// itemLister is one repository's open items of one kind. The kind is a
+// parameter of the query, not a branch: the Repos tab draws pull requests
+// and issues in separate panes, so the caller knows which it wants.
+type itemLister interface {
+	ListItems(ctx context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error)
 }
 
 // viewerFetcher names the signed-in user. It is not part of lister: there is
@@ -20,12 +25,8 @@ type viewerFetcher interface {
 	Viewer(ctx context.Context) (string, error)
 }
 
-func (u *Usecase) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
-	return u.lists.ListPRs(ctx, repo)
-}
-
-func (u *Usecase) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
-	return u.lists.ListIssues(ctx, repo)
+func (u *Usecase) ListItems(ctx context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+	return u.itemLists.ListItems(ctx, repo, kind)
 }
 
 func (u *Usecase) RepoName(ctx context.Context) (string, error) { return u.lists.RepoName(ctx) }

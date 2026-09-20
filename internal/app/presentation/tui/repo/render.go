@@ -92,7 +92,7 @@ func (m Model) selectedItem() (domain.WorkItem, bool) {
 	if m.tab == tabIssues {
 		issue := m.issues[m.cursors[tabIssues]]
 		return domain.WorkItem{
-			Ref:       domain.ItemRef{Kind: domain.ItemIssue, Repo: repo, Number: issue.Number},
+			Ref:       domain.ItemRef{Kind: domain.ItemIssue, Repo: repo, Number: issue.Ref.Number},
 			Title:     issue.Title,
 			Body:      issue.BodyText,
 			Author:    issue.Author.Login,
@@ -104,19 +104,19 @@ func (m Model) selectedItem() (domain.WorkItem, bool) {
 	}
 	pr := m.prs[m.cursors[tabPRs]]
 	return domain.WorkItem{
-		Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: repo, Number: pr.Number},
+		Ref:       domain.ItemRef{Kind: domain.ItemPR, Repo: repo, Number: pr.Ref.Number},
 		Title:     pr.Title,
 		Body:      pr.BodyText,
 		Author:    pr.Author.Login,
-		IsDraft:   pr.IsDraft,
+		IsDraft:   pr.Change.IsDraft,
 		State:     pr.State,
 		Labels:    pr.Labels,
-		Review:    pr.Review,
-		Head:      pr.Head,
-		Base:      pr.Base,
-		Additions: pr.Additions,
-		Deletions: pr.Deletions,
-		Checks:    pr.Checks,
+		Review:    pr.Change.Review,
+		Head:      pr.Change.Head,
+		Base:      pr.Change.Base,
+		Additions: pr.Change.Additions,
+		Deletions: pr.Change.Deletions,
+		Checks:    pr.Change.Checks,
 		UpdatedAt: pr.UpdatedAt,
 		URL:       pr.URL,
 	}, true
@@ -272,14 +272,15 @@ func (m Model) row(i int) string {
 	)
 	if m.tab == tabPRs {
 		pr := m.prs[i]
-		state = theme.Review(pr.Review, pr.IsDraft).Render(icon.Review(pr.Review, pr.IsDraft))
-		number, title, labels = "#"+strconv.Itoa(pr.Number), pr.Title, pr.Labels
-		checks = checksBar(pr.Checks)
+		ch := pr.Change
+		state = theme.Review(ch.Review, ch.IsDraft).Render(icon.Review(ch.Review, ch.IsDraft))
+		number, title, labels = "#"+strconv.Itoa(pr.Ref.Number), pr.Title, pr.Labels
+		checks = checksBar(ch.Checks)
 		age = i18n.RelTime(m.fetchedAt[tabPRs], pr.UpdatedAt)
 	} else {
 		issue := m.issues[i]
 		state = theme.Issue().Render(icon.Issue())
-		number, title, labels = "#"+strconv.Itoa(issue.Number), issue.Title, issue.Labels
+		number, title, labels = "#"+strconv.Itoa(issue.Ref.Number), issue.Title, issue.Labels
 		age = i18n.RelTime(m.fetchedAt[tabIssues], issue.UpdatedAt)
 	}
 
