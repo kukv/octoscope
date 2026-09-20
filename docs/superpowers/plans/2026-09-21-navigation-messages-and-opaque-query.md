@@ -381,10 +381,10 @@ root はタブからのものを `openDiff` に、detail からのものを `ope
 
 ```bash
 go run ./cmd/octoscope
-# Work: Enter で詳細 / d で差分 / c で CI
+# Work: Enter で詳細 / d で差分 / s で CI
 # Repos: 同じ 3 つ
 # Search: Enter で詳細 / d で差分
-# 詳細を開いた状態から d と c（詳細の上に重なることを見る）
+# 詳細を開いた状態から d と s（詳細の上に重なることを見る）
 go run ./cmd/octoscope --lang ja
 ```
 

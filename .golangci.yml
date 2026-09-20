@@ -183,8 +183,8 @@ linters:
             - pkg: github.com/kukv/octoscope/internal/app/presentation/tui/root
               desc: a child view must not import its parent
         # nav is the vocabulary the views share for asking to open a screen.
-        # It must stay a leaf: nothing it declares may depend on knowing a
-        # particular view, or nav would no longer be shared vocabulary.
+        # It must not know a view, or nav would no longer be shared
+        # vocabulary.
         tui-nav:
           files:
             - "**/internal/app/presentation/tui/nav/**"
