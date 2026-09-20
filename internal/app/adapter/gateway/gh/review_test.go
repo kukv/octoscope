@@ -139,10 +139,12 @@ func TestFileStatusFromAPIMapsEveryValue(t *testing.T) {
 	}
 }
 
-// TestPRDiffFromRawUsesParseDiff covers the common path: gh pr diff or the
-// REST diff media type answered, so the backend hands back raw unified diff
-// text and the gateway parses it with domain.ParseDiff.
-func TestPRDiffFromRawUsesParseDiff(t *testing.T) {
+// TestPRDiffFromRawParsesTheDiffText covers the common path: gh pr diff or
+// the REST diff media type answered, so the backend hands back raw unified
+// diff text and the gateway reads it. The expectation is written out rather
+// than run through the parser: a test that parses on both sides compares
+// the parser against itself and would hold whatever it did.
+func TestPRDiffFromRawParsesTheDiffText(t *testing.T) {
 	t.Parallel()
 
 	raw := []byte("diff --git a/x.go b/x.go\n" +
@@ -156,9 +158,22 @@ func TestPRDiffFromRawUsesParseDiff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PRDiff: %v", err)
 	}
-	want := domain.ParseDiff(raw)
+
+	want := []domain.FileDiff{{
+		Path:      "x.go",
+		Status:    domain.FileModified,
+		Additions: 1,
+		Deletions: 1,
+		Hunks: []domain.Hunk{{
+			Header: "@@ -1,1 +1,1 @@",
+			Lines: []domain.DiffLine{
+				{Kind: domain.LineRemoved, OldLine: 1, Text: "old"},
+				{Kind: domain.LineAdded, NewLine: 1, Text: "new"},
+			},
+		}},
+	}}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("PRDiff() = %+v, want the same as domain.ParseDiff(raw): %+v", got, want)
+		t.Errorf("PRDiff() = %+v, want %+v", got, want)
 	}
 }
 
