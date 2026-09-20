@@ -94,8 +94,6 @@ func TestAddedRowsSurviveTheRepositoryLookup(t *testing.T) {
 }
 
 // The settings file is hand-editable, and a malformed entry there is already
-// read as an uncountable row. Writing one on purpose would be worse.
-// The settings file is hand-editable, and a malformed entry there is already
 // read as an uncountable row. Writing one on purpose would be worse. What
 // counts as malformed is the source's answer, not a rule kept here.
 func TestAddingRefusesTheNameTheSourceRejects(t *testing.T) {
