@@ -386,10 +386,35 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 
 ### PR 5: 旧型と旧ポートの削除、規約の更新
 
-- `domain.PR` / `domain.Issue` を削除、`tags_test.go` の `exported` から除去（24 → 22）
-- gateway の旧ポート 14 本を削除
+**2 つに割った**（2026-09-20、利用者承認済み）。テストフィクスチャの `domain.PR` /
+`domain.Issue` 参照が **163 箇所 / 16 ファイル**あり、gateway の削除と規約 3 節の更新を
+同じレビューに乗せると §11 で「一括 1 PR」を却下したのと同じ状態になるため。
+
+#### PR 5a: gateway の旧オーバーライドの削除、規約の更新
+
+- gateway の**未使用オーバーライド 4 本**（`GetPR` `GetIssue` `ListPRs` `ListIssues`）と
+  変換関数 2 本（`toPR` `toIssue`）を削除
 - `.claude/rules/architecture.md` の 3 節を §7 のとおり更新
 - `.golangci.yml` の depguard に変更が要らないことを確認する（パッケージは増減しない）
+
+**「gateway の旧ポート 14 本を削除」は誤りだった**（2026-09-20 に実測して訂正）。
+書き込み側 10 本（`AddPRComment` `ClosePR` `EditPRLabels` など）は **`backend` インターフェースの
+メソッド**で、`internal/github` のクライアントが答え、`writes.go` が
+`g.backend.AddPRComment(...)` として呼んでいる。**消せない。** PR と Issue を別エンドポイントで
+呼び分けるのは GitHub の現実であり、gateway はそれを隠すために在る。
+§9 の「ポート対 14 本が 6 本」は usecase 側のポートの話で、**PR 4 で達成済み**である。
+
+オーバーライドを消すと昇格メソッドの shadow が外れるので、`.golangci.yml` の QF1008 の
+除外が `items.go` / `lists.go` にも広がる（`review.go` / `writes.go` と同じ理由）。
+
+**成功条件:** `make check` と `make release-check`。golden 無変更。
+
+**完了: 2026-09-20。**
+
+#### PR 5b: 旧型の削除
+
+- テストフィクスチャ 163 箇所を `domain.Item` に移す
+- `domain.PR` / `domain.Issue` を削除、`tags_test.go` の `exported` から除去（24 → 22）
 
 **成功条件:** `make check` と `make release-check`。golden 無変更。
 
@@ -399,7 +424,8 @@ gateway に降りてフェイクが `gql` のワイヤ型になる。** テス�
 - `domain` と `usecase` に 300 行を超えるファイルが無い
 - `domain.PR` と `domain.Issue` が存在しない
 - `usecase.Item` が存在しない
-- ポート対 14 本が 6 本になっている
+- ポート対 14 本が 6 本になっている（**PR 4 で達成**。gateway の `backend` 側は別で、
+  GitHub が PR と Issue を分けている以上そのまま残る）
 - `internal/app/usecase` に `ItemKind` の `switch` が 0 箇所
 - 新ポート 6 本すべてが `ctx` を取る
 - golden 354 枚と `testdata/` 全体が無変更
