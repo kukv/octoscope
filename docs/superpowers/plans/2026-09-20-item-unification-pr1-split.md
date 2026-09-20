@@ -117,7 +117,7 @@ internal/app/usecase/
 
 ```bash
 cd internal/app/domain
-grep -h '^type \|^func \|^var \|^const ' *.go | grep -v '_test.go' | sort > /tmp/domain-decls-before.txt
+grep -h '^type \|^func \|^var \|^const ' $(ls *.go | grep -v _test) | sort > /tmp/domain-decls-before.txt
 wc -l /tmp/domain-decls-before.txt
 go build ./... && echo BUILD-OK
 ```
@@ -208,7 +208,7 @@ git rm internal/app/domain/domain.go
 
 ```bash
 cd internal/app/domain
-grep -h '^type \|^func \|^var \|^const ' *.go | grep -v '_test.go' | sort > /tmp/domain-decls-after.txt
+grep -h '^type \|^func \|^var \|^const ' $(ls *.go | grep -v _test) | sort > /tmp/domain-decls-after.txt
 diff /tmp/domain-decls-before.txt /tmp/domain-decls-after.txt && echo DECLS-IDENTICAL
 ```
 
@@ -349,7 +349,7 @@ git commit -m "refactor: split the domain tests alongside the types" \
 
 ```bash
 cd internal/app/usecase
-grep -h '^type \|^func ' *.go | grep -v '_test.go' | sort > /tmp/usecase-decls-before.txt
+grep -h '^type \|^func ' $(ls *.go | grep -v _test) | sort > /tmp/usecase-decls-before.txt
 wc -l /tmp/usecase-decls-before.txt
 go build ./... && echo BUILD-OK
 ```
@@ -446,7 +446,7 @@ import は `"context"` `"fmt"` `"time"` と domain。
 
 ```bash
 cd internal/app/usecase
-grep -h '^type \|^func ' *.go | grep -v '_test.go' | sort > /tmp/usecase-decls-after.txt
+grep -h '^type \|^func ' $(ls *.go | grep -v _test) | sort > /tmp/usecase-decls-after.txt
 diff /tmp/usecase-decls-before.txt /tmp/usecase-decls-after.txt && echo DECLS-IDENTICAL
 ```
 
