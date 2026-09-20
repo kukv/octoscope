@@ -64,6 +64,6 @@ gh repo list --limit 100 --json nameWithOwner,isPrivate \
   > internal/github/cli/testdata/own_repos.json
 ```
 
-`sample.diff` は `internal/app/domain/testdata` にある（README も同じ場所）。パース
-そのものを見るテストが `internal/app/domain` に移ったので、録りものはそちらにしか
-置かない。
+`sample.diff` は `internal/app/adapter/gateway/gh/testdata` にある（README も同じ場所）。
+パースそのものを見るテストが `internal/app/adapter/gateway/gh` にあるので、録りものは
+そちらにしか置かない。

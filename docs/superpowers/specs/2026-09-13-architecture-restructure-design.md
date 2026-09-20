@@ -202,7 +202,7 @@ gateway が無かった時点では usecase が唯一の置き場所だったが
 | `Author` `Label` `Comment` の json タグ | タグを外し、デコードは `internal/github` の private 型で行う | 2 |
 | `ParseItemState` `ParseReviewDecision` | `internal/app/adapter/gateway/gh`（domain の型を返すため `internal/github` には置けない） | 2 |
 | `ParseFilesAPI` + `prFileJSON` | `internal/github` | **2** |
-| `ParseDiff`（git の unified diff） | domain に残す。GitLab も同形式 | — |
+| `ParseDiff`（git の unified diff） | domain に残す。GitLab も同形式（**2026-09-21 に覆した**——現在は `gateway/gh` の非公開 `parseDiff`。理由は `.claude/rules/architecture.md`） | — |
 | `ErrGhNotFound` `ErrTransient` `ErrUnauthenticated` `Classify` | `internal/github`。gateway が中立な sentinel に変換し、`IsFatal` は中立なものだけを見る | **2** |
 | `NewLogLine`（Actions のタイムスタンプ接頭辞を解釈する） | 解釈は `internal/github` へ。domain には素の構築だけ残す | 2 |
 | `WorkSection` → GitHub の検索文字列（`gql/search.go`） | gateway がクエリを組み、`gql` は文字列を受け取る | 2 |
