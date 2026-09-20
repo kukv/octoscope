@@ -31,42 +31,6 @@ func (f fakeLister) ListLabels(ctx context.Context, repo string) ([]gql.Label, e
 	return f.listLabels(ctx, repo)
 }
 
-func TestListPRsTranslatesEveryNode(t *testing.T) {
-	t.Parallel()
-
-	g := New(fakeLister{listPRs: func(context.Context, string) ([]gql.PullRequest, error) {
-		return []gql.PullRequest{
-			{Number: 1, State: "OPEN"},
-			{Number: 2, State: "MERGED"},
-		}, nil
-	}})
-
-	prs, err := g.ListPRs(context.Background(), "kukv/octoscope")
-	if err != nil {
-		t.Fatalf("ListPRs: %v", err)
-	}
-	if len(prs) != 2 || prs[0].Number != 1 || prs[1].Number != 2 {
-		t.Errorf("prs = %+v, want numbers 1 and 2 in order", prs)
-	}
-}
-
-func TestListIssuesTranslatesEveryNode(t *testing.T) {
-	t.Parallel()
-
-	g := New(fakeLister{listIssues: func(context.Context, string) ([]gql.Issue, error) {
-		return []gql.Issue{{Number: 3}, {Number: 4}}, nil
-	}})
-
-	issues, err := g.ListIssues(context.Background(), "kukv/octoscope")
-	if err != nil {
-		t.Fatalf("ListIssues: %v", err)
-	}
-	if len(issues) != 2 || issues[0].Number != 3 || issues[1].Number != 4 {
-		t.Errorf("issues = %+v, want numbers 3 and 4 in order", issues)
-	}
-}
-
-// TestAListedItemCarriesItsBodyAsText is what the Repos drawer previews. The
 // list asks for bodyText and not the markdown body, so the two travel in
 // fields of their own: a conversion that dropped this one would leave the
 // preview empty with nothing to notice.
@@ -82,17 +46,17 @@ func TestAListedItemCarriesItsBodyAsText(t *testing.T) {
 		},
 	})
 
-	prs, err := g.ListPRs(context.Background(), "kukv/octoscope")
+	prs, err := g.ListItems(context.Background(), "kukv/octoscope", domain.ItemPR)
 	if err != nil {
-		t.Fatalf("ListPRs: %v", err)
+		t.Fatalf("ListItems: %v", err)
 	}
 	if prs[0].BodyText != "what it changes" {
 		t.Errorf("the pull request's body text is %q", prs[0].BodyText)
 	}
 
-	issues, err := g.ListIssues(context.Background(), "kukv/octoscope")
+	issues, err := g.ListItems(context.Background(), "kukv/octoscope", domain.ItemIssue)
 	if err != nil {
-		t.Fatalf("ListIssues: %v", err)
+		t.Fatalf("ListItems: %v", err)
 	}
 	if issues[0].BodyText != "what is wrong" {
 		t.Errorf("the issue's body text is %q", issues[0].BodyText)

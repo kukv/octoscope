@@ -116,23 +116,38 @@ pending の有無で `SubmitNewReview` 1 回と `SubmitReview` 1 回を切り替
 `Gateway.AddReviewThread` は pending が無ければ `StartReview` を先に呼ぶ
 （`internal/app/adapter/gateway/gh/review.go`）。
 
-**アプリの都合による順序**（種別で呼ぶものが変わる、など）は `internal/app/usecase`
-に残る。`domain.ItemRef.Kind` を View で `switch` しない。
+**アプリの都合による順序**は `internal/app/usecase` に残る。
+`domain.ItemRef.Kind` を View で `switch` しない——この指示は変わらないが、
+**2026-09-20 に移る先が usecase から gateway になった。** 種別の振り分けは
+`gateway/gh` の `GetItem` / `ListItems` / `writes.go` が持つ。PR と Issue を
+別々に呼ぶのはサービス固有の事情だからである。
 
 置き場所を分けると、順序のテストに Bubble Tea が要る。順序を持つ層に
 フェイクを 1 つ渡すだけで検証できるようにする。
 
-## `usecase.Item` を画面の写しにしない
+**この層は今は薄い。** 振り分けが降りた後 `internal/app/usecase` に残るのは、
+`SeedCandidates`（組織スコープの無いトークンでも残りを失わない、というアプリ側の判断を
+持つ唯一のメソッド）、ポートの束ね方、各ビューへの薄い委譲だけである。
 
-`usecase.Item` は PR と Issue の合流点であって DTO ではない。
+**それでも残す。** 廃止すると、複数のサービスを横断して見る（複数の gateway に投げて
+結果を束ねる）を入れるときに同じ層を再導入することになる。
+
+**実コストも書いておく。** 振り分けのテストが usecase から gateway に降りた結果、
+フェイクがドメイン型から `gql` のワイヤ型になり、テストの準備が重くなった。
+これは port を 1 本化したことの代償である。
+
+## `domain.Item` を画面の写しにしない
+
+`domain.Item` は PR と Issue の合流点であって DTO ではない。
 **ここは UI の都合が下の層に漏れる唯一の穴**なので、太らせない。
 
 - **`Item` に共通フィールドを足してよいのは、PR と Issue の両方に GitHub 側の
   対応物があるときだけ。**
-- PR にしか無いものは `Item.PR`（`*domain.PR`）から読む。`Item` に写さない
+- PR にしか無いものは `Item.Change`（`*domain.Change`）から読む。`Item` に写さない。
+  `Change` が非 nil であることと `Ref.Kind == ItemPR` は同値で、保証するのは gateway である
 - 「画面に出したいものが `Item` に無い」と思ったら、まず `internal/app/domain` の
-  ドメイン型に無いのではないかを疑う。`domain.Issue` の公開フィールドは 10 個あり、
-  `Item` はその全部を持っている（2026-09-07 に数えた）
+  ドメイン型に無いのではないかを疑う。`Item` の公開フィールドは 12 個、
+  `Change` は 7 個ある（2026-09-20 に数えた）
 
 この規則があるかぎり、UI だけの修正（色・桁・文言・キー・状態遷移・
 何を描くかの選び方）は `internal/app/usecase` に波及しない。波及するのは
@@ -221,10 +236,27 @@ port の中立化は行う。ただし**名前**と**形**を分けて扱う。
 
 | 変えない | 変える |
 |---|---|
-| `AddPRComment` `ClosePR` `EditPRLabels` `ListPRs` `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → `JobLog(job domain.JobHandle)` |
+| `PRChecks` `PRMergeContext` `EnableAutoMerge` | `JobLog(jobID int64)` → `JobLog(job domain.JobHandle)` |
 | `CheckRun.Workflow` `RunNumber`（Forgejo Actions は同型、GitLab の pipeline も対応物がある） | `RerunWorkflow(runID int64)` → `RerunWorkflow(run domain.RunHandle)` |
 | `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → `domain.PullRequestHandle` `domain.ReviewHandle`（`ReviewContext.PullRequest` / `ReviewTarget.Pending`） |
 | | `StartReview` / `SubmitNewReview` を `SubmitReview` 1 つに畳んだ。pending review の作成は gateway が持つ（本規約の部分的な反転。設計 §6） |
+| | `AddPRComment` / `AddIssueComment` → `AddComment(ctx, ItemRef, body)`。`ClosePR` / `ReopenPR` / `CloseIssue` / `ReopenIssue` → `SetState`。`EditPRLabels` / `EditIssueLabels` → `EditLabels`。`EditPRAssignees` / `EditIssueAssignees` → `EditAssignees`。`GetPR` / `GetIssue` → `GetItem`。`ListPRs` / `ListIssues` → `ListItems(ctx, repo, kind)` |
+
+**対 14 本を 6 本に畳んだのは 2026-09-20 である。** PR と Issue を別々のエンドポイントで
+呼び分けるのは **GitHub の都合**であって、アプリの都合ではない。上の (ii)
+「GitHub が余計に 1 回呼ぶ必要があるから存在する port メソッドを作らない」が、
+まさにこれを禁じている。`ListItems` の `kind` は分岐ではなく**クエリの引数**である——
+Repos タブは PR の一覧と Issue の一覧を別のペインに描くので、呼ぶ側は最初から
+どちらが欲しいか決まっている。
+
+**守れなくなるもの:** port を読んでも GitHub への呼び出しが何回になるか分からなくなる。
+これは `StartReview` / `SubmitNewReview` を畳んだときと同じ性質の反転で、前例に揃えた。
+
+**`backend` 側は別である。** `internal/github` のクライアントは今も `AddPRComment` と
+`AddIssueComment` を別々に持ち、`gateway/gh/writes.go` がその間で振り分ける。
+`Gateway` は `backend` を埋め込んでいるので、それらはメソッド昇格で `Gateway` にも生えている。
+この規約が言う「形」は **usecase に向いた port の形**であって、ACL の内側ではない
+（`gateway/gh/backend.go` のパッケージコメントを見よ）。
 
 ## 規約そのものを変える
 
