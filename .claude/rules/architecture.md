@@ -241,6 +241,18 @@ port の中立化は行う。ただし**名前**と**形**を分けて扱う。
 | `PR` → `ChangeRequest` のような改名は**しない**（227 参照、他サービス対応は未確定） | `PullRequestID` `PendingID` → `domain.PullRequestHandle` `domain.ReviewHandle`（`ReviewContext.PullRequest` / `ReviewTarget.Pending`） |
 | | `StartReview` / `SubmitNewReview` を `SubmitReview` 1 つに畳んだ。pending review の作成は gateway が持つ（本規約の部分的な反転。設計 §6） |
 | | `AddPRComment` / `AddIssueComment` → `AddComment(ctx, ItemRef, body)`。`ClosePR` / `ReopenPR` / `CloseIssue` / `ReopenIssue` → `SetState`。`EditPRLabels` / `EditIssueLabels` → `EditLabels`。`EditPRAssignees` / `EditIssueAssignees` → `EditAssignees`。`GetPR` / `GetIssue` → `GetItem`。`ListPRs` / `ListIssues` → `ListItems(ctx, repo, kind)` |
+| | `isOwnerSlashName`（presentation の判定）→ `ValidRepoName(name string) bool`。名前の形は GitHub のものなので gateway が答える |
+
+**リポジトリ名の形を gateway に移したのは 2026-09-20 である。** presentation にあった
+`isOwnerSlashName` は `gql.SplitRepo` の逐語コピーで、depguard が
+presentation → `internal/github` を禁じているために共有できずにいた。domain に置けば
+層の線は通るが、`gql.SplitRepo` は消えないので重複は残り、しかも「2 つ目の `/` を弾く」
+という GitHub の形を domain に入れることになる。#124 の線（翻訳は ACL、政策はドメイン）では
+これは翻訳なので、gateway が答える。
+
+**守れなくなるもの:** 純粋な述語 1 つのために port が 1 本増え、`Source` を満たす
+フェイク 3 つがスタブを 1 つずつ背負う。検証にネットワークが要らないことは port を
+読んでも分からない（`ctx` を取らないことが唯一の手がかりである）。
 
 **対 14 本を 6 本に畳んだのは 2026-09-20 である。** PR と Issue を別々のエンドポイントで
 呼び分けるのは **GitHub の都合**であって、アプリの都合ではない。上の (ii)
