@@ -18,7 +18,7 @@ func TestAPullRequestCommentGoesToTheIssuesEndpoint(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, `{}`)
 	})
-	if err := c.AddPRComment("cli/cli", 61, "looks good"); err != nil {
+	if err := c.AddPRComment(t.Context(), "cli/cli", 61, "looks good"); err != nil {
 		t.Fatalf("AddPRComment: %v", err)
 	}
 
@@ -51,7 +51,7 @@ func TestClosingAPullRequestPatchesThePullsEndpoint(t *testing.T) {
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{}`)
 	})
-	if err := c.ClosePR("cli/cli", 61); err != nil {
+	if err := c.ClosePR(t.Context(), "cli/cli", 61); err != nil {
 		t.Fatalf("ClosePR: %v", err)
 	}
 
@@ -76,7 +76,7 @@ func TestReopeningAnIssuePatchesTheIssuesEndpointBackToOpen(t *testing.T) {
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{}`)
 	})
-	if err := c.ReopenIssue("cli/cli", 50); err != nil {
+	if err := c.ReopenIssue(t.Context(), "cli/cli", 50); err != nil {
 		t.Fatalf("ReopenIssue: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestRemovingALabelEscapesASlashInItsNameInsteadOfSplittingThePath(t *testin
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `[]`)
 	})
-	if err := c.EditIssueLabels("cli/cli", 50, nil, []string{"help wanted", "area/cli"}); err != nil {
+	if err := c.EditIssueLabels(t.Context(), "cli/cli", 50, nil, []string{"help wanted", "area/cli"}); err != nil {
 		t.Fatalf("EditIssueLabels: %v", err)
 	}
 
@@ -133,7 +133,7 @@ func TestEditingLabelsSendsTheAdditionsTogetherAndEachRemovalOnItsOwn(t *testing
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `[]`)
 	})
-	if err := c.EditPRLabels("cli/cli", 61, []string{"bug", "docs"}, []string{"stale", "keep"}); err != nil {
+	if err := c.EditPRLabels(t.Context(), "cli/cli", 61, []string{"bug", "docs"}, []string{"stale", "keep"}); err != nil {
 		t.Fatalf("EditPRLabels: %v", err)
 	}
 	if len(*got) != 3 {
@@ -157,7 +157,7 @@ func TestRemovingAssigneesCarriesThemInTheBody(t *testing.T) {
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{}`)
 	})
-	if err := c.EditIssueAssignees("cli/cli", 50, nil, []string{"octocat"}); err != nil {
+	if err := c.EditIssueAssignees(t.Context(), "cli/cli", 50, nil, []string{"octocat"}); err != nil {
 		t.Fatalf("EditIssueAssignees: %v", err)
 	}
 
@@ -187,7 +187,7 @@ func TestAddingAssigneesNamesThemUnderTheAssigneesKeyNotTheLabelsOne(t *testing.
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{}`)
 	})
-	if err := c.EditPRAssignees("cli/cli", 61, []string{"octocat"}, nil); err != nil {
+	if err := c.EditPRAssignees(t.Context(), "cli/cli", 61, []string{"octocat"}, nil); err != nil {
 		t.Fatalf("EditPRAssignees: %v", err)
 	}
 
@@ -216,7 +216,7 @@ func TestAnEditWithNothingToAddSendsNoAddRequest(t *testing.T) {
 	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `[]`)
 	})
-	if err := c.EditPRLabels("cli/cli", 61, nil, nil); err != nil {
+	if err := c.EditPRLabels(t.Context(), "cli/cli", 61, nil, nil); err != nil {
 		t.Fatalf("EditPRLabels: %v", err)
 	}
 	if len(*got) != 0 {

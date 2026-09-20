@@ -22,25 +22,25 @@ type itemFetcher interface {
 }
 
 type commenter interface {
-	AddPRComment(repo string, number int, body string) error
-	AddIssueComment(repo string, number int, body string) error
+	AddPRComment(ctx context.Context, repo string, number int, body string) error
+	AddIssueComment(ctx context.Context, repo string, number int, body string) error
 }
 
 type stateChanger interface {
-	ClosePR(repo string, number int) error
-	ReopenPR(repo string, number int) error
-	CloseIssue(repo string, number int) error
-	ReopenIssue(repo string, number int) error
+	ClosePR(ctx context.Context, repo string, number int) error
+	ReopenPR(ctx context.Context, repo string, number int) error
+	CloseIssue(ctx context.Context, repo string, number int) error
+	ReopenIssue(ctx context.Context, repo string, number int) error
 }
 
 type labelEditor interface {
-	EditPRLabels(repo string, number int, add, remove []string) error
-	EditIssueLabels(repo string, number int, add, remove []string) error
+	EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error
+	EditIssueLabels(ctx context.Context, repo string, number int, add, remove []string) error
 }
 
 type assigneeEditor interface {
-	EditPRAssignees(repo string, number int, add, remove []string) error
-	EditIssueAssignees(repo string, number int, add, remove []string) error
+	EditPRAssignees(ctx context.Context, repo string, number int, add, remove []string) error
+	EditIssueAssignees(ctx context.Context, repo string, number int, add, remove []string) error
 }
 
 type lister interface {
