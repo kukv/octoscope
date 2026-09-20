@@ -56,15 +56,24 @@ func (g *Gateway) AddReviewThread(t domain.ReviewTarget, c domain.PendingComment
 // submits in one call: starting a review first would leave an empty pending
 // review behind if the submission then failed.
 func (g *Gateway) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
+	var err error
 	if t.Pending == "" {
-		return wrap(g.backend.SubmitNewReview(string(t.PullRequest), fromReviewEvent(event), body))
+		err = g.backend.SubmitNewReview(string(t.PullRequest), fromReviewEvent(event), body)
+	} else {
+		err = g.backend.SubmitReview(string(t.Pending), fromReviewEvent(event), body)
 	}
-	return wrap(g.backend.SubmitReview(string(t.Pending), fromReviewEvent(event), body))
+	if err != nil {
+		return wrap(err)
+	}
+	return nil
 }
 
 // DiscardReview throws the unsubmitted review away, comments and all.
 func (g *Gateway) DiscardReview(review domain.ReviewHandle) error {
-	return wrap(g.backend.DiscardReview(string(review)))
+	if err := g.backend.DiscardReview(string(review)); err != nil {
+		return wrap(err)
+	}
+	return nil
 }
 
 func fromPendingComment(c domain.PendingComment) gql.PendingComment {

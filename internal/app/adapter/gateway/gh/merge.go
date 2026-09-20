@@ -19,18 +19,27 @@ func (g *Gateway) PRMergeContext(ctx context.Context, repo string, number int) (
 
 // MergePR merges the pull request now.
 func (g *Gateway) MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	return wrap(g.backend.MergePR(string(pr), fromMergeMethod(method)))
+	if err := g.backend.MergePR(string(pr), fromMergeMethod(method)); err != nil {
+		return wrap(err)
+	}
+	return nil
 }
 
 // EnableAutoMerge asks GitHub to merge the pull request once what it is
 // waiting on is in.
 func (g *Gateway) EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	return wrap(g.backend.EnableAutoMerge(string(pr), fromMergeMethod(method)))
+	if err := g.backend.EnableAutoMerge(string(pr), fromMergeMethod(method)); err != nil {
+		return wrap(err)
+	}
+	return nil
 }
 
 // DisableAutoMerge turns auto-merge back off.
 func (g *Gateway) DisableAutoMerge(pr domain.PullRequestHandle) error {
-	return wrap(g.backend.DisableAutoMerge(string(pr)))
+	if err := g.backend.DisableAutoMerge(string(pr)); err != nil {
+		return wrap(err)
+	}
+	return nil
 }
 
 func toMergeContext(c gql.MergeContext) domain.MergeContext {
