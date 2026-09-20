@@ -8,21 +8,13 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// fakeCrossRepo records the query SearchItems was asked to run.
-type fakeCrossRepo struct {
+// fakeSearcher records the query SearchItems was asked to run.
+type fakeSearcher struct {
 	searchQuery string
 	err         error
 }
 
-func (f *fakeCrossRepo) ListWorkSection(_ context.Context, _ domain.WorkSection) ([]domain.WorkItem, error) {
-	return nil, f.err
-}
-
-func (f *fakeCrossRepo) RepoCounts(_ context.Context, _ []string) ([]domain.RepoCount, error) {
-	return nil, f.err
-}
-
-func (f *fakeCrossRepo) SearchItems(_ context.Context, query string) ([]domain.WorkItem, error) {
+func (f *fakeSearcher) SearchItems(_ context.Context, query string) ([]domain.WorkItem, error) {
 	f.searchQuery = query
 	return nil, f.err
 }
@@ -30,8 +22,8 @@ func (f *fakeCrossRepo) SearchItems(_ context.Context, query string) ([]domain.W
 func TestSearchItemsReachesTheGitHubLayer(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeCrossRepo{}
-	u := &Usecase{crossRepo: f}
+	f := &fakeSearcher{}
+	u := &Usecase{search: f}
 	if _, err := u.SearchItems(t.Context(), "is:open is:pr"); err != nil {
 		t.Fatalf("SearchItems: %v", err)
 	}
