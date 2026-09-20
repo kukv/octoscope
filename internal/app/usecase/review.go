@@ -1,10 +1,34 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 )
+
+type reviewFetcher interface {
+	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
+	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
+}
+
+type reviewer interface {
+	AddReviewThread(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error
+	DiscardReview(review domain.ReviewHandle) error
+}
+
+func (u *Usecase) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
+	return u.reviewInfo.PRDiff(ctx, repo, number)
+}
+
+func (u *Usecase) PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error) {
+	return u.reviewInfo.PRReviewContext(ctx, repo, number)
+}
+
+func (u *Usecase) DiscardReview(review domain.ReviewHandle) error {
+	return u.reviews.DiscardReview(review)
+}
 
 // PostLineComment attaches one line comment to the pull request's review and
 // answers the review it went onto: which requests that takes is the
