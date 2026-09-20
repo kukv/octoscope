@@ -38,16 +38,24 @@ func (g *Gateway) ListIssues(ctx context.Context, repo string) ([]domain.Issue, 
 // Repos tab draws the two in separate panes and knows which it is filling.
 func (g *Gateway) ListItems(ctx context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
 	if kind == domain.ItemPR {
-		nodes, err := g.backend.ListPRs(ctx, repo)
-		if err != nil {
-			return nil, wrap(err)
-		}
-		items := make([]domain.Item, len(nodes))
-		for i, n := range nodes {
-			items[i] = toItemFromPR(n, repo)
-		}
-		return items, nil
+		return g.listPRItems(ctx, repo)
 	}
+	return g.listIssueItems(ctx, repo)
+}
+
+func (g *Gateway) listPRItems(ctx context.Context, repo string) ([]domain.Item, error) {
+	nodes, err := g.backend.ListPRs(ctx, repo)
+	if err != nil {
+		return nil, wrap(err)
+	}
+	items := make([]domain.Item, len(nodes))
+	for i, n := range nodes {
+		items[i] = toItemFromPR(n, repo)
+	}
+	return items, nil
+}
+
+func (g *Gateway) listIssueItems(ctx context.Context, repo string) ([]domain.Item, error) {
 	nodes, err := g.backend.ListIssues(ctx, repo)
 	if err != nil {
 		return nil, wrap(err)

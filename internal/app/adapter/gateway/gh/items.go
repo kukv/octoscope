@@ -31,17 +31,25 @@ func (g *Gateway) GetIssue(ctx context.Context, repo string, number int) (domain
 // knowledge: nothing above it switches on the kind.
 func (g *Gateway) GetItem(ctx context.Context, ref domain.ItemRef) (domain.Item, error) {
 	if ref.Kind == domain.ItemPR {
-		n, err := g.backend.GetPR(ctx, ref.Repo, ref.Number)
-		if err != nil {
-			return domain.Item{}, wrap(err)
-		}
-		return toItemFromPR(n, ref.Repo), nil
+		return g.getPRItem(ctx, ref.Repo, ref.Number)
 	}
-	n, err := g.backend.GetIssue(ctx, ref.Repo, ref.Number)
+	return g.getIssueItem(ctx, ref.Repo, ref.Number)
+}
+
+func (g *Gateway) getPRItem(ctx context.Context, repo string, number int) (domain.Item, error) {
+	n, err := g.backend.GetPR(ctx, repo, number)
 	if err != nil {
 		return domain.Item{}, wrap(err)
 	}
-	return toItemFromIssue(n, ref.Repo), nil
+	return toItemFromPR(n, repo), nil
+}
+
+func (g *Gateway) getIssueItem(ctx context.Context, repo string, number int) (domain.Item, error) {
+	n, err := g.backend.GetIssue(ctx, repo, number)
+	if err != nil {
+		return domain.Item{}, wrap(err)
+	}
+	return toItemFromIssue(n, repo), nil
 }
 
 func toPR(n gql.PullRequest) domain.PR {
