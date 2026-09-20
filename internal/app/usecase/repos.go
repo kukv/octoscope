@@ -7,6 +7,19 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
+// repoFinder is what the add dialog offers: candidates while it is typed
+// into, and the repositories a first run can be seeded from.
+type repoFinder interface {
+	SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error)
+	ListOwnRepos(ctx context.Context, owner string, limit int) ([]domain.RepoCandidate, error)
+	ListOrgs(ctx context.Context) ([]string, error)
+}
+
+// repoStore is where the sidebar's list survives a restart.
+type repoStore interface {
+	SaveRepositories(repos []string) error
+}
+
 // seedLimit is how many repositories one owner contributes to the seeding
 // list. gh repo list fetches 30 by default; an account or an organisation
 // with more than that would lose the rest without a word.
