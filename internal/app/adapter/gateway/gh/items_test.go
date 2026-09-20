@@ -254,3 +254,54 @@ func TestParseReviewDecision(t *testing.T) {
 		}
 	}
 }
+
+// TestGetItemKeepsChangeAndKindInStep is the invariant domain.Item's doc
+// states: Change is non-nil exactly when the reference says ItemPR. The
+// gateway is what guarantees it, because the gateway is what builds an Item.
+func TestGetItemKeepsChangeAndKindInStep(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		ref        domain.ItemRef
+		backend    fakeBackend
+		wantKind   domain.ItemKind
+		wantChange bool
+	}{
+		{
+			name: "a pull request has a change",
+			ref:  domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 7},
+			backend: fakeBackend{getPR: func(context.Context, string, int) (gql.PullRequest, error) {
+				return gql.PullRequest{Number: 7, HeadRefName: "topic", BaseRefName: "main"}, nil
+			}},
+			wantKind:   domain.ItemPR,
+			wantChange: true,
+		},
+		{
+			name: "an issue has none",
+			ref:  domain.ItemRef{Kind: domain.ItemIssue, Repo: "kukv/octoscope", Number: 9},
+			backend: fakeBackend{getIssue: func(context.Context, string, int) (gql.Issue, error) {
+				return gql.Issue{Number: 9}, nil
+			}},
+			wantKind:   domain.ItemIssue,
+			wantChange: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := New(tt.backend).GetItem(context.Background(), tt.ref)
+			if err != nil {
+				t.Fatalf("GetItem: %v", err)
+			}
+			if got.Ref.Kind != tt.wantKind {
+				t.Errorf("Ref.Kind = %v, want %v", got.Ref.Kind, tt.wantKind)
+			}
+			if (got.Change != nil) != tt.wantChange {
+				t.Errorf("Change != nil = %v, want %v", got.Change != nil, tt.wantChange)
+			}
+			if got.Ref != tt.ref {
+				t.Errorf("Ref = %+v, want %+v", got.Ref, tt.ref)
+			}
+		})
+	}
+}

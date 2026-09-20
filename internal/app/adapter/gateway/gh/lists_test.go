@@ -118,3 +118,46 @@ func TestListLabelsTranslatesEveryLabel(t *testing.T) {
 		t.Errorf("ListLabels() = %+v, want %+v", labels, want)
 	}
 }
+
+// TestListItemsPicksTheQueryByKind checks the other half of the dispatch:
+// which of GitHub's two listings runs is decided here, not above.
+func TestListItemsPicksTheQueryByKind(t *testing.T) {
+	t.Parallel()
+	t.Run("pull requests", func(t *testing.T) {
+		t.Parallel()
+		b := fakeBackend{listPRs: func(context.Context, string) ([]gql.PullRequest, error) {
+			return []gql.PullRequest{{Number: 1}, {Number: 2}}, nil
+		}}
+		got, err := New(b).ListItems(context.Background(), "kukv/octoscope", domain.ItemPR)
+		if err != nil {
+			t.Fatalf("ListItems: %v", err)
+		}
+		if len(got) != 2 {
+			t.Fatalf("got %d items, want 2", len(got))
+		}
+		for _, item := range got {
+			if item.Ref.Kind != domain.ItemPR || item.Change == nil {
+				t.Errorf("item %+v is not a pull request with a change", item.Ref)
+			}
+			if item.Ref.Repo != "kukv/octoscope" {
+				t.Errorf("Ref.Repo = %q, want the repository asked for", item.Ref.Repo)
+			}
+		}
+	})
+	t.Run("issues", func(t *testing.T) {
+		t.Parallel()
+		b := fakeBackend{listIssues: func(context.Context, string) ([]gql.Issue, error) {
+			return []gql.Issue{{Number: 3}}, nil
+		}}
+		got, err := New(b).ListItems(context.Background(), "kukv/octoscope", domain.ItemIssue)
+		if err != nil {
+			t.Fatalf("ListItems: %v", err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("got %d items, want 1", len(got))
+		}
+		if got[0].Ref.Kind != domain.ItemIssue || got[0].Change != nil {
+			t.Errorf("item %+v is not an issue without a change", got[0].Ref)
+		}
+	})
+}

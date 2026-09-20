@@ -33,6 +33,32 @@ func (g *Gateway) ListIssues(ctx context.Context, repo string) ([]domain.Issue, 
 	return issues, nil
 }
 
+// ListItems returns the open pull requests or the open issues of one
+// repository. kind is which listing to run, not a branch in the caller: the
+// Repos tab draws the two in separate panes and knows which it is filling.
+func (g *Gateway) ListItems(ctx context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+	if kind == domain.ItemPR {
+		nodes, err := g.backend.ListPRs(ctx, repo)
+		if err != nil {
+			return nil, wrap(err)
+		}
+		items := make([]domain.Item, len(nodes))
+		for i, n := range nodes {
+			items[i] = toItemFromPR(n, repo)
+		}
+		return items, nil
+	}
+	nodes, err := g.backend.ListIssues(ctx, repo)
+	if err != nil {
+		return nil, wrap(err)
+	}
+	items := make([]domain.Item, len(nodes))
+	for i, n := range nodes {
+		items[i] = toItemFromIssue(n, repo)
+	}
+	return items, nil
+}
+
 // ListLabels names the repository's labels.
 func (g *Gateway) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	labels, err := g.backend.ListLabels(ctx, repo)
