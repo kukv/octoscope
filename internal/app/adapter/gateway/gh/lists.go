@@ -7,32 +7,6 @@ import (
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
-// ListPRs returns the open pull requests of one repository.
-func (g *Gateway) ListPRs(ctx context.Context, repo string) ([]domain.PR, error) {
-	nodes, err := g.backend.ListPRs(ctx, repo)
-	if err != nil {
-		return nil, wrap(err)
-	}
-	prs := make([]domain.PR, len(nodes))
-	for i, n := range nodes {
-		prs[i] = toPR(n)
-	}
-	return prs, nil
-}
-
-// ListIssues returns the open issues of one repository.
-func (g *Gateway) ListIssues(ctx context.Context, repo string) ([]domain.Issue, error) {
-	nodes, err := g.backend.ListIssues(ctx, repo)
-	if err != nil {
-		return nil, wrap(err)
-	}
-	issues := make([]domain.Issue, len(nodes))
-	for i, n := range nodes {
-		issues[i] = toIssue(n)
-	}
-	return issues, nil
-}
-
 // ListItems returns the open pull requests or the open issues of one
 // repository. kind is which listing to run, not a branch in the caller: the
 // Repos tab draws the two in separate panes and knows which it is filling.

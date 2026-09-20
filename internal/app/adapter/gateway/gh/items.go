@@ -8,24 +8,6 @@ import (
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
-// GetPR returns one pull request with its body and conversation.
-func (g *Gateway) GetPR(ctx context.Context, repo string, number int) (domain.PR, error) {
-	n, err := g.backend.GetPR(ctx, repo, number)
-	if err != nil {
-		return domain.PR{}, wrap(err)
-	}
-	return toPR(n), nil
-}
-
-// GetIssue returns one issue with its body and conversation.
-func (g *Gateway) GetIssue(ctx context.Context, repo string, number int) (domain.Issue, error) {
-	n, err := g.backend.GetIssue(ctx, repo, number)
-	if err != nil {
-		return domain.Issue{}, wrap(err)
-	}
-	return toIssue(n), nil
-}
-
 // GetItem returns whichever of the two the reference names, with its body and
 // conversation. Which of GitHub's two queries that takes is this layer's
 // knowledge: nothing above it switches on the kind.
@@ -50,45 +32,6 @@ func (g *Gateway) getIssueItem(ctx context.Context, repo string, number int) (do
 		return domain.Item{}, wrap(err)
 	}
 	return toItemFromIssue(n, repo), nil
-}
-
-func toPR(n gql.PullRequest) domain.PR {
-	return domain.PR{
-		Number:    n.Number,
-		Title:     n.Title,
-		Author:    domain.Author{Login: n.Author.Login},
-		State:     parseItemState(n.State),
-		IsDraft:   n.IsDraft,
-		UpdatedAt: n.UpdatedAt,
-		Review:    parseReviewDecision(n.ReviewDecision),
-		URL:       n.URL,
-		Body:      n.Body,
-		BodyText:  n.BodyText,
-		Comments:  toComments(n.Comments.Nodes),
-		Labels:    toLabels(n.Labels.Nodes),
-		Assignees: toAuthors(n.Assignees.Nodes),
-		Checks:    toChecksFromContexts(n.StatusCheckContexts()),
-		Head:      n.HeadRefName,
-		Base:      n.BaseRefName,
-		Additions: n.Additions,
-		Deletions: n.Deletions,
-	}
-}
-
-func toIssue(n gql.Issue) domain.Issue {
-	return domain.Issue{
-		Number:    n.Number,
-		Title:     n.Title,
-		Author:    domain.Author{Login: n.Author.Login},
-		State:     parseItemState(n.State),
-		UpdatedAt: n.UpdatedAt,
-		URL:       n.URL,
-		Body:      n.Body,
-		BodyText:  n.BodyText,
-		Comments:  toComments(n.Comments.Nodes),
-		Labels:    toLabels(n.Labels.Nodes),
-		Assignees: toAuthors(n.Assignees.Nodes),
-	}
 }
 
 // toItemFromPR builds the domain's Item out of a pull request. Change is

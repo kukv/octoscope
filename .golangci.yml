@@ -318,13 +318,15 @@ linters:
         text: "G304"
       # staticcheck QF1008 wants g.backend.X simplified to the promoted g.X
       # for calls that are not overridden elsewhere in the package (in
-      # review.go: StartReview, SubmitNewReview; in writes.go: the ten old
+      # review.go: StartReview, SubmitNewReview; in writes.go: the ten
       # AddPRComment/AddIssueComment/ClosePR/ReopenPR/CloseIssue/ReopenIssue/
       # EditPRLabels/EditIssueLabels/EditPRAssignees/EditIssueAssignees pairs
-      # writes.go dispatches between). Those calls are deliberately explicit:
-      # they are the gateway calling its own backend, not a caller reaching
-      # through promotion (see the package comment in backend.go).
-      - path: internal/app/adapter/gateway/gh/(review|writes)\.go
+      # writes.go dispatches between; in items.go and lists.go: GetPR,
+      # GetIssue, ListPRs and ListIssues, which stopped being overridden when
+      # the domain-typed versions were deleted). Those calls are deliberately
+      # explicit: they are the gateway calling its own backend, not a caller
+      # reaching through promotion (see the package comment in backend.go).
+      - path: internal/app/adapter/gateway/gh/(review|writes|items|lists)\.go
         linters:
           - staticcheck
         text: "QF1008"
