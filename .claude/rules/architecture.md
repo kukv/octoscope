@@ -51,10 +51,9 @@ import する adapter を domain から import すると、depguard より先に
 depguard の発火を確かめるときは、**実際に使う形で import する。**
 blank import（`import _`）は見られない。
 
-（`i18n-layer` と `browser-layer` の deny は今も `internal/app`（末尾スラッシュ無し）のままで、
-`github-layer` は `internal/app/`（末尾スラッシュ付き）に直した。前者は `internal/appfoo` のような
-無関係なパッケージ名も誤って拾う over-match の余地を残しているが、実害はまだ無い。
-直すなら 3 つ揃えて直す。）
+（`i18n-layer` と `browser-layer` の deny は `internal/app`（末尾スラッシュ無し）、
+`github-layer` は `internal/app/`（末尾スラッシュ付き）。前者は `internal/appfoo` のような
+無関係なパッケージ名も誤って拾う over-match の余地がある。直すなら 3 つ揃えて直す。）
 
 ## interface は利用側で定義する
 
@@ -185,7 +184,7 @@ GitHub への**新しい操作**を足すときだけで、それは元から UI
 DI コンテナ、ドメインモデルとインフラモデルの二重定義、Input/Output DTO は
 **入れていない**。
 
-**`internal/app/usecase` を入れる判断を 2026-09-07 にした。**
+**`internal/app/usecase` を入れた判断。**
 それまでは「Web サービス向けの構造だから入れない」という一般論で退けていたが、
 その判断は `internal/app/presentation/tui` が 1 行も存在しない時点（Phase 0、`67ba0de`）に書かれ、
 以後一度も再検証されていなかった。再検証したときの実測は次のとおりである。
@@ -210,7 +209,7 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
 足すときに触るファイルが `internal/github/cli` + ビューの 2 つから
 `internal/github/cli` + `usecase` + ビューの 3 つになる。これが唯一の実コストである。
 
-**`internal/app/adapter/datasource` を入れる判断を 2026-09-13 にした。**
+**`internal/app/adapter/datasource` を入れた判断。**
 
 - **無いと何が壊れるか（実測）:** `SavedQuery` が `config`（ファイル形式）→
   `usecase`（再定義）→ `root.Options` の 3 段を経由していた。tui が `config` を
@@ -225,7 +224,7 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
   壊れるので、`datasource_test.go` に「片方を保存しても、もう片方と起動時設定が
   消えない」テストを置いた
 
-**`internal/app/adapter/gateway/gh` を入れる判断を 2026-09-13 にした。**
+**`internal/app/adapter/gateway/gh` を入れた判断。**
 
 - **無いと何が壊れるか（実測）:** `internal/github` から domain への参照が
   430 箇所 / 81 シンボルあった。`Author` `Label` `Comment` は json タグ付きのまま
@@ -283,7 +282,7 @@ Repos タブは PR の一覧と Issue の一覧を別のペインに描くので
 **守れなくなるもの:** port を読んでも GitHub への呼び出しが何回になるか分からなくなる。
 これは `StartReview` / `SubmitNewReview` を畳んだときと同じ性質の反転で、前例に揃えた。
 
-**`backend` 側は別である。** `internal/github` のクライアントは今も `AddPRComment` と
+**`backend` 側は別である。** `internal/github` のクライアントは `AddPRComment` と
 `AddIssueComment` を別々に持ち、`gateway/gh/writes.go` がその間で振り分ける。
 `Gateway` は `backend` を埋め込んでいるので、それらはメソッド昇格で `Gateway` にも生えている。
 この規約が言う「形」は **usecase に向いた port の形**であって、ACL の内側ではない

@@ -196,6 +196,65 @@ func (g *Gateway) DisableAutoMerge(ctx context.Context, pr domain.PullRequestHan
 
 ---
 
+### Task 4: 範囲外にしていた古い日付と「今の状態」も消す
+
+Task 1 で「今回の整備より前のものは触らない」としたが、**Task 3 で書いた規約が
+それらを違反にした**ので、利用者の指示（2026-09-21）で範囲を広げる。
+
+**Files:**
+- Modify: `.claude/rules/architecture.md`（3 節の見出し + 2 箇所の「今」）
+- Modify: `.claude/rules/testing.md:98`
+
+- [ ] 「**`internal/app/usecase` を入れる判断を 2026-09-07 にした。**」など 3 節の
+      見出しから日付を落とす。**本文は残す**——「層を足す前に」節はこの 3 つを
+      「書けたときの見本」として参照しており、実測値そのものが規約の中身である。
+      失われる「いつのコードに対する判断か」は、`usecase` の節が既に
+      `（Phase 0、67ba0de）` とコミットで書いているので、日付より正確な形で残る
+- [ ] `architecture.md:54-57` の「今も」「実害はまだ無い」を時制の無い形に直す
+- [ ] `architecture.md:286` の「今も」を落とす
+- [ ] `testing.md:98` の `（2026-09-14）` を落とす
+- [ ] `go-style.md:82` の「今も有効な規約を指している」は**残す**——
+      これは「いつか無効になるかもしれない」ではなく、規約とプランの違いを
+      言っているだけで、状態の記述ではない
+- [ ] **Verification:** `make check`。`grep -rn "2026-09" .claude/rules/` が
+      Task 3 で書いた規約の**例示**以外にヒットしないこと
+
+**Commit:** `docs: finish taking the dates out of the rules`
+
+---
+
+### Task 5: コードから spec / design への参照を消す
+
+`go-style.md` の「実装計画や設計書への参照を書かない」に対する違反が 25 箇所ある
+（`spec §6.5`、`standalone design §4.4.4`、`Design §9` など。`grep` 済み）。
+**利用者が挙げたのは 3 ファイルだが、規約は全体に掛かるので全部直す。**
+
+**Files:** 下記 15 ファイル
+
+| ファイル | 箇所 |
+|---|---|
+| `adapter/gateway/gh/merge.go` | 1 |
+| `presentation/tui/repo/sidebar.go` | 2 |
+| `presentation/tui/merge/{merge,render}.go` | 2 |
+| テスト 11 ファイル | 20 |
+
+- [ ] **ほとんどは括弧つきの引用で、落としても文が成り立つ。** 落とすだけにする
+- [ ] 引用が文頭にあるもの（`// Design §9: under 100 columns ...`）は、
+      引用だけを落として本文を文頭に繰り上げる
+- [ ] `guards spec §6.5:` / `guards spec §6.4` は**何を守っているかに置き換える**
+      （`guards the catalog:` / `guards the width`）——番号を落とすだけだと
+      「何を」が消える
+- [ ] `repo/sidebar.go:26` の `minSidebarWidth` は、引用を落とすと
+      「折り畳む幅である」しか残らず Task 2 の基準に掛かる。**理由を書く**
+- [ ] `gql/merge_test.go:27` はコメントではなく `t.Error` の文字列。
+      `, spec §2` だけを落とし、`measured on kukv/octoscope` は残す
+- [ ] **Verification:** `make check`。golden が 1 枚も変わらないこと。
+      `git diff` にコード行が 1 行も無いこと（`merge_test.go` の文字列を除く）
+
+**Commit:** `refactor: stop the comments pointing at the spec and the design`
+
+---
+
 ## 完了条件
 
 - [ ] `make check` が通る
