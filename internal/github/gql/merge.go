@@ -52,8 +52,6 @@ type mergeContextResponse struct {
 	} `json:"data"`
 }
 
-// PRMergeContext fetches what the merge popup draws: what the repository
-// allows and what state this pull request is in.
 func (c *Client) PRMergeContext(ctx context.Context, repo string, number int) (MergeContext, error) {
 	repoFields, err := c.repoVars(repo)
 	if err != nil {
@@ -106,7 +104,6 @@ const (
 	MergeMethodRebase MergeMethod = "REBASE"
 )
 
-// MergePR merges the pull request now.
 func (c *Client) MergePR(ctx context.Context, pullRequestID string, method MergeMethod) error {
 	_, err := c.Write(ctx, mergePRMutation,
 		S("pullRequestId", pullRequestID),
@@ -115,8 +112,6 @@ func (c *Client) MergePR(ctx context.Context, pullRequestID string, method Merge
 	return err
 }
 
-// EnableAutoMerge asks GitHub to merge the pull request once what it is
-// waiting on is in.
 func (c *Client) EnableAutoMerge(ctx context.Context, pullRequestID string, method MergeMethod) error {
 	_, err := c.Write(ctx, enableAutoMergeMutation,
 		S("pullRequestId", pullRequestID),
@@ -125,7 +120,6 @@ func (c *Client) EnableAutoMerge(ctx context.Context, pullRequestID string, meth
 	return err
 }
 
-// DisableAutoMerge cancels a queued auto-merge.
 func (c *Client) DisableAutoMerge(ctx context.Context, pullRequestID string) error {
 	_, err := c.Write(ctx, disableAutoMergeMutation, S("pullRequestId", pullRequestID))
 	return err

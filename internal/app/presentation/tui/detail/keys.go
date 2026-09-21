@@ -105,7 +105,6 @@ func (m Model) refetch() (Model, tea.Cmd) {
 	return m, fetch(m.src, m.ref)
 }
 
-// openCompose opens the comment composer.
 func (m Model) openCompose() (Model, tea.Cmd) {
 	if m.phase == phaseLoading {
 		return m.stillLoading(), nil
@@ -117,7 +116,6 @@ func (m Model) openCompose() (Model, tea.Cmd) {
 	return m, textarea.Blink
 }
 
-// openConfirm asks before closing or reopening the item.
 func (m Model) openConfirm() (Model, tea.Cmd) {
 	if m.phase == phaseLoading {
 		return m.stillLoading(), nil

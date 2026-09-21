@@ -99,7 +99,6 @@ func (c *Client) base() string {
 	return defaultBase
 }
 
-// endpointURL is where the GraphQL documents go.
 func (c *Client) endpointURL() string {
 	return c.base() + "/graphql"
 }

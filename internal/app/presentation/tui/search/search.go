@@ -30,7 +30,6 @@ type candidateSource interface {
 	ListAssignees(ctx context.Context, repo string) ([]string, error)
 }
 
-// Source is what the Search tab needs from the GitHub layer.
 type Source interface {
 	searcher
 	candidateSource
@@ -176,7 +175,6 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	return m.startSearch()
 }
 
-// startSearch runs the query for the filters or raw text as they stand now.
 func (m Model) startSearch() (Model, tea.Cmd) {
 	m.gen++
 	m.loading = true
@@ -380,7 +378,6 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleFilterKey is browse mode with the filter pane focused.
 func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
@@ -422,7 +419,6 @@ func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleResultKey is browse mode with the result pane focused.
 func (m Model) handleResultKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":

@@ -8,7 +8,6 @@ import (
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
-// PRDiff returns the pull request's diff, one entry per file.
 func (g *Gateway) PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error) {
 	d, err := g.backend.PRDiff(ctx, repo, number)
 	if err != nil {
@@ -24,8 +23,6 @@ func (g *Gateway) PRDiff(ctx context.Context, repo string, number int) ([]domain
 	return parseDiff(d.Raw), nil
 }
 
-// PRReviewContext returns everything the diff view needs to draw and change
-// a review.
 func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error) {
 	rc, err := g.backend.PRReviewContext(ctx, repo, number)
 	if err != nil {
@@ -68,7 +65,6 @@ func (g *Gateway) SubmitReview(ctx context.Context, t domain.ReviewTarget, event
 	return nil
 }
 
-// DiscardReview throws the unsubmitted review away, comments and all.
 func (g *Gateway) DiscardReview(ctx context.Context, review domain.ReviewHandle) error {
 	if err := g.backend.DiscardReview(ctx, string(review)); err != nil {
 		return wrap(err)

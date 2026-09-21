@@ -23,7 +23,6 @@ const jsonMediaType = "application/vnd.github+json"
 // one, and the decoding here is written against this version.
 const apiVersion = "2022-11-28"
 
-// restURL turns a path into an absolute URL against this client's base.
 func (c *Client) restURL(path string) string {
 	return c.base() + "/" + strings.TrimPrefix(path, "/")
 }

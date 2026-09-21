@@ -31,7 +31,6 @@ func page(limit int) int {
 	return limit
 }
 
-// SearchRepos looks for repositories matching query.
 func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]github.Repository, error) {
 	path := fmt.Sprintf("search/repositories?q=%s&per_page=%d",
 		url.QueryEscape(query), page(limit))
@@ -82,7 +81,6 @@ func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]g
 	return repos, nil
 }
 
-// ListOrgs names the organisations the authenticated user belongs to.
 func (c *Client) ListOrgs(ctx context.Context) ([]string, error) {
 	out, err := c.read(ctx, "user/orgs", "")
 	if err != nil {

@@ -16,7 +16,6 @@ type repoFinder interface {
 	ValidRepoName(name string) bool
 }
 
-// repoStore is where the sidebar's list survives a restart.
 type repoStore interface {
 	SaveRepositories(repos []string) error
 }
@@ -26,13 +25,10 @@ type repoStore interface {
 // with more than that would lose the rest without a word.
 const seedLimit = 100
 
-// SaveRepositories writes the sidebar's list to the settings file.
 func (u *Usecase) SaveRepositories(repos []string) error {
 	return u.repoStore.SaveRepositories(repos)
 }
 
-// SearchRepos looks for repositories to offer while the add dialog is being
-// typed into.
 func (u *Usecase) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
 	return u.repos.SearchRepos(ctx, query, limit)
 }

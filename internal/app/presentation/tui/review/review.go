@@ -16,7 +16,6 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// Source is what submitting needs.
 type Source interface {
 	SubmitReview(ctx context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error
 }
@@ -33,7 +32,6 @@ type Target struct {
 // SubmittedMsg tells the holder the review went out; it should refetch.
 type SubmittedMsg struct{}
 
-// CancelledMsg tells the holder to take the popup away.
 type CancelledMsg struct{}
 
 // ErrorMsg carries a failure the holder shows at footer level. The popup

@@ -38,7 +38,6 @@ const (
 	gutter = "  "
 )
 
-// sectionTitleIDs maps a column to its heading in the catalog.
 var sectionTitleIDs = map[domain.WorkSection]string{
 	domain.SectionReviewRequested: "work.review_requested",
 	domain.SectionYourPRs:         "work.your_prs",

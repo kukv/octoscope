@@ -31,7 +31,6 @@ func New(title, hint string) Model {
 	return Model{title: title, hint: hint, input: in, cursor: -1}
 }
 
-// Query is what has been typed, which is what a search is run for.
 func (m Model) Query() string { return m.input.Value() }
 
 // Value is the name enter would take: the suggestion under the cursor, or
@@ -62,7 +61,6 @@ func (m Model) SetCandidates(c []domain.RepoCandidate) Model {
 	return m
 }
 
-// SetWidth fits the box and the field to the terminal.
 func (m Model) SetWidth(w int) Model {
 	m.width = w
 	m.input.SetWidth(max(m.contentWidth()-promptCols, 1))
@@ -72,7 +70,6 @@ func (m Model) SetWidth(w int) Model {
 // SetError puts one line under the suggestions. Typing clears it.
 func (m Model) SetError(text string) Model { m.errText = text; return m }
 
-// SetValue starts the field with v already in it.
 func (m Model) SetValue(v string) Model {
 	m.input.SetValue(v)
 	return m

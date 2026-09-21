@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-// PRFile is one entry of the files API's response.
 type PRFile struct {
 	Filename         string  `json:"filename"`
 	PreviousFilename string  `json:"previous_filename"`

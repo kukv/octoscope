@@ -26,10 +26,8 @@ type Source interface {
 	review.Source
 }
 
-// ClosedMsg tells the parent the user left the diff view.
 type ClosedMsg struct{}
 
-// ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
 type diffMsg struct {
@@ -503,7 +501,6 @@ func (m Model) toggleCollapsed() Model {
 	return m.follow()
 }
 
-// buildRows flattens the selected file into the lines the diff pane draws.
 func (m Model) buildRows() []row {
 	if len(m.files) == 0 {
 		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.no_changes")}}

@@ -46,7 +46,6 @@ func init() {
 	SetLanguage(language.English)
 }
 
-// SetLanguage switches the language used by T, Tf and Tn.
 func SetLanguage(tag language.Tag) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -110,7 +109,6 @@ func DateTime(t time.Time) string {
 	return t.Format(T("time.datetime_layout"))
 }
 
-// RelTime renders how long ago t was, relative to now.
 func RelTime(now, t time.Time) string {
 	d := now.Sub(t)
 	switch {

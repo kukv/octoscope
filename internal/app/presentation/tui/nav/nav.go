@@ -10,12 +10,8 @@ package nav
 
 import "github.com/kukv/octoscope/internal/app/domain"
 
-// OpenDetailMsg asks the parent to show the detail view for one item.
 type OpenDetailMsg struct{ Ref domain.ItemRef }
 
-// OpenDiffMsg asks the parent to show the diff of the selected pull request.
 type OpenDiffMsg struct{ Ref domain.ItemRef }
 
-// OpenChecksMsg asks the parent to show the checks of the selected pull
-// request.
 type OpenChecksMsg struct{ Ref domain.ItemRef }

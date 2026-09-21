@@ -27,7 +27,6 @@ const (
 	StateMerged
 )
 
-// ItemKind separates pull requests from issues in a mixed list.
 type ItemKind int
 
 const (

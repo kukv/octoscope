@@ -29,7 +29,6 @@ var (
 	isDark    = true
 )
 
-// SetDark tells the palette which way the terminal's background goes.
 func SetDark(dark bool) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -58,7 +57,6 @@ func attention() lipgloss.Style { return fg("#9a6700", "#d29922") }
 func accent() lipgloss.Style    { return fg("#0969da", "#58a6ff") }
 func muted() lipgloss.Style     { return fg("#57606a", "#8b949e") }
 
-// selection is the background a cursor row or card is marked with.
 func selection() color.Color { return pick("#e8eef5", "#1d2735") }
 
 // diffAddedBg and diffRemovedBg are the backgrounds an added and a removed
@@ -123,7 +121,6 @@ func fillLine(s string, bg color.Color) string {
 	return seq + s + ansi.ResetStyle
 }
 
-// SelectedLine draws s as the selected row.
 func SelectedLine(s string) string { return fillLine(s, selection()) }
 
 // DiffLine fills an added or a removed line with the colour that says which
@@ -161,24 +158,19 @@ func Count(attention bool) lipgloss.Style {
 // footers, the empty-column note.
 func Dim() lipgloss.Style { return muted() }
 
-// Cursor styles the row or card under the selection.
 func Cursor() lipgloss.Style { return accent().Bold(true) }
 
-// ActiveTab and InactiveTab style the tab row.
 func ActiveTab() lipgloss.Style   { return accent().Bold(true).Underline(true) }
 func InactiveTab() lipgloss.Style { return muted() }
 
-// Title styles the name of the thing on screen.
 func Title() lipgloss.Style { return lipgloss.NewStyle().Bold(true) }
 
-// Error styles a failure.
 func Error() lipgloss.Style { return danger() }
 
 // Accent styles a branch name or anything else the eye should land on inside
 // a line of otherwise muted metadata.
 func Accent() lipgloss.Style { return accent() }
 
-// Added and Removed style the two halves of a diff's size.
 func Added() lipgloss.Style   { return success() }
 func Removed() lipgloss.Style { return danger() }
 
@@ -209,7 +201,6 @@ func Review(s domain.ReviewState, draft bool) lipgloss.Style {
 // other when a palette changes.
 func Issue() lipgloss.Style { return success() }
 
-// Check styles the marker for a rolled-up check state.
 func Check(s domain.CheckState) lipgloss.Style {
 	switch s {
 	case domain.CheckSuccess:
@@ -287,7 +278,6 @@ func DiffRemoved() lipgloss.Style { return fg("#cf222e", "#f85149") }
 // takes the muted colour and a weight of its own.
 func HunkHeader() lipgloss.Style { return muted().Bold(true) }
 
-// LineNumber styles the two numbers down the left of the diff.
 func LineNumber() lipgloss.Style { return muted() }
 
 // Thread styles a review comment drawn under the line it is about. A comment
@@ -371,8 +361,6 @@ var (
 	highlightLines = map[highlightKey]string{}
 )
 
-// cachedHighlight answers from the cache, colouring and remembering the
-// line on a miss.
 func cachedHighlight(key highlightKey, colour func() string) string {
 	highlightMu.RLock()
 	line, ok := highlightLines[key]

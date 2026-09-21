@@ -1,6 +1,5 @@
 package domain
 
-// MergeMethod is how the pull request's commits land on the base branch.
 type MergeMethod int
 
 const (
@@ -24,8 +23,6 @@ const (
 	BlockDirty
 )
 
-// MergeContext is everything the merge popup draws and acts on: what the
-// repository allows, and what state this pull request is in.
 type MergeContext struct {
 	PullRequest PullRequestHandle
 

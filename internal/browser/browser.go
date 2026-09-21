@@ -35,7 +35,6 @@ func (e *NoneError) Error() string {
 	return fmt.Sprintf("no browser to open %s", e.URL)
 }
 
-// Open shows url in the user's browser.
 func Open(url string) error {
 	argv, ok := command(environment{
 		goos:    runtime.GOOS,

@@ -38,7 +38,6 @@ const (
 	checks = 3
 )
 
-// Render draws the selected item.
 func Render(it domain.WorkItem, width int) []string {
 	// The mockup gives the description the larger share; the checks are a
 	// short list of short names.

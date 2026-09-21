@@ -20,7 +20,6 @@ const (
 	searchLimit = 5
 )
 
-// openAddDialog puts up the popup that asks for a name.
 func (m Model) openAddDialog() (Model, tea.Cmd) {
 	m.mode = modeAdd
 	m.dlg = dialog.New(i18n.T("dialog.add_repo_title"), i18n.T("dialog.add_repo_hint")).

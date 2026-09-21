@@ -157,7 +157,6 @@ func (c *Client) ListPRs(ctx context.Context, repo string) ([]PullRequest, error
 	return resp.Data.Repository.PullRequests.Nodes, nil
 }
 
-// ListIssues returns the open issues of one repository.
 func (c *Client) ListIssues(ctx context.Context, repo string) ([]Issue, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {
@@ -174,7 +173,6 @@ func (c *Client) ListIssues(ctx context.Context, repo string) ([]Issue, error) {
 	return resp.Data.Repository.Issues.Nodes, nil
 }
 
-// GetPR returns one pull request with its body and conversation.
 func (c *Client) GetPR(ctx context.Context, repo string, number int) (PullRequest, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {
@@ -196,7 +194,6 @@ func (c *Client) GetPR(ctx context.Context, repo string, number int) (PullReques
 	return node, nil
 }
 
-// GetIssue returns one issue with its body and conversation.
 func (c *Client) GetIssue(ctx context.Context, repo string, number int) (Issue, error) {
 	vars, err := c.repoVars(repo)
 	if err != nil {

@@ -14,7 +14,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/presentation/tui/nav"
 )
 
-// Source is what the Work board needs from the GitHub layer.
 type Source interface {
 	ListWorkSection(ctx context.Context, s domain.WorkSection) ([]domain.WorkItem, error)
 }

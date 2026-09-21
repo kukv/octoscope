@@ -31,7 +31,6 @@ func (u *Usecase) ListItems(ctx context.Context, repo string, kind domain.ItemKi
 
 func (u *Usecase) RepoName(ctx context.Context) (string, error) { return u.lists.RepoName(ctx) }
 
-// Viewer is the login of the signed-in user.
 func (u *Usecase) Viewer(ctx context.Context) (string, error) { return u.viewer.Viewer(ctx) }
 
 func (u *Usecase) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {

@@ -23,7 +23,6 @@ type commentPage struct {
 	Nodes    []Comment `json:"nodes"`
 }
 
-// Comment is one comment on a pull request or an issue.
 type Comment struct {
 	Author    Author    `json:"author"`
 	Body      string    `json:"body"`

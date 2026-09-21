@@ -11,7 +11,6 @@ import (
 // know it has a parent.
 const tabRowHeight = 2
 
-// tabGap separates the labels of the tab row.
 const tabGap = "  "
 
 // handleMouse routes a mouse message the way handleKey routes a key: to one

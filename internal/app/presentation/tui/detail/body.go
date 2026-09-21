@@ -142,7 +142,6 @@ func markdownLines(src string, w int) []string {
 	return trimBlankEdges(strings.Split(out, "\n"))
 }
 
-// trimBlankEdges drops the blank lines at either end of a rendered block.
 func trimBlankEdges(lines []string) []string {
 	for len(lines) > 0 && strings.TrimSpace(ansi.Strip(lines[0])) == "" {
 		lines = lines[1:]

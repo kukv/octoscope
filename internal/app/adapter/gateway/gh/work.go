@@ -21,7 +21,6 @@ var workQueries = [domain.WorkSectionCount]string{
 	domain.SectionMentioned:       "is:open mentions:@me archived:false",
 }
 
-// workQuery is the GitHub search that defines one column of the Work board.
 func workQuery(s domain.WorkSection) string {
 	return workQueries[s]
 }
@@ -39,7 +38,6 @@ func (g *Gateway) ListWorkSection(ctx context.Context, s domain.WorkSection) ([]
 	return toWorkItems(nodes), nil
 }
 
-// SearchItems runs one GitHub issue search and returns what it found.
 func (g *Gateway) SearchItems(ctx context.Context, query string) ([]domain.WorkItem, error) {
 	nodes, err := g.backend.SearchItems(ctx, query)
 	if err != nil {
@@ -85,8 +83,6 @@ func toWorkItem(n gql.SearchItem) domain.WorkItem {
 	return item
 }
 
-// RepoCounts fetches how many pull requests and issues are open in each
-// repository.
 func (g *Gateway) RepoCounts(ctx context.Context, repos []string) ([]domain.RepoCount, error) {
 	nodes, err := g.backend.RepoCounts(ctx, repos)
 	if err != nil {

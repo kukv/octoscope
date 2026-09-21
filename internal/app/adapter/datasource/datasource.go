@@ -17,7 +17,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// Store reads and writes one settings file.
 type Store struct{ path string }
 
 // NewStore returns a store for the settings file at path. An empty path is

@@ -27,7 +27,6 @@ type source interface {
 	merger
 }
 
-// Usecase holds the backend every view talks to.
 type Usecase struct {
 	items      itemFetcher
 	comments   commenter

@@ -23,7 +23,6 @@ import (
 // and only a number that never repeats can tell their answers apart.
 var nextGen atomic.Int64
 
-// Source is what merging needs.
 type Source interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
 	MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error
@@ -37,7 +36,6 @@ type Source interface {
 // leaves the pull request open and worth reading.
 type MergedMsg struct{ Merged bool }
 
-// CancelledMsg tells the holder to take the popup away.
 type CancelledMsg struct{}
 
 // ErrorMsg carries a failure the holder shows at footer level, the same way
