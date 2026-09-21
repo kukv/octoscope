@@ -561,7 +561,6 @@ func headingTexts() []string {
 	return texts
 }
 
-// headingsOn reports which column headings a board drew, by name.
 func headingsOn(m Model) []string {
 	out := ansi.Strip(m.View())
 	var drawn []string

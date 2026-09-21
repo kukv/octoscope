@@ -60,7 +60,6 @@ func checksRerunModel(width int) Model {
 	return press(goldenModel(width), "R")
 }
 
-// checksLoadingModel is the view before its fetch has landed.
 func checksLoadingModel(width int) Model {
 	m := New(&fakeSource{checks: fixture(), log: goldenLog()},
 		domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
@@ -122,7 +121,6 @@ func checksNoneModel(width int) Model {
 	return m
 }
 
-// goldenStates are the recorded states, by the name their recording carries.
 var goldenStates = []struct {
 	name  string
 	build func(width int) Model

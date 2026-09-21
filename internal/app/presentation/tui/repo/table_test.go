@@ -15,7 +15,6 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// next is the model after one key press.
 func next(m Model, k string) Model {
 	m, _ = m.Update(key(k))
 	return m

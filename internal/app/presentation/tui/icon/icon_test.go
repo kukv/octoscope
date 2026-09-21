@@ -26,7 +26,6 @@ func use(t *testing.T, s icon.Set) {
 	t.Cleanup(func() { icon.Use(icon.Unicode) })
 }
 
-// markers is every glyph a set can draw, in one slice.
 func markers() []string {
 	var got []string
 	for _, draft := range []bool{false, true} {

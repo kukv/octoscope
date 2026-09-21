@@ -314,7 +314,6 @@ func TestTheReposTabWaitsForTheLookupBeforeCallingItEmpty(t *testing.T) {
 	}
 }
 
-// isQuit reports whether cmd is tea.Quit.
 func isQuit(cmd tea.Cmd) bool {
 	if cmd == nil {
 		return false
@@ -1167,7 +1166,6 @@ func overlongSource() *fakeSource {
 	}
 }
 
-// renderEveryScreen renders every screen the root can show at width.
 func renderEveryScreen(t *testing.T, width int) map[string]string {
 	t.Helper()
 	size := tea.WindowSizeMsg{Width: width, Height: 40}

@@ -118,14 +118,12 @@ func mergeFailedModel(t *testing.T, width int) Model {
 	return m
 }
 
-// mergeLoadingModel is the popup before its fetch has landed.
 func mergeLoadingModel(t *testing.T, width int) Model {
 	m := New(&fakeSource{ctx: mergeable()}, ref())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
 	return m
 }
 
-// goldenStates are the recorded states, by the name their recording carries.
 var goldenStates = []struct {
 	name  string
 	build func(t *testing.T, width int) Model

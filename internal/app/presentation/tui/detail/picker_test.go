@@ -48,9 +48,7 @@ func TestNewPickerIncludesCurrentNotInCandidates(t *testing.T) {
 
 func TestPickerToggleDiff(t *testing.T) {
 	p := newPicker(pickLabels, "Labels", []string{"bug", "wip"}, nil, []string{"bug"})
-	// cursor at 0 (bug, selected) -> toggle off (remove bug)
 	p.toggle()
-	// move to wip and toggle on (add wip)
 	p.moveDown(10)
 	p.toggle()
 	add, remove := p.diff()
@@ -157,7 +155,6 @@ func TestPickerApplyComputesDiffAndRefetches(t *testing.T) {
 		labels: []domain.Label{{Name: "bug"}, {Name: "wip"}},
 	}
 	m := openPicker(t, f, prRef(), "l")
-	// toggle bug off (cursor 0), move to wip, toggle on
 	m, _ = m.Update(key("space"))
 	m, _ = m.Update(key("j"))
 	m, _ = m.Update(key("space"))

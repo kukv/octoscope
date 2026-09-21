@@ -193,8 +193,6 @@ func TestFromMergeMethodMapsEveryValue(t *testing.T) {
 	}
 }
 
-// TestPRMergeContextTranslatesWhatTheBackendReturns wires PRMergeContext
-// through the gateway end to end.
 func TestPRMergeContextTranslatesWhatTheBackendReturns(t *testing.T) {
 	t.Parallel()
 
@@ -212,8 +210,6 @@ func TestPRMergeContextTranslatesWhatTheBackendReturns(t *testing.T) {
 	}
 }
 
-// TestMergePRPassesTheConvertedMethod wires MergePR through the gateway end
-// to end.
 func TestMergePRPassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
@@ -231,8 +227,6 @@ func TestMergePRPassesTheConvertedMethod(t *testing.T) {
 	}
 }
 
-// TestEnableAutoMergePassesTheConvertedMethod wires EnableAutoMerge through
-// the gateway end to end.
 func TestEnableAutoMergePassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 

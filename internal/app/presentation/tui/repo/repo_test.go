@@ -18,7 +18,6 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// fakeSource implements Source and records calls.
 type fakeSource struct {
 	prs      []domain.Item
 	issues   []domain.Item

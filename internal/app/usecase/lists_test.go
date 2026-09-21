@@ -16,7 +16,6 @@ type fakeViewer struct {
 
 func (f *fakeViewer) Viewer(context.Context) (string, error) { return f.viewer, f.viewerErr }
 
-// fakeItemLister records the query ListItems was asked to run.
 type fakeItemLister struct {
 	items []domain.Item
 	err   error

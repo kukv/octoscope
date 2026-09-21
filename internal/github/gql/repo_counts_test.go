@@ -200,7 +200,6 @@ func TestRepoCountsRejectsNamesThatOnlyLookLikeTheyCanSplit(t *testing.T) {
 	}
 }
 
-// varValue returns the value of the named variable.
 func varValue(vars []Var, name string) string {
 	for _, v := range vars {
 		if v.Name == name {
