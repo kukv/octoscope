@@ -43,6 +43,11 @@ const (
 // Kind is part of the identity rather than of the Item because a reference
 // is held before the Item is fetched -- a card on the Work board sends one
 // to open a view, and what it points at has to be known by then.
+//
+// This names an item for reading, and for the writes that go through
+// ItemRef: a comment, a close, a label. Reviewing and merging name the same
+// pull request differently, with a PullRequestHandle, and one cannot be made
+// from the other -- see handle.go, which says where a handle comes from.
 type ItemRef struct {
 	Kind   ItemKind
 	Repo   string
