@@ -21,9 +21,10 @@ type fakeBackend struct {
 	getIssue        func(ctx context.Context, repo string, number int) (gql.Issue, error)
 	prDiff          func(ctx context.Context, repo string, number int) (github.Diff, error)
 	prReviewContext func(ctx context.Context, repo string, number int) (gql.ReviewContext, error)
-	addReviewThread func(reviewID string, c gql.PendingComment) error
-	submitReview    func(reviewID string, event gql.ReviewEvent, body string) error
-	submitNewReview func(pullRequestID string, event gql.ReviewEvent, body string) error
+	startReview     func(ctx context.Context, pullRequestID string) (string, error)
+	addReviewThread func(ctx context.Context, reviewID string, c gql.PendingComment) error
+	submitReview    func(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error
+	submitNewReview func(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error
 	prChecks        func(ctx context.Context, repo string, number int) ([]gql.CheckRun, error)
 	jobLog          func(ctx context.Context, repo string, jobID int64, failedOnly bool) ([]github.LogLine, error)
 	rerunWorkflow   func(ctx context.Context, repo string, runID int64, scope github.RerunScope) error
@@ -31,8 +32,8 @@ type fakeBackend struct {
 	listIssues      func(ctx context.Context, repo string) ([]gql.Issue, error)
 	listLabels      func(ctx context.Context, repo string) ([]gql.Label, error)
 	prMergeContext  func(ctx context.Context, repo string, number int) (gql.MergeContext, error)
-	mergePR         func(pullRequestID string, method gql.MergeMethod) error
-	enableAutoMerge func(pullRequestID string, method gql.MergeMethod) error
+	mergePR         func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	enableAutoMerge func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
 	searchRepos     func(ctx context.Context, query string, limit int) ([]github.Repository, error)
 	listOwnRepos    func(ctx context.Context, owner string, limit int) ([]github.Repository, error)
 	searchItems     func(ctx context.Context, query string) ([]gql.SearchItem, error)
@@ -49,8 +50,8 @@ type fakeBackend struct {
 	editPRAssignees    func(ctx context.Context, repo string, number int, add, remove []string) error
 	editIssueAssignees func(ctx context.Context, repo string, number int, add, remove []string) error
 
-	discardReview    func(reviewID string) error
-	disableAutoMerge func(pullRequestID string) error
+	discardReview    func(ctx context.Context, reviewID string) error
+	disableAutoMerge func(ctx context.Context, pullRequestID string) error
 }
 
 func (f fakeBackend) GetPR(ctx context.Context, repo string, number int) (gql.PullRequest, error) {
@@ -85,12 +86,16 @@ func (f fakeBackend) ReopenIssue(ctx context.Context, repo string, number int) e
 	return f.reopenIssue(ctx, repo, number)
 }
 
-func (f fakeBackend) DiscardReview(reviewID string) error {
-	return f.discardReview(reviewID)
+func (f fakeBackend) StartReview(ctx context.Context, pullRequestID string) (string, error) {
+	return f.startReview(ctx, pullRequestID)
 }
 
-func (f fakeBackend) DisableAutoMerge(pullRequestID string) error {
-	return f.disableAutoMerge(pullRequestID)
+func (f fakeBackend) DiscardReview(ctx context.Context, reviewID string) error {
+	return f.discardReview(ctx, reviewID)
+}
+
+func (f fakeBackend) DisableAutoMerge(ctx context.Context, pullRequestID string) error {
+	return f.disableAutoMerge(ctx, pullRequestID)
 }
 
 func (f fakeBackend) EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error {

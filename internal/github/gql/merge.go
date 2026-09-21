@@ -106,12 +106,9 @@ const (
 	MergeMethodRebase MergeMethod = "REBASE"
 )
 
-// The three mutations take no context, for the same reason review.go's do:
-// a merge that has happened has happened.
-
 // MergePR merges the pull request now.
-func (c *Client) MergePR(pullRequestID string, method MergeMethod) error {
-	_, err := c.Write(context.Background(), mergePRMutation,
+func (c *Client) MergePR(ctx context.Context, pullRequestID string, method MergeMethod) error {
+	_, err := c.Write(ctx, mergePRMutation,
 		S("pullRequestId", pullRequestID),
 		S("mergeMethod", string(method)),
 	)
@@ -120,8 +117,8 @@ func (c *Client) MergePR(pullRequestID string, method MergeMethod) error {
 
 // EnableAutoMerge asks GitHub to merge the pull request once what it is
 // waiting on is in.
-func (c *Client) EnableAutoMerge(pullRequestID string, method MergeMethod) error {
-	_, err := c.Write(context.Background(), enableAutoMergeMutation,
+func (c *Client) EnableAutoMerge(ctx context.Context, pullRequestID string, method MergeMethod) error {
+	_, err := c.Write(ctx, enableAutoMergeMutation,
 		S("pullRequestId", pullRequestID),
 		S("mergeMethod", string(method)),
 	)
@@ -129,7 +126,7 @@ func (c *Client) EnableAutoMerge(pullRequestID string, method MergeMethod) error
 }
 
 // DisableAutoMerge cancels a queued auto-merge.
-func (c *Client) DisableAutoMerge(pullRequestID string) error {
-	_, err := c.Write(context.Background(), disableAutoMergeMutation, S("pullRequestId", pullRequestID))
+func (c *Client) DisableAutoMerge(ctx context.Context, pullRequestID string) error {
+	_, err := c.Write(ctx, disableAutoMergeMutation, S("pullRequestId", pullRequestID))
 	return err
 }

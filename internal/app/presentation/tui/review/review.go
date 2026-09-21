@@ -7,6 +7,8 @@
 package review
 
 import (
+	"context"
+
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
@@ -16,7 +18,7 @@ import (
 
 // Source is what submitting needs.
 type Source interface {
-	SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error
+	SubmitReview(ctx context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error
 }
 
 // Target names what the popup submits against: the pull request it belongs
@@ -134,7 +136,7 @@ func (m Model) submit() (Model, tea.Cmd) {
 	event, body := m.event, m.textarea.Value()
 	m.sending = true
 	return m, func() tea.Msg {
-		if err := src.SubmitReview(target, event, body); err != nil {
+		if err := src.SubmitReview(context.Background(), target, event, body); err != nil {
 			return ErrorMsg{Err: err}
 		}
 		return SubmittedMsg{}

@@ -144,7 +144,7 @@ func (f *scenarioSource) PRReviewContext(context.Context, string, int) (domain.R
 
 // PostLineComment starts the pending review the first time, the way the
 // usecase does.
-func (f *scenarioSource) PostLineComment(_ domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+func (f *scenarioSource) PostLineComment(_ context.Context, _ domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
 	f.posted = append(f.posted, c)
 	f.pendingID = "PRR_1"
 	f.threads = append(f.threads, domain.ReviewThread{
@@ -154,9 +154,9 @@ func (f *scenarioSource) PostLineComment(_ domain.ReviewTarget, c domain.Pending
 	return f.pendingID, nil
 }
 
-func (f *scenarioSource) DiscardReview(domain.ReviewHandle) error { return nil }
+func (f *scenarioSource) DiscardReview(context.Context, domain.ReviewHandle) error { return nil }
 
-func (f *scenarioSource) SubmitReview(domain.ReviewTarget, domain.ReviewEvent, string) error {
+func (f *scenarioSource) SubmitReview(context.Context, domain.ReviewTarget, domain.ReviewEvent, string) error {
 	return nil
 }
 
@@ -176,13 +176,17 @@ func (f *scenarioSource) PRMergeContext(context.Context, string, int) (domain.Me
 	return domain.MergeContext{}, nil
 }
 
-func (f *scenarioSource) MergePR(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
-
-func (f *scenarioSource) EnableAutoMerge(domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *scenarioSource) MergePR(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
 	return nil
 }
 
-func (f *scenarioSource) DisableAutoMerge(domain.PullRequestHandle) error { return nil }
+func (f *scenarioSource) EnableAutoMerge(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+	return nil
+}
+
+func (f *scenarioSource) DisableAutoMerge(context.Context, domain.PullRequestHandle) error {
+	return nil
+}
 
 var scenarioAt = time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 

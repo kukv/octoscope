@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"sync"
@@ -23,7 +24,7 @@ type recordingSource struct {
 	discardCalls int
 }
 
-func (s *recordingSource) PostLineComment(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+func (s *recordingSource) PostLineComment(_ context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.targets = append(s.targets, t)
@@ -31,7 +32,7 @@ func (s *recordingSource) PostLineComment(t domain.ReviewTarget, c domain.Pendin
 	return "PRR_new", nil
 }
 
-func (s *recordingSource) DiscardReview(domain.ReviewHandle) error {
+func (s *recordingSource) DiscardReview(context.Context, domain.ReviewHandle) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.discardCalls++

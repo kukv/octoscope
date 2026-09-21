@@ -26,9 +26,9 @@ var nextGen atomic.Int64
 // Source is what merging needs.
 type Source interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
-	MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error
-	EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error
-	DisableAutoMerge(pr domain.PullRequestHandle) error
+	MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error
+	EnableAutoMerge(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error
+	DisableAutoMerge(ctx context.Context, pr domain.PullRequestHandle) error
 }
 
 // MergedMsg tells the holder the pull request was merged, queued, or taken
@@ -182,7 +182,7 @@ func (m Model) mergeAsAdmin() (Model, tea.Cmd) {
 		return m, nil
 	}
 	method := m.method()
-	return m.sendCmd(true, func() error { return m.src.MergePR(m.ctx.PullRequest, method) })
+	return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.PullRequest, method) })
 }
 
 // send does the one thing the popup is for. Leaving the auto-merge queue is
@@ -191,15 +191,15 @@ func (m Model) mergeAsAdmin() (Model, tea.Cmd) {
 func (m Model) send() (Model, tea.Cmd) {
 	switch {
 	case m.ctx.AutoMergeEnabled:
-		return m.sendCmd(false, func() error { return m.src.DisableAutoMerge(m.ctx.PullRequest) })
+		return m.sendCmd(false, func(ctx context.Context) error { return m.src.DisableAutoMerge(ctx, m.ctx.PullRequest) })
 	case m.ctx.Block != domain.BlockNone:
 		return m, nil
 	case m.auto:
 		method := m.method()
-		return m.sendCmd(false, func() error { return m.src.EnableAutoMerge(m.ctx.PullRequest, method) })
+		return m.sendCmd(false, func(ctx context.Context) error { return m.src.EnableAutoMerge(ctx, m.ctx.PullRequest, method) })
 	default:
 		method := m.method()
-		return m.sendCmd(true, func() error { return m.src.MergePR(m.ctx.PullRequest, method) })
+		return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.PullRequest, method) })
 	}
 }
 
@@ -213,11 +213,11 @@ func (m Model) method() domain.MergeMethod {
 	return domain.MergeSquash
 }
 
-func (m Model) sendCmd(merged bool, do func() error) (Model, tea.Cmd) {
+func (m Model) sendCmd(merged bool, do func(ctx context.Context) error) (Model, tea.Cmd) {
 	m.sending = true
 	ref, gen := m.ref, m.gen
 	return m, func() tea.Msg {
-		if err := do(); err != nil {
+		if err := do(context.Background()); err != nil {
 			return ErrorMsg{Ref: ref, Gen: gen, Err: err}
 		}
 		return MergedMsg{Merged: merged}

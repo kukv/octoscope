@@ -91,12 +91,12 @@ func (f fakeBackend) PRMergeContext(ctx context.Context, repo string, number int
 	return f.prMergeContext(ctx, repo, number)
 }
 
-func (f fakeBackend) MergePR(pullRequestID string, method gql.MergeMethod) error {
-	return f.mergePR(pullRequestID, method)
+func (f fakeBackend) MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+	return f.mergePR(ctx, pullRequestID, method)
 }
 
-func (f fakeBackend) EnableAutoMerge(pullRequestID string, method gql.MergeMethod) error {
-	return f.enableAutoMerge(pullRequestID, method)
+func (f fakeBackend) EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+	return f.enableAutoMerge(ctx, pullRequestID, method)
 }
 
 func (f fakeBackend) SearchRepos(ctx context.Context, query string, limit int) ([]github.Repository, error) {
@@ -132,10 +132,10 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		getIssue:           func(context.Context, string, int) (gql.Issue, error) { return gql.Issue{}, authErr },
 		prDiff:             func(context.Context, string, int) (github.Diff, error) { return github.Diff{}, authErr },
 		prReviewContext:    func(context.Context, string, int) (gql.ReviewContext, error) { return gql.ReviewContext{}, authErr },
-		addReviewThread:    func(string, gql.PendingComment) error { return authErr },
-		submitReview:       func(string, gql.ReviewEvent, string) error { return authErr },
-		submitNewReview:    func(string, gql.ReviewEvent, string) error { return authErr },
-		discardReview:      func(string) error { return authErr },
+		addReviewThread:    func(context.Context, string, gql.PendingComment) error { return authErr },
+		submitReview:       func(context.Context, string, gql.ReviewEvent, string) error { return authErr },
+		submitNewReview:    func(context.Context, string, gql.ReviewEvent, string) error { return authErr },
+		discardReview:      func(context.Context, string) error { return authErr },
 		prChecks:           func(context.Context, string, int) ([]gql.CheckRun, error) { return nil, authErr },
 		jobLog:             func(context.Context, string, int64, bool) ([]github.LogLine, error) { return nil, authErr },
 		rerunWorkflow:      func(context.Context, string, int64, github.RerunScope) error { return authErr },
@@ -143,9 +143,9 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		listIssues:         func(context.Context, string) ([]gql.Issue, error) { return nil, authErr },
 		listLabels:         func(context.Context, string) ([]gql.Label, error) { return nil, authErr },
 		prMergeContext:     func(context.Context, string, int) (gql.MergeContext, error) { return gql.MergeContext{}, authErr },
-		mergePR:            func(string, gql.MergeMethod) error { return authErr },
-		enableAutoMerge:    func(string, gql.MergeMethod) error { return authErr },
-		disableAutoMerge:   func(string) error { return authErr },
+		mergePR:            func(context.Context, string, gql.MergeMethod) error { return authErr },
+		enableAutoMerge:    func(context.Context, string, gql.MergeMethod) error { return authErr },
+		disableAutoMerge:   func(context.Context, string) error { return authErr },
 		searchRepos:        func(context.Context, string, int) ([]github.Repository, error) { return nil, authErr },
 		listOwnRepos:       func(context.Context, string, int) ([]github.Repository, error) { return nil, authErr },
 		searchItems:        func(context.Context, string) ([]gql.SearchItem, error) { return nil, authErr },
@@ -171,27 +171,27 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		{"RerunWorkflow", func() error { return g.RerunWorkflow(context.Background(), "kukv/octoscope", "1", domain.RerunAll) }},
 		{"ListLabels", func() error { _, err := g.ListLabels(context.Background(), "kukv/octoscope"); return err }},
 		{"PRMergeContext", func() error { _, err := g.PRMergeContext(context.Background(), "kukv/octoscope", 1); return err }},
-		{"MergePR", func() error { return g.MergePR("pr-id", domain.MergeSquash) }},
-		{"EnableAutoMerge", func() error { return g.EnableAutoMerge("pr-id", domain.MergeSquash) }},
+		{"MergePR", func() error { return g.MergePR(t.Context(), "pr-id", domain.MergeSquash) }},
+		{"EnableAutoMerge", func() error { return g.EnableAutoMerge(t.Context(), "pr-id", domain.MergeSquash) }},
 		{"SearchRepos", func() error { _, err := g.SearchRepos(context.Background(), "octoscope", 10); return err }},
 		{"ListOwnRepos", func() error { _, err := g.ListOwnRepos(context.Background(), "kukv", 10); return err }},
 		{"PRDiff", func() error { _, err := g.PRDiff(context.Background(), "kukv/octoscope", 1); return err }},
 		{"PRReviewContext", func() error { _, err := g.PRReviewContext(context.Background(), "kukv/octoscope", 1); return err }},
 		{"AddReviewThread", func() error {
-			_, err := g.AddReviewThread(domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.PendingComment{})
+			_, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.PendingComment{})
 			return err
 		}},
 		{"SubmitReview", func() error {
-			return g.SubmitReview(domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.EventApprove, "")
+			return g.SubmitReview(t.Context(), domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.EventApprove, "")
 		}},
 		{"SubmitReview (no pending)", func() error {
-			return g.SubmitReview(domain.ReviewTarget{PullRequest: "pr-id"}, domain.EventApprove, "")
+			return g.SubmitReview(t.Context(), domain.ReviewTarget{PullRequest: "pr-id"}, domain.EventApprove, "")
 		}},
 		{"ListWorkSection", func() error { _, err := g.ListWorkSection(context.Background(), domain.SectionYourPRs); return err }},
 		{"SearchItems", func() error { _, err := g.SearchItems(context.Background(), "is:open"); return err }},
 		{"RepoCounts", func() error { _, err := g.RepoCounts(context.Background(), []string{"kukv/octoscope"}); return err }},
-		{"DiscardReview", func() error { return g.DiscardReview(domain.ReviewHandle("review-id")) }},
-		{"DisableAutoMerge", func() error { return g.DisableAutoMerge(domain.PullRequestHandle("pr-id")) }},
+		{"DiscardReview", func() error { return g.DiscardReview(t.Context(), domain.ReviewHandle("review-id")) }},
+		{"DisableAutoMerge", func() error { return g.DisableAutoMerge(t.Context(), domain.PullRequestHandle("pr-id")) }},
 		{"GetItem (PR)", func() error {
 			_, err := g.GetItem(context.Background(), domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 1})
 			return err

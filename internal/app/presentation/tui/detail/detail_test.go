@@ -112,7 +112,7 @@ func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (d
 	return f.reviewCtx, f.reviewErr
 }
 
-func (f *fakeSource) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
+func (f *fakeSource) SubmitReview(_ context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	f.submitCalls = append(f.submitCalls, string(t.Pending)+":"+body)
 	return f.submitErr
 }
@@ -121,11 +121,15 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return f.mergeCtx, f.mergeErr
 }
 
-func (f *fakeSource) MergePR(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+func (f *fakeSource) MergePR(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+	return nil
+}
 
-func (f *fakeSource) EnableAutoMerge(domain.PullRequestHandle, domain.MergeMethod) error { return nil }
+func (f *fakeSource) EnableAutoMerge(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+	return nil
+}
 
-func (f *fakeSource) DisableAutoMerge(domain.PullRequestHandle) error { return nil }
+func (f *fakeSource) DisableAutoMerge(context.Context, domain.PullRequestHandle) error { return nil }
 
 func editSuffix(add, remove []string) string {
 	return ":add=" + strings.Join(add, ",") + ":remove=" + strings.Join(remove, ",")

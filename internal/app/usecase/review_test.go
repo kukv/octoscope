@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,7 +15,7 @@ type fakeReviewer struct {
 	gotTarget domain.ReviewTarget
 }
 
-func (f *fakeReviewer) AddReviewThread(t domain.ReviewTarget, _ domain.PendingComment) (domain.ReviewHandle, error) {
+func (f *fakeReviewer) AddReviewThread(_ context.Context, t domain.ReviewTarget, _ domain.PendingComment) (domain.ReviewHandle, error) {
 	f.gotTarget = t
 	if f.threadErr != nil {
 		return "", f.threadErr
@@ -22,12 +23,12 @@ func (f *fakeReviewer) AddReviewThread(t domain.ReviewTarget, _ domain.PendingCo
 	return domain.ReviewHandle(f.newID), nil
 }
 
-func (f *fakeReviewer) SubmitReview(t domain.ReviewTarget, _ domain.ReviewEvent, _ string) error {
+func (f *fakeReviewer) SubmitReview(_ context.Context, t domain.ReviewTarget, _ domain.ReviewEvent, _ string) error {
 	f.gotTarget = t
 	return f.submitErr
 }
 
-func (f *fakeReviewer) DiscardReview(_ domain.ReviewHandle) error {
+func (f *fakeReviewer) DiscardReview(_ context.Context, _ domain.ReviewHandle) error {
 	return nil
 }
 
@@ -40,7 +41,7 @@ func TestPostLineCommentAnswersTheGatewaysHandle(t *testing.T) {
 	u := &Usecase{reviews: f}
 
 	tgt := domain.ReviewTarget{PullRequest: "PR_1"}
-	id, err := u.PostLineComment(tgt, domain.PendingComment{Path: "a.go", Line: 1, Body: "nit"})
+	id, err := u.PostLineComment(t.Context(), tgt, domain.PendingComment{Path: "a.go", Line: 1, Body: "nit"})
 	if err != nil {
 		t.Fatalf("PostLineComment: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestPostLineCommentWrapsTheGatewaysError(t *testing.T) {
 	f := &fakeReviewer{threadErr: boom}
 	u := &Usecase{reviews: f}
 
-	if _, err := u.PostLineComment(domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{}); !errors.Is(err, boom) {
+	if _, err := u.PostLineComment(t.Context(), domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{}); !errors.Is(err, boom) {
 		t.Errorf("err = %v, want it to wrap %v", err, boom)
 	}
 }
@@ -71,7 +72,7 @@ func TestSubmitReviewPassesTheTargetThrough(t *testing.T) {
 	u := &Usecase{reviews: f}
 
 	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "REV_open"}
-	if err := u.SubmitReview(tgt, domain.EventApprove, "lgtm"); err != nil {
+	if err := u.SubmitReview(t.Context(), tgt, domain.EventApprove, "lgtm"); err != nil {
 		t.Fatalf("SubmitReview: %v", err)
 	}
 	if f.gotTarget != tgt {
@@ -86,7 +87,7 @@ func TestSubmitReviewWrapsTheGatewaysError(t *testing.T) {
 	f := &fakeReviewer{submitErr: boom}
 	u := &Usecase{reviews: f}
 
-	if err := u.SubmitReview(domain.ReviewTarget{PullRequest: "PR_1"}, domain.EventApprove, "lgtm"); !errors.Is(err, boom) {
+	if err := u.SubmitReview(t.Context(), domain.ReviewTarget{PullRequest: "PR_1"}, domain.EventApprove, "lgtm"); !errors.Is(err, boom) {
 		t.Errorf("err = %v, want it to wrap %v", err, boom)
 	}
 }

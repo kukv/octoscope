@@ -15,20 +15,20 @@ import (
 type fakeMerger struct {
 	backend
 	prMergeContext  func(ctx context.Context, repo string, number int) (gql.MergeContext, error)
-	mergePR         func(pullRequestID string, method gql.MergeMethod) error
-	enableAutoMerge func(pullRequestID string, method gql.MergeMethod) error
+	mergePR         func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	enableAutoMerge func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
 }
 
 func (f fakeMerger) PRMergeContext(ctx context.Context, repo string, number int) (gql.MergeContext, error) {
 	return f.prMergeContext(ctx, repo, number)
 }
 
-func (f fakeMerger) MergePR(pullRequestID string, method gql.MergeMethod) error {
-	return f.mergePR(pullRequestID, method)
+func (f fakeMerger) MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+	return f.mergePR(ctx, pullRequestID, method)
 }
 
-func (f fakeMerger) EnableAutoMerge(pullRequestID string, method gql.MergeMethod) error {
-	return f.enableAutoMerge(pullRequestID, method)
+func (f fakeMerger) EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+	return f.enableAutoMerge(ctx, pullRequestID, method)
 }
 
 // TestToMergeContextTranslatesEveryField gives every field of
@@ -218,12 +218,12 @@ func TestMergePRPassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
 	var got gql.MergeMethod
-	g := New(fakeMerger{mergePR: func(_ string, method gql.MergeMethod) error {
+	g := New(fakeMerger{mergePR: func(_ context.Context, _ string, method gql.MergeMethod) error {
 		got = method
 		return nil
 	}})
 
-	if err := g.MergePR("PR_1", domain.MergeRebase); err != nil {
+	if err := g.MergePR(t.Context(), "PR_1", domain.MergeRebase); err != nil {
 		t.Fatalf("MergePR: %v", err)
 	}
 	if got != gql.MergeMethodRebase {
@@ -237,12 +237,12 @@ func TestEnableAutoMergePassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
 	var got gql.MergeMethod
-	g := New(fakeMerger{enableAutoMerge: func(_ string, method gql.MergeMethod) error {
+	g := New(fakeMerger{enableAutoMerge: func(_ context.Context, _ string, method gql.MergeMethod) error {
 		got = method
 		return nil
 	}})
 
-	if err := g.EnableAutoMerge("PR_1", domain.MergeCommit); err != nil {
+	if err := g.EnableAutoMerge(t.Context(), "PR_1", domain.MergeCommit); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if got != gql.MergeMethodMerge {
@@ -278,5 +278,69 @@ func TestANonAdminPermissionDoesNotSetViewerIsAdmin(t *testing.T) {
 	})
 	if got.ViewerIsAdmin {
 		t.Error("ViewerIsAdmin = true, want false for a WRITE permission")
+	}
+}
+
+// TestTheMergeWritesHandTheirContextToTheBackend is the merge half of
+// review_test.go's check: the context the caller passes is the one the
+// backend is called with, which is the only property threading it buys.
+func TestTheMergeWritesHandTheirContextToTheBackend(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey struct{}
+	want := context.WithValue(context.Background(), ctxKey{}, "the caller's")
+
+	tests := []struct {
+		name string
+		call func(g *Gateway, ctx context.Context) error
+		fake func(got *context.Context) fakeBackend
+	}{
+		{
+			name: "MergePR",
+			call: func(g *Gateway, ctx context.Context) error {
+				return g.MergePR(ctx, "PR_1", domain.MergeSquash)
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{mergePR: func(ctx context.Context, _ string, _ gql.MergeMethod) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "EnableAutoMerge",
+			call: func(g *Gateway, ctx context.Context) error {
+				return g.EnableAutoMerge(ctx, "PR_1", domain.MergeSquash)
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{enableAutoMerge: func(ctx context.Context, _ string, _ gql.MergeMethod) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "DisableAutoMerge",
+			call: func(g *Gateway, ctx context.Context) error { return g.DisableAutoMerge(ctx, "PR_1") },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{disableAutoMerge: func(ctx context.Context, _ string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			var got context.Context
+			if err := c.call(New(c.fake(&got)), want); err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			if got != want {
+				t.Errorf("the backend was handed %v, not the context the caller passed", got)
+			}
+		})
 	}
 }

@@ -18,8 +18,8 @@ func (g *Gateway) PRMergeContext(ctx context.Context, repo string, number int) (
 }
 
 // MergePR merges the pull request now.
-func (g *Gateway) MergePR(pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	if err := g.backend.MergePR(string(pr), fromMergeMethod(method)); err != nil {
+func (g *Gateway) MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	if err := g.backend.MergePR(ctx, string(pr), fromMergeMethod(method)); err != nil {
 		return wrap(err)
 	}
 	return nil
@@ -27,16 +27,16 @@ func (g *Gateway) MergePR(pr domain.PullRequestHandle, method domain.MergeMethod
 
 // EnableAutoMerge asks GitHub to merge the pull request once what it is
 // waiting on is in.
-func (g *Gateway) EnableAutoMerge(pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	if err := g.backend.EnableAutoMerge(string(pr), fromMergeMethod(method)); err != nil {
+func (g *Gateway) EnableAutoMerge(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
+	if err := g.backend.EnableAutoMerge(ctx, string(pr), fromMergeMethod(method)); err != nil {
 		return wrap(err)
 	}
 	return nil
 }
 
 // DisableAutoMerge turns auto-merge back off.
-func (g *Gateway) DisableAutoMerge(pr domain.PullRequestHandle) error {
-	if err := g.backend.DisableAutoMerge(string(pr)); err != nil {
+func (g *Gateway) DisableAutoMerge(ctx context.Context, pr domain.PullRequestHandle) error {
+	if err := g.backend.DisableAutoMerge(ctx, string(pr)); err != nil {
 		return wrap(err)
 	}
 	return nil
