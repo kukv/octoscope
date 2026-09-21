@@ -171,7 +171,7 @@ func TestAThreadCarriesEveryCommentsReviewState(t *testing.T) {
 func TestStartReviewReturnsTheNewReviewID(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	id, err := c.StartReview("PR_kwDO1")
+	id, err := c.StartReview(t.Context(), "PR_kwDO1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fake{body: []byte(`{"data":{"addPullRequestReviewThread":{"thread":{"id":"T_1"}}}}`)}
 			c := f.client()
-			if err := c.AddReviewThread("PRR_9", tt.comment); err != nil {
+			if err := c.AddReviewThread(t.Context(), "PRR_9", tt.comment); err != nil {
 				t.Fatal(err)
 			}
 			for _, want := range []Var{
@@ -237,7 +237,7 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fake{body: []byte(`{"data":{"submitPullRequestReview":{"pullRequestReview":{"id":"PRR_9"}}}}`)}
 			c := f.client()
-			if err := c.SubmitReview("PRR_9", tt.event, "looks good"); err != nil {
+			if err := c.SubmitReview(t.Context(), "PRR_9", tt.event, "looks good"); err != nil {
 				t.Fatal(err)
 			}
 			if !slices.Contains(f.vars[0], S("event", tt.want)) {
@@ -253,7 +253,7 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	if err := c.SubmitNewReview("PR_1", EventApprove, ""); err != nil {
+	if err := c.SubmitNewReview(t.Context(), "PR_1", EventApprove, ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []Var{S("pullRequestId", "PR_1"), S("event", "APPROVE"), S("body", "")} {
@@ -266,7 +266,7 @@ func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
 func TestDiscardReviewNamesTheReview(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"deletePullRequestReview":{"pullRequestReview":{"id":"PRR_9"}}}}`)}
 	c := f.client()
-	if err := c.DiscardReview("PRR_9"); err != nil {
+	if err := c.DiscardReview(t.Context(), "PRR_9"); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(f.vars[0], S("reviewId", "PRR_9")) {
@@ -277,7 +277,7 @@ func TestDiscardReviewNamesTheReview(t *testing.T) {
 func TestABodyThatStartsWithAtIsNotReadAsAFile(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"submitPullRequestReview":{"pullRequestReview":{"id":"PRR_9"}}}}`)}
 	c := f.client()
-	if err := c.SubmitReview("PRR_9", EventComment, "@kukv please look"); err != nil {
+	if err := c.SubmitReview(t.Context(), "PRR_9", EventComment, "@kukv please look"); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(f.vars[0], S("body", "@kukv please look")) {
@@ -295,7 +295,7 @@ func TestASubmittedReviewIsNeverSentTwice(t *testing.T) {
 		calls++
 		return nil, github.Classify(github.ErrTransient, "HTTP 502")
 	}}
-	if err := c.SubmitReview("R_1", EventApprove, ""); err == nil {
+	if err := c.SubmitReview(t.Context(), "R_1", EventApprove, ""); err == nil {
 		t.Fatal("SubmitReview succeeded, want an error")
 	}
 	if calls != 1 {

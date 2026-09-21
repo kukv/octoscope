@@ -20,16 +20,16 @@ func (f fakeBackend) PRReviewContext(ctx context.Context, repo string, number in
 	return f.prReviewContext(ctx, repo, number)
 }
 
-func (f fakeBackend) AddReviewThread(reviewID string, c gql.PendingComment) error {
-	return f.addReviewThread(reviewID, c)
+func (f fakeBackend) AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) error {
+	return f.addReviewThread(ctx, reviewID, c)
 }
 
-func (f fakeBackend) SubmitReview(reviewID string, event gql.ReviewEvent, body string) error {
-	return f.submitReview(reviewID, event, body)
+func (f fakeBackend) SubmitReview(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error {
+	return f.submitReview(ctx, reviewID, event, body)
 }
 
-func (f fakeBackend) SubmitNewReview(pullRequestID string, event gql.ReviewEvent, body string) error {
-	return f.submitNewReview(pullRequestID, event, body)
+func (f fakeBackend) SubmitNewReview(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error {
+	return f.submitNewReview(ctx, pullRequestID, event, body)
 }
 
 // recordingBackend records which review calls were made, in order. Asserting
@@ -40,22 +40,22 @@ type recordingBackend struct {
 	calls []string
 }
 
-func (b *recordingBackend) StartReview(string) (string, error) {
+func (b *recordingBackend) StartReview(context.Context, string) (string, error) {
 	b.calls = append(b.calls, "StartReview")
 	return "PRR_new", nil
 }
 
-func (b *recordingBackend) SubmitReview(string, gql.ReviewEvent, string) error {
+func (b *recordingBackend) SubmitReview(context.Context, string, gql.ReviewEvent, string) error {
 	b.calls = append(b.calls, "SubmitReview")
 	return nil
 }
 
-func (b *recordingBackend) SubmitNewReview(string, gql.ReviewEvent, string) error {
+func (b *recordingBackend) SubmitNewReview(context.Context, string, gql.ReviewEvent, string) error {
 	b.calls = append(b.calls, "SubmitNewReview")
 	return nil
 }
 
-func (b *recordingBackend) AddReviewThread(string, gql.PendingComment) error {
+func (b *recordingBackend) AddReviewThread(context.Context, string, gql.PendingComment) error {
 	b.calls = append(b.calls, "AddReviewThread")
 	return nil
 }
@@ -65,7 +65,7 @@ func TestSubmitReviewWithNoPendingCreatesAndSubmitsInOneCall(t *testing.T) {
 	b := &recordingBackend{}
 	g := &Gateway{backend: b}
 	tgt := domain.ReviewTarget{PullRequest: "PR_1"}
-	if err := g.SubmitReview(tgt, domain.EventComment, "body"); err != nil {
+	if err := g.SubmitReview(t.Context(), tgt, domain.EventComment, "body"); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"SubmitNewReview"}; !slices.Equal(b.calls, want) {
@@ -78,7 +78,7 @@ func TestSubmitReviewWithAPendingSubmitsThatOne(t *testing.T) {
 	b := &recordingBackend{}
 	g := &Gateway{backend: b}
 	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
-	if err := g.SubmitReview(tgt, domain.EventApprove, "body"); err != nil {
+	if err := g.SubmitReview(t.Context(), tgt, domain.EventApprove, "body"); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"SubmitReview"}; !slices.Equal(b.calls, want) {
@@ -90,7 +90,7 @@ func TestAddReviewThreadStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 	t.Parallel()
 	b := &recordingBackend{}
 	g := &Gateway{backend: b}
-	id, err := g.AddReviewThread(domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
+	id, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestAddReviewThreadStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 
 	b2 := &recordingBackend{}
 	g2 := &Gateway{backend: b2}
-	id, err = g2.AddReviewThread(domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
+	id, err = g2.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,14 +418,14 @@ func TestAddReviewThreadConvertsThePendingCommentBeforeCallingTheBackend(t *test
 	t.Parallel()
 
 	var got gql.PendingComment
-	g := New(fakeBackend{addReviewThread: func(reviewID string, c gql.PendingComment) error {
+	g := New(fakeBackend{addReviewThread: func(_ context.Context, reviewID string, c gql.PendingComment) error {
 		got = c
 		return nil
 	}})
 
 	in := domain.PendingComment{Path: "a.go", Line: 3, Side: domain.SideRight, Body: "hi"}
 	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
-	if _, err := g.AddReviewThread(tgt, in); err != nil {
+	if _, err := g.AddReviewThread(t.Context(), tgt, in); err != nil {
 		t.Fatalf("AddReviewThread: %v", err)
 	}
 
@@ -441,13 +441,13 @@ func TestSubmitReviewConvertsTheEventBeforeCallingTheBackend(t *testing.T) {
 	t.Parallel()
 
 	var gotEvent gql.ReviewEvent
-	g := New(fakeBackend{submitReview: func(reviewID string, event gql.ReviewEvent, body string) error {
+	g := New(fakeBackend{submitReview: func(_ context.Context, reviewID string, event gql.ReviewEvent, body string) error {
 		gotEvent = event
 		return nil
 	}})
 
 	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
-	if err := g.SubmitReview(tgt, domain.EventApprove, "lgtm"); err != nil {
+	if err := g.SubmitReview(t.Context(), tgt, domain.EventApprove, "lgtm"); err != nil {
 		t.Fatalf("SubmitReview: %v", err)
 	}
 	if gotEvent != gql.EventApprove {
@@ -462,13 +462,13 @@ func TestSubmitReviewWithNoPendingConvertsTheEventBeforeCallingTheBackend(t *tes
 	t.Parallel()
 
 	var gotEvent gql.ReviewEvent
-	g := New(fakeBackend{submitNewReview: func(pullRequestID string, event gql.ReviewEvent, body string) error {
+	g := New(fakeBackend{submitNewReview: func(_ context.Context, pullRequestID string, event gql.ReviewEvent, body string) error {
 		gotEvent = event
 		return nil
 	}})
 
 	tgt := domain.ReviewTarget{PullRequest: "PR_1"}
-	if err := g.SubmitReview(tgt, domain.EventRequestChanges, ""); err != nil {
+	if err := g.SubmitReview(t.Context(), tgt, domain.EventRequestChanges, ""); err != nil {
 		t.Fatalf("SubmitReview: %v", err)
 	}
 	if gotEvent != gql.EventRequestChanges {

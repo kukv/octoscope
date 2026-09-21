@@ -35,17 +35,17 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return f.ctx, f.err
 }
 
-func (f *fakeSource) MergePR(_ domain.PullRequestHandle, m domain.MergeMethod) error {
+func (f *fakeSource) MergePR(_ context.Context, _ domain.PullRequestHandle, m domain.MergeMethod) error {
 	f.merged = append(f.merged, m)
 	return nil
 }
 
-func (f *fakeSource) EnableAutoMerge(_ domain.PullRequestHandle, m domain.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(_ context.Context, _ domain.PullRequestHandle, m domain.MergeMethod) error {
 	f.enabled = append(f.enabled, m)
 	return nil
 }
 
-func (f *fakeSource) DisableAutoMerge(domain.PullRequestHandle) error {
+func (f *fakeSource) DisableAutoMerge(context.Context, domain.PullRequestHandle) error {
 	f.offCall++
 	return nil
 }

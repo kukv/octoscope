@@ -29,13 +29,15 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (domain.Revie
 	return f.review, nil
 }
 
-func (f *fakeSource) PostLineComment(domain.ReviewTarget, domain.PendingComment) (domain.ReviewHandle, error) {
+func (f *fakeSource) PostLineComment(context.Context, domain.ReviewTarget, domain.PendingComment) (domain.ReviewHandle, error) {
 	return "", nil
 }
 
-func (f *fakeSource) DiscardReview(domain.ReviewHandle) error { return nil }
+func (f *fakeSource) DiscardReview(context.Context, domain.ReviewHandle) error { return nil }
 
-func (f *fakeSource) SubmitReview(domain.ReviewTarget, domain.ReviewEvent, string) error { return nil }
+func (f *fakeSource) SubmitReview(context.Context, domain.ReviewTarget, domain.ReviewEvent, string) error {
+	return nil
+}
 
 // fixture is two files, so that moving between files is testable, with a
 // second hunk in the first so that hunk movement is too.

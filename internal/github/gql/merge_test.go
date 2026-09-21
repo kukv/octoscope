@@ -101,7 +101,7 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 
 			f := &fakeSeq{outs: []string{`{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}`}}
 			c := &Client{Do: f.do}
-			if err := c.MergePR("PR_1", tt.method); err != nil {
+			if err := c.MergePR(t.Context(), "PR_1", tt.method); err != nil {
 				t.Fatalf("MergePR: %v", err)
 			}
 			if !slices.Contains(f.calls[0], tt.want) {
@@ -119,7 +119,7 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 
 	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
 	c := &Client{Do: on.do}
-	if err := c.EnableAutoMerge("PR_1", MergeMethodRebase); err != nil {
+	if err := c.EnableAutoMerge(t.Context(), "PR_1", MergeMethodRebase); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if !slices.Contains(on.calls[0], S("mergeMethod", "REBASE")) {
@@ -128,7 +128,7 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 
 	off := &fakeSeq{outs: []string{`{"data":{"disablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
 	c = &Client{Do: off.do}
-	if err := c.DisableAutoMerge("PR_1"); err != nil {
+	if err := c.DisableAutoMerge(t.Context(), "PR_1"); err != nil {
 		t.Fatalf("DisableAutoMerge: %v", err)
 	}
 	// Turning it off takes the pull request and nothing else: the method

@@ -1,6 +1,8 @@
 package diff
 
 import (
+	"context"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
@@ -98,6 +100,6 @@ func (m Model) discard() (Model, tea.Cmd) {
 	m.phase = phaseWorking
 	m.errText = ""
 	return m, func() tea.Msg {
-		return discardedMsg{ref: ref, err: src.DiscardReview(pending)}
+		return discardedMsg{ref: ref, err: src.DiscardReview(context.Background(), pending)}
 	}
 }

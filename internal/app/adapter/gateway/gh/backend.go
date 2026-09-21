@@ -83,11 +83,11 @@ type reviewFetcher interface {
 }
 
 type reviewer interface {
-	StartReview(pullRequestID string) (string, error)
-	AddReviewThread(reviewID string, c gql.PendingComment) error
-	SubmitReview(reviewID string, event gql.ReviewEvent, body string) error
-	SubmitNewReview(pullRequestID string, event gql.ReviewEvent, body string) error
-	DiscardReview(reviewID string) error
+	StartReview(ctx context.Context, pullRequestID string) (string, error)
+	AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) error
+	SubmitReview(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error
+	SubmitNewReview(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error
+	DiscardReview(ctx context.Context, reviewID string) error
 }
 
 type checksFetcher interface {
@@ -98,9 +98,9 @@ type checksFetcher interface {
 
 type merger interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (gql.MergeContext, error)
-	MergePR(pullRequestID string, method gql.MergeMethod) error
-	EnableAutoMerge(pullRequestID string, method gql.MergeMethod) error
-	DisableAutoMerge(pullRequestID string) error
+	MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	DisableAutoMerge(ctx context.Context, pullRequestID string) error
 }
 
 // backend is what a GitHub client answers. It is declared here, on the

@@ -1,6 +1,8 @@
 package diff
 
 import (
+	"context"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kukv/octoscope/internal/app/domain"
@@ -87,7 +89,7 @@ func (m Model) post() (Model, tea.Cmd) {
 	m.phase = phaseWorking
 	m.errText = ""
 	return m, func() tea.Msg {
-		id, err := src.PostLineComment(target, comment)
+		id, err := src.PostLineComment(context.Background(), target, comment)
 		if err != nil {
 			return commentErrorMsg{ref: ref, err: err}
 		}

@@ -197,16 +197,11 @@ func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]
 	}
 }
 
-// The five mutations take no context. They are changes, not fetches: a
-// comment that has been sent has been sent, so there is nothing to abandon
-// half-way. The existing AddPRComment and ClosePR take none for the same
-// reason (.claude/rules/go-style.md).
-
 // StartReview opens an unsubmitted review on the pull request and returns its
 // node id. A pending review is visible only to its author, so this is the id
 // the rest of the session adds comments to.
-func (c *Client) StartReview(pullRequestID string) (string, error) {
-	out, err := c.Write(context.Background(), startReviewMutation, S("pullRequestId", pullRequestID))
+func (c *Client) StartReview(ctx context.Context, pullRequestID string) (string, error) {
+	out, err := c.Write(ctx, startReviewMutation, S("pullRequestId", pullRequestID))
 	if err != nil {
 		return "", err
 	}
@@ -246,8 +241,8 @@ const (
 )
 
 // AddReviewThread attaches one line comment to an unsubmitted review.
-func (c *Client) AddReviewThread(reviewID string, comment PendingComment) error {
-	_, err := c.Write(context.Background(), addThreadMutation,
+func (c *Client) AddReviewThread(ctx context.Context, reviewID string, comment PendingComment) error {
+	_, err := c.Write(ctx, addThreadMutation,
 		S("reviewId", reviewID),
 		S("path", comment.Path),
 		N("line", comment.Line),
@@ -258,8 +253,8 @@ func (c *Client) AddReviewThread(reviewID string, comment PendingComment) error 
 }
 
 // SubmitReview sends the unsubmitted review, with every comment on it.
-func (c *Client) SubmitReview(reviewID string, event ReviewEvent, body string) error {
-	_, err := c.Write(context.Background(), submitReviewMutation,
+func (c *Client) SubmitReview(ctx context.Context, reviewID string, event ReviewEvent, body string) error {
+	_, err := c.Write(ctx, submitReviewMutation,
 		S("reviewId", reviewID),
 		S("event", string(event)),
 		S("body", body),
@@ -271,8 +266,8 @@ func (c *Client) SubmitReview(reviewID string, event ReviewEvent, body string) e
 // addPullRequestReview takes an event, so creating and submitting is one
 // call. Approving a diff you had nothing to say about is the commonest review
 // there is, and it should not have to leave a pending review behind first.
-func (c *Client) SubmitNewReview(pullRequestID string, event ReviewEvent, body string) error {
-	_, err := c.Write(context.Background(), reviewAtOnceMutation,
+func (c *Client) SubmitNewReview(ctx context.Context, pullRequestID string, event ReviewEvent, body string) error {
+	_, err := c.Write(ctx, reviewAtOnceMutation,
 		S("pullRequestId", pullRequestID),
 		S("event", string(event)),
 		S("body", body),
@@ -281,7 +276,7 @@ func (c *Client) SubmitNewReview(pullRequestID string, event ReviewEvent, body s
 }
 
 // DiscardReview throws the unsubmitted review away, comments and all.
-func (c *Client) DiscardReview(reviewID string) error {
-	_, err := c.Write(context.Background(), discardReviewMutation, S("reviewId", reviewID))
+func (c *Client) DiscardReview(ctx context.Context, reviewID string) error {
+	_, err := c.Write(ctx, discardReviewMutation, S("reviewId", reviewID))
 	return err
 }

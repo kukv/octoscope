@@ -1,6 +1,7 @@
 package review
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -19,7 +20,7 @@ type fakeSource struct {
 	err    error
 }
 
-func (f *fakeSource) SubmitReview(t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
+func (f *fakeSource) SubmitReview(_ context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	f.calls++
 	f.target, f.event, f.body = t, event, body
 	return f.err

@@ -519,13 +519,23 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 		"EditIssueAssignees": func(c *Client) error {
 			return c.EditIssueAssignees(context.Background(), "kukv/demo", 1, []string{"kukv"}, nil)
 		},
-		"MergePR":          func(c *Client) error { return c.MergePR("id", gql.MergeMethodSquash) },
-		"EnableAutoMerge":  func(c *Client) error { return c.EnableAutoMerge("id", gql.MergeMethodSquash) },
-		"DisableAutoMerge": func(c *Client) error { return c.DisableAutoMerge("id") },
-		"AddReviewThread":  func(c *Client) error { return c.AddReviewThread("id", gql.PendingComment{}) },
-		"SubmitReview":     func(c *Client) error { return c.SubmitReview("id", gql.EventApprove, "") },
-		"SubmitNewReview":  func(c *Client) error { return c.SubmitNewReview("id", gql.EventApprove, "") },
-		"DiscardReview":    func(c *Client) error { return c.DiscardReview("id") },
+		"MergePR": func(c *Client) error {
+			return c.MergePR(context.Background(), "id", gql.MergeMethodSquash)
+		},
+		"EnableAutoMerge": func(c *Client) error {
+			return c.EnableAutoMerge(context.Background(), "id", gql.MergeMethodSquash)
+		},
+		"DisableAutoMerge": func(c *Client) error { return c.DisableAutoMerge(context.Background(), "id") },
+		"AddReviewThread": func(c *Client) error {
+			return c.AddReviewThread(context.Background(), "id", gql.PendingComment{})
+		},
+		"SubmitReview": func(c *Client) error {
+			return c.SubmitReview(context.Background(), "id", gql.EventApprove, "")
+		},
+		"SubmitNewReview": func(c *Client) error {
+			return c.SubmitNewReview(context.Background(), "id", gql.EventApprove, "")
+		},
+		"DiscardReview": func(c *Client) error { return c.DiscardReview(context.Background(), "id") },
 		"RerunWorkflow": func(c *Client) error {
 			return c.RerunWorkflow(context.Background(), "kukv/demo", int64(1), github.RerunFailed)
 		},
@@ -551,7 +561,7 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			calls++
 			return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 		}
-		_, _ = c.StartReview("id")
+		_, _ = c.StartReview(t.Context(), "id")
 		if calls != 1 {
 			t.Errorf("StartReview ran gh %d times, want 1: a write must never be retried", calls)
 		}

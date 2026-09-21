@@ -15,20 +15,20 @@ import (
 type fakeMerger struct {
 	backend
 	prMergeContext  func(ctx context.Context, repo string, number int) (gql.MergeContext, error)
-	mergePR         func(pullRequestID string, method gql.MergeMethod) error
-	enableAutoMerge func(pullRequestID string, method gql.MergeMethod) error
+	mergePR         func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	enableAutoMerge func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
 }
 
 func (f fakeMerger) PRMergeContext(ctx context.Context, repo string, number int) (gql.MergeContext, error) {
 	return f.prMergeContext(ctx, repo, number)
 }
 
-func (f fakeMerger) MergePR(pullRequestID string, method gql.MergeMethod) error {
-	return f.mergePR(pullRequestID, method)
+func (f fakeMerger) MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+	return f.mergePR(ctx, pullRequestID, method)
 }
 
-func (f fakeMerger) EnableAutoMerge(pullRequestID string, method gql.MergeMethod) error {
-	return f.enableAutoMerge(pullRequestID, method)
+func (f fakeMerger) EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+	return f.enableAutoMerge(ctx, pullRequestID, method)
 }
 
 // TestToMergeContextTranslatesEveryField gives every field of
@@ -218,12 +218,12 @@ func TestMergePRPassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
 	var got gql.MergeMethod
-	g := New(fakeMerger{mergePR: func(_ string, method gql.MergeMethod) error {
+	g := New(fakeMerger{mergePR: func(_ context.Context, _ string, method gql.MergeMethod) error {
 		got = method
 		return nil
 	}})
 
-	if err := g.MergePR("PR_1", domain.MergeRebase); err != nil {
+	if err := g.MergePR(t.Context(), "PR_1", domain.MergeRebase); err != nil {
 		t.Fatalf("MergePR: %v", err)
 	}
 	if got != gql.MergeMethodRebase {
@@ -237,12 +237,12 @@ func TestEnableAutoMergePassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
 	var got gql.MergeMethod
-	g := New(fakeMerger{enableAutoMerge: func(_ string, method gql.MergeMethod) error {
+	g := New(fakeMerger{enableAutoMerge: func(_ context.Context, _ string, method gql.MergeMethod) error {
 		got = method
 		return nil
 	}})
 
-	if err := g.EnableAutoMerge("PR_1", domain.MergeCommit); err != nil {
+	if err := g.EnableAutoMerge(t.Context(), "PR_1", domain.MergeCommit); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if got != gql.MergeMethodMerge {

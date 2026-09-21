@@ -21,8 +21,8 @@ import (
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
-	PostLineComment(t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
-	DiscardReview(review domain.ReviewHandle) error
+	PostLineComment(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	DiscardReview(ctx context.Context, review domain.ReviewHandle) error
 	review.Source
 }
 
