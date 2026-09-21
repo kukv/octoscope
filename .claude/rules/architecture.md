@@ -43,6 +43,14 @@ gateway は domain だけを見て port を満たす。結線は `cmd/octoscope`
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**
 足し忘れると、次に誰かが依存の向きを壊しても誰も気づかない。
 
+**lint が守っているように見えて、実は別のものが守っていることがある。** `domain-layer` が
+`internal/app/adapter` を deny するのは 2026-09-21 からで、それ以前の domain → adapter は
+Go の import cycle だけが止めていた。今日ある adapter 2 つ（`datasource` / `gateway/gh`）は
+どちらも domain を import しているので、domain から import すると depguard より先に
+型検査が `import cycle not allowed` で落ちる。この deny が実際に効くのは、
+**domain を import しない adapter のサブパッケージが将来できたとき**である。
+（depguard は blank import を見ない。発火を確かめるときは実際に使う形で import する。）
+
 （`i18n-layer` と `browser-layer` の deny は今も `internal/app`（末尾スラッシュ無し）のままで、
 `github-layer` は `internal/app/`（末尾スラッシュ付き）に直した。前者は `internal/appfoo` のような
 無関係なパッケージ名も誤って拾う over-match の余地を残しているが、実害はまだ無い。

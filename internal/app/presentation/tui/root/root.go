@@ -495,7 +495,9 @@ func (m Model) openDetail(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 }
 
 // openDiff shows the diff on its own, with the tabs underneath: the Work
-// board and a Repos row have no detail view open when they ask for it.
+// board, a Repos row and a Search result have no detail view open when they
+// ask for it. (Search asks for a diff but never for checks, which is why
+// openChecks below names two senders rather than three.)
 func (m Model) openDiff(ref domain.ItemRef) (tea.Model, tea.Cmd) {
 	m.stack = []overlay{overlayDiff}
 	return m.startDiff(ref)
