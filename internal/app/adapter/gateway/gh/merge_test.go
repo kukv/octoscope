@@ -280,3 +280,67 @@ func TestANonAdminPermissionDoesNotSetViewerIsAdmin(t *testing.T) {
 		t.Error("ViewerIsAdmin = true, want false for a WRITE permission")
 	}
 }
+
+// TestTheMergeWritesHandTheirContextToTheBackend is the merge half of
+// review_test.go's check: the context the caller passes is the one the
+// backend is called with, which is the only property threading it buys.
+func TestTheMergeWritesHandTheirContextToTheBackend(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey struct{}
+	want := context.WithValue(context.Background(), ctxKey{}, "the caller's")
+
+	tests := []struct {
+		name string
+		call func(g *Gateway, ctx context.Context) error
+		fake func(got *context.Context) fakeBackend
+	}{
+		{
+			name: "MergePR",
+			call: func(g *Gateway, ctx context.Context) error {
+				return g.MergePR(ctx, "PR_1", domain.MergeSquash)
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{mergePR: func(ctx context.Context, _ string, _ gql.MergeMethod) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "EnableAutoMerge",
+			call: func(g *Gateway, ctx context.Context) error {
+				return g.EnableAutoMerge(ctx, "PR_1", domain.MergeSquash)
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{enableAutoMerge: func(ctx context.Context, _ string, _ gql.MergeMethod) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "DisableAutoMerge",
+			call: func(g *Gateway, ctx context.Context) error { return g.DisableAutoMerge(ctx, "PR_1") },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{disableAutoMerge: func(ctx context.Context, _ string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			var got context.Context
+			if err := c.call(New(c.fake(&got)), want); err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			if got != want {
+				t.Errorf("the backend was handed %v, not the context the caller passed", got)
+			}
+		})
+	}
+}

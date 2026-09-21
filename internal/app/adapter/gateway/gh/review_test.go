@@ -475,3 +475,102 @@ func TestSubmitReviewWithNoPendingConvertsTheEventBeforeCallingTheBackend(t *tes
 		t.Errorf("backend received event %v, want %v", gotEvent, gql.EventRequestChanges)
 	}
 }
+
+// TestTheReviewWritesHandTheirContextToTheBackend is the review half of what
+// writes_test.go checks for the item writes: the context the caller passes
+// is the one the backend is called with. Threading it through the signatures
+// buys nothing if a layer quietly substitutes one of its own, and nothing
+// else in the suite would notice.
+func TestTheReviewWritesHandTheirContextToTheBackend(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey struct{}
+	want := context.WithValue(context.Background(), ctxKey{}, "the caller's")
+
+	tests := []struct {
+		name string
+		call func(g *Gateway, ctx context.Context) error
+		fake func(got *context.Context) fakeBackend
+	}{
+		{
+			name: "AddReviewThread onto a pending review",
+			call: func(g *Gateway, ctx context.Context) error {
+				_, err := g.AddReviewThread(ctx, domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
+				return err
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{addReviewThread: func(ctx context.Context, _ string, _ gql.PendingComment) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			// With no pending review AddReviewThread makes two calls, and
+			// the first is the one a thread-through is easiest to lose on:
+			// StartReview is reached from inside the gateway rather than
+			// from the port, so nothing above it names the context.
+			name: "AddReviewThread starting one first",
+			call: func(g *Gateway, ctx context.Context) error {
+				_, err := g.AddReviewThread(ctx, domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
+				return err
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{
+					startReview: func(ctx context.Context, _ string) (string, error) {
+						*got = ctx
+						return "PRR_new", nil
+					},
+					addReviewThread: func(context.Context, string, gql.PendingComment) error { return nil },
+				}
+			},
+		},
+		{
+			name: "SubmitReview",
+			call: func(g *Gateway, ctx context.Context) error {
+				return g.SubmitReview(ctx, domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.EventApprove, "")
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{submitReview: func(ctx context.Context, _ string, _ gql.ReviewEvent, _ string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "SubmitReview with nothing pending",
+			call: func(g *Gateway, ctx context.Context) error {
+				return g.SubmitReview(ctx, domain.ReviewTarget{PullRequest: "PR_1"}, domain.EventApprove, "")
+			},
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{submitNewReview: func(ctx context.Context, _ string, _ gql.ReviewEvent, _ string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+		{
+			name: "DiscardReview",
+			call: func(g *Gateway, ctx context.Context) error { return g.DiscardReview(ctx, "PRR_1") },
+			fake: func(got *context.Context) fakeBackend {
+				return fakeBackend{discardReview: func(ctx context.Context, _ string) error {
+					*got = ctx
+					return nil
+				}}
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			var got context.Context
+			if err := c.call(New(c.fake(&got)), want); err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			if got != want {
+				t.Errorf("the backend was handed %v, not the context the caller passed", got)
+			}
+		})
+	}
+}

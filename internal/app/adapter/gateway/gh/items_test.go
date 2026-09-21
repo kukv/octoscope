@@ -21,6 +21,7 @@ type fakeBackend struct {
 	getIssue        func(ctx context.Context, repo string, number int) (gql.Issue, error)
 	prDiff          func(ctx context.Context, repo string, number int) (github.Diff, error)
 	prReviewContext func(ctx context.Context, repo string, number int) (gql.ReviewContext, error)
+	startReview     func(ctx context.Context, pullRequestID string) (string, error)
 	addReviewThread func(ctx context.Context, reviewID string, c gql.PendingComment) error
 	submitReview    func(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error
 	submitNewReview func(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error
@@ -83,6 +84,10 @@ func (f fakeBackend) CloseIssue(ctx context.Context, repo string, number int) er
 
 func (f fakeBackend) ReopenIssue(ctx context.Context, repo string, number int) error {
 	return f.reopenIssue(ctx, repo, number)
+}
+
+func (f fakeBackend) StartReview(ctx context.Context, pullRequestID string) (string, error) {
+	return f.startReview(ctx, pullRequestID)
 }
 
 func (f fakeBackend) DiscardReview(ctx context.Context, reviewID string) error {
