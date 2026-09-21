@@ -9,10 +9,11 @@ import "errors"
 // their language (i18n error.gh_not_found).
 var ErrBackendUnavailable = errors.New("backend unavailable")
 
-// ErrTransient wraps a failure GitHub's front end produced rather than
+// ErrTransient wraps a failure the service's front end produced rather than
 // answered -- 502, 503, 504. The request was well-formed, so asking again
-// is the right response.
-var ErrTransient = errors.New("GitHub did not answer")
+// is the right response. Which service that was is the gateway's to know:
+// the text names only the kind, as the two above do.
+var ErrTransient = errors.New("the backend did not answer")
 
 // ErrUnauthenticated is returned when the backend has no usable credentials
 // -- gh not signed in, or no token for the API client. Same rule as above:
