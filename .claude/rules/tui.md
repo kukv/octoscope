@@ -37,8 +37,7 @@ tea "charm.land/bubbletea/v2"
 
 **画面遷移の信号は `presentation/tui/nav` にある。** タブ（work / repo / search）が
 「これを開いてほしい」と言うための型は `nav.OpenDetailMsg` / `nav.OpenDiffMsg` /
-`nav.OpenChecksMsg` の 3 つで、タブごとに定義しない（2026-09-21 に畳んだ。
-それ以前は 3 パッケージが同じ型を別々に持ち、root が 10 本の case で受けていた）。
+`nav.OpenChecksMsg` の 3 つで、タブごとに定義しない。
 
 **ただし `detail` は自分の `OpenDiffMsg` / `OpenChecksMsg` を持つ。これは重複ではない。**
 root はタブからのものを `openDiff` に、detail からのものを `openDiffOverDetail` に回す——
@@ -46,7 +45,7 @@ root はタブからのものを `openDiff` に、detail からのものを `ope
 コンパイラが保証しているこの区別が実行時の bool になる。同じ形の struct が 2 つ
 並んでいるのを見て 1 つにしたくなったら、root の `switch` の答えが同じかを先に見ること。
 
-**`FatalMsg` は 3 タブが今もそれぞれ持ち、`nav` には畳んでいない。** 中身はどれも
+**`FatalMsg` は 3 タブがそれぞれ持ち、`nav` には畳まない。** 中身はどれも
 `struct{ Err error }` で、root は 3 つとも `m.fail` に渡しており、doc コメントの
 文言が違うだけに見える。それでも畳まないのは、`nav` の責務が「画面を開いてほしいと
 伝える」ことであって、「致命的な失敗を報告する」ことではないからである。文言を
