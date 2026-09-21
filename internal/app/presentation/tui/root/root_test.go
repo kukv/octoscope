@@ -632,7 +632,7 @@ func TestAClosedDiffsFailureIsNotShown(t *testing.T) {
 	}
 }
 
-// TestASubmittedReviewRefreshesTheBoardAndTheReposList guards spec 4.4.2: a
+// TestASubmittedReviewRefreshesTheBoardAndTheReposList: a
 // submitted review must be reflected in the Work board and the Repos list,
 // not just in the detail/diff view the reviewer submitted it from.
 func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
@@ -653,7 +653,7 @@ func TestASubmittedReviewRefreshesTheBoardAndTheReposList(t *testing.T) {
 	}
 }
 
-// TestAMergeRefreshesTheBoardAndTheReposList guards spec 4.4.4: a merged
+// TestAMergeRefreshesTheBoardAndTheReposList: a merged
 // pull request must leave the Work board, not only the view it was merged
 // from.
 func TestAMergeRefreshesTheBoardAndTheReposList(t *testing.T) {
@@ -1204,7 +1204,7 @@ func renderEveryScreen(t *testing.T, width int) map[string]string {
 	}
 }
 
-// TestNoLineExceedsTheTerminalWidth guards spec §6.4 across every screen the
+// TestNoLineExceedsTheTerminalWidth guards the width across every screen the
 // root can show. A Japanese character occupies two columns, so a line that
 // fits in English can still run off the screen in Japanese.
 func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
@@ -1269,7 +1269,7 @@ func TestAStaleDetailErrorDoesNotReplaceTheOpenOne(t *testing.T) {
 	}
 }
 
-// TestNoUnresolvedIDsInTheRootViews guards spec §6.5: a message ID the code
+// TestNoUnresolvedIDsInTheRootViews guards the catalog: a message ID the code
 // asks for but the catalog of the active language does not carry renders as
 // "!the.id" rather than failing anywhere else.
 func TestNoUnresolvedIDsInTheRootViews(t *testing.T) {

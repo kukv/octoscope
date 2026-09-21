@@ -79,7 +79,7 @@ func TestTheDrawerOnlyReportsChecksForPullRequests(t *testing.T) {
 	}
 }
 
-// TestTheDrawerShowsTheBodyAndEachCheck pins spec §4.1: the drawer is what
+// TestTheDrawerShowsTheBodyAndEachCheck pins what the drawer is for: it is what
 // lets a card be read without pressing enter, so it carries the body and the
 // checks one by one — not a summary line.
 func TestTheDrawerShowsTheBodyAndEachCheck(t *testing.T) {
@@ -447,7 +447,7 @@ func TestAPullRequestWithoutChecksSaysWhereItsReviewStands(t *testing.T) {
 	}
 }
 
-// TestLabelsAreDrawnAsFilledBadges guards spec 4.5: GitHub's own label
+// TestLabelsAreDrawnAsFilledBadges guards how a label is drawn: GitHub's own
 // colour, filled, not just the name in plain text. The mockup puts them on
 // the meta line, beside the repository.
 func TestLabelsAreDrawnAsFilledBadges(t *testing.T) {

@@ -28,7 +28,7 @@ const overlongBody = overlongTitle + "\n\nhttps://github.com/kukv/octoscope/pull
 
 const overlongLabel = "Kind: a label nobody would name this way — ラベル名が長すぎる場合"
 
-// TestNoLineExceedsTheTerminalWidth guards spec §6.4 across every screen the
+// TestNoLineExceedsTheTerminalWidth guards the width across every screen the
 // detail view can show. A Japanese character occupies two columns, so a line
 // that fits in English can still run off the screen in Japanese.
 func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
@@ -142,7 +142,7 @@ func TestTheFooterNeverDropsEsc(t *testing.T) {
 	}
 }
 
-// TestNoUnresolvedIDsInRenderedViews guards spec §6.5. It renders each of the
+// TestNoUnresolvedIDsInRenderedViews guards the catalog. It renders each of the
 // view's screens in both languages and fails when a message ID the code asked
 // for is missing from that language's catalog. Walking i18n.IDs() cannot catch
 // this: it only proves the catalog can resolve its own IDs, never that the IDs

@@ -112,7 +112,7 @@ func TestATwoColumnBoardHitTestsTheSecondPage(t *testing.T) {
 }
 
 // TestClickingTheSelectedCardOpensIt is the substitute for a double click,
-// which Bubble Tea does not report (spec 4).
+// which Bubble Tea does not report.
 func TestClickingTheSelectedCardOpensIt(t *testing.T) {
 	m := loaded() // the cursor starts on #12; "bump deps" is #3
 	x, y := titleAt(t, m, "bump deps")
@@ -200,7 +200,7 @@ func TestTheWheelFollowsTheColumnUnderThePointer(t *testing.T) {
 }
 
 // TestASingleColumnBoardStillHitTests covers the regime where View puts two
-// extra lines above the board (spec 4.6): a hit-test that ignored them would
+// extra lines above the board: a hit-test that ignored them would
 // be off by one card everywhere.
 func TestASingleColumnBoardStillHitTests(t *testing.T) {
 	m := loaded()

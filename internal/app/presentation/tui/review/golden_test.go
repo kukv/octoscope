@@ -75,7 +75,7 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 	}
 }
 
-// TestNoUnresolvedIDsInTheReviewView guards spec §6.5: a message ID the code
+// TestNoUnresolvedIDsInTheReviewView guards the catalog: a message ID the code
 // asked for but the catalog does not have shows up literally, and this fails
 // the moment it would be seen.
 func TestNoUnresolvedIDsInTheReviewView(t *testing.T) {

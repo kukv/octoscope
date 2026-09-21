@@ -56,8 +56,8 @@ func toMergeContext(c gql.MergeContext) domain.MergeContext {
 	}
 }
 
-// allowedMethods lists the methods in the order the popup draws them
-// (standalone design §4.4.4): squash, merge commit, rebase.
+// allowedMethods lists the methods in the order the popup draws them:
+// squash, merge commit, rebase.
 func allowedMethods(squash, commit, rebase bool) []domain.MergeMethod {
 	var methods []domain.MergeMethod
 	if squash {

@@ -70,7 +70,7 @@ func methodText(method domain.MergeMethod) string {
 
 // autoLine is one of three things: a pull request already in the queue only
 // offers to leave it, one that can join shows the box space toggles, and one
-// that cannot says why (standalone design §4.4.4, D6).
+// that cannot says why.
 func (m Model) autoLine() string {
 	switch {
 	case m.ctx.AutoMergeEnabled:

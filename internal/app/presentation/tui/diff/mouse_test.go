@@ -49,8 +49,7 @@ func TestClickingTheFileListSelectsThatFile(t *testing.T) {
 
 // TestClickingASettledThreadTwiceOpensIt: the first click selects, the second
 // on an already-selected row opens. No double click -- Bubble Tea does not
-// report one, and measuring the gap ourselves would put a clock in Update
-// (spec 4.0).
+// report one, and measuring the gap ourselves would put a clock in Update.
 func TestClickingASettledThreadTwiceOpensIt(t *testing.T) {
 	m := withThreads(t, 120, 40)
 	y := rowY(t, m, "settled comment")

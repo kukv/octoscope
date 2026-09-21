@@ -109,7 +109,7 @@ func TestScrollingFollowsTheCursorDownALongColumn(t *testing.T) {
 
 // TestGoldenIconSets records the board once per glyph set. The board is what
 // the sets exist for, and a set that draws the wrong width shows up here as a
-// column that no longer lines up (spec 4.5).
+// column that no longer lines up.
 func TestGoldenIconSets(t *testing.T) {
 	for name, set := range map[string]icon.Set{"nerd": icon.Nerd, "ascii": icon.ASCII} {
 		t.Run(name, func(t *testing.T) {

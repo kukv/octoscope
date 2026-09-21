@@ -182,7 +182,7 @@ func TestAnUnsentCommentIsMarked(t *testing.T) {
 	}
 }
 
-// TestSidebarShowsAThreadCountBadge covers spec 4.4.1's "●2": the sidebar
+// TestSidebarShowsAThreadCountBadge covers the "●2" badge: the sidebar
 // draws a file's thread count next to its size, and says nothing at all for
 // a file with no threads.
 func TestSidebarShowsAThreadCountBadge(t *testing.T) {

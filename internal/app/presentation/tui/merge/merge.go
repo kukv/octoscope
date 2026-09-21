@@ -5,7 +5,7 @@
 // It is a popup rather than a view of its own, so it has no place in the
 // root model's stack. The detail view holds one and draws it over itself.
 // Unlike internal/app/presentation/tui/review it fetches for itself: r has to be able to ask
-// GitHub again while the popup stays open (standalone design §4.4.4).
+// GitHub again while the popup stays open.
 package merge
 
 import (

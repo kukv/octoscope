@@ -863,7 +863,7 @@ func overlongIssues() []domain.Item {
 	}
 }
 
-// TestNoLineExceedsTheTerminalWidth guards spec §6.4 across both scripts: a
+// TestNoLineExceedsTheTerminalWidth guards the width across both scripts: a
 // Japanese character occupies two columns, so a line that fits in English can
 // still run off the screen in Japanese.
 func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
@@ -999,7 +999,7 @@ func TestSidebarListsEveryRepository(t *testing.T) {
 	}
 }
 
-// Design §9: under 100 columns the sidebar folds away and the header keeps
+// Under 100 columns the sidebar folds away and the header keeps
 // the name of the repository being shown.
 func TestSidebarFoldsAwayWhenNarrow(t *testing.T) {
 	m := sidebarModel(&fakeSource{prs: samplePRs()}, 80)
@@ -1133,7 +1133,7 @@ func TestSetCurrentFetchesCounts(t *testing.T) {
 	}
 }
 
-// Design §8: the key bar must fit ja at 80 columns. FitKeyBar guarantees the
+// The key bar must fit ja at 80 columns. FitKeyBar guarantees the
 // width on its own -- it drops hints until they fit -- so measuring the width
 // would assert nothing (see docs: the seven tests that could not fail). What
 // is worth holding is which hints survive the drop.
@@ -1154,7 +1154,7 @@ func TestKeyBarKeepsTheEssentialKeysInJapaneseAt80(t *testing.T) {
 	}
 }
 
-// 20-50 repositories is the realistic size of the list (design §2). The
+// 20-50 repositories is the realistic size of the list. The
 // sidebar must scroll rather than run off the bottom of the terminal.
 func TestSidebarScrollsRatherThanOverflowing(t *testing.T) {
 	var many []string
@@ -1175,7 +1175,7 @@ func TestSidebarScrollsRatherThanOverflowing(t *testing.T) {
 	}
 }
 
-// TestNoUnresolvedIDsInRenderedViews guards spec §6.5. It renders each of the
+// TestNoUnresolvedIDsInRenderedViews guards the catalog. It renders each of the
 // list's screens in both languages and fails when a message ID the code asked
 // for is missing from that language's catalog. Walking i18n.IDs() cannot catch
 // this: it only proves the catalog can resolve its own IDs, never that the IDs
