@@ -25,6 +25,8 @@ linters:
               desc: ドメインは UI を知らない
             - pkg: github.com/kukv/octoscope/internal/app/config
               desc: ドメインは設定ファイルを知らない
+            - pkg: github.com/kukv/octoscope/internal/app/adapter
+              desc: ドメインは腐敗防止層を知らない
             - pkg: github.com/kukv/octoscope/internal/github
               desc: ドメインは特定サービスのクライアントを知らない
             - pkg: github.com/kukv/octoscope/internal/i18n
