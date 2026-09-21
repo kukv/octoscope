@@ -10,8 +10,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// write puts raw into a settings file inside a temporary directory and
-// returns its path.
 func write(t *testing.T, raw string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.yaml")

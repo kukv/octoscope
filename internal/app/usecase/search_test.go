@@ -8,7 +8,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// fakeSearcher records the query SearchItems was asked to run.
 type fakeSearcher struct {
 	searchQuery string
 	err         error

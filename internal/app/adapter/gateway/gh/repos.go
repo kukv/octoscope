@@ -8,7 +8,6 @@ import (
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
-// SearchRepos looks for repositories matching query.
 func (g *Gateway) SearchRepos(ctx context.Context, query string, limit int) ([]domain.RepoCandidate, error) {
 	found, err := g.backend.SearchRepos(ctx, query, limit)
 	if err != nil {

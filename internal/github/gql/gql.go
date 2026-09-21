@@ -28,7 +28,6 @@ const (
 	VarPlaceholder
 )
 
-// Var is one GraphQL variable.
 type Var struct {
 	Name string
 	Kind VarKind
@@ -106,7 +105,6 @@ func SplitRepoVars(repo string) ([]Var, error) {
 	return []Var{S("owner", owner), S("name", name)}, nil
 }
 
-// repoVars is what a caller uses to name the repository of a call.
 func (c *Client) repoVars(repo string) ([]Var, error) {
 	split := c.RepoVars
 	if split == nil {

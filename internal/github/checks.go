@@ -29,7 +29,6 @@ func ParseLogLine(step, message string) LogLine {
 	return line
 }
 
-// RerunScope is how much of a workflow run to start again.
 type RerunScope int
 
 const (

@@ -182,7 +182,7 @@ func TestAnUnsentCommentIsMarked(t *testing.T) {
 	}
 }
 
-// TestSidebarShowsAThreadCountBadge covers spec 4.4.1's "●2": the sidebar
+// TestSidebarShowsAThreadCountBadge covers the "●2" badge: the sidebar
 // draws a file's thread count next to its size, and says nothing at all for
 // a file with no threads.
 func TestSidebarShowsAThreadCountBadge(t *testing.T) {
@@ -315,7 +315,6 @@ func TestCollapseThreadClearsTheDeclineMessage(t *testing.T) {
 	}
 	m.row = last
 
-	// Press c on the thread row; it should decline with a message.
 	m = press(m, "c")
 	if m.declined == "" {
 		t.Error("c on a thread row should have set a decline message")
@@ -328,7 +327,6 @@ func TestCollapseThreadClearsTheDeclineMessage(t *testing.T) {
 		t.Errorf("m.declined = %q, want empty after collapse", m.declined)
 	}
 
-	// Assert the cursor is now on a rowLine.
 	if m.currentRow().kind != rowLine {
 		t.Errorf("cursor is on %v, want rowLine after collapse", m.currentRow().kind)
 	}

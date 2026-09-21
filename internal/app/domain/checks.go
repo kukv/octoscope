@@ -20,7 +20,6 @@ type LogLine struct {
 	Text string
 }
 
-// RerunScope is how much of a workflow run to start again.
 type RerunScope int
 
 const (
@@ -28,7 +27,6 @@ const (
 	RerunAll
 )
 
-// CheckState is the rolled-up outcome of a pull request's checks.
 type CheckState int
 
 const (

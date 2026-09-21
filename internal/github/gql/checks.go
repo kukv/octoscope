@@ -75,7 +75,6 @@ type checkSuiteNode struct {
 	WorkflowRun *WorkflowRun `json:"workflowRun"`
 }
 
-// WorkflowRun names the Actions workflow a check run belongs to.
 type WorkflowRun struct {
 	DatabaseID int64 `json:"databaseId"`
 	RunNumber  int   `json:"runNumber"`

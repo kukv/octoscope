@@ -5,7 +5,7 @@
 // It is a popup rather than a view of its own, so it has no place in the
 // root model's stack. The detail view holds one and draws it over itself.
 // Unlike internal/app/presentation/tui/review it fetches for itself: r has to be able to ask
-// GitHub again while the popup stays open (standalone design §4.4.4).
+// GitHub again while the popup stays open.
 package merge
 
 import (
@@ -23,7 +23,6 @@ import (
 // and only a number that never repeats can tell their answers apart.
 var nextGen atomic.Int64
 
-// Source is what merging needs.
 type Source interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
 	MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error
@@ -37,7 +36,6 @@ type Source interface {
 // leaves the pull request open and worth reading.
 type MergedMsg struct{ Merged bool }
 
-// CancelledMsg tells the holder to take the popup away.
 type CancelledMsg struct{}
 
 // ErrorMsg carries a failure the holder shows at footer level, the same way

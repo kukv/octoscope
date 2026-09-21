@@ -43,18 +43,17 @@ gateway は domain だけを見て port を満たす。結線は `cmd/octoscope`
 書き、CI で落とす。**パッケージを増やしたら、その場で depguard にも足す。**
 足し忘れると、次に誰かが依存の向きを壊しても誰も気づかない。
 
-**lint が守っているように見えて、実は別のものが守っていることがある。** `domain-layer` が
-`internal/app/adapter` を deny するのは 2026-09-21 からで、それ以前の domain → adapter は
-Go の import cycle だけが止めていた。今日ある adapter 2 つ（`datasource` / `gateway/gh`）は
-どちらも domain を import しているので、domain から import すると depguard より先に
-型検査が `import cycle not allowed` で落ちる。この deny が実際に効くのは、
-**domain を import しない adapter のサブパッケージが将来できたとき**である。
-（depguard は blank import を見ない。発火を確かめるときは実際に使う形で import する。）
+**lint が守っているように見えて、実は別のものが守っていることがある。** domain を
+import する adapter を domain から import すると、depguard より先に型検査が
+`import cycle not allowed` で落ちる。`domain-layer` の `internal/app/adapter` deny が
+実際に効くのは、**domain を import しない adapter のサブパッケージ**に対してだけである。
 
-（`i18n-layer` と `browser-layer` の deny は今も `internal/app`（末尾スラッシュ無し）のままで、
-`github-layer` は `internal/app/`（末尾スラッシュ付き）に直した。前者は `internal/appfoo` のような
-無関係なパッケージ名も誤って拾う over-match の余地を残しているが、実害はまだ無い。
-直すなら 3 つ揃えて直す。）
+depguard の発火を確かめるときは、**実際に使う形で import する。**
+blank import（`import _`）は見られない。
+
+（`i18n-layer` と `browser-layer` の deny は `internal/app`（末尾スラッシュ無し）、
+`github-layer` は `internal/app/`（末尾スラッシュ付き）。前者は `internal/appfoo` のような
+無関係なパッケージ名も誤って拾う over-match の余地がある。直すなら 3 つ揃えて直す。）
 
 ## interface は利用側で定義する
 
@@ -113,7 +112,6 @@ const (
 
 **テキスト形式の解釈も同じ側にある。** unified diff を読む `parseDiff` /
 `parseBarePatch` は `internal/app/adapter/gateway/gh` にあり、domain には無い
-（2026-09-21 に移した。それ以前は `domain.ParseDiff` だった）。
 **domain が持つのは差分の形**——`FileDiff` / `Hunk` / `DiffLine` と
 「削除された行には新側の行番号が無い」といった型が負うルール——**であって、
 git がそれをどう綴るかではない。** #124 の線（翻訳は ACL、政策はドメイン）では、
@@ -139,15 +137,14 @@ pending の有無で `SubmitNewReview` 1 回と `SubmitReview` 1 回を切り替
 （`internal/app/adapter/gateway/gh/review.go`）。
 
 **アプリの都合による順序**は `internal/app/usecase` に残る。
-`domain.ItemRef.Kind` を View で `switch` しない——この指示は変わらないが、
-**2026-09-20 に移る先が usecase から gateway になった。** 種別の振り分けは
+`domain.ItemRef.Kind` を View で `switch` しない。**振り分けの置き場所は gateway で、**
 `gateway/gh` の `GetItem` / `ListItems` / `writes.go` が持つ。PR と Issue を
 別々に呼ぶのはサービス固有の事情だからである。
 
 置き場所を分けると、順序のテストに Bubble Tea が要る。順序を持つ層に
 フェイクを 1 つ渡すだけで検証できるようにする。
 
-**この層は今は薄い。** 振り分けが降りた後 `internal/app/usecase` に残るのは、
+**この層は薄い。** 振り分けが gateway にあるので `internal/app/usecase` に残るのは、
 `SeedCandidates`（組織スコープの無いトークンでも残りを失わない、というアプリ側の判断を
 持つ唯一のメソッド）、ポートの束ね方、各ビューへの薄い委譲だけである。
 
@@ -168,8 +165,7 @@ pending の有無で `SubmitNewReview` 1 回と `SubmitReview` 1 回を切り替
 - PR にしか無いものは `Item.Change`（`*domain.Change`）から読む。`Item` に写さない。
   `Change` が非 nil であることと `Ref.Kind == ItemPR` は同値で、保証するのは gateway である
 - 「画面に出したいものが `Item` に無い」と思ったら、まず `internal/app/domain` の
-  ドメイン型に無いのではないかを疑う。`Item` の公開フィールドは 12 個、
-  `Change` は 7 個ある（2026-09-20 に数えた）
+  ドメイン型に無いのではないかを疑う
 
 この規則があるかぎり、UI だけの修正（色・桁・文言・キー・状態遷移・
 何を描くかの選び方）は `internal/app/usecase` に波及しない。波及するのは
@@ -188,7 +184,7 @@ GitHub への**新しい操作**を足すときだけで、それは元から UI
 DI コンテナ、ドメインモデルとインフラモデルの二重定義、Input/Output DTO は
 **入れていない**。
 
-**`internal/app/usecase` を入れる判断を 2026-09-07 にした。**
+**`internal/app/usecase` を入れた判断。**
 それまでは「Web サービス向けの構造だから入れない」という一般論で退けていたが、
 その判断は `internal/app/presentation/tui` が 1 行も存在しない時点（Phase 0、`67ba0de`）に書かれ、
 以後一度も再検証されていなかった。再検証したときの実測は次のとおりである。
@@ -213,7 +209,7 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
 足すときに触るファイルが `internal/github/cli` + ビューの 2 つから
 `internal/github/cli` + `usecase` + ビューの 3 つになる。これが唯一の実コストである。
 
-**`internal/app/adapter/datasource` を入れる判断を 2026-09-13 にした。**
+**`internal/app/adapter/datasource` を入れた判断。**
 
 - **無いと何が壊れるか（実測）:** `SavedQuery` が `config`（ファイル形式）→
   `usecase`（再定義）→ `root.Options` の 3 段を経由していた。tui が `config` を
@@ -228,7 +224,7 @@ DI コンテナ、ドメインモデルとインフラモデルの二重定義�
   壊れるので、`datasource_test.go` に「片方を保存しても、もう片方と起動時設定が
   消えない」テストを置いた
 
-**`internal/app/adapter/gateway/gh` を入れる判断を 2026-09-13 にした。**
+**`internal/app/adapter/gateway/gh` を入れた判断。**
 
 - **無いと何が壊れるか（実測）:** `internal/github` から domain への参照が
   430 箇所 / 81 シンボルあった。`Author` `Label` `Comment` は json タグ付きのまま
@@ -265,18 +261,18 @@ port の中立化は行う。ただし**名前**と**形**を分けて扱う。
 | | `AddPRComment` / `AddIssueComment` → `AddComment(ctx, ItemRef, body)`。`ClosePR` / `ReopenPR` / `CloseIssue` / `ReopenIssue` → `SetState`。`EditPRLabels` / `EditIssueLabels` → `EditLabels`。`EditPRAssignees` / `EditIssueAssignees` → `EditAssignees`。`GetPR` / `GetIssue` → `GetItem`。`ListPRs` / `ListIssues` → `ListItems(ctx, repo, kind)` |
 | | `isOwnerSlashName`（presentation の判定）→ `ValidRepoName(name string) bool`。名前の形は GitHub のものなので gateway が答える |
 
-**リポジトリ名の形を gateway に移したのは 2026-09-20 である。** presentation にあった
+**リポジトリ名の形は gateway が答える。** presentation にあった
 `isOwnerSlashName` は `gql.SplitRepo` の逐語コピーで、depguard が
 presentation → `internal/github` を禁じているために共有できずにいた。domain に置けば
 層の線は通るが、`gql.SplitRepo` は消えないので重複は残り、しかも「2 つ目の `/` を弾く」
 という GitHub の形を domain に入れることになる。#124 の線（翻訳は ACL、政策はドメイン）では
-これは翻訳なので、gateway が答える。
+これは翻訳にあたる。
 
 **守れなくなるもの:** 純粋な述語 1 つのために port が 1 本増え、`Source` を満たす
 フェイク 3 つがスタブを 1 つずつ背負う。検証にネットワークが要らないことは port を
 読んでも分からない（`ctx` を取らないことが唯一の手がかりである）。
 
-**対 14 本を 6 本に畳んだのは 2026-09-20 である。** PR と Issue を別々のエンドポイントで
+**対 14 本は 6 本に畳んである。** PR と Issue を別々のエンドポイントで
 呼び分けるのは **GitHub の都合**であって、アプリの都合ではない。上の (ii)
 「GitHub が余計に 1 回呼ぶ必要があるから存在する port メソッドを作らない」が、
 まさにこれを禁じている。`ListItems` の `kind` は分岐ではなく**クエリの引数**である——
@@ -286,7 +282,7 @@ Repos タブは PR の一覧と Issue の一覧を別のペインに描くので
 **守れなくなるもの:** port を読んでも GitHub への呼び出しが何回になるか分からなくなる。
 これは `StartReview` / `SubmitNewReview` を畳んだときと同じ性質の反転で、前例に揃えた。
 
-**`backend` 側は別である。** `internal/github` のクライアントは今も `AddPRComment` と
+**`backend` 側は別である。** `internal/github` のクライアントは `AddPRComment` と
 `AddIssueComment` を別々に持ち、`gateway/gh/writes.go` がその間で振り分ける。
 `Gateway` は `backend` を埋め込んでいるので、それらはメソッド昇格で `Gateway` にも生えている。
 この規約が言う「形」は **usecase に向いた port の形**であって、ACL の内側ではない
@@ -302,6 +298,12 @@ Repos タブは PR の一覧と Issue の一覧を別のペインに描くので
 
 規約を変えたら、**その場で該当する rules ファイルを更新する。**
 更新されない合意は次のセッションには残らない。
+
+**規約に「今の状態」と日付を書かない。** 規約は今の形を規定するものであって、
+いつそうなったかの記録ではない。「2026-09-21 に移した」「今日ある adapter 2 つ」
+「`Change` は 7 個ある」のような文は、コードが動いた瞬間に嘘になり、
+読む人は段落のどこまでが今も正しいのかを判断できなくなる。**時制の無い規則と、
+その理由だけを書く。** いつ決まったかは git と `docs/superpowers/plans/` にある。
 
 lint で守っている規約（depguard など）を変えるときは、設定も一緒に変える。
 片方だけ変えると、ドキュメントと CI が食い違ったまま放置される。

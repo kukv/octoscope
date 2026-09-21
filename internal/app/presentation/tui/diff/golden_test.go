@@ -238,7 +238,7 @@ func declinedNoPendingReviewModel(width int) Model {
 // TestGoldenIconSets records a view with both an open thread and a folded
 // one, once per glyph set: the marker and the comment bar are the two
 // literals this glyph pair covers, and a set that draws them the wrong width
-// shows up here as the thread column no longer lining up (spec 4.5).
+// shows up here as the thread column no longer lining up.
 func TestGoldenIconSets(t *testing.T) {
 	m := withThreads(t, 120, 40)
 	for name, set := range map[string]icon.Set{"nerd": icon.Nerd, "ascii": icon.ASCII} {

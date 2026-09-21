@@ -7,8 +7,6 @@ import (
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
-// PRMergeContext fetches what the merge popup draws: what the repository
-// allows and what state this pull request is in.
 func (g *Gateway) PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error) {
 	c, err := g.backend.PRMergeContext(ctx, repo, number)
 	if err != nil {
@@ -17,7 +15,6 @@ func (g *Gateway) PRMergeContext(ctx context.Context, repo string, number int) (
 	return toMergeContext(c), nil
 }
 
-// MergePR merges the pull request now.
 func (g *Gateway) MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
 	if err := g.backend.MergePR(ctx, string(pr), fromMergeMethod(method)); err != nil {
 		return wrap(err)
@@ -25,8 +22,6 @@ func (g *Gateway) MergePR(ctx context.Context, pr domain.PullRequestHandle, meth
 	return nil
 }
 
-// EnableAutoMerge asks GitHub to merge the pull request once what it is
-// waiting on is in.
 func (g *Gateway) EnableAutoMerge(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
 	if err := g.backend.EnableAutoMerge(ctx, string(pr), fromMergeMethod(method)); err != nil {
 		return wrap(err)
@@ -34,7 +29,6 @@ func (g *Gateway) EnableAutoMerge(ctx context.Context, pr domain.PullRequestHand
 	return nil
 }
 
-// DisableAutoMerge turns auto-merge back off.
 func (g *Gateway) DisableAutoMerge(ctx context.Context, pr domain.PullRequestHandle) error {
 	if err := g.backend.DisableAutoMerge(ctx, string(pr)); err != nil {
 		return wrap(err)
@@ -62,8 +56,8 @@ func toMergeContext(c gql.MergeContext) domain.MergeContext {
 	}
 }
 
-// allowedMethods lists the methods in the order the popup draws them
-// (standalone design §4.4.4): squash, merge commit, rebase.
+// allowedMethods lists the methods in the order the popup draws them:
+// squash, merge commit, rebase.
 func allowedMethods(squash, commit, rebase bool) []domain.MergeMethod {
 	var methods []domain.MergeMethod
 	if squash {

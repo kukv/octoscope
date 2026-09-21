@@ -53,7 +53,6 @@ type Source interface {
 	merge.Source
 }
 
-// ClosedMsg tells the parent the user left the detail view.
 type ClosedMsg struct{}
 
 // OpenDiffMsg asks the parent to show the diff of the shown pull request.
@@ -65,7 +64,6 @@ type OpenDiffMsg struct{ Ref domain.ItemRef }
 // openChecksOverDetail.
 type OpenChecksMsg struct{ Ref domain.ItemRef }
 
-// ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
 type (

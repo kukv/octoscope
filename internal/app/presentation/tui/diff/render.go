@@ -442,8 +442,6 @@ func (m Model) diffLine(r row, selected bool, width int) string {
 	}
 }
 
-// styledLine is one row in its own colours, whether or not the cursor is on
-// it.
 func (m Model) styledLine(r row, width int) string {
 	switch r.kind {
 	case rowHunkHeader:
@@ -466,7 +464,6 @@ func (m Model) threadLine(r row, width int) string {
 	return theme.Thread(r.comment.Pending).Render(clip(m.threadText(r), width))
 }
 
-// threadText is what threadLine draws, without its colour.
 func (m Model) threadText(r row) string {
 	body := r.comment.Author.Login + " · " + singleLine(r.comment.Body)
 	if r.comment.Pending {
@@ -518,7 +515,6 @@ func lineNumbers(l domain.DiffLine) (old, num string) {
 	return old, num
 }
 
-// markerStyle colours the +/- marker.
 func markerStyle(k domain.DiffLineKind) string {
 	switch k {
 	case domain.LineAdded:

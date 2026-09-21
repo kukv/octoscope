@@ -28,7 +28,6 @@ type assigneeEditor interface {
 	EditAssignees(ctx context.Context, ref domain.ItemRef, add, remove []string) error
 }
 
-// GetItem fetches whichever of the two the reference names.
 func (u *Usecase) GetItem(ctx context.Context, ref domain.ItemRef) (domain.Item, error) {
 	return u.items.GetItem(ctx, ref)
 }

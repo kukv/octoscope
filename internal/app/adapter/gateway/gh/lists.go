@@ -41,7 +41,6 @@ func (g *Gateway) listIssueItems(ctx context.Context, repo string) ([]domain.Ite
 	return items, nil
 }
 
-// ListLabels names the repository's labels.
 func (g *Gateway) ListLabels(ctx context.Context, repo string) ([]domain.Label, error) {
 	labels, err := g.backend.ListLabels(ctx, repo)
 	if err != nil {

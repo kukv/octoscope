@@ -73,7 +73,6 @@ func sampleWork() domain.Work {
 // sampleItems is the column sampleWork fills with cards.
 func sampleItems() []domain.WorkItem { return sampleWork()[domain.SectionReviewRequested] }
 
-// loaded returns a model that already received its data.
 func loaded() Model {
 	return answeredAll(sized(New(&fakeSource{work: sampleWork()})), sampleWork())
 }

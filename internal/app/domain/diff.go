@@ -1,6 +1,5 @@
 package domain
 
-// FileStatus is what happened to one file in a diff.
 type FileStatus int
 
 const (
@@ -13,7 +12,6 @@ const (
 	FileUnchanged
 )
 
-// DiffLineKind separates the three kinds of line a unified diff holds.
 type DiffLineKind int
 
 const (

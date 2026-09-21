@@ -54,7 +54,6 @@ type SearchItem struct {
 	} `json:"commits"`
 }
 
-// CheckContext is one entry of a commit's status check rollup.
 type CheckContext struct {
 	Typename   string `json:"__typename"`
 	Name       string `json:"name"`

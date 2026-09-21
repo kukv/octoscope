@@ -49,7 +49,6 @@ type Source interface {
 	viewerNamer
 }
 
-// Options carries what main determined before the UI started.
 type Options struct {
 	// Repo is what --repo named, if anything. Without the flag the
 	// repository of the working directory is not known yet: asking the
@@ -390,7 +389,6 @@ func (m Model) has(o overlay) bool {
 	return false
 }
 
-// top is the view on screen, if any.
 func (m Model) top() (overlay, bool) {
 	if len(m.stack) == 0 {
 		return 0, false

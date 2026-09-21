@@ -23,7 +23,8 @@ const (
 	// could not be counted gets.
 	badgeColumn = 8
 
-	// minSidebarWidth is where the sidebar folds away (spec §4.6, design §9).
+	// minSidebarWidth is where the sidebar folds away: under a hundred columns
+	// the table has too little left once the sidebar has taken its share.
 	minSidebarWidth = 100
 
 	// addButtonHeight is the blank line and the add button under the
@@ -64,7 +65,7 @@ func (m Model) selectedRepo() string {
 
 // sidebarRows is how many repositories fit under the heading, and
 // sidebarWindow is the first one drawn, chosen to keep the cursor in view.
-// The list is realistically 20-50 long and the terminal is not (design §2),
+// The list is realistically 20-50 long and the terminal is not,
 // so it scrolls exactly as the table does.
 func (m Model) sidebarRows() int {
 	if m.height <= 0 {

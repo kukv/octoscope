@@ -24,7 +24,7 @@ func TestPRMergeContextReadsWhatTheRepositoryAllows(t *testing.T) {
 		t.Errorf("allowed methods = %+v, want all three true", got)
 	}
 	if got.AutoMergeAllowed {
-		t.Error("AutoMergeAllowed = true, want false (measured on kukv/octoscope, spec §2)")
+		t.Error("AutoMergeAllowed = true, want false (measured on kukv/octoscope)")
 	}
 }
 

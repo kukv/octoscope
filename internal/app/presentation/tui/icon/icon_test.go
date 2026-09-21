@@ -26,7 +26,6 @@ func use(t *testing.T, s icon.Set) {
 	t.Cleanup(func() { icon.Use(icon.Unicode) })
 }
 
-// markers is every glyph a set can draw, in one slice.
 func markers() []string {
 	var got []string
 	for _, draft := range []bool{false, true} {
@@ -52,7 +51,7 @@ func markers() []string {
 // TestEveryGlyphIsOneColumn is what keeps a set usable: the board pads its
 // columns by display width, and a glyph that measures two columns shifts
 // every card beside it. Nerd Font glyphs live in the private use area, where
-// width is not something to assume (spec 6.4).
+// width is not something to assume.
 func TestEveryGlyphIsOneColumn(t *testing.T) {
 	for name, set := range allSets {
 		t.Run(name, func(t *testing.T) {

@@ -115,7 +115,6 @@ func TestListOrgsReadsTheLoginsOnly(t *testing.T) {
 	}
 }
 
-// flagValue returns the argument that follows name.
 func flagValue(args []string, name string) (string, bool) {
 	for i, a := range args {
 		if a == name && i+1 < len(args) {

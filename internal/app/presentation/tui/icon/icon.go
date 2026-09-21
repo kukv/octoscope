@@ -13,7 +13,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// Set is one family of glyphs.
 type Set int
 
 const (
@@ -80,7 +79,6 @@ var (
 	current = Unicode
 )
 
-// Use switches the set every glyph is drawn from.
 func Use(s Set) {
 	mu.Lock()
 	defer mu.Unlock()

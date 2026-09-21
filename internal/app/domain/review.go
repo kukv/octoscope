@@ -41,7 +41,6 @@ func (t ReviewThread) Pending() bool {
 // screen.
 func (t ReviewThread) Collapsed() bool { return t.Resolved || t.Outdated }
 
-// PendingComment is a line comment on its way to GitHub.
 type PendingComment struct {
 	Path string
 	Line int
@@ -49,7 +48,6 @@ type PendingComment struct {
 	Body string
 }
 
-// ReviewEvent is what submitting a review says about it.
 type ReviewEvent int
 
 const (

@@ -15,14 +15,13 @@ import (
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
-// next is the model after one key press.
 func next(m Model, k string) Model {
 	m, _ = m.Update(key(k))
 	return m
 }
 
 // TestARowShowsTheStateTheNumberAndTheAge pins the table's fixed fields
-// (spec 4.2). The title takes whatever the others leave.
+// The title takes whatever the others leave.
 func TestARowShowsTheStateTheNumberAndTheAge(t *testing.T) {
 	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
 	cases := []struct {
@@ -77,7 +76,7 @@ func TestARowShowsTheStateTheNumberAndTheAge(t *testing.T) {
 
 // TestTheColumnsLineUpDownThePage is what the fixed widths are for: the eye
 // runs down one column, and a Japanese title must not push what follows it
-// sideways (spec 6.4).
+// sideways.
 func TestTheColumnsLineUpDownThePage(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 

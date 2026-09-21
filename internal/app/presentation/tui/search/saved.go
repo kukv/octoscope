@@ -8,7 +8,6 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-// queryStore is where the Search tab's saved queries survive a restart.
 type queryStore interface {
 	SaveQueries(queries []domain.SavedQuery) error
 }

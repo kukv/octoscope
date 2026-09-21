@@ -521,7 +521,7 @@ func manyFilesFixture() []domain.FileDiff {
 }
 
 // TestTheSidebarScrollsToKeepTheSelectionVisible is the sidebar's own
-// follow, deferred from Task 5: on a pull request touching more files than
+// follow: on a pull request touching more files than
 // fit, moving the selection past the bottom must not run it off screen.
 func TestTheSidebarScrollsToKeepTheSelectionVisible(t *testing.T) {
 	files := manyFilesFixture()

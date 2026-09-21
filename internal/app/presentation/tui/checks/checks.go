@@ -22,10 +22,8 @@ type Source interface {
 	RerunWorkflow(ctx context.Context, repo string, run domain.RunHandle, scope domain.RerunScope) error
 }
 
-// ClosedMsg tells the parent the user left the checks view.
 type ClosedMsg struct{}
 
-// ErrorMsg carries a failure the parent shows on its error screen.
 type ErrorMsg struct{ Err error }
 
 type checksMsg struct {
@@ -103,14 +101,12 @@ type Model struct {
 	open func(url string) error
 }
 
-// New builds the view for one pull request's checks.
 func New(src Source, ref domain.ItemRef) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	return Model{src: src, ref: ref, loading: true, spin: s, failedOnly: true, open: browser.Open}
 }
 
-// Init starts the fetch.
 func (m Model) Init() tea.Cmd { return tea.Batch(m.spin.Tick, m.fetch()) }
 
 func (m Model) fetch() tea.Cmd {

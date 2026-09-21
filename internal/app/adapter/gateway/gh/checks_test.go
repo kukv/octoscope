@@ -247,7 +247,6 @@ func TestToLogLineTranslatesEveryField(t *testing.T) {
 	}
 }
 
-// TestJobLogTranslatesEveryLine wires JobLog through the gateway end to end.
 func TestJobLogTranslatesEveryLine(t *testing.T) {
 	t.Parallel()
 
@@ -326,8 +325,6 @@ func TestFromRerunScopeCoversEveryValue(t *testing.T) {
 	}
 }
 
-// TestRerunWorkflowPassesTheConvertedScope wires RerunWorkflow through the
-// gateway end to end.
 func TestRerunWorkflowPassesTheConvertedScope(t *testing.T) {
 	t.Parallel()
 

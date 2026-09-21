@@ -369,7 +369,6 @@ func TestFromReviewEventMapsEveryValue(t *testing.T) {
 	}
 }
 
-// TestFromDiffSideMapsBothValues covers both domain.DiffSide values.
 func TestFromDiffSideMapsBothValues(t *testing.T) {
 	tests := []struct {
 		side domain.DiffSide

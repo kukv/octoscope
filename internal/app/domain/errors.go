@@ -34,7 +34,6 @@ type classified struct {
 func (e *classified) Error() string { return e.msg }
 func (e *classified) Unwrap() error { return e.kind }
 
-// Classify pairs what gh said with the sentinel that says what it was.
 func Classify(kind error, msg string) error {
 	return &classified{kind: kind, msg: msg}
 }

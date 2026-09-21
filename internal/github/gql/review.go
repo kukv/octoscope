@@ -220,7 +220,6 @@ func (c *Client) StartReview(ctx context.Context, pullRequestID string) (string,
 	return resp.Data.AddPullRequestReview.PullRequestReview.ID, nil
 }
 
-// PendingComment is a line comment on its way to GitHub.
 type PendingComment struct {
 	Path string
 	Line int
@@ -240,7 +239,6 @@ const (
 	EventComment        ReviewEvent = "COMMENT"
 )
 
-// AddReviewThread attaches one line comment to an unsubmitted review.
 func (c *Client) AddReviewThread(ctx context.Context, reviewID string, comment PendingComment) error {
 	_, err := c.Write(ctx, addThreadMutation,
 		S("reviewId", reviewID),
@@ -252,7 +250,6 @@ func (c *Client) AddReviewThread(ctx context.Context, reviewID string, comment P
 	return err
 }
 
-// SubmitReview sends the unsubmitted review, with every comment on it.
 func (c *Client) SubmitReview(ctx context.Context, reviewID string, event ReviewEvent, body string) error {
 	_, err := c.Write(ctx, submitReviewMutation,
 		S("reviewId", reviewID),
@@ -275,7 +272,6 @@ func (c *Client) SubmitNewReview(ctx context.Context, pullRequestID string, even
 	return err
 }
 
-// DiscardReview throws the unsubmitted review away, comments and all.
 func (c *Client) DiscardReview(ctx context.Context, reviewID string) error {
 	_, err := c.Write(ctx, discardReviewMutation, S("reviewId", reviewID))
 	return err

@@ -41,7 +41,6 @@ func (u *Usecase) PostLineComment(ctx context.Context, t domain.ReviewTarget, c 
 	return id, nil
 }
 
-// SubmitReview sends the review out.
 func (u *Usecase) SubmitReview(ctx context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	if err := u.reviews.SubmitReview(ctx, t, event, body); err != nil {
 		return fmt.Errorf("submit review: %w", err)
