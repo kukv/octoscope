@@ -11,7 +11,12 @@ octoscope = **Octo**cat + **-scope**: a telescope for looking over your GitHub w
 
 ## Requirements
 
+One of:
+
 - [GitHub CLI](https://cli.github.com/) (`gh`), authenticated via `gh auth login`
+- A personal access token in `GH_TOKEN` or `GITHUB_TOKEN`
+
+See [Authentication](#authentication).
 
 ## Install
 
@@ -71,6 +76,7 @@ Or point it at any repository:
 | `--repo owner/name` | Target repository, and the tab octoscope opens on. Defaults to the repository of the current directory, and to the Work tab. |
 | `--lang en\|ja` | Display language. Defaults to the settings file, then the operating system locale. |
 | `--icons unicode\|nerd\|ascii` | Glyph set. Defaults to `unicode`; `OCTOSCOPE_ICONS` or the settings file sets it permanently. |
+| `--backend auto\|gh\|api` | How to reach GitHub. Defaults to `auto`; `OCTOSCOPE_BACKEND` or the settings file sets it permanently. See [Authentication](#authentication). |
 | `--version` | Print the version and exit. |
 
 ### Settings file
@@ -92,6 +98,7 @@ mv ~/Library/Application\ Support/octoscope/config.yaml ~/.config/octoscope/
 |---|---|
 | `language` | `en` or `ja` |
 | `icons` | `unicode`, `nerd`, or `ascii` |
+| `backend` | `auto`, `gh`, or `api` |
 | `default_tab` | `repos` or `search`, to start on that tab instead of Work. `--repo` outranks it. |
 | `saved_queries` | The Search tab's saved queries: a list of `name` / `query` pairs. `s` adds one, `x` in the `ctrl+o` popup removes one. |
 
@@ -107,6 +114,41 @@ Pass `--icons nerd` if you have a [Nerd Font](https://www.nerdfonts.com/)
 patched font installed, or `--icons ascii` if the Unicode symbols do not draw.
 There is no reliable way to detect a patched font — a terminal reports neither
 the font in use nor its coverage — so the default is the set that needs none.
+
+### Authentication
+
+octoscope reaches GitHub in one of two ways:
+
+- **gh**: runs the `gh` command, which uses the account from `gh auth login`.
+- **api**: calls the GitHub API over HTTPS with a personal access token read from
+  `GH_TOKEN`, or `GITHUB_TOKEN` when that is unset. `gh` is not needed.
+
+Which one is used is chosen by `--backend`, then `OCTOSCOPE_BACKEND`, then
+`backend` in the settings file:
+
+| Value | Uses |
+|---|---|
+| `auto` (default) | `gh` if it is on `PATH`, otherwise a token |
+| `gh` | `gh` only |
+| `api` | a token only, even when `gh` is installed |
+
+An unrecognized value stops octoscope from starting, with a message saying where
+the value came from.
+
+`gh` itself also reads `GH_TOKEN` and `GITHUB_TOKEN` and prefers them over its
+stored login, so under `auto` a token takes effect whether or not `gh` is
+installed.
+
+The token needs these permissions:
+
+- Classic token: `repo`. Add `read:org` if you want your organizations'
+  repositories suggested in the Repos tab.
+- Fine-grained token, for each repository you open: Pull requests, Issues,
+  Contents and Actions (read and write), and Checks, Commit statuses and
+  Metadata (read). Grant only read access if you only want to browse.
+
+The `api` backend talks to github.com only; `GH_HOST` and
+`GH_ENTERPRISE_TOKEN` are not read, so GitHub Enterprise Server needs `gh`.
 
 ### Keys
 

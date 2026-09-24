@@ -189,6 +189,11 @@ Phase 4 の範囲外である。
 見つかれば `cli`、見つからなければトークンで `api` を組む。どちらも無ければ、
 `gh auth login` かトークンの設定を促すエラー画面を出す（spec §3.2）。
 
+**この自動選択は上書きできる。** `--backend`、`OCTOSCOPE_BACKEND`、設定ファイルの
+`backend` の順で `auto` / `gh` / `api` を選ぶ。既定の `auto` は上の自動選択のまま。
+`api` は `gh` が PATH にあっても使わず、トークンで `api` を組む。
+知らない値は起動を止める（`docs/superpowers/plans/2026-09-24-backend-flag.md`）。
+
 **このスライスで一番重いのは `run view --log` の代替である。** `gh` は Actions の
 ログ zip を取って `ジョブ名 \t ステップ名 \t タイムスタンプ 本文` に整形しており
 （Phase 3 設計 §2）、api 側はこの整形を自分で書くことになる。計画ではここを
