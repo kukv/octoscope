@@ -21,6 +21,10 @@ error:
     other: "Not signed in to GitHub. Run gh auth login, or set GH_TOKEN to a personal access token."
   no_backend:
     other: "No way to reach GitHub. Either install the gh CLI and run gh auth login, or set GH_TOKEN to a personal access token."
+  no_token:
+    other: "The api backend needs a personal access token in GH_TOKEN or GITHUB_TOKEN."
+  unknown_backend:
+    other: "Unknown backend {{.Value}} ({{.Source}}); use auto, gh, or api."
 
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).

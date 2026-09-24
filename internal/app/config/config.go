@@ -20,6 +20,7 @@ import (
 type Config struct {
 	Language   string `yaml:"language,omitempty"`
 	Icons      string `yaml:"icons,omitempty"`
+	Backend    string `yaml:"backend,omitempty"`
 	DefaultTab string `yaml:"default_tab,omitempty"`
 
 	// Repositories is the list the Repos tab shows, in the order it shows

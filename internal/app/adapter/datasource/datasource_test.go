@@ -69,7 +69,7 @@ func TestAMissingFileReadsAsNothingSaved(t *testing.T) {
 // and what one writes the other has to be able to read.
 func TestSavingQueriesLeavesTheStartupSettingsAlone(t *testing.T) {
 	t.Parallel()
-	path := write(t, "language: ja\nicons: nerdfont\ndefault_tab: search\nrepositories:\n  - kukv/octoscope\n")
+	path := write(t, "language: ja\nicons: nerdfont\nbackend: api\ndefault_tab: search\nrepositories:\n  - kukv/octoscope\n")
 	if err := datasource.NewStore(path).SaveQueries([]domain.SavedQuery{{Name: "mine", Query: "is:open"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +82,9 @@ func TestSavingQueriesLeavesTheStartupSettingsAlone(t *testing.T) {
 	}
 	if cfg.Icons != "nerdfont" {
 		t.Errorf("icons = %q, want nerdfont", cfg.Icons)
+	}
+	if cfg.Backend != "api" {
+		t.Errorf("backend = %q, want api", cfg.Backend)
 	}
 	if cfg.DefaultTabName() != "search" {
 		t.Errorf("default tab = %q, want search", cfg.DefaultTabName())
@@ -136,7 +139,7 @@ func TestAStoreWithNoPathReportsItRatherThanSavingNothing(t *testing.T) {
 // file.
 func TestSaveRepositoriesKeepsTheOtherSettings(t *testing.T) {
 	t.Parallel()
-	path := write(t, "language: ja\nicons: nerd\ndefault_tab: repos\n")
+	path := write(t, "language: ja\nicons: nerd\nbackend: api\ndefault_tab: repos\n")
 	if err := datasource.NewStore(path).SaveRepositories([]string{"kukv/octoscope"}); err != nil {
 		t.Fatalf("SaveRepositories: %v", err)
 	}
@@ -144,7 +147,7 @@ func TestSaveRepositoriesKeepsTheOtherSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got.Language != "ja" || got.Icons != "nerd" || got.DefaultTab != "repos" {
+	if got.Language != "ja" || got.Icons != "nerd" || got.Backend != "api" || got.DefaultTab != "repos" {
 		t.Errorf("save dropped the other settings: %+v", got)
 	}
 	if len(got.Repositories) != 1 || got.Repositories[0] != "kukv/octoscope" {

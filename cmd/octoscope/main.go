@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -52,6 +53,10 @@ func main() {
 	icons := flag.String("icons", "",
 		"glyph set: unicode (default), nerd for a Nerd Font patched font, or ascii; "+
 			"OCTOSCOPE_ICONS or the settings file can set it permanently")
+	backendFlag := flag.String("backend", "",
+		"how to reach GitHub: auto (gh if it is on PATH, else a token; the default), gh, "+
+			"or api (GH_TOKEN or GITHUB_TOKEN, without gh); "+
+			"OCTOSCOPE_BACKEND or the settings file can set it permanently")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -77,6 +82,15 @@ func main() {
 	i18n.SetLanguage(i18n.Resolve(*lang, cfg.Language, osLocale))
 	icon.Use(icon.Resolve(*icons, cfg.Icons))
 
+	// Resolved after the language, so that a bad value is reported in it.
+	mode, err := resolveBackend(*backendFlag, os.Getenv(backendEnvVar), cfg.Backend)
+	var unknown *unknownBackendError
+	if errors.As(err, &unknown) {
+		fmt.Fprintln(os.Stderr, i18n.Tf("error.unknown_backend",
+			map[string]any{"Source": unknown.Source, "Value": unknown.Value}))
+		os.Exit(2)
+	}
+
 	dir, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -86,11 +100,11 @@ func main() {
 	// Whether the current directory has a repository is settled by the UI,
 	// not here: answering it costs a gh subprocess, and waiting for one before
 	// the first frame left the terminal blank for as long as it took.
-	ghClient, apiClient, err := chooseBackend(dir, *repoFlag, exec.LookPath, api.Token)
+	ghClient, apiClient, err := chooseBackend(dir, *repoFlag, mode, exec.LookPath, api.Token)
 	if err != nil {
 		// Printed before the program starts: once it is in the alt screen,
 		// nothing written here survives the screen being cleared.
-		fmt.Fprintln(os.Stderr, i18n.T("error.no_backend"))
+		fmt.Fprintln(os.Stderr, i18n.T(backendFailure(mode)))
 		os.Exit(1)
 	}
 

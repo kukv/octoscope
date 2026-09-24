@@ -21,6 +21,10 @@ error:
     other: "GitHub にサインインしていません。gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
   no_backend:
     other: "GitHub に接続する手段がありません。gh CLI を入れて gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
+  no_token:
+    other: "api バックエンドには、GH_TOKEN か GITHUB_TOKEN に個人アクセストークンが必要です。"
+  unknown_backend:
+    other: "バックエンド {{.Value}}（{{.Source}}）は使えません。auto、gh、api のどれかを指定してください。"
 
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).
