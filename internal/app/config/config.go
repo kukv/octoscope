@@ -22,6 +22,11 @@ type Config struct {
 	Icons      string `yaml:"icons,omitempty"`
 	DefaultTab string `yaml:"default_tab,omitempty"`
 
+	// API takes the API backend even when gh is installed. It is the last
+	// place asked, after --api and OCTOSCOPE_API, so false and unset need not
+	// be told apart.
+	API bool `yaml:"api,omitempty"`
+
 	// Repositories is the list the Repos tab shows, in the order it shows
 	// them.
 	Repositories []string `yaml:"repositories,omitempty"`
