@@ -1,0 +1,39 @@
+name: Enhancement request
+description: Suggest an improvement to something octoscope already does
+labels: ["Kind: Enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a change to an existing screen, key, option or behavior — it is slow, awkward,
+        shows too little or too much, reads badly in one language. Something octoscope does
+        not do at all is a **Feature request**; something that does not work as the README
+        describes is a **Bug report**.
+  - type: input
+    id: target
+    attributes:
+      label: What to improve
+      description: The screen, key, option or behavior this is about.
+      placeholder: the pull request list, the `--icons` option, ...
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: How it works today
+      description: What it does now, and where that falls short for you.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How it should work
+      description: What you would change. A rough sketch of the screen is welcome.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What `octoscope --version` prints, so the current behavior can be checked.
+      placeholder: v0.8.3

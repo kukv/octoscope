@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest something octoscope should show or do
+description: Suggest something new octoscope should show or do
 labels: ["Kind: Feature"]
 body:
   - type: markdown
