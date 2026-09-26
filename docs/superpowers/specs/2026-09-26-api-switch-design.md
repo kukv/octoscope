@@ -42,7 +42,7 @@ PR #132 は `auto` / `gh` / `api` の 3 値で経路を選ばせていた。
 - **api 経路が指定された**: `gh` を探さず、トークン（`GH_TOKEN`、それが無ければ `GITHUB_TOKEN`）で api 経路を組む。
   トークンが無ければ、画面に入る前に stderr へ `error.no_token` を出して終了する。
   今の `error.no_backend`（「gh を入れるかトークンを設定せよ」）は、この場合には案内が的外れなので使わない。
-- **`OCTOSCOPE_API` が真偽値として読めない**（`yes` など）: 起動を止め、`error.invalid_api` で値と、それが書かれていた場所を示す。
+- **`OCTOSCOPE_API` が真偽値として読めない**（`yes` など）: 起動を止め、`error.invalid_api` で `OCTOSCOPE_API` の値が読めないことを示す。
   `--icons` は打ち間違いを黙って既定値として扱うが、ここではそうしない。
   どちらの経路で動いているかは画面に出ないので、打ち間違いに気づく機会が無いためである。
 - **設定ファイルの `api:` が bool として読めない**: YAML のデコードに失敗するので、既存の「設定ファイルが読めない」扱い
@@ -74,16 +74,12 @@ API bool `yaml:"api,omitempty"`
 ```go
 // resolveAPI decides whether to take the API backend.
 func resolveAPI(flagSet, flagValue bool, env string, configured bool) (bool, error)
-
-// invalidAPIError is an OCTOSCOPE_API value strconv.ParseBool cannot read.
-type invalidAPIError struct {
-	Source string
-	Value  string
-}
 ```
 
 - `flagSet` が真なら `flagValue` を返す。フラグが明示されたかどうかは、`main` が `flag.Visit` で調べて渡す。
-- `env` が（前後の空白を除いて）空でなければ `strconv.ParseBool` で読む。読めなければ `*invalidAPIError` を返す。
+- `env` が（前後の空白を除いて）空でなければ `strconv.ParseBool` で読む。読めなければ `%w` で包んだエラーを返す。
+  値の出どころを持つ専用のエラー型は作らない。フラグは `flag` パッケージが、設定ファイルは YAML が型を検査するので、
+  ここで読めない値は必ず `OCTOSCOPE_API` から来ている。
 - どちらも無ければ `configured` を返す。
 - 環境変数は `main` が `os.Getenv` で読んでから渡す。こうするとテストで環境変数を触らずに済む。
 
@@ -102,7 +98,7 @@ func chooseBackend(dir, repo string, useAPI bool,
 ### 4.3 `cmd/octoscope/main.go`
 
 - `--api` フラグを足す。
-- `resolveAPI` を呼ぶ。失敗したら `error.invalid_api` を stderr に出して終了する。
+- `resolveAPI` を呼ぶ。失敗したら `error.invalid_api` に `OCTOSCOPE_API` の値を差し込んで stderr に出し、終了する。
 - `chooseBackend` に `useAPI` を渡す。失敗したときのメッセージは、`useAPI` が真なら `error.no_token`、偽なら今の `error.no_backend`。
 
 ### 4.4 i18n（en / ja）
@@ -110,7 +106,7 @@ func chooseBackend(dir, repo string, useAPI bool,
 | キー | 内容 |
 |---|---|
 | `error.no_token` | api 経路が指定されているが `GH_TOKEN` / `GITHUB_TOKEN` が無い |
-| `error.invalid_api` | `{{.Source}}` に書かれた `{{.Value}}` は真偽値として読めない |
+| `error.invalid_api` | `OCTOSCOPE_API` の値 `{{.Value}}` は真偽値として読めない |
 
 ## 5. テスト
 
@@ -120,7 +116,7 @@ func chooseBackend(dir, repo string, useAPI bool,
   - `--api=false` が環境変数と設定ファイルを打ち消す
   - `OCTOSCOPE_API=0` が設定ファイルを打ち消す
   - どこにも指定が無ければ偽
-- 不正な値のエラーが、場所（`OCTOSCOPE_API`）と値を持っていること。
+- `OCTOSCOPE_API` が真偽値として読めなければエラーになり、下位の設定ファイルに落ちないこと。
 - `chooseBackend`:
   - `useAPI` が真なら、`gh` があっても api 経路になり、`lookPath` が呼ばれないこと
   - `useAPI` が真でトークンが無ければ、`domain.ErrUnauthenticated` になること
