@@ -29,6 +29,11 @@ Changes to `internal/` and `cmd/` follow a design and an implementation plan:
 - Designs: `docs/superpowers/specs/`
 - Plans: `docs/superpowers/plans/`
 
+Both are written with the [superpowers](https://github.com/obra/superpowers) plugin for
+Claude Code: its `brainstorming` skill produces the design and its `writing-plans` skill
+the plan. You do not need the plugin to contribute — the documents are plain Markdown —
+but new ones should follow the same format and locations.
+
 Read the ones that cover your change first. If none does, open an issue to agree on
 the design before writing code — a pull request that restructures packages without one
 is closed.
