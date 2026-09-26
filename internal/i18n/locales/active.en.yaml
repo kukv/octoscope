@@ -21,6 +21,10 @@ error:
     other: "Not signed in to GitHub. Run gh auth login, or set GH_TOKEN to a personal access token."
   no_backend:
     other: "No way to reach GitHub. Either install the gh CLI and run gh auth login, or set GH_TOKEN to a personal access token."
+  no_token:
+    other: "The GitHub API was asked for (--api, OCTOSCOPE_API or api in the settings file), but neither GH_TOKEN nor GITHUB_TOKEN is set. Set one to a personal access token."
+  invalid_api:
+    other: "OCTOSCOPE_API is \"{{.Value}}\", which is neither true nor false. Use 1 or true to call the GitHub API directly, 0 or false not to."
 
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).

@@ -11,7 +11,12 @@ octoscope = **Octo**cat + **-scope**: 自分の GitHub の仕事を見渡す望�
 
 ## 必要なもの
 
+次のどちらか。
+
 - [GitHub CLI](https://cli.github.com/)（`gh`）。`gh auth login` で認証済みであること
+- `GH_TOKEN` か `GITHUB_TOKEN` に設定した個人アクセストークン
+
+詳しくは[認証](#認証)を参照。
 
 ## インストール
 
@@ -69,6 +74,7 @@ git リポジトリの中で実行する。
 | `--repo owner/name` | 対象リポジトリ。指定すると Repos タブから始まる。デフォルトはカレントディレクトリのリポジトリで、この場合は Work タブから始まる |
 | `--lang en\|ja` | 表示言語。デフォルトは設定ファイル、次にオペレーティングシステムのロケール |
 | `--icons unicode\|nerd\|ascii` | グリフの種類。デフォルトは `unicode`。`OCTOSCOPE_ICONS` または設定ファイルで恒久的に指定できる |
+| `--api` | `gh` が入っていても、トークンで GitHub API を直接呼ぶ。`OCTOSCOPE_API` または設定ファイルで恒久的に指定できる。[認証](#認証)を参照 |
 | `--version` | バージョンを表示して終了する |
 
 ### 設定ファイル
@@ -90,6 +96,7 @@ mv ~/Library/Application\ Support/octoscope/config.yaml ~/.config/octoscope/
 |---|---|
 | `language` | `en` または `ja` |
 | `icons` | `unicode` / `nerd` / `ascii` |
+| `api` | `true` で、`gh` が入っていてもトークンで GitHub API を直接呼ぶ |
 | `default_tab` | `repos` または `search`。Work の代わりにそのタブから始まる。`--repo` のほうが強い |
 | `saved_queries` | Search タブの保存クエリ。`name` / `query` の組のリスト。`s` で追加し、`ctrl+o` のポップアップで `x` を押すと消える |
 
@@ -105,6 +112,32 @@ saved_queries:
 `--icons nerd`、Unicode 記号が描けない環境なら `--icons ascii` を渡す。
 使用中のフォントもその収録範囲も端末は報告しないため、パッチ済みフォントの
 有無は検出できない。したがってデフォルトはフォントを要求しない側にしてある。
+
+### 認証
+
+octoscope が GitHub に接続する経路は 2 つある。
+
+- **gh**: `gh` コマンドを実行する。認証は `gh` 自身が行う。`GH_TOKEN` か
+  `GITHUB_TOKEN` があればそれを、無ければ `gh auth login` のアカウントを使う。
+- **API**: octoscope 自身が HTTPS で GitHub API を呼ぶ。トークンは `GH_TOKEN`、
+  それが無ければ `GITHUB_TOKEN` から読む。`gh` は実行しない。
+
+デフォルトでは、`PATH` に `gh` があれば gh、無ければ API を使う。`gh` が入っていても
+API を使うには、`--api` を渡すか、`OCTOSCOPE_API=1` を設定するか、設定ファイルに
+`api: true` を書く。この順に読むので、`--api=false` や `OCTOSCOPE_API=0` で、
+それより下の指定をすべて、その 1 回だけ打ち消せる。`OCTOSCOPE_API` が真偽値として読めない値なら
+起動を止める。
+
+トークンに必要な権限は次のとおり。
+
+- classic トークン: `repo`。Repos タブで所属する組織のリポジトリを候補に出すなら
+  `read:org` も付ける。
+- fine-grained トークン: 開くリポジトリごとに、Pull requests・Issues・Contents・
+  Actions を読み書き、Checks・Commit statuses・Metadata を読み取り。見るだけなら
+  すべて読み取りでよい。
+
+API は github.com にしか接続しない。`GH_HOST` と `GH_ENTERPRISE_TOKEN` は
+読まないので、GitHub Enterprise Server では `gh` を使う。
 
 ### キー
 

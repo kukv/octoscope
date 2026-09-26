@@ -28,13 +28,13 @@ func TestLoadTreatsAMissingFileAsDefaults(t *testing.T) {
 func TestLoadReadsEveryField(t *testing.T) {
 	t.Parallel()
 
-	path := write(t, "language: ja\nicons: nerd\ndefault_tab: repos\n")
+	path := write(t, "language: ja\nicons: nerd\ndefault_tab: repos\napi: true\n")
 
 	got, err := config.Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	want := config.Config{Language: "ja", Icons: "nerd", DefaultTab: "repos"}
+	want := config.Config{Language: "ja", Icons: "nerd", DefaultTab: "repos", API: true}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load = %+v, want %+v", got, want)
 	}

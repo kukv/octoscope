@@ -52,6 +52,9 @@ func main() {
 	icons := flag.String("icons", "",
 		"glyph set: unicode (default), nerd for a Nerd Font patched font, or ascii; "+
 			"OCTOSCOPE_ICONS or the settings file can set it permanently")
+	useAPIFlag := flag.Bool("api", false,
+		"call the GitHub API directly with GH_TOKEN or GITHUB_TOKEN, even when gh is installed; "+
+			apiEnvVar+" or the settings file can set it permanently")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -83,14 +86,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	apiSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "api" {
+			apiSet = true
+		}
+	})
+	apiEnv := os.Getenv(apiEnvVar)
+	useAPI, err := resolveAPI(apiSet, *useAPIFlag, apiEnv, cfg.API)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, i18n.Tf("error.invalid_api", map[string]any{"Value": apiEnv}))
+		os.Exit(1)
+	}
+
 	// Whether the current directory has a repository is settled by the UI,
 	// not here: answering it costs a gh subprocess, and waiting for one before
 	// the first frame left the terminal blank for as long as it took.
-	ghClient, apiClient, err := chooseBackend(dir, *repoFlag, exec.LookPath, api.Token)
+	ghClient, apiClient, err := chooseBackend(dir, *repoFlag, useAPI, exec.LookPath, api.Token)
 	if err != nil {
 		// Printed before the program starts: once it is in the alt screen,
-		// nothing written here survives the screen being cleared.
-		fmt.Fprintln(os.Stderr, i18n.T("error.no_backend"))
+		// nothing written here survives the screen being cleared. Asked for
+		// the API, installing gh would not help, so only the token is named.
+		msg := "error.no_backend"
+		if useAPI {
+			msg = "error.no_token"
+		}
+		fmt.Fprintln(os.Stderr, i18n.T(msg))
 		os.Exit(1)
 	}
 

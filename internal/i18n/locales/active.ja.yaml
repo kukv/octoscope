@@ -21,6 +21,10 @@ error:
     other: "GitHub にサインインしていません。gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
   no_backend:
     other: "GitHub に接続する手段がありません。gh CLI を入れて gh auth login を実行するか、GH_TOKEN に個人アクセストークンを設定してください。"
+  no_token:
+    other: "GitHub API への直接接続が指定されています（--api / OCTOSCOPE_API / 設定ファイルの api）が、GH_TOKEN も GITHUB_TOKEN も設定されていません。どちらかに個人アクセストークンを設定してください。"
+  invalid_api:
+    other: "OCTOSCOPE_API の値「{{.Value}}」は真偽値として読めません。GitHub API に直接接続するなら 1 か true、しないなら 0 か false を指定してください。"
 
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).
