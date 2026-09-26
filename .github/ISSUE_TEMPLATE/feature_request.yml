@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest something octoscope should show or do
+labels: ["Kind: Feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        octoscope is a terminal UI for looking across pull requests and issues. It ships as a
+        single binary for Linux, macOS and Windows, so a proposal has to work on all three.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you want solved
+      description: What you are trying to do today, and where octoscope gets in the way or falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: How it would look or behave. A rough sketch of the screen is welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: The workaround you use now (`gh`, the web UI, another tool), if any.

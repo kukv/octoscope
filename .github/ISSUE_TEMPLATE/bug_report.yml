@@ -1,0 +1,66 @@
+name: Bug report
+description: Something does not work as the README describes
+labels: ["Kind: Bug Fix"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **A security issue does not belong here.** A token leaking into output, a crafted
+        repository or pull request that makes octoscope run something — report it privately
+        through the **Security** tab (*Report a vulnerability*); see
+        [SECURITY.md](https://github.com/kukv/octoscope/blob/main/SECURITY.md).
+
+        Anything else that behaves differently from the README — a crash, a wrong list, a
+        broken layout, a key that does nothing — belongs here.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What `octoscope --version` prints.
+      placeholder: v0.8.3
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal
+      description: The terminal emulator, and the shell or multiplexer inside it if any.
+      placeholder: Windows Terminal + pwsh, iTerm2 + tmux, ...
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: How you ran it
+      description: |
+        The full command line, plus anything that changes how octoscope runs: `--lang`,
+        `--icons`, whether `gh` is installed or you used `--api` (`OCTOSCOPE_API`), and the
+        settings file if you have one.
+      placeholder: octoscope --repo kukv/octoscope --lang ja
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The steps that lead to it, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: screen
+    attributes:
+      label: Screenshot or output
+      description: |
+        For a layout problem, a screenshot. For an error, the message as text. Remove any
+        token before pasting.
