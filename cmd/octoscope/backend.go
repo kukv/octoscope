@@ -42,6 +42,9 @@ func resolveAPI(flagSet, flagValue bool, env string, configured bool) (bool, err
 // already signed in, and it carries a login the environment variables need not
 // have. Without it a token is the whole reason the API backend exists.
 //
+// useAPI skips gh altogether, for a machine where gh is installed but should
+// not be the way to GitHub. Only a token is tried then.
+//
 // lookPath and token are parameters rather than the functions themselves so a
 // test can say what the machine has.
 //
@@ -49,11 +52,13 @@ func resolveAPI(flagSet, flagValue bool, env string, configured bool) (bool, err
 // rather than one interface is deliberate: the caller passes whichever it got
 // to usecase.New, and the compiler checks both clients answer everything the
 // usecase layer asks for.
-func chooseBackend(dir, repo string, lookPath func(string) (string, error),
-	token func() (string, error),
+func chooseBackend(dir, repo string, useAPI bool,
+	lookPath func(string) (string, error), token func() (string, error),
 ) (*cli.Client, *api.Client, error) {
-	if _, err := lookPath("gh"); err == nil {
-		return cli.New(dir, repo), nil, nil
+	if !useAPI {
+		if _, err := lookPath("gh"); err == nil {
+			return cli.New(dir, repo), nil, nil
+		}
 	}
 	t, err := token()
 	if err != nil {

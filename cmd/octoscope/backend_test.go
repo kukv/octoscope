@@ -13,7 +13,7 @@ import (
 func TestGhOnThePathWins(t *testing.T) {
 	t.Parallel()
 
-	c, a, err := chooseBackend("/work", "kukv/octoscope",
+	c, a, err := chooseBackend("/work", "kukv/octoscope", false,
 		func(string) (string, error) { return "/usr/bin/gh", nil },
 		func() (string, error) { return "a-token", nil })
 	if err != nil {
@@ -28,7 +28,7 @@ func TestGhOnThePathWins(t *testing.T) {
 func TestATokenIsUsedWhenGhIsNotThere(t *testing.T) {
 	t.Parallel()
 
-	c, a, err := chooseBackend("/work", "kukv/octoscope",
+	c, a, err := chooseBackend("/work", "kukv/octoscope", false,
 		func(string) (string, error) { return "", exec.ErrNotFound },
 		func() (string, error) { return "a-token", nil })
 	if err != nil {
@@ -44,7 +44,7 @@ func TestATokenIsUsedWhenGhIsNotThere(t *testing.T) {
 func TestNeitherGhNorATokenIsAnAuthenticationFailure(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := chooseBackend("/work", "kukv/octoscope",
+	_, _, err := chooseBackend("/work", "kukv/octoscope", false,
 		func(string) (string, error) { return "", exec.ErrNotFound },
 		func() (string, error) { return "", domain.ErrUnauthenticated })
 	if !errors.Is(err, domain.ErrUnauthenticated) {
@@ -61,7 +61,7 @@ func TestTheUnderlyingTokenErrorSurvives(t *testing.T) {
 	t.Parallel()
 
 	cause := errors.New("keyring is locked")
-	_, _, err := chooseBackend("/work", "kukv/octoscope",
+	_, _, err := chooseBackend("/work", "kukv/octoscope", false,
 		func(string) (string, error) { return "", exec.ErrNotFound },
 		func() (string, error) { return "", cause })
 	if !errors.Is(err, cause) {
@@ -115,5 +115,37 @@ func TestAnUnreadableOCTOSCOPEAPIIsAnError(t *testing.T) {
 
 	if _, err := resolveAPI(false, false, "yes", true); err == nil {
 		t.Error("resolveAPI accepted OCTOSCOPE_API=yes")
+	}
+}
+
+// --api exists for a machine where gh is installed but should not be used, so
+// gh is not even looked for.
+func TestUseAPISkipsGhEvenWhenItIsThere(t *testing.T) {
+	t.Parallel()
+
+	c, a, err := chooseBackend("/work", "kukv/octoscope", true,
+		func(string) (string, error) {
+			t.Error("looked for gh although the API backend was asked for")
+			return "/usr/bin/gh", nil
+		},
+		func() (string, error) { return "a-token", nil })
+	if err != nil {
+		t.Fatalf("chooseBackend: %v", err)
+	}
+	if a == nil || c != nil {
+		t.Errorf("did not choose the API backend when asked for it")
+	}
+}
+
+// Asking for the API backend without a token has no gh to fall back to: it is
+// the same authentication failure as having neither.
+func TestUseAPIWithoutATokenIsAnAuthenticationFailure(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := chooseBackend("/work", "kukv/octoscope", true,
+		func(string) (string, error) { return "/usr/bin/gh", nil },
+		func() (string, error) { return "", domain.ErrUnauthenticated })
+	if !errors.Is(err, domain.ErrUnauthenticated) {
+		t.Errorf("err = %v, want domain.ErrUnauthenticated", err)
 	}
 }
