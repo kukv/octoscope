@@ -127,7 +127,7 @@ octoscope reaches GitHub in one of two ways:
 By default octoscope uses `gh` when it is on `PATH`, and the API otherwise. To
 use the API even with `gh` installed, pass `--api`, set `OCTOSCOPE_API=1`, or
 put `api: true` in the settings file; they are read in that order, so
-`--api=false` or `OCTOSCOPE_API=0` undoes the one below it for a single run.
+`--api=false` or `OCTOSCOPE_API=0` undoes whatever is set below it for a single run.
 A value of `OCTOSCOPE_API` that is neither true nor false stops octoscope from
 starting.
 
