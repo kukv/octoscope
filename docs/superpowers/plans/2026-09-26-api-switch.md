@@ -422,6 +422,9 @@ git commit -m "feat: --api takes the API backend even with gh installed"
 - Modify: `README.md` / `README.ja.md`
 - Modify: `docs/superpowers/specs/2026-09-08-phase4-design.md`（「**認証**」段落）
 
+トークン権限の一覧は PR #132 から引き継いだ文面で、まだ検証していない。コミット前に、`internal/github/api` が
+実際に叩くエンドポイント（GraphQL / REST、`/user/orgs` を含む）と突き合わせ、合わない行は直す。
+
 - [ ] **Step 1: README.md**
 
 「## Requirements」の箇条書き 1 行を置き換える。
