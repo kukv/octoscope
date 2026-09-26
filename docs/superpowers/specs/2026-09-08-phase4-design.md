@@ -189,6 +189,10 @@ Phase 4 の範囲外である。
 見つかれば `cli`、見つからなければトークンで `api` を組む。どちらも無ければ、
 `gh auth login` かトークンの設定を促すエラー画面を出す（spec §3.2）。
 
+`gh` があっても `api` を選ぶ手段として、`--api` / `OCTOSCOPE_API` / 設定ファイルの
+`api` を後から足した（`docs/superpowers/specs/2026-09-26-api-switch-design.md`）。
+指定されたときは `exec.LookPath("gh")` を試みない。
+
 **このスライスで一番重いのは `run view --log` の代替である。** `gh` は Actions の
 ログ zip を取って `ジョブ名 \t ステップ名 \t タイムスタンプ 本文` に整形しており
 （Phase 3 設計 §2）、api 側はこの整形を自分で書くことになる。計画ではここを
