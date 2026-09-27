@@ -99,9 +99,8 @@ func (m Model) addSelected() (Model, tea.Cmd) {
 	m.mode = modeList
 	m = m.setRows(rows)
 	next, cmd := m.selectRow(indexOf(rows, name))
-	return next, tea.Batch(cmd,
-		fetchCounts(next.src, next.rowNames()),
-		saveRepos(next.src, savedNames(next.rows), next.tab))
+	next, save := next.save()
+	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()), save)
 }
 
 // removeSelected drops the repository under the sidebar's cursor. It is
@@ -120,9 +119,8 @@ func (m Model) removeSelected() (Model, tea.Cmd) {
 	// the new one's; going around it would leave the removed repository's
 	// pull requests on screen.
 	next, cmd := m.selectRow(min(m.selected, len(rows)-1))
-	return next, tea.Batch(cmd,
-		fetchCounts(next.src, next.rowNames()),
-		saveRepos(next.src, savedNames(next.rows), next.tab))
+	next, save := next.save()
+	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()), save)
 }
 
 // setRows keeps Options.Repositories in step with the rows on screen.
@@ -159,11 +157,34 @@ func (m Model) runSearch(gen int) tea.Cmd {
 	}
 }
 
+// save writes the sidebar's list to the settings file, or, while a save is
+// still out, marks the list to be written once it answers.
+func (m Model) save() (Model, tea.Cmd) {
+	if m.saving {
+		m.saveAgain = true
+		return m, nil
+	}
+	m.saving = true
+	return m, saveRepos(m.src, savedNames(m.rows), m.tab)
+}
+
+// saveDone ends the save that was out, and writes the list as it now stands
+// if it changed meanwhile -- after a failure too, since that list was never
+// written.
+func (m Model) saveDone() (Model, tea.Cmd) {
+	m.saving = false
+	if !m.saveAgain {
+		return m, nil
+	}
+	m.saveAgain = false
+	return m.save()
+}
+
 func saveRepos(src repoEditor, names []string, t tabID) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SaveRepositories(names); err != nil {
 			return errMsg{tab: t, kind: noticeSave, err: err}
 		}
-		return nil
+		return savedMsg{}
 	}
 }

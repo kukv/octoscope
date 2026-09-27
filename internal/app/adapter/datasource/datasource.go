@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	yaml "go.yaml.in/yaml/v3"
 
@@ -17,7 +18,14 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-type Store struct{ path string }
+type Store struct {
+	path string
+
+	// mu holds a save from its read to its write. Each save replaces one
+	// setting in a file it read first, so two that overlap would each write
+	// back the other's setting as it was before.
+	mu sync.Mutex
+}
 
 // NewStore returns a store for the settings file at path. An empty path is
 // allowed: main builds a store even when it could not locate the config
@@ -55,6 +63,8 @@ func (s *Store) SavedQueries() ([]domain.SavedQuery, error) {
 // setting as it was. A file that cannot be parsed is not written at all: a
 // list is not worth flattening the rest of someone's settings for.
 func (s *Store) SaveRepositories(repos []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	c, err := s.load()
 	if err != nil {
 		return err
@@ -66,6 +76,8 @@ func (s *Store) SaveRepositories(repos []string) error {
 // SaveQueries replaces the saved queries and leaves every other setting as
 // it was, for the same reason SaveRepositories does.
 func (s *Store) SaveQueries(queries []domain.SavedQuery) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	c, err := s.load()
 	if err != nil {
 		return err

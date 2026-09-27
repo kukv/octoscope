@@ -86,6 +86,10 @@ type (
 		kind noticeKind
 		err  error
 	}
+
+	// savedMsg says the list reached the settings file. A failed save
+	// answers with an errMsg of kind noticeSave instead.
+	savedMsg struct{}
 )
 
 // noticeKind says which failure the line above the key bar is reporting. The
@@ -239,6 +243,13 @@ type Model struct {
 	// at twenty seconds and has been measured at over six cold, and for all
 	// that time "no repositories yet" would be a claim octoscope cannot make.
 	currentSettled bool
+
+	// saving says a save is out, and saveAgain that the list changed again
+	// while it was. Two saves in flight together run in whichever order
+	// their goroutines happen to, and the older list written last would put
+	// a removed row back; so the second waits and writes the list as it
+	// stands once the first has answered.
+	saving, saveAgain bool
 
 	// fetchedAt is when the shown list arrived. The rows carry relative
 	// times, and View must render the same string from the same state, so
@@ -512,6 +523,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.loading[tabIssues] = false
 		return m, nil
+	case savedMsg:
+		return m.saveDone()
 	case errMsg:
 		// Symmetric with prListMsg/issueListMsg above: a row the cursor has
 		// left can still fail, and its failure must not touch the row now on
@@ -519,6 +532,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// A save is not a fetch and belongs to no row, so it is never stale.
 		if msg.kind != noticeSave && msg.gen != m.gen {
 			return m, nil
+		}
+		var again tea.Cmd
+		if msg.kind == noticeSave {
+			m, again = m.saveDone()
 		}
 		// Only a fetch's failure ends a fetch. A browser that would not start
 		// leaves whatever is in flight in flight.
@@ -530,7 +547,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, func() tea.Msg { return FatalMsg{err} }
 		}
 		m.notice[msg.tab] = notice{kind: msg.kind, text: noticeText(msg.err)}
-		return m, nil
+		return m, again
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
