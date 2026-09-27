@@ -22,7 +22,9 @@ type ThreadComment struct {
 // line for a thread whose code has since moved, in which case Outdated is set
 // and Line is the line it was originally written against.
 type ReviewThread struct {
-	Path     string
+	Path string
+	// Line is 0 when the line the thread was written on is not in the
+	// current diff any more.
 	Line     int
 	Side     DiffSide
 	Resolved bool
