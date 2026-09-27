@@ -77,6 +77,24 @@ func TestAutoMergeNeedsSomethingToWaitFor(t *testing.T) {
 		{"viewer may not", MergeContext{
 			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: false, Clean: false,
 		}, false},
+		{"held by a branch rule: the checks it waits for are what auto-merge waits for", MergeContext{
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Block: BlockProtected,
+		}, true},
+		{"behind the base branch", MergeContext{
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Block: BlockBehind,
+		}, true},
+		{"draft", MergeContext{
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Block: BlockDraft,
+		}, false},
+		{"conflicting", MergeContext{
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Block: BlockConflicting,
+		}, false},
+		{"still being worked out", MergeContext{
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Block: BlockComputing,
+		}, false},
+		{"dirty", MergeContext{
+			AutoMergeAllowed: true, ViewerCanEnableAutoMerge: true, Block: BlockDirty,
+		}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

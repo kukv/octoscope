@@ -566,3 +566,54 @@ func TestAPopupWithNoAdminOfferSaysNothingAboutIt(t *testing.T) {
 		t.Errorf("the popup says %q to a viewer who may not:\n%s", notWant, view)
 	}
 }
+
+// A branch rule holding the merge for its checks is what auto-merge waits
+// out: the box space ticks has to be the thing enter sends.
+func TestEnterQueuesAPullRequestABranchRuleIsHolding(t *testing.T) {
+	t.Parallel()
+
+	c := blocked()
+	c.AutoMergeAllowed = true
+	c.ViewerCanEnableAutoMerge = true
+	f := &fakeSource{ctx: c}
+	m := loaded(t, f)
+	m, _ = press(m, " ")
+	if view, want := ansi.Strip(m.View()), i18n.T("merge.key_queue"); !strings.Contains(view, want) {
+		t.Errorf("the key bar has no %q:\n%s", want, view)
+	}
+	_, cmd := enter(m)
+	if cmd == nil {
+		t.Fatal("enter returned no command: the ticked auto-merge was not sent")
+	}
+	if msg := cmd(); msg != (MergedMsg{}) {
+		t.Fatalf("cmd() = %#v, want MergedMsg{}: the pull request is only queued", msg)
+	}
+	if len(f.enabled) != 1 || len(f.merged) != 0 {
+		t.Errorf("enabled = %v, merged = %v, want one auto-merge and no merge", f.enabled, f.merged)
+	}
+}
+
+// A conflict is not something to wait for, so auto-merge is not offered, and
+// the popup does not claim there is nothing left to wait for either.
+func TestAutoMergeIsNotOfferedOnAConflict(t *testing.T) {
+	t.Parallel()
+
+	c := autoMergeable()
+	c.Block = domain.BlockConflicting
+	f := &fakeSource{ctx: c}
+	m := loaded(t, f)
+	m, _ = press(m, " ")
+	_, cmd := enter(m)
+	if cmd != nil {
+		t.Fatal("enter returned a command on a conflicting pull request")
+	}
+	view := ansi.Strip(m.View())
+	for _, notWant := range []string{i18n.T("merge.key_auto"), i18n.T("merge.auto_unavailable_clean")} {
+		if strings.Contains(view, notWant) {
+			t.Errorf("the popup says %q on a conflicting pull request:\n%s", notWant, view)
+		}
+	}
+	if want := i18n.T("merge.auto_unavailable_block"); !strings.Contains(view, want) {
+		t.Errorf("the popup does not say %q:\n%s", want, view)
+	}
+}

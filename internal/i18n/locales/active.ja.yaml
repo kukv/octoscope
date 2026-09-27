@@ -537,6 +537,8 @@ merge:
     other: "auto-merge を有効にする権限がありません"
   auto_unavailable_clean:
     other: "auto-merge が待つものはありません"
+  auto_unavailable_block:
+    other: "auto-merge では待てない状態です"
   delete_branch_on:
     other: "ブランチはマージ後に削除されます"
   delete_branch_off:
