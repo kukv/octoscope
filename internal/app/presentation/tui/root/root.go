@@ -331,6 +331,15 @@ func (m Model) repoResolved(msg repoResolvedMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// selectTab is the user choosing a tab. It spends wantRepos: a tab picked
+// while the lookup is still out is where the user wants to be, and its
+// answer must not take them off it.
+func (m Model) selectTab(t tabID) Model {
+	m.tab = t
+	m.wantRepos = false
+	return m
+}
+
 // The detail view keeps requests in flight after the user leaves it.
 // Their failures must not drag a closed view's error onto the screen.
 func (m Model) detailFailed(msg detail.ErrorMsg) (tea.Model, tea.Cmd) {
@@ -648,14 +657,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, m.quit()
 	case "1":
-		m.tab = tabWork
-		return m, nil
+		return m.selectTab(tabWork), nil
 	case "2":
-		m.tab = tabRepos
-		return m, nil
+		return m.selectTab(tabRepos), nil
 	case "3":
-		m.tab = tabSearch
-		return m, nil
+		return m.selectTab(tabSearch), nil
 	}
 
 	switch m.tab {

@@ -1399,6 +1399,33 @@ func TestDefaultReposDoesNotPullTheUserBackAfterTheyMove(t *testing.T) {
 	}
 }
 
+// The lookup can take seconds. A tab the user picks while it is still out is
+// where they want to be, and the answer arriving later must not take it away.
+func TestDefaultReposDoesNotPullTheUserOffATabTheyPickedFirst(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		pick func(Model) Model
+		want tabID
+	}{
+		{"key", func(m Model) Model { return press(m, "3") }, tabSearch},
+		{"tab row click", func(m Model) Model {
+			next, _ := m.Update(click(0, 0)) // the Work label
+			return next.(Model)
+		}, tabWork},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New(&fakeSource{}, Options{DefaultTab: "repos"})
+			next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+			picked := tt.pick(next.(Model))
+
+			after, _ := picked.Update(repoResolvedMsg{name: "kukv/octoscope"})
+			if got := after.(Model).tab; got != tt.want {
+				t.Errorf("tab = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // default_tab: search has no dependency on the current repository, unlike
 // repos, so it must not wait for the lookup: the Search tab is there before
 // any message reaches Update.

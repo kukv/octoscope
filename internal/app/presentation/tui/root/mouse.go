@@ -37,7 +37,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	if click, ok := msg.(tea.MouseClickMsg); ok && click.Y == 0 {
 		if t, ok := m.tabAt(click.X); ok {
-			m.tab = t
+			m = m.selectTab(t)
 		}
 		return m, nil
 	}
