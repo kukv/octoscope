@@ -36,6 +36,11 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
+	// Below the board are the drawer, the notice and the key bar. None of
+	// them scrolls, so a wheel there is about nothing on the board.
+	if msg.Y >= m.boardTop()+m.boardHeight() {
+		return m, nil
+	}
 	// The wheel moves the cursor in the column it is over, so scrolling a
 	// column the cursor is not in brings the cursor to it first.
 	if col, ok := m.columnAt(msg.X); ok && col != m.col {
