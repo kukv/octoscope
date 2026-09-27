@@ -182,6 +182,27 @@ func TestTheWheelMovesTheCursor(t *testing.T) {
 	}
 }
 
+// TestTheWheelBelowTheBoardDoesNothing covers the drawer, the notice and the
+// key bar: none of them scrolls, and a wheel over them read only by its x
+// would move the cursor of whichever column happens to be above.
+func TestTheWheelBelowTheBoardDoesNothing(t *testing.T) {
+	m := loaded()
+	if !m.drawerShown() {
+		t.Fatal("no drawer at this size; this test covers nothing")
+	}
+	x, _ := titleAt(t, m, "an issue") // a column the cursor is not in
+	lines := strings.Count(m.View(), "\n") + 1
+	for y := m.boardTop() + m.boardHeight(); y < lines; y++ {
+		for _, up := range []bool{false, true} {
+			after, _ := m.Update(wheel(x, y, up))
+			if after.col != m.col || after.row != m.row {
+				t.Errorf("a wheel at line %d moved the cursor from (%d,%d) to (%d,%d)",
+					y, m.col, m.row, after.col, after.row)
+			}
+		}
+	}
+}
+
 // TestTheWheelFollowsTheColumnUnderThePointer is why the wheel reads x at
 // all: scrolling over a column is about that column, not about whichever one
 // the keyboard last left the cursor in.
