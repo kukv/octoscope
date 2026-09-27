@@ -25,6 +25,8 @@ func TestParseRemoteReadsEveryShapeGitWritesTheURLIn(t *testing.T) {
 		"scp-like ssh":      {"git@github.com:kukv/octoscope.git", "kukv/octoscope"},
 		"ssh url":           {"ssh://git@github.com/kukv/octoscope.git", "kukv/octoscope"},
 		"ssh url no user":   {"ssh://github.com/kukv/octoscope.git", "kukv/octoscope"},
+		"ssh url with port": {"ssh://git@github.com:22/kukv/octoscope.git", "kukv/octoscope"},
+		"ssh url port bare": {"ssh://git@github.com:22/kukv/octoscope", "kukv/octoscope"},
 		"https with suffix": {"https://github.com/kukv/octoscope.git", "kukv/octoscope"},
 		"https bare":        {"https://github.com/kukv/octoscope", "kukv/octoscope"},
 		"https with user":   {"https://kukv@github.com/kukv/octoscope.git", "kukv/octoscope"},
@@ -54,6 +56,8 @@ func TestParseRemoteRefusesAnythingButGitHubCom(t *testing.T) {
 
 	for _, url := range []string{
 		"git@gitlab.com:kukv/octoscope.git",
+		"ssh://git@gitlab.com:22/kukv/octoscope.git",
+		"ssh://git@github.com:abc/kukv/octoscope.git",
 		"https://github.example.com/kukv/octoscope.git",
 		"https://github.com/kukv",
 		"",
