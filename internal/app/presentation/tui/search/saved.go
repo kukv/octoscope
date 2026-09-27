@@ -18,6 +18,9 @@ type queryStore interface {
 // (.claude/rules/errors.md).
 type saveErrMsg struct{ err error }
 
+// savedMsg says the saved queries reached the settings file.
+type savedMsg struct{}
+
 // SetSavedQueries loads the Search tab's saved queries, the way root.New
 // hands the sidebar's list to the Repos tab.
 func (m Model) SetSavedQueries(qs []domain.SavedQuery) Model {
@@ -47,14 +50,39 @@ func removeSaved(qs []domain.SavedQuery, i int) ([]domain.SavedQuery, bool) {
 	return append(slices.Clone(qs[:i]), qs[i+1:]...), true
 }
 
-// saveQueries writes the saved queries as they now stand to the settings
-// file. It runs in a tea.Cmd so the write itself, and any failure, do not
-// happen inside handleNameKey (.claude/rules/errors.md).
+// save writes the saved queries as they now stand, or, while a save is
+// still out, marks them to be written once it answers. Two saves in flight
+// together run in whichever order their goroutines happen to, and the older
+// list written last would put a removed query back.
+func (m Model) save() (Model, tea.Cmd) {
+	if m.saving {
+		m.saveAgain = true
+		return m, nil
+	}
+	m.saving = true
+	return m, saveQueries(m.src, m.saved)
+}
+
+// saveDone ends the save that was out, and writes the list as it now stands
+// if it changed meanwhile -- after a failure too, since that list was never
+// written.
+func (m Model) saveDone() (Model, tea.Cmd) {
+	m.saving = false
+	if !m.saveAgain {
+		return m, nil
+	}
+	m.saveAgain = false
+	return m.save()
+}
+
+// saveQueries writes the saved queries to the settings file. It runs in a
+// tea.Cmd so the write itself, and any failure, do not happen inside
+// handleNameKey (.claude/rules/errors.md).
 func saveQueries(src queryStore, qs []domain.SavedQuery) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SaveQueries(qs); err != nil {
 			return saveErrMsg{err: err}
 		}
-		return nil
+		return savedMsg{}
 	}
 }

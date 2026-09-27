@@ -3,6 +3,8 @@ package repo
 import (
 	"slices"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestXRemovesTheRowAndSavesTheRest(t *testing.T) {
@@ -17,6 +19,30 @@ func TestXRemovesTheRowAndSavesTheRest(t *testing.T) {
 	}
 	if !slices.Equal(f.saved, []string{"kukv/octoscope"}) {
 		t.Errorf("saved = %v, want [kukv/octoscope]", f.saved)
+	}
+}
+
+// Two saves in flight together run in whichever order their goroutines
+// happen to, and the older list written last puts a removed row back. A
+// second x waits for the first save and then writes the list as it stands.
+func TestASecondSaveWaitsForTheFirst(t *testing.T) {
+	f := &fakeSource{}
+	m := sized(New(f, Options{Repositories: []string{"a/1", "a/2", "a/3"}}), 120)
+	m, _ = m.Update(key("h"))
+	m, first := m.Update(key("x"))
+	m, second := m.Update(key("x"))
+	drain(t, second)
+	if len(f.saved) != 0 {
+		t.Fatalf("saved = %v before the first save answered, want nothing", f.saved)
+	}
+
+	for _, msg := range drain(t, first) {
+		var cmd tea.Cmd
+		m, cmd = m.Update(msg)
+		drain(t, cmd)
+	}
+	if !slices.Equal(f.saved, []string{"a/3"}) {
+		t.Errorf("saved last = %v, want [a/3]: the list as it stands", f.saved)
 	}
 }
 

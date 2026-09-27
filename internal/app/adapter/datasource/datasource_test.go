@@ -1,8 +1,11 @@
 package datasource_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/kukv/octoscope/internal/app/adapter/datasource"
@@ -226,5 +229,45 @@ func TestSaveRepositoriesLeavesNoTempBehind(t *testing.T) {
 			names[i] = e.Name()
 		}
 		t.Errorf("directory holds %v, want only config.yaml", names)
+	}
+}
+
+// Every save reads the file, replaces one setting and writes the file back.
+// Two saves of different settings that overlap each read the file before
+// the other wrote it, and the later write puts the earlier one's setting
+// back the way it was.
+func TestSavesOfDifferentSettingsThatOverlapKeepBoth(t *testing.T) {
+	t.Parallel()
+	for i := range 50 {
+		path := write(t, "")
+		s := datasource.NewStore(path)
+		repos := []string{fmt.Sprintf("kukv/r%d", i)}
+		queries := []domain.SavedQuery{{Name: "q", Query: fmt.Sprintf("is:open %d", i)}}
+
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			if err := s.SaveRepositories(repos); err != nil {
+				t.Error(err)
+			}
+		})
+		wg.Go(func() {
+			if err := s.SaveQueries(queries); err != nil {
+				t.Error(err)
+			}
+		})
+		wg.Wait()
+
+		gotRepos, err := s.Repositories()
+		if err != nil {
+			t.Fatal(err)
+		}
+		gotQueries, err := s.SavedQueries()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(gotRepos, repos) || !slices.Equal(gotQueries, queries) {
+			t.Fatalf("round %d: repositories = %v, queries = %v, want %v and %v",
+				i, gotRepos, gotQueries, repos, queries)
+		}
 	}
 }

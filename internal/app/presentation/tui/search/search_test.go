@@ -48,11 +48,13 @@ func (f *fakeSource) SaveQueries([]domain.SavedQuery) error { return nil }
 type fakeStore struct {
 	fakeSource
 	saved []domain.SavedQuery
+	saves int
 	err   error
 }
 
 func (f *fakeStore) SaveQueries(qs []domain.SavedQuery) error {
 	f.saved = qs
+	f.saves++
 	return f.err
 }
 
@@ -665,6 +667,39 @@ func TestXRemovesASavedQueryAndSavesTheRest(t *testing.T) {
 	}
 	if strings.Contains(m.View(), "mine") {
 		t.Error("the removed row is still drawn")
+	}
+}
+
+// Two saves in flight together run in whichever order their goroutines
+// happen to, and the older list written last puts a removed query back. A
+// second x waits for the first save and then writes the list as it stands.
+func TestASecondSaveWaitsForTheFirst(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	m := newTestModel(t, store)
+	m = m.SetSavedQueries([]domain.SavedQuery{
+		{Name: "a", Query: "is:open"},
+		{Name: "b", Query: "is:pr"},
+		{Name: "c", Query: "is:issue"},
+	})
+	m, _ = press(m, "ctrl+o")
+	m, first := press(m, "x")
+	m, second := press(m, "x")
+	if second != nil {
+		t.Fatal("the second x saved while the first save was still out")
+	}
+
+	m, again := m.Update(first())
+	if again == nil {
+		t.Fatal("the first save answered and nothing wrote the list as it now stands")
+	}
+	_ = resolve(t, m, again)
+	if store.saves != 2 {
+		t.Fatalf("saves = %d, want 2: the first, then the list as it stands", store.saves)
+	}
+	if len(store.saved) != 1 || store.saved[0].Name != "c" {
+		t.Errorf("saved last = %+v, want only c", store.saved)
 	}
 }
 

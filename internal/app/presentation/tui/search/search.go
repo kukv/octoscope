@@ -120,6 +120,9 @@ type Model struct {
 
 	// saved is the Search tab's saved queries, in the order they were saved.
 	saved []domain.SavedQuery
+	// saving says a save is out, and saveAgain that saved changed again
+	// while it was (see save).
+	saving, saveAgain bool
 	// pick is the picker's own cursor, drawn as its selected row.
 	pick int
 
@@ -291,9 +294,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case webErrMsg:
 		m.notice = msg.err.Error()
 		return m, nil
+	case savedMsg:
+		return m.saveDone()
 	case saveErrMsg:
 		m.notice = i18n.T("search.save_failed") + ": " + msg.err.Error()
-		return m, nil
+		return m.saveDone()
 	case labelCandidatesMsg:
 		if msg.repo != m.filters.Value(FilterRepo) {
 			return m, nil
@@ -373,7 +378,7 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		m.saved = qs
 		m.pick = min(m.pick, len(qs)-1)
-		return m, saveQueries(m.src, qs)
+		return m.save()
 	}
 	return m, nil
 }
@@ -557,7 +562,7 @@ func (m Model) handleNameKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.saved = upsert(m.saved, domain.SavedQuery{Name: name, Query: m.query()})
-		return m, saveQueries(m.src, m.saved)
+		return m.save()
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
