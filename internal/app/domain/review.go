@@ -20,11 +20,10 @@ type ThreadComment struct {
 //
 // Line is the line it sits on in the version named by Side. GitHub returns no
 // line for a thread whose code has since moved, in which case Outdated is set
-// and Line is the line it was originally written against.
+// and Line is 0: the line it was originally written against is numbered in an
+// older commit, and in the current diff that number is some other line.
 type ReviewThread struct {
-	Path string
-	// Line is 0 when the line the thread was written on is not in the
-	// current diff any more.
+	Path     string
 	Line     int
 	Side     DiffSide
 	Resolved bool
