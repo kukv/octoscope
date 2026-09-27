@@ -75,6 +75,11 @@ type (
 		candidates []domain.RepoCandidate
 	}
 
+	// rowSettledMsg fires once the sidebar's cursor has stayed on a row for
+	// rowSettle. It names the generation it was started for, so a row the
+	// cursor has since left is not fetched.
+	rowSettledMsg struct{ gen int }
+
 	errMsg struct {
 		gen  int
 		tab  tabID
@@ -218,6 +223,16 @@ type Model struct {
 	// treats every fetch's failure the same way its success is treated.
 	gen int
 
+	// settling says the selected row's fetch is waiting for the cursor to
+	// rest (see moveRow). The first look at a tab leaves the fetch to it and
+	// r takes it over, so the row is never asked about twice.
+	settling bool
+
+	// cancel stops each tab's list fetch in flight. gen only drops a stale
+	// answer; without this the fetch behind it still runs to the end, once
+	// for every row the cursor passes over.
+	cancel [2]context.CancelFunc
+
 	// currentSettled says the lookup that names the working directory's
 	// repository has answered, whatever it answered. Before it has, an empty
 	// list is not an answer but a question still open: the lookup is bounded
@@ -285,23 +300,63 @@ func (m Model) Capturing() bool { return m.mode == modeAdd }
 // was also 0, and an index alone cannot tell that row apart from the one it
 // replaced.
 func (m Model) selectRow(i int) (Model, tea.Cmd) {
+	m = m.leaveRow(i)
+	if len(m.rows) == 0 {
+		return m, nil
+	}
+	m.loading[m.tab] = true
+	return m.startList(m.tab)
+}
+
+// moveRow is the cursor stepping to row i by key or wheel. It asks nothing
+// until the cursor has rested for rowSettle: cancelling a request GitHub has
+// already received does not give its cost back, so a run through the
+// sidebar must not ask about every row it passes over.
+func (m Model) moveRow(i int) (Model, tea.Cmd) {
+	m = m.leaveRow(i)
+	if len(m.rows) == 0 {
+		return m, nil
+	}
+	m.loading[m.tab] = true
+	m.settling = true
+	gen := m.gen
+	return m, tea.Tick(rowSettle, func(time.Time) tea.Msg { return rowSettledMsg{gen: gen} })
+}
+
+// leaveRow clears the previous row's lists and stops its fetches.
+func (m Model) leaveRow(i int) Model {
 	m.selected = i
 	m.gen++
 	m.prs, m.issues = nil, nil
 	m.loaded, m.cursors = [2]bool{}, [2]int{}
 	m.notice = [2]notice{}
-	if len(m.rows) == 0 {
-		return m, nil
+	m.settling = false
+	for _, cancel := range m.cancel {
+		if cancel != nil {
+			cancel()
+		}
 	}
-	m.loading[m.tab] = true
-	return m, fetchList(m.src, m.tab, m.selectedRepo(), m.gen)
+	return m
+}
+
+// startList fetches tab t's list for the selected row, cancelling the fetch
+// for t that was still out: its answer would be dropped or replaced anyway.
+func (m Model) startList(t tabID) (Model, tea.Cmd) {
+	if m.cancel[t] != nil {
+		m.cancel[t]()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel[t] = cancel
+	return m, fetchList(ctx, m.src, t, m.selectedRepo(), m.gen)
 }
 
 func (m Model) Init() tea.Cmd {
 	if len(m.rows) == 0 {
 		return nil
 	}
-	return tea.Batch(m.spin.Tick, fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
+	// A value receiver cannot keep a cancel function, so the first fetch is
+	// the one no later move can stop.
+	return tea.Batch(m.spin.Tick, fetchList(context.Background(), m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
 }
 
 // Refresh re-fetches the current tab. The parent calls it after an event
@@ -312,10 +367,12 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading[m.tab] = true
+	m.settling = false
 	// A tab that is being asked again has no failure to report until the new
 	// request answers.
 	m.answeredFetch(m.tab)
-	return m, tea.Batch(fetchList(m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
+	m, list := m.startList(m.tab)
+	return m, tea.Batch(list, fetchCounts(m.src, m.rowNames()))
 }
 
 // rowNames is the sidebar's repositories in their current spelling, in the
@@ -328,14 +385,19 @@ func (m Model) rowNames() []string {
 	return names
 }
 
-func fetchList(src Source, t tabID, repo string, gen int) tea.Cmd {
+func fetchList(ctx context.Context, src Source, t tabID, repo string, gen int) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
 		kind := domain.ItemPR
 		if t == tabIssues {
 			kind = domain.ItemIssue
 		}
 		items, err := src.ListItems(ctx, repo, kind)
+		// A cancelled fetch has been replaced and reports nothing. The
+		// context says so: a killed gh subprocess answers "signal: killed",
+		// not a wrapped context.Canceled.
+		if ctx.Err() != nil {
+			return nil
+		}
 		if err != nil {
 			return errMsg{gen: gen, tab: t, err: err}
 		}
@@ -416,6 +478,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.rows[i].counted = true
 		}
 		return m, nil
+	case rowSettledMsg:
+		if msg.gen != m.gen || !m.settling {
+			return m, nil
+		}
+		m.settling = false
+		return m.startList(m.tab)
 	case prListMsg:
 		// A fetch started for a row the cursor has since left must not land
 		// under the row now selected.
@@ -500,7 +568,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "j", "down":
 		if m.focus == paneSidebar {
 			if m.selected < len(m.rows)-1 {
-				return m.selectRow(m.selected + 1)
+				return m.moveRow(m.selected + 1)
 			}
 			return m, nil
 		}
@@ -511,7 +579,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "k", "up":
 		if m.focus == paneSidebar {
 			if m.selected > 0 {
-				return m.selectRow(m.selected - 1)
+				return m.moveRow(m.selected - 1)
 			}
 			return m, nil
 		}

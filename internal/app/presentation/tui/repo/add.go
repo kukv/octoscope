@@ -16,6 +16,12 @@ const (
 	// so one per keystroke would queue a request behind every letter.
 	searchDebounce = 400 * time.Millisecond
 
+	// rowSettle is how long the sidebar's cursor has to stay on a row before
+	// its list is asked for. It is long enough for a run of keys or a turn of
+	// the wheel to end on one request; every request spends rate limit, and
+	// one the cursor has already left is wasted.
+	rowSettle = time.Second
+
 	// searchLimit is how many suggestions fit the box without scrolling it.
 	searchLimit = 5
 )
