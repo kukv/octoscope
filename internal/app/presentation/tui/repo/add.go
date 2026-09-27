@@ -23,7 +23,7 @@ const (
 func (m Model) openAddDialog() (Model, tea.Cmd) {
 	m.mode = modeAdd
 	m.dlg = dialog.New(i18n.T("dialog.add_repo_title"), i18n.T("dialog.add_repo_hint")).
-		SetWidth(m.width)
+		SetWidth(m.width).SetHeight(m.dialogHeight())
 	// Standing on the repository that leads the list without being in it, a
 	// is almost always a request to keep that one, so it starts typed in.
 	if i := m.selected; i < len(m.rows) && m.rows[i].temporary {
@@ -31,6 +31,9 @@ func (m Model) openAddDialog() (Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+// dialogHeight is what the dialog may take: View draws the key bar under it.
+func (m Model) dialogHeight() int { return m.height - 1 }
 
 // seed opens the dialog on the repositories the user already has, which is
 // the only way out of a first run's empty list that does not mean typing

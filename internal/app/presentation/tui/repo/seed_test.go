@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -40,6 +41,29 @@ func TestSeedingOpensTheDialogWithWhatWasFound(t *testing.T) {
 	}
 	if slices.Contains(m.rowNames(), "kukv/koto") {
 		t.Errorf("rows = %v, want nothing added without the user saying so", m.rowNames())
+	}
+}
+
+// Seeding can offer a hundred repositories per account. The dialog and the
+// key bar under it have to stay on a terminal of forty lines, esc included,
+// or there is no visible way back out.
+func TestASeededDialogFitsTheTerminal(t *testing.T) {
+	var seed []domain.RepoCandidate
+	for i := range 100 {
+		seed = append(seed, domain.RepoCandidate{Name: fmt.Sprintf("kukv/repo-%03d", i)})
+	}
+	m := sized(New(&fakeSource{seed: seed}, Options{}), 120)
+	m, _ = m.SetCurrent("")
+	m, cmd := m.Update(key("g"))
+	for _, msg := range drain(t, cmd) {
+		m, _ = m.Update(msg)
+	}
+	view := m.View()
+	if got := strings.Count(view, "\n") + 1; got > 40 {
+		t.Errorf("the dialog and its key bar take %d lines, want at most 40", got)
+	}
+	if !strings.Contains(view, "esc") {
+		t.Errorf("the key bar is not on screen:\n%s", view)
 	}
 }
 

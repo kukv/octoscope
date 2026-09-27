@@ -1,6 +1,7 @@
 package dialog_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -137,5 +138,45 @@ func TestTheBoxFitsAnEightyColumnTerminal(t *testing.T) {
 	}
 	if !strings.Contains(m.View(), "charmbracelet/lipgloss") {
 		t.Errorf("the suggestion does not fit at eighty columns:\n%s", m.View())
+	}
+}
+
+func manyCandidates(n int) []domain.RepoCandidate {
+	out := make([]domain.RepoCandidate, n)
+	for i := range out {
+		out[i] = domain.RepoCandidate{Name: fmt.Sprintf("kukv/repo-%03d", i)}
+	}
+	return out
+}
+
+// Seeding offers every repository the user and their organisations have, a
+// hundred a piece. Drawn in full the box outgrows the terminal, and its top
+// edge and the key bar under it are pushed off the screen.
+func TestManySuggestionsFitTheHeightGiven(t *testing.T) {
+	t.Parallel()
+
+	for _, withError := range []bool{false, true} {
+		m := dialog.New("t", "h").SetWidth(80).SetHeight(15).SetCandidates(manyCandidates(100))
+		if withError {
+			m = m.SetError("kukv/repo-000 is already listed")
+		}
+		if got := strings.Count(m.View(), "\n") + 1; got > 15 {
+			t.Errorf("error shown %v: the dialog is %d lines tall, want at most 15", withError, got)
+		}
+	}
+}
+
+// The window follows the cursor: a suggestion tab has moved onto is one the
+// user can see.
+func TestTheCursorStaysOnScreen(t *testing.T) {
+	t.Parallel()
+
+	m := dialog.New("t", "h").SetWidth(80).SetHeight(15).SetCandidates(manyCandidates(100))
+	for range 40 {
+		m, _ = m.Update(key("tab"))
+	}
+	view := ansi.Strip(m.View())
+	if want := m.Value(); !strings.Contains(view, want) {
+		t.Errorf("the suggestion under the cursor, %q, is not drawn:\n%s", want, view)
 	}
 }
