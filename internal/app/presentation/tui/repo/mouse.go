@@ -128,7 +128,7 @@ func (m Model) showTab(t tabID, ok bool) (Model, tea.Cmd) {
 	m.tab = t
 	if !m.loaded[m.tab] && len(m.rows) > 0 {
 		m.loading[m.tab] = true
-		return m, fetchList(m.src, m.tab, m.selectedRepo(), m.gen)
+		return m.startList(m.tab)
 	}
 	return m, nil
 }

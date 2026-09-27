@@ -31,6 +31,7 @@ type fakeSource struct {
 
 	prRepos    []string // the repositories the PR pane asked for, in call order
 	issueRepos []string
+	listCtxs   []context.Context
 
 	saved     []string // the list handed to SaveRepositories, most recent last
 	saveErr   error
@@ -75,7 +76,8 @@ func typeInto(m Model, s string) Model {
 // ListItems records the two kinds apart so the tests can still say which
 // pane asked for which repository. That is this fake's bookkeeping, not a
 // branch the view has.
-func (f *fakeSource) ListItems(_ context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+func (f *fakeSource) ListItems(ctx context.Context, repo string, kind domain.ItemKind) ([]domain.Item, error) {
+	f.listCtxs = append(f.listCtxs, ctx)
 	if kind == domain.ItemPR {
 		f.prRepos = append(f.prRepos, repo)
 		return f.prs, f.err
