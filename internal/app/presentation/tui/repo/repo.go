@@ -372,7 +372,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.dlg = m.dlg.SetWidth(msg.Width)
+		m.dlg = m.dlg.SetWidth(msg.Width).SetHeight(m.dialogHeight())
 		if m.sidebarCols() == 0 {
 			m.focus = paneList
 		}

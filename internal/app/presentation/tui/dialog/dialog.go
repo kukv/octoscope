@@ -19,9 +19,9 @@ type Model struct {
 	// otherwise. There is no third place to be, so it doubles as the focus.
 	cursor int
 
-	width     int
-	errText   string
-	searching bool
+	width, height int
+	errText       string
+	searching     bool
 }
 
 // New returns a dialog with the field focused and no suggestions yet.
@@ -64,6 +64,13 @@ func (m Model) SetCandidates(c []domain.RepoCandidate) Model {
 func (m Model) SetWidth(w int) Model {
 	m.width = w
 	m.input.SetWidth(max(m.contentWidth()-promptCols, 1))
+	return m
+}
+
+// SetHeight is the most lines the box may take. The holder passes what is
+// left once its own key bar is drawn under the box.
+func (m Model) SetHeight(h int) Model {
+	m.height = h
 	return m
 }
 

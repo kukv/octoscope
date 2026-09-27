@@ -15,6 +15,11 @@ const (
 
 	// promptCols is the "> " textinput draws in front of what is typed.
 	promptCols = 2
+
+	// chromeRows is every line of the box that is not a suggestion: the
+	// border's two, the title and the blank under it, the field, the hint,
+	// the blank above the suggestions and the empty line they end on.
+	chromeRows = 8
 )
 
 func (m Model) View() string {
@@ -44,7 +49,10 @@ func (m Model) candidateLines() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	nameWidth := max(m.contentWidth()-starColumn, 1)
-	for i, c := range m.candidates {
+	rows := m.candidateRows()
+	first := m.candidateWindow(rows)
+	for i := first; i < min(first+rows, len(m.candidates)); i++ {
+		c := m.candidates[i]
 		line := layout.Pad(c.Name, nameWidth) + layout.Right(theme.Dim().Render(stars(c.Stars)), starColumn)
 		if i == m.cursor {
 			line = theme.SelectedLine(line)
@@ -52,6 +60,30 @@ func (m Model) candidateLines() string {
 		b.WriteString(line + "\n")
 	}
 	return b.String()
+}
+
+// candidateRows is how many suggestions fit the height the holder gave,
+// once the rest of the box and (while one is up) the error have taken their
+// share. With no height yet it draws them all.
+func (m Model) candidateRows() int {
+	if m.height <= 0 {
+		return len(m.candidates)
+	}
+	rows := m.height - chromeRows
+	if m.errText != "" {
+		rows--
+	}
+	return max(rows, 1)
+}
+
+// candidateWindow is the first suggestion drawn, chosen to keep the cursor
+// in view -- the same top-anchored scroll the Search tab's saved-query
+// picker uses. The field (cursor -1) keeps the list at its top.
+func (m Model) candidateWindow(rows int) int {
+	if m.cursor < rows {
+		return 0
+	}
+	return m.cursor - rows + 1
 }
 
 // stars is the count beside a suggestion. A repository with none gets
