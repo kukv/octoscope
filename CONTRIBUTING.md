@@ -91,12 +91,22 @@ To release:
    name still matches the bump the labels call for. If a `v0.9.1` milestone picked up a
    `Kind: Feature`, rename it to `v0.10.0`.
 2. Close the milestone. `.github/workflows/tag-on-milestone.yaml` tags the head of
-   `main` with the milestone's name and starts the release. A name that is not a version
-   (`v0.10.0`, or with a suffix such as `v0.10.0-beta.1`) is left alone.
+   `main` with the milestone's name and starts the release. A name that is not a plain
+   version like `v0.10.0` is left alone.
 3. `.github/workflows/release.yaml` runs GoReleaser, which builds the binaries for
    Linux, macOS and Windows and creates the GitHub Release. Its notes are generated from
-   the pull request labels, following `.github/release.yaml`. A version with a suffix is
-   published as a pre-release.
+   the pull request labels, following `.github/release.yaml`.
+
+A release no milestone stands for, such as a pre-release, is tagged by hand on `main`;
+the tag push starts `release.yaml` the same way:
+
+```bash
+git switch main && git pull
+git tag v1.0.0-beta.1 && git push origin v1.0.0-beta.1
+```
+
+A version with a suffix (`-beta.1`, `-rc.1`) is published as a pre-release, so it does not
+become the latest release.
 
 Tags are never moved or reused once pushed: `go install` and mise resolve versions from
 them. Going to v2 or later also means changing the module path to

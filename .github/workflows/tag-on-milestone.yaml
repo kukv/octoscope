@@ -23,7 +23,7 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ github.event.milestone.title }}
         run: |
-          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::notice::Milestone '$TAG' is not a version; no tag pushed."
             exit 0
           fi
