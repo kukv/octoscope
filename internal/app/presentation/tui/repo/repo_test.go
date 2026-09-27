@@ -1054,7 +1054,8 @@ func TestMovingTheSidebarFetchesThatRepository(t *testing.T) {
 	m := sidebarModel(f, 120)
 	f.prRepos = nil
 	m, _ = m.Update(key("h"))
-	_, cmd := m.Update(key("j")) // onto kukv/koto
+	m, _ = m.Update(key("j"))                     // onto kukv/koto
+	_, cmd := m.Update(rowSettledMsg{gen: m.gen}) // and it rests there
 	drain(t, cmd)
 	if len(f.prRepos) != 1 || f.prRepos[0] != "kukv/koto" {
 		t.Errorf("ListItems got %v, want the row the cursor moved onto", f.prRepos)

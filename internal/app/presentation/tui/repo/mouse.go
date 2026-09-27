@@ -83,11 +83,11 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 		switch msg.Button {
 		case tea.MouseWheelUp:
 			if m.selected > 0 {
-				return m.selectRow(m.selected - 1)
+				return m.moveRow(m.selected - 1)
 			}
 		case tea.MouseWheelDown:
 			if m.selected < len(m.rows)-1 {
-				return m.selectRow(m.selected + 1)
+				return m.moveRow(m.selected + 1)
 			}
 		}
 		return m, nil
@@ -128,6 +128,9 @@ func (m Model) showTab(t tabID, ok bool) (Model, tea.Cmd) {
 	m.tab = t
 	if !m.loaded[m.tab] && len(m.rows) > 0 {
 		m.loading[m.tab] = true
+		if m.settling {
+			return m, nil // the wait for the cursor fetches whichever tab is shown
+		}
 		return m.startList(m.tab)
 	}
 	return m, nil
