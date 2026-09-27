@@ -558,6 +558,8 @@ merge:
     other: "you may not turn auto-merge on here"
   auto_unavailable_clean:
     other: "auto-merge has nothing left to wait for"
+  auto_unavailable_block:
+    other: "auto-merge cannot wait this out"
   delete_branch_on:
     other: "the branch is deleted after the merge"
   delete_branch_off:

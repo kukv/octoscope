@@ -184,17 +184,18 @@ func (m Model) mergeAsAdmin() (Model, tea.Cmd) {
 }
 
 // send does the one thing the popup is for. Leaving the auto-merge queue is
-// the one action offered while merging itself is blocked: a pull request
-// that cannot be merged is no reason to be stuck with a queued merge.
+// offered while merging itself is blocked: a pull request that cannot be
+// merged is no reason to be stuck with a queued merge. So is joining it,
+// where the block is one auto-merge can wait out.
 func (m Model) send() (Model, tea.Cmd) {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		return m.sendCmd(false, func(ctx context.Context) error { return m.src.DisableAutoMerge(ctx, m.ctx.PullRequest) })
-	case m.ctx.Block != domain.BlockNone:
-		return m, nil
 	case m.auto:
 		method := m.method()
 		return m.sendCmd(false, func(ctx context.Context) error { return m.src.EnableAutoMerge(ctx, m.ctx.PullRequest, method) })
+	case m.ctx.Block != domain.BlockNone:
+		return m, nil
 	default:
 		method := m.method()
 		return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.PullRequest, method) })

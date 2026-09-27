@@ -111,7 +111,7 @@ $ gh api graphql -f query='{repository(owner:"kukv",name:"octoscope"){
 │ ブランチは残ります            │
 │                               │
 │ ⚠ 保護ルールに止められています│
-│   admin 権限で押し切れます    │  ◀ 足す行
+│   admin 権限なら保護ルール…   │  ◀ 足す行
 │ a:adminでマージ r:更新 esc:中止│  ◀ 足すキー
 └───────────────────────────────┘
 ```
@@ -198,7 +198,7 @@ case "a":
 | キー | en | ja |
 |---|---|---|
 | `merge.key_admin` | `a:admin merge` | `a:adminでマージ` |
-| `merge.admin_offer` | `you can merge it anyway as an admin` | `admin 権限で押し切れます` |
+| `merge.admin_offer` | `you can merge it anyway as an admin` | `admin 権限なら保護ルールを無視できます` |
 
 ## 4. 失敗したとき
 

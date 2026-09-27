@@ -81,8 +81,10 @@ func (m Model) autoLine() string {
 		return theme.Dim().Render(i18n.T("merge.auto_unavailable_repo"))
 	case !m.ctx.ViewerCanEnableAutoMerge:
 		return theme.Dim().Render(i18n.T("merge.auto_unavailable_permission"))
-	default:
+	case m.ctx.Clean:
 		return theme.Dim().Render(i18n.T("merge.auto_unavailable_clean"))
+	default:
+		return theme.Dim().Render(i18n.T("merge.auto_unavailable_block"))
 	}
 }
 
@@ -167,14 +169,18 @@ func (m Model) hints() []string {
 	switch {
 	case m.ctx.AutoMergeEnabled:
 		hints = append(hints, i18n.T("merge.key_auto_off"))
+	case m.auto:
+		// space only ticks the box where auto-merge can wait out whatever is
+		// holding the merge, so enter queues it even while merging is blocked.
+		// a is left off: the user has just chosen to wait, and the bar has no
+		// room for both without dropping esc.
+		hints = append(hints, i18n.T("merge.key_queue"))
 	case !m.answered() || m.ctx.Block != domain.BlockNone:
 		// enter sends nothing: there is no answer, or something refuses it.
 		// a does, where the viewer may push past what refuses it.
 		if m.ctx.CanMergeAsAdmin() {
 			hints = append(hints, i18n.T("merge.key_admin"))
 		}
-	case m.auto:
-		hints = append(hints, i18n.T("merge.key_queue"))
 	default:
 		hints = append(hints, i18n.T("merge.key_merge"))
 	}

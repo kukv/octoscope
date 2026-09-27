@@ -59,8 +59,20 @@ type MergeContext struct {
 // CanAutoMerge reports whether auto-merge can be turned on. GitHub refuses
 // it on a pull request that is already clean: there is nothing left to wait
 // for, so it wants an ordinary merge instead.
+//
+// Of the blocks, only the two a rule imposes can be waited out -- the same
+// two CanMergeAsAdmin lets an admin push past. A branch rule holding the
+// merge for its checks is exactly what auto-merge is for. A draft, a
+// conflict or an answer not worked out yet is not something to wait for.
 func (c MergeContext) CanAutoMerge() bool {
-	return c.AutoMergeAllowed && c.ViewerCanEnableAutoMerge && !c.Clean
+	if !c.AutoMergeAllowed || !c.ViewerCanEnableAutoMerge || c.Clean {
+		return false
+	}
+	switch c.Block {
+	case BlockNone, BlockProtected, BlockBehind:
+		return true
+	}
+	return false
 }
 
 // CanMergeAsAdmin reports whether the viewer can push the merge through what
