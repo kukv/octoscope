@@ -90,17 +90,13 @@ To release:
 1. Check that every pull request in the milestone is labelled, and that the milestone's
    name still matches the bump the labels call for. If a `v0.9.1` milestone picked up a
    `Kind: Feature`, rename it to `v0.10.0`.
-2. Push the tag on `main`:
-
-   ```bash
-   git switch main && git pull
-   git tag v0.10.0 && git push origin v0.10.0
-   ```
-
+2. Close the milestone. `.github/workflows/tag-on-milestone.yaml` tags the head of
+   `main` with the milestone's name and starts the release. A name that is not a version
+   (`v0.10.0`, or with a suffix such as `v0.10.0-beta.1`) is left alone.
 3. `.github/workflows/release.yaml` runs GoReleaser, which builds the binaries for
    Linux, macOS and Windows and creates the GitHub Release. Its notes are generated from
-   the pull request labels, following `.github/release.yaml`.
-4. Close the milestone.
+   the pull request labels, following `.github/release.yaml`. A version with a suffix is
+   published as a pre-release.
 
 Tags are never moved or reused once pushed: `go install` and mise resolve versions from
 them. Going to v2 or later also means changing the module path to
