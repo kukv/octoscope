@@ -36,7 +36,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case pickerAppliedMsg:
 		return m.pickApplied(msg)
 	case pickErrorMsg:
-		return m.pickFailed(msg), nil
+		return m.pickFailed(msg)
 	case reviewContextMsg:
 		return m.reviewContextArrived(msg), nil
 	case reviewContextErrMsg:
@@ -100,6 +100,9 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	m.phase = phaseIdle
 	m.state = it.State
 	m.errText = ""
+	if msg.editErr != nil {
+		m.errText = i18n.Tf("detail.edit_partial", map[string]any{"Err": msg.editErr.Error()})
+	}
 	m.declined = ""
 	m.labels = labelNames(it.Labels)
 	m.assignees = authorLogins(it.Assignees)
@@ -179,17 +182,23 @@ func (m Model) pickApplied(msg pickerAppliedMsg) (Model, tea.Cmd) {
 	return m, fetch(m.src, m.ref)
 }
 
-func (m Model) pickFailed(msg pickErrorMsg) Model {
+// pickFailed tells a failed apply from candidates that never arrived by the
+// phase. An apply is more than one request on the api backend -- labels are
+// added, then removed one at a time -- so a failure may have left part of it
+// on GitHub. The item is fetched again to show what is there now; a retry
+// opens the picker afresh and works out its change from that.
+func (m Model) pickFailed(msg pickErrorMsg) (Model, tea.Cmd) {
 	if msg.ref != m.ref {
-		return m
+		return m, nil
 	}
-	if m.phase == phaseWorking { // the apply failed; the picker stays up
-		m.phase = phaseIdle
-	} else { // the candidates never arrived; there is no picker to show
-		m.mode, m.phase = modeView, phaseIdle
+	if m.phase == phaseWorking {
+		m.mode, m.phase = modeView, phaseLoading
+		m.errText = i18n.Tf("detail.edit_partial", map[string]any{"Err": msg.err.Error()})
+		return m, fetchAfterFailedEdit(m.src, m.ref, msg.err)
 	}
+	m.mode, m.phase = modeView, phaseIdle
 	m.errText = msg.err.Error()
-	return m
+	return m, nil
 }
 
 func (m Model) reviewContextArrived(msg reviewContextMsg) Model {

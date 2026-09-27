@@ -138,6 +138,8 @@ detail:
     other: "Issue #{{.Number}} {{.Title}}"
   decline_loading:
     other: "the item is still on its way; try that key again in a moment"
+  edit_partial:
+    other: "the change may have gone through only in part: {{.Err}}"
   no_description:
     other: "_no description_"
   meta:
