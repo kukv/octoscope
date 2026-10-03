@@ -113,6 +113,36 @@ func TestASettledThreadIsACountUntilItIsOpened(t *testing.T) {
 	}
 }
 
+// An outdated thread is exactly the one whose line has left the diff, so the
+// end-of-file section is where most settled threads land. It has to fold them
+// the same way a line does, or it fills with arguments that are over.
+func TestASettledThreadOffTheDiffIsACountUntilItIsOpened(t *testing.T) {
+	m := loaded(t, 120, 40)
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{
+		PullRequest: "PR_1",
+		Threads: []domain.ReviewThread{{
+			Path: "graph/walk.go", Line: 0, Side: domain.SideRight, Outdated: true,
+			Comments: []domain.ThreadComment{{Author: domain.Author{Login: "someone"}, Body: "on code since rewritten"}},
+		}},
+	}})
+	out := ansi.Strip(m.View())
+	if strings.Contains(out, "on code since rewritten") {
+		t.Errorf("an outdated thread off the diff is shown in full before it is opened:\n%s", out)
+	}
+	if !strings.Contains(out, "settled comment") {
+		t.Errorf("the outdated thread is not counted:\n%s", out)
+	}
+
+	m = press(openCollapsedThread(m), "enter")
+	if !strings.Contains(ansi.Strip(m.View()), "on code since rewritten") {
+		t.Errorf("enter did not open the thread:\n%s", ansi.Strip(m.View()))
+	}
+	m = press(m, "enter")
+	if strings.Contains(ansi.Strip(m.View()), "on code since rewritten") {
+		t.Errorf("enter did not close the thread again")
+	}
+}
+
 // settledThreadWithTwoComments is one resolved thread with two comments, so
 // opening it draws two rowThread rows sharing the same key.
 func settledThreadWithTwoComments() domain.ReviewContext {
