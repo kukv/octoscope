@@ -905,7 +905,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	other := domain.ItemRef{Kind: domain.ItemPR, Number: 99}
 	m := New(&fakeSource{}, prRef())
 
-	next, _ := m.Update(itemMsg{other, domain.Item{
+	next, _ := m.Update(itemMsg{ref: other, item: domain.Item{
 		Ref:    domain.ItemRef{Kind: domain.ItemPR, Number: 99},
 		Title:  "the previous one",
 		Change: &domain.Change{},
@@ -918,7 +918,7 @@ func TestAnAnswerForAnotherItemIsDropped(t *testing.T) {
 	}
 
 	issue := New(&fakeSource{}, issueRef())
-	next, _ = issue.Update(itemMsg{other, domain.Item{
+	next, _ = issue.Update(itemMsg{ref: other, item: domain.Item{
 		Ref:   domain.ItemRef{Kind: domain.ItemIssue, Number: 99},
 		Title: "the previous one",
 	}})

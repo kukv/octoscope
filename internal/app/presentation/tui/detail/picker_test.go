@@ -2,10 +2,14 @@ package detail
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 func TestNewPickerPrechecksCurrent(t *testing.T) {
@@ -213,25 +217,40 @@ func TestPickerEscCancels(t *testing.T) {
 	}
 }
 
-func TestPickerApplyErrorKeepsPicker(t *testing.T) {
+// An edit is more than one request on the api backend -- labels are added,
+// then removed one by one -- so a failure can leave part of it applied. The
+// screen has to show what GitHub now holds, not what it held before, and the
+// failure has to say it may have gone through in part.
+func TestAFailedEditFetchesTheItemAgain(t *testing.T) {
 	f := &fakeSource{
-		pr:      labelledPR(),
+		pr:      labelledPR(), // bug
 		labels:  []domain.Label{{Name: "bug"}, {Name: "wip"}},
 		editErr: errors.New("gh pr: HTTP 403 forbidden"),
 	}
 	m := openPicker(t, f, prRef(), "l")
-	m, _ = m.Update(key("space")) // toggle bug off -> a diff
+	m, _ = m.Update(key("space")) // bug off
+	m, _ = m.Update(key("j"))
+	m, _ = m.Update(key("space")) // wip on
 	m, cmd := m.Update(key("enter"))
-	m, _ = m.Update(cmd()) // pickErrorMsg
-	if m.mode != modePick || m.phase != phaseIdle {
-		t.Errorf("mode/phase = %v/%v, want the picker up and no longer applying",
-			m.mode, m.phase)
+	m, cmd = m.Update(cmd()) // pickErrorMsg
+	if m.mode != modeView || cmd == nil {
+		t.Fatalf("mode = %v, cmd = %v, want the picker closed and a fetch", m.mode, cmd)
 	}
-	if !strings.Contains(m.errText, "403") {
-		t.Errorf("errText = %q, want to contain 403", m.errText)
+
+	// wip went on, and removing bug is what failed.
+	f.pr.Labels = []domain.Label{{Name: "bug"}, {Name: "wip"}}
+	m, _ = m.Update(cmd())
+	if m.phase != phaseIdle {
+		t.Errorf("phase = %v, want idle once the item is back", m.phase)
 	}
-	if !strings.Contains(m.View(), "403") {
-		t.Errorf("picker view missing error text:\n%s", m.View())
+	if want := []string{"bug", "wip"}; !slices.Equal(m.labels, want) {
+		t.Errorf("labels = %v, want %v: what GitHub now holds", m.labels, want)
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"403", i18n.Tf("detail.edit_partial", map[string]any{"Err": ""})} {
+		if !strings.Contains(view, strings.TrimSpace(want)) {
+			t.Errorf("view missing %q:\n%s", want, view)
+		}
 	}
 }
 
