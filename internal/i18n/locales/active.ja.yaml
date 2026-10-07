@@ -134,6 +134,8 @@ detail:
     other: "Issue #{{.Number}} {{.Title}}"
   decline_loading:
     other: "本文がまだ届いていません。少し待ってからもう一度"
+  edit_partial:
+    other: "一部だけ適用された可能性があります: {{.Err}}"
   no_description:
     other: "_説明はありません_"
   meta:

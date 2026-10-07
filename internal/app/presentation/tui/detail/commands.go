@@ -20,7 +20,19 @@ func fetch(src Source, ref domain.ItemRef) tea.Cmd {
 		if err != nil {
 			return errMsg{ref, err}
 		}
-		return itemMsg{ref, item}
+		return itemMsg{ref: ref, item: item}
+	}
+}
+
+func fetchAfterFailedEdit(src Source, ref domain.ItemRef, editErr error) tea.Cmd {
+	get := fetch(src, ref)
+	return func() tea.Msg {
+		msg := get()
+		if it, ok := msg.(itemMsg); ok {
+			it.editErr = editErr
+			return it
+		}
+		return msg
 	}
 }
 

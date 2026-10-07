@@ -72,6 +72,9 @@ type (
 	itemMsg struct {
 		ref  domain.ItemRef
 		item domain.Item
+		// editErr is the edit that failed just before this fetch. The
+		// answer would otherwise clear the failure the fetch was sent for.
+		editErr error
 	}
 	errMsg struct {
 		ref domain.ItemRef
