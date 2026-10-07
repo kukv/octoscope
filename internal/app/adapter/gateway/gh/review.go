@@ -164,10 +164,12 @@ func toReviewContext(rc gql.ReviewContext) domain.ReviewContext {
 func toReviewThread(t gql.ReviewThread) domain.ReviewThread {
 	rt := domain.ReviewThread{
 		Path:     t.Path,
-		Line:     t.OriginalLine,
 		Resolved: t.IsResolved,
 		Outdated: t.IsOutdated,
 	}
+	// A null line means the code the thread was written against is no longer
+	// in the diff. originalLine is not a stand-in: it counts lines in that
+	// older commit, and in today's diff the same number is some other line.
 	if t.Line != nil {
 		rt.Line = *t.Line
 	}

@@ -61,31 +61,26 @@ func (m Model) threadRows(hunk int, path string, line int, side domain.DiffSide)
 // rather than being dropped -- a comment nobody can see is a comment nobody
 // answers.
 //
+// They are grouped by the position they were written on and drawn the way
+// threadRows draws a line's, so settled ones fold and open the same way.
+//
 // Known limitation: a thread on a file not in this diff at all is filtered
 // out by the Path check below and never surfaces anywhere in the UI, because
 // this is only called once per file, for the file on screen.
 func (m Model) orphanRows(placed map[string]bool) []row {
+	path := m.files[m.file].Path
+	drawn := map[string]bool{}
 	var rows []row
 	for _, t := range m.review.Threads {
-		if t.Path != m.files[m.file].Path {
+		key := threadKey(t.Path, t.Line, t.Side)
+		if t.Path != path || placed[key] || drawn[key] {
 			continue
 		}
-		if placed[threadKey(t.Path, t.Line, t.Side)] {
-			continue
-		}
-		rows = append(rows, row{kind: rowNote, hunk: -1, text: i18n.T("diff.orphaned")})
-		break
+		drawn[key] = true
+		rows = append(rows, m.threadRows(-1, t.Path, t.Line, t.Side)...)
 	}
 	if len(rows) == 0 {
 		return nil
 	}
-	for _, t := range m.review.Threads {
-		if t.Path != m.files[m.file].Path || placed[threadKey(t.Path, t.Line, t.Side)] {
-			continue
-		}
-		for _, c := range t.Comments {
-			rows = append(rows, row{kind: rowThread, hunk: -1, thread: t, comment: c})
-		}
-	}
-	return rows
+	return append([]row{{kind: rowNote, hunk: -1, text: i18n.T("diff.orphaned")}}, rows...)
 }

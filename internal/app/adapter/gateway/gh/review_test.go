@@ -250,7 +250,9 @@ func TestPRDiffFromFilesTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 // expectation. The two threads differ in the fields toReviewThread has to
 // choose between: one has a current Line distinct from its OriginalLine
 // (guarding against the two being swapped), the other has none and must
-// fall back to OriginalLine; one is on each DiffSide.
+// come out with no line rather than its OriginalLine -- that number belongs
+// to the commit the thread was written against, and in today's diff it names
+// some other line; one is on each DiffSide.
 func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	t.Parallel()
 
@@ -331,7 +333,7 @@ func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 			},
 			{
 				Path:     "b.go",
-				Line:     9,
+				Line:     0,
 				Side:     domain.SideRight,
 				Resolved: false,
 				Outdated: true,
