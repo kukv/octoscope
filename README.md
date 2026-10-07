@@ -9,6 +9,25 @@ comment on a line, and submit a review without leaving the terminal.
 
 octoscope = **Octo**cat + **-scope**: a telescope for looking over your GitHub work.
 
+![Opening a review request, commenting on a line of its diff, and approving it](docs/assets/review-en.gif)
+
+## Tour
+
+**See why CI failed.** Open a pull request's checks, read the log of the
+failed step, and ask for changes.
+
+![Reading a failed check's log and requesting changes](docs/assets/checks.gif)
+
+**Triage issues.** Label, assign, comment on and close an issue from its
+detail view.
+
+![Labelling, assigning, commenting on and closing an issue](docs/assets/issue.gif)
+
+**Browse a repository and search.** Walk a repository's pull requests and
+issues, then search with GitHub's syntax and save the query for later.
+
+![Browsing a repository's pull requests and issues, then searching and saving the query](docs/assets/repos-search.gif)
+
 ## Requirements
 
 One of:
