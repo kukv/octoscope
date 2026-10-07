@@ -82,11 +82,15 @@ func parseRemote(url string) (string, error) {
 	case strings.HasPrefix(s, "git@"+host+":"):
 		s = strings.TrimPrefix(s, "git@"+host+":")
 	default:
-		if _, rest, ok := strings.Cut(s, "://"); ok {
+		_, rest, isURL := strings.Cut(s, "://")
+		if isURL {
 			s = rest
 		}
 		if _, rest, ok := strings.Cut(s, "@"); ok {
 			s = rest
+		}
+		if isURL {
+			s = dropPort(s)
 		}
 		rest, ok := strings.CutPrefix(s, host+"/")
 		if !ok {
@@ -99,6 +103,21 @@ func parseRemote(url string) (string, error) {
 		return "", fmt.Errorf("remote %q has no owner/name", url)
 	}
 	return s, nil
+}
+
+// dropPort takes an explicit port off the host of "host:22/owner/name", the
+// shape git keeps ssh://git@github.com:22/owner/name in. Only a URL may carry
+// one: in the scp-like git@host:owner/name the colon is not a port.
+func dropPort(s string) string {
+	hostPort, path, ok := strings.Cut(s, "/")
+	if !ok {
+		return s
+	}
+	h, port, ok := strings.Cut(hostPort, ":")
+	if !ok || port == "" || strings.Trim(port, "0123456789") != "" {
+		return s
+	}
+	return h + "/" + path
 }
 
 // RepoName returns the repository the client works against, as GitHub spells
