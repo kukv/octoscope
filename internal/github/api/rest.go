@@ -165,22 +165,27 @@ func validNext(next, base string) string {
 
 // nextLink is the URL of the page after this one, or empty on the last page.
 // GitHub puts every relation in one Link header, so the rel has to be read
-// rather than the position.
+// rather than the position. The links are told apart by their angle brackets,
+// not by the commas between them: a URL can hold a comma (labels=a,b) but not
+// a bare < or > (RFC 3986), so what lies between < and > is one URL, and what
+// follows it up to the next < is that URL's parameters.
 func nextLink(h http.Header) string {
-	for _, part := range strings.Split(h.Get("Link"), ",") {
-		fields := strings.Split(part, ";")
-		if len(fields) < 2 {
-			continue
+	rest := h.Get("Link")
+	for {
+		_, after, ok := strings.Cut(rest, "<")
+		if !ok {
+			return ""
 		}
-		url := strings.TrimSpace(fields[0])
-		if !strings.HasPrefix(url, "<") || !strings.HasSuffix(url, ">") {
-			continue
+		target, after, ok := strings.Cut(after, ">")
+		if !ok {
+			return ""
 		}
-		for _, f := range fields[1:] {
-			if strings.TrimSpace(f) == `rel="next"` {
-				return url[1 : len(url)-1]
+		params, _, _ := strings.Cut(after, "<")
+		for _, p := range strings.Split(params, ";") {
+			if strings.Trim(p, " ,") == `rel="next"` {
+				return target
 			}
 		}
+		rest = after
 	}
-	return ""
 }

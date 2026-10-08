@@ -127,6 +127,20 @@ func TestNextLinkFindsTheNextPageAmongTheOtherRelations(t *testing.T) {
 	}
 }
 
+// GitHub carries the request's own query into the next link, and a query can
+// hold a comma (labels=a,b). Splitting the header on commas cut such a URL in
+// two, and the walk stopped at the first page with nothing to say so.
+func TestNextLinkKeepsACommaInsideTheURL(t *testing.T) {
+	t.Parallel()
+
+	const next = "https://api.github.com/x?labels=bug,ui&page=2"
+	h := http.Header{}
+	h.Set("Link", `<`+next+`>; rel="next", <https://api.github.com/x?labels=bug,ui&page=5>; rel="last"`)
+	if got := nextLink(h); got != next {
+		t.Errorf("nextLink = %q, want %q", got, next)
+	}
+}
+
 // Every REST path needs an owner and a name. An explicit repository wins, then
 // the client's own, then the working directory's remote -- the same order
 // repoVars uses for GraphQL, so the two halves of this backend cannot disagree
