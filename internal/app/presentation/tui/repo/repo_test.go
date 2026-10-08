@@ -306,7 +306,7 @@ func TestTabSwitchLoadsIssues(t *testing.T) {
 func TestATransientFailureKeepsTheList(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := loadedModel(f)
-	m, cmd := m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	m, cmd := m.Update(fetchFailedMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
 	if cmd != nil {
 		if _, fatal := cmd().(FatalMsg); fatal {
 			t.Error("a transient failure reached the full-screen error")
@@ -324,7 +324,7 @@ func TestATransientFailureKeepsTheList(t *testing.T) {
 // Only what the user must act on takes the whole screen.
 func TestAMissingGhIsFatal(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{}), 120)
-	_, cmd := m.Update(errMsg{gen: m.gen, err: domain.ErrBackendUnavailable})
+	_, cmd := m.Update(fetchFailedMsg{gen: m.gen, err: domain.ErrBackendUnavailable})
 	if cmd == nil {
 		t.Fatal("a missing gh produced no message")
 	}
@@ -337,7 +337,7 @@ func TestAMissingGhIsFatal(t *testing.T) {
 func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := sized(New(f, Options{Current: "kukv/octoscope"}), 120)
-	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
 	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
 	if strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
 		t.Errorf("the notice outlived the failure:\n%s", ansi.Strip(m.View()))
@@ -395,7 +395,7 @@ func TestAnotherTabsSuccessDoesNotClearThisTabsNotice(t *testing.T) {
 	m := currentModel(f, 120)
 	m, cmd := m.Update(key("tab")) // to Issues, which fetches
 	m, _ = m.Update(cmd())         // the fetch answers; drop it and fail instead
-	m, _ = m.Update(errMsg{gen: m.gen, tab: tabIssues, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, tab: tabIssues, err: errors.New("gh: HTTP 502")})
 	if !strings.Contains(ansi.Strip(m.View()), "HTTP 502") {
 		t.Fatalf("setup: the Issues tab does not carry the notice:\n%s", ansi.Strip(m.View()))
 	}
@@ -422,7 +422,7 @@ func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 	}}
 	m := currentModel(f, 120)
 	m, _ = m.Update(issueListMsg{gen: m.gen, issues: f.issues})
-	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
 
 	m, cmd := m.Update(key("tab"))
 	if cmd != nil {
@@ -457,7 +457,7 @@ func TestAFailureLandsOnTheTabItsFetchWasStartedFor(t *testing.T) {
 
 	m, cmd := m.Update(key("tab")) // to Issues, whose own fetch is now in flight
 	m, _ = m.Update(cmd())         // and answers
-	m, _ = m.Update(errMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, tab: tabPRs, err: errors.New("gh: HTTP 502")})
 
 	view := ansi.Strip(m.View())
 	if strings.Contains(view, "HTTP 502") {
@@ -517,7 +517,7 @@ func TestAListWithANoticeStillFitsTheTerminal(t *testing.T) {
 	m := New(f, Options{Current: "kukv/octoscope"})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
 	m, _ = m.Update(prListMsg{gen: m.gen, prs: prs})
-	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
 
 	out := m.View()
 	if got := len(strings.Split(out, "\n")); got > height {
@@ -532,7 +532,7 @@ func TestAListWithANoticeStillFitsTheTerminal(t *testing.T) {
 // pull requests": that is the same picture as a repository with none.
 func TestAFailedFirstFetchDoesNotReadAsAnEmptyTab(t *testing.T) {
 	m := sized(New(&fakeSource{}, Options{Current: "kukv/octoscope"}), 120)
-	m, _ = m.Update(errMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, err: errors.New("gh: HTTP 502")})
 	if got := ansi.Strip(m.View()); strings.Contains(got, i18n.T("list.no_open_prs")) {
 		t.Errorf("a tab GitHub would not answer is drawn as an empty one:\n%s", got)
 	}
@@ -551,7 +551,7 @@ func TestAStaleFetchFailureIsDropped(t *testing.T) {
 		t.Fatal("setup: moving the sidebar should have started a new fetch")
 	}
 	stale := m.gen - 1 // the generation kukv/octoscope's own fetch started in
-	m, cmd = m.Update(errMsg{gen: stale, err: errors.New("gh pr: repository not found")})
+	m, cmd = m.Update(fetchFailedMsg{gen: stale, err: errors.New("gh pr: repository not found")})
 	if cmd != nil {
 		t.Errorf("a stale error produced a cmd = %v, want nil", cmd)
 	}
@@ -560,6 +560,27 @@ func TestAStaleFetchFailureIsDropped(t *testing.T) {
 	}
 	if m.notice[tabPRs].text != "" {
 		t.Errorf("a stale error complained about the row now on screen: %q", m.notice[tabPRs].text)
+	}
+}
+
+// o belongs to the key that was pressed, not to the row: a browser that would
+// not start is still news after the sidebar has moved on, and the address in
+// it is the only way left to reach the page.
+func TestABrowserFailureSurvivesASidebarMove(t *testing.T) {
+	url := samplePRs()[0].URL
+	f := &fakeSource{prs: samplePRs(), webErr: &browser.NoneError{URL: url}}
+	m := sidebarModel(f, 120)
+	m.open = f.open
+	m, open := m.Update(key("o"))
+	if open == nil {
+		t.Fatal("setup: o produced no command")
+	}
+	m, _ = m.Update(key("h"))
+	m, _ = m.Update(key("j")) // the browser answers after the move
+	m, _ = m.Update(open())
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, i18n.T("notice.open_failed")) || !strings.Contains(view, url) {
+		t.Errorf("the browser's failure was dropped by the move:\n%s", view)
 	}
 }
 

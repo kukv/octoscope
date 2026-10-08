@@ -128,16 +128,14 @@ func TestGolden(t *testing.T) {
 				// The list the user is left with when a refetch fails: the
 				// rows it already had, and a line saying what GitHub said.
 				failed := goldenModel(w)
-				failed, _ = failed.Update(errMsg{gen: failed.gen, err: domain.Classify(domain.ErrTransient, goldenFailure)})
+				failed, _ = failed.Update(fetchFailedMsg{gen: failed.gen, err: domain.Classify(domain.ErrTransient, goldenFailure)})
 				golden.Assert(t, fmt.Sprintf("repo_failed_%s_%d", lang.name, w), failed.View())
 
 				// The other failure that reaches the same line, which must
 				// not blame the fetch for what the browser did.
 				noBrowser := goldenModel(w)
-				noBrowser, _ = noBrowser.Update(errMsg{
-					gen:  noBrowser.gen,
-					kind: noticeOpen,
-					err:  &browser.NoneError{URL: "https://github.com/kukv/octoscope/pull/1"},
+				noBrowser, _ = noBrowser.Update(openFailedMsg{
+					err: &browser.NoneError{URL: "https://github.com/kukv/octoscope/pull/1"},
 				})
 				golden.Assert(t, fmt.Sprintf("repo_no_browser_%s_%d", lang.name, w), noBrowser.View())
 
