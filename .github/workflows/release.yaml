@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - "v*"
-  # Started by tag-on-milestone.yaml with the tag as the ref.
+  # Rerun a release by hand with the tag as the ref.
   workflow_dispatch:
 
 permissions:
