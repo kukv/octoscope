@@ -183,7 +183,7 @@ func (m Model) saveDone() (Model, tea.Cmd) {
 func saveRepos(src repoEditor, names []string, t tabID) tea.Cmd {
 	return func() tea.Msg {
 		if err := src.SaveRepositories(names); err != nil {
-			return errMsg{tab: t, kind: noticeSave, err: err}
+			return saveFailedMsg{tab: t, err: err}
 		}
 		return savedMsg{}
 	}

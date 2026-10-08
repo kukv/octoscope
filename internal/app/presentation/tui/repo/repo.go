@@ -80,15 +80,25 @@ type (
 	// cursor has since left is not fetched.
 	rowSettledMsg struct{ gen int }
 
-	errMsg struct {
-		gen  int
-		tab  tabID
-		kind noticeKind
-		err  error
+	// A fetch's failure belongs to the row it was asked for and names its
+	// generation; a browser's or a save's belongs to no row and is never
+	// stale (.claude/rules/errors.md: one message type per place it lands).
+	fetchFailedMsg struct {
+		gen int
+		tab tabID
+		err error
+	}
+	openFailedMsg struct {
+		tab tabID
+		err error
+	}
+	saveFailedMsg struct {
+		tab tabID
+		err error
 	}
 
 	// savedMsg says the list reached the settings file. A failed save
-	// answers with an errMsg of kind noticeSave instead.
+	// answers with a saveFailedMsg instead.
 	savedMsg struct{}
 )
 
@@ -126,6 +136,16 @@ func (m *Model) answeredFetch(t tabID) {
 	if m.notice[t].kind == noticeFetch {
 		m.notice[t] = notice{}
 	}
+}
+
+// fail hands what cannot be carried on from to the parent and puts the rest
+// on tab's notice. then runs only when the tab carries on.
+func (m Model) fail(t tabID, kind noticeKind, err error, then tea.Cmd) (Model, tea.Cmd) {
+	if domain.IsFatal(err) {
+		return m, func() tea.Msg { return FatalMsg{err} }
+	}
+	m.notice[t] = notice{kind: kind, text: noticeText(err)}
+	return m, then
 }
 
 // noticeText is what the line carries after the words in front of it. A
@@ -219,7 +239,7 @@ type Model struct {
 	// user onto a tab that answered.
 	notice [2]notice
 
-	// gen counts how many times selectRow has run. A fetch or the errMsg it
+	// gen counts how many times selectRow has run. A fetch or the failure it
 	// can produce carries the generation it started in; Update drops one
 	// whose generation no longer matches, which is what a row the cursor has
 	// since left means. This does not depend on a repository's spelling, so
@@ -410,7 +430,7 @@ func fetchList(ctx context.Context, src Source, t tabID, repo string, gen int) t
 			return nil
 		}
 		if err != nil {
-			return errMsg{gen: gen, tab: t, err: err}
+			return fetchFailedMsg{gen: gen, tab: t, err: err}
 		}
 		if t == tabPRs {
 			return prListMsg{gen: gen, prs: items}
@@ -432,10 +452,10 @@ func fetchCounts(src repoCounter, repos []string) tea.Cmd {
 	}
 }
 
-func openWeb(open func(url string) error, url string, t tabID, gen int) tea.Cmd {
+func openWeb(open func(url string) error, url string, t tabID) tea.Cmd {
 	return func() tea.Msg {
 		if err := open(url); err != nil {
-			return errMsg{gen: gen, tab: t, kind: noticeOpen, err: err}
+			return openFailedMsg{tab: t, err: err}
 		}
 		return nil
 	}
@@ -525,29 +545,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 	case savedMsg:
 		return m.saveDone()
-	case errMsg:
+	case fetchFailedMsg:
 		// Symmetric with prListMsg/issueListMsg above: a row the cursor has
 		// left can still fail, and its failure must not touch the row now on
 		// screen -- neither its loading spinner nor the full-screen error.
-		// A save is not a fetch and belongs to no row, so it is never stale.
-		if msg.kind != noticeSave && msg.gen != m.gen {
+		if msg.gen != m.gen {
 			return m, nil
 		}
+		m.loading[msg.tab] = false
+		return m.fail(msg.tab, noticeFetch, msg.err, nil)
+	case openFailedMsg:
+		// A browser that would not start leaves whatever is in flight in
+		// flight.
+		return m.fail(msg.tab, noticeOpen, msg.err, nil)
+	case saveFailedMsg:
 		var again tea.Cmd
-		if msg.kind == noticeSave {
-			m, again = m.saveDone()
-		}
-		// Only a fetch's failure ends a fetch. A browser that would not start
-		// leaves whatever is in flight in flight.
-		if msg.kind == noticeFetch {
-			m.loading[msg.tab] = false
-		}
-		if domain.IsFatal(msg.err) {
-			err := msg.err
-			return m, func() tea.Msg { return FatalMsg{err} }
-		}
-		m.notice[msg.tab] = notice{kind: msg.kind, text: noticeText(msg.err)}
-		return m, again
+		m, again = m.saveDone()
+		return m.fail(msg.tab, noticeSave, msg.err, again)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
@@ -613,7 +627,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		if url, ok := m.selectedURL(); ok {
-			return m, openWeb(m.open, url, m.tab, m.gen)
+			return m, openWeb(m.open, url, m.tab)
 		}
 		return m, nil
 	case "d":
