@@ -94,9 +94,9 @@ type ReviewThread struct {
 
 // ThreadComment is one comment inside a review thread, as GraphQL answers it.
 type ThreadComment struct {
-	Body              string    `json:"body"`
-	CreatedAt         time.Time `json:"createdAt"`
-	Author            Author    `json:"author"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"createdAt"`
+	Author    Author    `json:"author"`
 	// PullRequestReview is nil for a comment whose review is being deleted:
 	// for about a second after deletePullRequestReview returns, GitHub still
 	// lists the review's threads, with this field null.
