@@ -22,7 +22,7 @@ type fakeBackend struct {
 	prDiff          func(ctx context.Context, repo string, number int) (github.Diff, error)
 	prReviewContext func(ctx context.Context, repo string, number int) (gql.ReviewContext, error)
 	startReview     func(ctx context.Context, pullRequestID string) (string, error)
-	addReviewThread func(ctx context.Context, reviewID string, c gql.PendingComment) error
+	addReviewThread func(ctx context.Context, reviewID string, c gql.PendingComment) (gql.ReviewThread, error)
 	submitReview    func(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error
 	submitNewReview func(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error
 	prChecks        func(ctx context.Context, repo string, number int) ([]gql.CheckRun, error)

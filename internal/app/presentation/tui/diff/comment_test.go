@@ -24,12 +24,12 @@ type recordingSource struct {
 	discardCalls int
 }
 
-func (s *recordingSource) PostLineComment(_ context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+func (s *recordingSource) PostLineComment(_ context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.targets = append(s.targets, t)
 	s.comments = append(s.comments, c)
-	return "PRR_new", nil
+	return "PRR_new", domain.ReviewThread{}, nil
 }
 
 func (s *recordingSource) DiscardReview(context.Context, domain.ReviewHandle) error {
@@ -143,10 +143,9 @@ func TestCommentingOnARemovedLineQuotesTheLeftSide(t *testing.T) {
 	}
 }
 
-// commentPostedMsg sets Pending synchronously; the refetch that would
-// confirm it is not. Handing over an empty Pending leaves two pending
-// reviews open on the pull request.
-func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
+// A second comment goes onto the review the first one opened. Handing over
+// an empty Pending leaves two pending reviews open on the pull request.
+func TestASecondCommentReusesTheReviewTheFirstOpened(t *testing.T) {
 	src := &recordingSource{fakeSource: fakeSource{files: fixture()}}
 	m := loadedWith(t, src)
 
@@ -156,8 +155,6 @@ func TestASecondCommentBeforeTheRefetchLandsStillReusesTheReview(t *testing.T) {
 	m, cmd := m.Update(keyPress("ctrl+s"))
 	posted := cmd()
 	m, _ = m.Update(posted)
-	// posted's own fetchReview command is deliberately never run: the
-	// refetch's answer must not be what makes Pending available.
 
 	m = cursorOnLine(t, m, domain.LineAdded, 13)
 	m = press(m, "c")
@@ -415,32 +412,6 @@ func TestAFailedPostKeepsTheDraftAndShowsTheError(t *testing.T) {
 	if !strings.Contains(out, "422: line not part of the diff") {
 		t.Errorf("the failure is not shown:\n%s", out)
 	}
-}
-
-// TestAPostedCommentReusesTheReviewIDAndRefetches checks the two things
-// commentPostedMsg is responsible for: the id a second comment would reuse,
-// and asking for the review context again so the viewer's own comment comes
-// back as a Pending thread.
-func TestAPostedCommentReusesTheReviewIDAndRefetches(t *testing.T) {
-	m := loaded(t, 120, 40)
-	m, cmd := m.Update(commentPostedMsg{ref: m.ref, review: "PRR_1"})
-	if m.mode != modeView || m.phase != phaseIdle {
-		t.Errorf("mode = %v, phase = %v after commentPostedMsg, want the composer closed and idle", m.mode, m.phase)
-	}
-	if m.review.Pending != "PRR_1" {
-		t.Errorf("review.Pending = %q, want %q", m.review.Pending, "PRR_1")
-	}
-	if cmd == nil {
-		t.Fatal("commentPostedMsg produced no command to refetch the review context")
-	}
-	if _, ok := cmd().(reviewMsg); !ok && !isReviewErrMsg(cmd()) {
-		t.Errorf("commentPostedMsg's command produced %T, want a review fetch", cmd())
-	}
-}
-
-func isReviewErrMsg(msg tea.Msg) bool {
-	_, ok := msg.(reviewErrMsg)
-	return ok
 }
 
 // TestARefetchMidComposeDoesNotShiftThePostedTarget is the finding this fix

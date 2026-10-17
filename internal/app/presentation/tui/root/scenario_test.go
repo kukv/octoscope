@@ -143,15 +143,16 @@ func (f *scenarioSource) PRReviewContext(context.Context, string, int) (domain.R
 }
 
 // PostLineComment starts the pending review the first time, the way the
-// usecase does.
-func (f *scenarioSource) PostLineComment(_ context.Context, _ domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+// usecase does, and answers the thread it created.
+func (f *scenarioSource) PostLineComment(_ context.Context, _ domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
 	f.posted = append(f.posted, c)
 	f.pendingID = "PRR_1"
-	f.threads = append(f.threads, domain.ReviewThread{
+	thread := domain.ReviewThread{
 		Path: c.Path, Line: c.Line, Side: c.Side,
 		Comments: []domain.ThreadComment{{Author: domain.Author{Login: "kukv"}, Body: c.Body, Pending: true}},
-	})
-	return f.pendingID, nil
+	}
+	f.threads = append(f.threads, thread)
+	return f.pendingID, thread, nil
 }
 
 func (f *scenarioSource) DiscardReview(context.Context, domain.ReviewHandle) error { return nil }

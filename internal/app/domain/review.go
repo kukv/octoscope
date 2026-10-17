@@ -87,6 +87,47 @@ type ReviewTarget struct {
 	Pending     ReviewHandle
 }
 
+// Discarded is the context once the unsubmitted review is deleted: its
+// comments go, and with them every thread they were the only comments in.
+// The unsubmitted review is visible only to its author, so every pending
+// comment here is the viewer's and goes with it.
+func (c ReviewContext) Discarded() ReviewContext {
+	var threads []ReviewThread
+	for _, t := range c.Threads {
+		var kept []ThreadComment
+		for _, comment := range t.Comments {
+			if !comment.Pending {
+				kept = append(kept, comment)
+			}
+		}
+		if len(kept) > 0 {
+			t.Comments = kept
+			threads = append(threads, t)
+		}
+	}
+	c.Threads = threads
+	c.Pending = ""
+	return c
+}
+
+// Submitted is the context once the unsubmitted review is sent: its comments
+// are published as they are.
+func (c ReviewContext) Submitted() ReviewContext {
+	threads := make([]ReviewThread, len(c.Threads))
+	for i, t := range c.Threads {
+		comments := make([]ThreadComment, len(t.Comments))
+		for j, comment := range t.Comments {
+			comment.Pending = false
+			comments[j] = comment
+		}
+		t.Comments = comments
+		threads[i] = t
+	}
+	c.Threads = threads
+	c.Pending = ""
+	return c
+}
+
 // PendingCount is how many comments across every thread have not been
 // submitted yet -- what a review submission is about to send along with it.
 func (c ReviewContext) PendingCount() int {

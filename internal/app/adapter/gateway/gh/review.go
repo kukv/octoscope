@@ -33,20 +33,22 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 
 // AddReviewThread attaches one line comment to the target's unsubmitted
 // review, starting one first if there is none: on GitHub a line comment has
-// to hang off a review. It answers the review the comment went onto.
-func (g *Gateway) AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+// to hang off a review. It answers the review the comment went onto and the
+// thread it created.
+func (g *Gateway) AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
 	review := t.Pending
 	if review == "" {
 		id, err := g.backend.StartReview(ctx, string(t.PullRequest))
 		if err != nil {
-			return "", wrap(err)
+			return "", domain.ReviewThread{}, wrap(err)
 		}
 		review = domain.ReviewHandle(id)
 	}
-	if err := g.backend.AddReviewThread(ctx, string(review), fromPendingComment(c)); err != nil {
-		return "", wrap(err)
+	thread, err := g.backend.AddReviewThread(ctx, string(review), fromPendingComment(c))
+	if err != nil {
+		return "", domain.ReviewThread{}, wrap(err)
 	}
-	return review, nil
+	return review, toReviewThread(thread), nil
 }
 
 // SubmitReview sends the review out. With nothing waiting it creates and
