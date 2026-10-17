@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/i18n"
 )
 
 func threadFixture() domain.ReviewContext {
@@ -209,6 +210,23 @@ func TestAnUnsentCommentIsMarked(t *testing.T) {
 	}
 	if !strings.Contains(out, "pending · 1") {
 		t.Errorf("the header does not count the pending comment:\n%s", out)
+	}
+}
+
+// A pending review can be open with nothing in it yet -- started on the web
+// and emptied, say. It is still what v will submit into, so the header must
+// not hide it just because there is nothing to count.
+func TestAnEmptyPendingReviewIsShownInTheHeader(t *testing.T) {
+	m := loaded(t, 120, 40)
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequest: "PR_1", Pending: "PRR_1"}})
+	if out := ansi.Strip(m.View()); !strings.Contains(out, i18n.Tn("diff.pending_note", 0)) {
+		t.Errorf("the header hides the empty pending review:\n%s", out)
+	}
+
+	none := loaded(t, 120, 40)
+	none, _ = none.Update(reviewMsg{ref: none.ref, ctx: domain.ReviewContext{PullRequest: "PR_1"}})
+	if out := ansi.Strip(none.View()); strings.Contains(out, i18n.Tn("diff.pending_note", 0)) {
+		t.Errorf("the header reports a pending review there is none of:\n%s", out)
 	}
 }
 
