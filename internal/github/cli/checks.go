@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -28,8 +29,16 @@ func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnl
 	return parseJobLog(string(out)), nil
 }
 
+// caretSGR is a colour code the way gh hands one over: gh turns the escape
+// character into caret notation, so ESC [ 36;1 m arrives as "^[[36;1m".
+var caretSGR = regexp.MustCompile(`\^\[\[[0-9;]*m`)
+
 // parseJobLog reads the format gh prints: three tab-separated fields, the
 // job's name, the step's name, and the line the runner wrote.
+//
+// Colour codes are dropped: the runner puts one around every command it
+// echoes, and on screen that is only noise. The api backend drops them the
+// same way.
 func parseJobLog(out string) []github.LogLine {
 	var lines []github.LogLine
 	for _, raw := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
@@ -38,10 +47,10 @@ func parseJobLog(out string) []github.LogLine {
 		}
 		fields := strings.SplitN(raw, "\t", 3)
 		if len(fields) < 3 {
-			lines = append(lines, github.LogLine{Text: fields[len(fields)-1]})
+			lines = append(lines, github.LogLine{Text: caretSGR.ReplaceAllString(fields[len(fields)-1], "")})
 			continue
 		}
-		lines = append(lines, github.ParseLogLine(fields[1], fields[2]))
+		lines = append(lines, github.ParseLogLine(caretSGR.ReplaceAllString(fields[1], ""), caretSGR.ReplaceAllString(fields[2], "")))
 	}
 	return lines
 }

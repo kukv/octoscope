@@ -75,6 +75,38 @@ func TestALineWithoutATimestampKeepsItsText(t *testing.T) {
 	}
 }
 
+// The runner colours every command it echoes, and gh hands those colour
+// codes over in caret notation: "^[[36;1m" on every such line is noise to
+// whoever reads the log. Any other escape stays as gh wrote it, and so does
+// the tab test output is laid out with.
+func TestJobLogDropsTheColourCodesGhHandsOver(t *testing.T) {
+	t.Parallel()
+
+	c := New("", "kukv/octoscope")
+	c.run = fileRun(t, "testdata/job_log_sgr.txt")
+	lines, err := c.JobLog(context.Background(), "", 117502461818, true)
+	if err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+	texts := make([]string, len(lines))
+	for i, l := range lines {
+		texts[i] = l.Text
+	}
+	all := strings.Join(texts, "\n")
+	if !strings.Contains(all, "printf 'FAIL") {
+		t.Fatalf("the recording's command line is missing:\n%s", all)
+	}
+	if strings.Contains(all, "m^[") || strings.Contains(all, "^[[36;1m") || strings.Contains(all, "^[[0m") {
+		t.Errorf("a colour code is still in the text:\n%s", all)
+	}
+	if !strings.Contains(all, "^[[2Knot a colour") {
+		t.Errorf("the escape that is not a colour lost its caret notation:\n%s", all)
+	}
+	if !strings.Contains(all, "FAIL\tgithub.com/example/fail\t0.003s") {
+		t.Errorf("the tab-separated line lost its tabs:\n%s", all)
+	}
+}
+
 func TestJobLogAsksForOnlyTheFailedStepsWhenToldTo(t *testing.T) {
 	t.Parallel()
 

@@ -4,7 +4,8 @@
 GitHub の返し方が変わったときに気づけることがこの testdata の目的なので、
 テストを通すために中身を編集すると意味がなくなる。
 
-録る対象は自分の公開リポジトリ（`kukv/octoscope`）に限る。秘密情報を入れない。
+録る対象は自分の公開リポジトリ（`kukv/octoscope`）と、動作確認用の公開リポジトリ
+（`bright-room-sandbox/octoscope-test-repository`）に限る。秘密情報を入れない。
 
 ## `pr_files.json`
 
@@ -28,6 +29,21 @@ gh api 'repos/kukv/octoscope/pulls/55/files?per_page=100' --paginate | jq . > $D
 D=internal/github/cli/testdata
 gh run view -R kukv/octoscope --job 88970766114 --log-failed > $D/job_log_failed.txt
 gh run view -R kukv/octoscope --job 101635448466 --log | head -40 > $D/job_log.txt
+```
+
+## `job_log_sgr.txt`
+
+`JobLog`（`--log-failed`）に対する実出力。録った日: 2026-10-18、対象:
+`bright-room-sandbox/octoscope-test-repository` の PR #3 のジョブ 117502461818。
+
+わざと失敗するワークフロー（`.github/workflows/fail.yml`）で、タブ区切りの行（`go test` の
+出力の形）、runner がコマンドの行に付ける色指定、色指定でないエスケープ（`ESC [2K`）を出す。
+**gh はエスケープ文字を caret 表記（`^[`）にしてから渡してくる**ので、このファイルに生の ESC は無い。
+録ったままで、先頭行の BOM も含めて手を入れていない。
+
+```bash
+gh run view -R bright-room-sandbox/octoscope-test-repository --job 117502461818 --log-failed \
+  > internal/github/cli/testdata/job_log_sgr.txt
 ```
 
 ## `job_log_in_progress.txt`

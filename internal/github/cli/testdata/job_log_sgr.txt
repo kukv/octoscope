@@ -1,0 +1,11 @@
+test	Print like go test	﻿2026-10-17T20:58:57.2062473Z ##[group]Run printf 'ok\tgithub.com/example/pass\t0.002s\n'
+test	Print like go test	2026-10-17T20:58:57.2063159Z ^[[36;1mprintf 'ok\tgithub.com/example/pass\t0.002s\n'^[[0m
+test	Print like go test	2026-10-17T20:58:57.2063975Z ^[[36;1mprintf 'FAIL\tgithub.com/example/fail\t0.003s\n'^[[0m
+test	Print like go test	2026-10-17T20:58:57.2064533Z ^[[36;1mprintf '\033[2Knot a colour: erase line\n'^[[0m
+test	Print like go test	2026-10-17T20:58:57.2064996Z ^[[36;1mexit 1^[[0m
+test	Print like go test	2026-10-17T20:58:57.2121831Z shell: /usr/bin/bash -e {0}
+test	Print like go test	2026-10-17T20:58:57.2122257Z ##[endgroup]
+test	Print like go test	2026-10-17T20:58:57.2200176Z ok	github.com/example/pass	0.002s
+test	Print like go test	2026-10-17T20:58:57.2200724Z FAIL	github.com/example/fail	0.003s
+test	Print like go test	2026-10-17T20:58:57.2273379Z ^[[2Knot a colour: erase line
+test	Print like go test	2026-10-17T20:58:57.2281259Z ##[error]Process completed with exit code 1.

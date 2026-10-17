@@ -512,22 +512,22 @@ func TestARecordedJobIsDecodedTheWayGitHubSpellsIt(t *testing.T) {
 	}
 }
 
-// A step's output can carry an escape sequence -- a test runner's own colour
-// codes, say. Handing it to the screen raw would let the log repaint the
-// user's terminal, where the cli backend already shows it in caret notation.
+// A step's output can carry an escape sequence -- one that erases the line,
+// say. Handing it to the screen raw would let the log repaint the user's
+// terminal, where the cli backend already shows it in caret notation.
 func TestAnEscapeInAStepsOutputCannotReachTheScreen(t *testing.T) {
 	t.Parallel()
 
 	c, _ := serveJobLog(t, twoStepJob, zipOf(t, map[string]string{
 		"build/1_Set up job.txt": "starting\n",
-		"build/2_Run tests.txt":  "\x1b[31mFAIL\x1b[0m\n",
+		"build/2_Run tests.txt":  "\x1b[2KFAIL\n",
 	}))
 
 	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
 	}
-	if len(lines) != 2 || lines[1].Text != "^[[31mFAIL^[[0m" {
+	if len(lines) != 2 || lines[1].Text != "^[[2KFAIL" {
 		t.Fatalf("lines = %+v, want the escape shown as caret notation", lines)
 	}
 }
@@ -540,16 +540,16 @@ func TestAnEscapeInAStepNameCannotReachTheScreen(t *testing.T) {
 	t.Parallel()
 
 	j := `{"id": 61, "run_id": 7, "name": "build", "status": "completed",
-		"conclusion": "failure", "steps": [{"name": "\u001b[31mRun tests", "number": 1, "conclusion": "failure"}]}`
+		"conclusion": "failure", "steps": [{"name": "\u001b[2KRun tests", "number": 1, "conclusion": "failure"}]}`
 	c, _ := serveJobLog(t, j, zipOf(t, map[string]string{
-		"build/1_\x1b[31mRun tests.txt": "FAIL\n",
+		"build/1_\x1b[2KRun tests.txt": "FAIL\n",
 	}))
 
 	lines, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
 	if err != nil {
 		t.Fatalf("JobLog: %v", err)
 	}
-	if len(lines) != 1 || lines[0].Step != "^[[31mRun tests" {
+	if len(lines) != 1 || lines[0].Step != "^[[2KRun tests" {
 		t.Fatalf("lines = %+v, want the step name shown as caret notation", lines)
 	}
 }

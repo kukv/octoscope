@@ -355,7 +355,7 @@ func buildLogLines(log []domain.LogLine) []string {
 		}
 		last = l.Step
 		first = false
-		text := l.Text
+		text := expandTabs(l.Text)
 		if !l.Time.IsZero() {
 			text = l.Time.Format("15:04:05") + "  " + text
 		}
@@ -363,6 +363,15 @@ func buildLogLines(log []domain.LogLine) []string {
 	}
 	return lines
 }
+
+// tabWidth is how many columns expandTabs turns a tab into, the same as the
+// diff view's.
+const tabWidth = 4
+
+// expandTabs replaces a literal tab with spaces. ansi measures a tab as zero
+// columns wide, so a log line laid out with tabs (go test's results) would
+// draw its words run together.
+func expandTabs(s string) string { return strings.ReplaceAll(s, "\t", strings.Repeat(" ", tabWidth)) }
 
 // clip cuts s to w display columns. Japanese takes two columns per
 // character, so the count is never a byte or a rune count.

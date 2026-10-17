@@ -63,14 +63,24 @@ func TestAnEmojiCountsTwiceTowardTheLimit(t *testing.T) {
 	}
 }
 
-// The runner writes ANSI colour codes into the log. Handing an escape
-// character to the screen lets the log repaint the terminal, so every C0 and
-// C1 control turns into caret notation -- which is what gh hands the cli
-// backend, so both backends show the same text.
+// Handing an escape character to the screen lets the log repaint the
+// terminal, so every C0 and C1 control turns into caret notation -- which is
+// what gh hands the cli backend, so both backends show the same text.
 func TestAnEscapeInTheLogCannotReachTheScreen(t *testing.T) {
 	t.Parallel()
 
-	if got := sanitizeControls("\x1b[31mFAIL\x1b[0m"); got != "^[[31mFAIL^[[0m" {
+	if got := sanitizeControls("\x1b[2Kerased"); got != "^[[2Kerased" {
+		t.Errorf("sanitizeControls = %q", got)
+	}
+}
+
+// The runner colours every command it echoes. In caret notation that is
+// "^[[36;1m" on every such line, noise to whoever reads the log, so a colour
+// code goes altogether -- the cli backend drops it the same way.
+func TestAColourCodeIsDropped(t *testing.T) {
+	t.Parallel()
+
+	if got := sanitizeControls("\x1b[36;1mgo test ./...\x1b[0m"); got != "go test ./..." {
 		t.Errorf("sanitizeControls = %q", got)
 	}
 }

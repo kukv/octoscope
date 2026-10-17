@@ -85,3 +85,13 @@ func TestALogWithStepsIsStillCalledFailedSteps(t *testing.T) {
 		t.Errorf("the heading does not say failed steps:\n%s", out)
 	}
 }
+
+// go test lays its result lines out with tabs. A tab is drawn zero columns
+// wide, so "FAIL\tgithub.com/x\t0.003s" came out as "FAILgithub.com/x0.003s".
+func TestATabInALogLineIsDrawnAsSpace(t *testing.T) {
+	lines := buildLogLines([]domain.LogLine{{Step: "Test", Text: "FAIL\tgithub.com/example/fail\t0.003s"}})
+	got := ansi.Strip(lines[len(lines)-1])
+	if strings.Contains(got, "\t") || !strings.Contains(got, "FAIL ") || !strings.Contains(got, "fail ") {
+		t.Errorf("row = %q, want the tabs drawn as space", got)
+	}
+}
