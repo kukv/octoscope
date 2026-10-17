@@ -484,6 +484,8 @@ checks:
     other: "full log"
   log_failed_only:
     other: "failed steps"
+  log_whole_job:
+    other: "whole job log"
   rerun_title:
     other: "Rerun {{.Workflow}}"
   rerun_failed_only:

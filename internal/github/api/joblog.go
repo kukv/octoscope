@@ -91,15 +91,10 @@ func (c *Client) jobLogLines(ctx context.Context, repo string, j job, failedOnly
 		return lines, nil
 	}
 	if f := match(zr, wholeJobPattern(j.Name)); f != nil {
-		return readEntry(f, unknownStep)
+		return readEntry(f, github.UnknownStep)
 	}
 	return c.wholeJobLog(ctx, repo, j)
 }
-
-// unknownStep is what a line is attributed to when only the job's whole log is
-// available: the file holds every step's output with no boundary between them.
-// It is the words gh puts there, so both backends show the same thing.
-const unknownStep = "UNKNOWN STEP"
 
 // stepLines reads one entry per step. ok is false when the archive has no
 // per-step entry for this job at all, which is the caller's signal to fall
@@ -138,7 +133,7 @@ func (c *Client) wholeJobLog(ctx context.Context, repo string, j job) ([]github.
 	if err != nil {
 		return nil, err
 	}
-	return logLines(string(body), unknownStep), nil
+	return logLines(string(body), github.UnknownStep), nil
 }
 
 func readEntry(f *zip.File, step string) ([]github.LogLine, error) {

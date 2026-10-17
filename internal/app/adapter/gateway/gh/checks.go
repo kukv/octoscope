@@ -191,7 +191,11 @@ func toCheckState(n gql.CheckContext) domain.CheckState {
 }
 
 func toLogLine(l github.LogLine) domain.LogLine {
-	return domain.LogLine{Step: l.Step, Time: l.Time, Text: l.Text}
+	step := l.Step
+	if step == github.UnknownStep {
+		step = ""
+	}
+	return domain.LogLine{Step: step, Time: l.Time, Text: l.Text}
 }
 
 // fromRerunScope spells a rerun scope the way the shared github package

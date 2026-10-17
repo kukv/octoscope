@@ -469,6 +469,8 @@ checks:
     other: "全ログ"
   log_failed_only:
     other: "失敗ステップ"
+  log_whole_job:
+    other: "ジョブ全体のログ"
   rerun_title:
     other: "{{.Workflow}} を再実行"
   rerun_failed_only:
