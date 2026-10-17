@@ -107,8 +107,7 @@ func TestGolden(t *testing.T) {
 				candidates := New(&fakeSource{items: goldenItems(), labels: goldenLabels()})
 				candidates = resolve(t, candidates, candidates.Init())
 				candidates = withRepo(t, candidates)
-				candidates = onFilter(t, candidates, FilterLabel)
-				candidates = resolveCandidates(t, candidates)
+				candidates = resolveCandidates(t, candidates, FilterLabel)
 				candidates, _ = candidates.Update(windowSize(w))
 				candidates.fetchedAt = goldenFetchedAt
 				golden.Assert(t, fmt.Sprintf("search_candidates_%s_%d", lang.name, w), candidates.View())

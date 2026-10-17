@@ -20,6 +20,7 @@ type fakeSource struct {
 
 	labels    []domain.Label
 	labelRepo string
+	labelErr  error
 
 	users      []string
 	authorRepo string
@@ -32,7 +33,7 @@ func (f *fakeSource) SearchItems(_ context.Context, query string) ([]domain.Work
 
 func (f *fakeSource) ListLabels(_ context.Context, repo string) ([]domain.Label, error) {
 	f.labelRepo = repo
-	return f.labels, nil
+	return f.labels, f.labelErr
 }
 
 func (f *fakeSource) ListAssignees(_ context.Context, repo string) ([]string, error) {
@@ -531,13 +532,13 @@ func withRepo(t *testing.T, m Model) Model {
 	return resolve(t, m, cmd)
 }
 
-// resolveCandidates runs the candidate fetch the cursor's current filter
-// (FilterLabel or FilterAuthor) starts, and feeds its answer back into
-// Update, the way a landing on that row does once repo: names a repository.
-func resolveCandidates(t *testing.T, m Model) Model {
+// resolveCandidates lands on id (FilterLabel or FilterAuthor) and feeds the
+// answer of the candidate fetch that landing starts back into Update, the
+// way it arrives once repo: names a repository.
+func resolveCandidates(t *testing.T, m Model, id FilterID) Model {
 	t.Helper()
 
-	_, cmd := m.maybeFetchCandidates()
+	m, cmd := onFilterCmd(t, m, id)
 	if cmd == nil {
 		t.Fatal("no candidate fetch to resolve")
 	}
@@ -571,8 +572,7 @@ func TestTheLabelsOfTheNamedRepositoryAreOffered(t *testing.T) {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())
 	m = withRepo(t, m)
-	m = onFilter(t, m, FilterLabel)
-	m = resolveCandidates(t, m)
+	m = resolveCandidates(t, m, FilterLabel)
 
 	if !strings.Contains(m.View(), "bug") {
 		t.Errorf("the repository's labels are not offered:\n%s", m.View())
@@ -603,6 +603,74 @@ func TestTheSameRepositoryIsNotAskedForTwice(t *testing.T) {
 	}
 }
 
+// Passing over the label row while its fetch is still out must not start a
+// second one for the same repository: the cache only fills when the answer
+// lands, and a cursor is faster than the network.
+func TestARepositoryBeingFetchedIsNotAskedForAgain(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labels: []domain.Label{{Name: "bug"}}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+
+	m, cmd := onFilterCmd(t, m, FilterLabel)
+	if cmd == nil {
+		t.Fatal("landing on label did not start a fetch")
+	}
+	m = onFilter(t, m, FilterReview)
+	if _, cmd = onFilterCmd(t, m, FilterLabel); cmd != nil {
+		t.Error("asked for the labels again while the first fetch was still out")
+	}
+}
+
+// An answer for a repository the filter no longer names is dropped, and it
+// must not take the in-flight mark of the repository it does name with it.
+func TestAStaleAnswerLeavesTheFetchInFlight(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labels: []domain.Label{{Name: "bug"}}}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+
+	m, cmd := onFilterCmd(t, m, FilterLabel)
+	if cmd == nil {
+		t.Fatal("landing on label did not start a fetch")
+	}
+	m, _ = m.Update(labelCandidatesMsg{repo: "kukv/elsewhere", labels: []domain.Label{{Name: "stale"}}})
+	m = onFilter(t, m, FilterReview)
+	if _, cmd = onFilterCmd(t, m, FilterLabel); cmd != nil {
+		t.Error("a stale answer cleared the mark of the fetch still out")
+	}
+}
+
+// A failed fetch is not shown, so the only way to get the chips after one is
+// to come back to the row. That must still ask again.
+func TestAFailedFetchIsAskedForAgain(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{labelErr: errors.New("gh: HTTP 502")}
+	m := New(src)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = resolve(t, m, m.Init())
+	m = withRepo(t, m)
+
+	m, cmd := onFilterCmd(t, m, FilterLabel)
+	if cmd == nil {
+		t.Fatal("landing on label did not start a fetch")
+	}
+	if msg := cmd(); msg != nil {
+		m, _ = m.Update(msg)
+	}
+	m = onFilter(t, m, FilterReview)
+	if _, cmd = onFilterCmd(t, m, FilterLabel); cmd == nil {
+		t.Error("a failed fetch was never asked for again")
+	}
+}
+
 // author: offers the repository's assignable users the same way label: does.
 func TestTheAuthorsOfTheNamedRepositoryAreOffered(t *testing.T) {
 	t.Parallel()
@@ -614,8 +682,7 @@ func TestTheAuthorsOfTheNamedRepositoryAreOffered(t *testing.T) {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = resolve(t, m, m.Init())
 	m = withRepo(t, m)
-	m = onFilter(t, m, FilterAuthor)
-	m = resolveCandidates(t, m)
+	m = resolveCandidates(t, m, FilterAuthor)
 
 	if !strings.Contains(m.View(), "octocat") {
 		t.Errorf("the repository's authors are not offered:\n%s", m.View())
