@@ -224,6 +224,24 @@ func TestClickingBelowTheDrawnSidebarRowsSelectsNothing(t *testing.T) {
 	}
 }
 
+// The rule between the panes belongs to neither. The table's rows are hit by
+// their line alone, so a click on the rule that fell through to the table
+// selected whichever row shared its line.
+func TestClickingTheRuleBetweenThePanesChangesNothing(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m.focus = paneSidebar
+	_, y := tokenAt(t, m, "second pr")
+
+	m, cmd := m.Update(click(sidebarWidth, y))
+	if cmd != nil {
+		t.Errorf("clicking the rule produced a command")
+	}
+	if m.cursors[m.tab] != 0 || m.focus != paneSidebar {
+		t.Errorf("cursor = %d focus = %v, want the click on the rule to change nothing", m.cursors[m.tab], m.focus)
+	}
+}
+
 // The wheel moves whichever pane the pointer is over.
 func TestWheelOverTheSidebarMovesTheSidebar(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
