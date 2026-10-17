@@ -58,15 +58,18 @@ type webErrMsg struct{ err error }
 
 // labelCandidatesMsg and authorCandidatesMsg carry what a repository offers
 // for the label and author chips. repo guards against a stale answer: the
-// user may have typed a different repo: by the time it arrives.
+// user may have typed a different repo: by the time it arrives. err is never
+// shown; it only ends the fetch so the row can ask again.
 type labelCandidatesMsg struct {
 	repo   string
 	labels []domain.Label
+	err    error
 }
 
 type authorCandidatesMsg struct {
 	repo  string
 	users []string
+	err   error
 }
 
 // pane says which half of the split screen j/k and enter act on.
@@ -129,10 +132,14 @@ type Model struct {
 	// labelCandidates and authorCandidates are what the named repository
 	// offers for the chips under the filter pane, kept with the repo they
 	// were fetched for so the same repository is not asked for twice.
+	// labelFetching and authorFetching name the repository whose answer is
+	// still out, so passing over the row again does not ask a second time.
 	labelCandidates      []domain.Label
 	labelCandidatesRepo  string
+	labelFetching        string
 	authorCandidates     []string
 	authorCandidatesRepo string
+	authorFetching       string
 
 	spin          spinner.Model
 	width, height int
@@ -211,20 +218,14 @@ func openWeb(open func(url string) error, url string) tea.Cmd {
 func fetchLabelCandidates(src candidateSource, repo string) tea.Cmd {
 	return func() tea.Msg {
 		labels, err := src.ListLabels(context.Background(), repo)
-		if err != nil {
-			return nil
-		}
-		return labelCandidatesMsg{repo: repo, labels: labels}
+		return labelCandidatesMsg{repo: repo, labels: labels, err: err}
 	}
 }
 
 func fetchAuthorCandidates(src candidateSource, repo string) tea.Cmd {
 	return func() tea.Msg {
 		users, err := src.ListAssignees(context.Background(), repo)
-		if err != nil {
-			return nil
-		}
-		return authorCandidatesMsg{repo: repo, users: users}
+		return authorCandidatesMsg{repo: repo, users: users, err: err}
 	}
 }
 
@@ -239,14 +240,16 @@ func (m Model) maybeFetchCandidates() (Model, tea.Cmd) {
 	}
 	switch m.cursor {
 	case FilterLabel:
-		if m.labelCandidatesRepo == repo {
+		if m.labelCandidatesRepo == repo || m.labelFetching == repo {
 			return m, nil
 		}
+		m.labelFetching = repo
 		return m, fetchLabelCandidates(m.src, repo)
 	case FilterAuthor:
-		if m.authorCandidatesRepo == repo {
+		if m.authorCandidatesRepo == repo || m.authorFetching == repo {
 			return m, nil
 		}
+		m.authorFetching = repo
 		return m, fetchAuthorCandidates(m.src, repo)
 	}
 	return m, nil
@@ -300,14 +303,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.notice = i18n.T("search.save_failed") + ": " + msg.err.Error()
 		return m.saveDone()
 	case labelCandidatesMsg:
-		if msg.repo != m.filters.Value(FilterRepo) {
+		if msg.repo == m.labelFetching {
+			m.labelFetching = ""
+		}
+		if msg.err != nil || msg.repo != m.filters.Value(FilterRepo) {
 			return m, nil
 		}
 		m.labelCandidates = msg.labels
 		m.labelCandidatesRepo = msg.repo
 		return m, nil
 	case authorCandidatesMsg:
-		if msg.repo != m.filters.Value(FilterRepo) {
+		if msg.repo == m.authorFetching {
+			m.authorFetching = ""
+		}
+		if msg.err != nil || msg.repo != m.filters.Value(FilterRepo) {
 			return m, nil
 		}
 		m.authorCandidates = msg.users
