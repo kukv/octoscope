@@ -38,6 +38,9 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m.selectRow(row)
 	}
 	msg.X -= m.sidebarCols()
+	if msg.X < 0 {
+		return m, nil // the rule between the panes
+	}
 	m.focus = paneList
 	if msg.Y == subTabRow {
 		return m.showTab(m.subTabAt(msg.X))
