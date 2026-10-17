@@ -33,20 +33,22 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 
 // AddReviewThread attaches one line comment to the target's unsubmitted
 // review, starting one first if there is none: on GitHub a line comment has
-// to hang off a review. It answers the review the comment went onto.
-func (g *Gateway) AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
+// to hang off a review. It answers the review the comment went onto and the
+// thread it created.
+func (g *Gateway) AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
 	review := t.Pending
 	if review == "" {
 		id, err := g.backend.StartReview(ctx, string(t.PullRequest))
 		if err != nil {
-			return "", wrap(err)
+			return "", domain.ReviewThread{}, wrap(err)
 		}
 		review = domain.ReviewHandle(id)
 	}
-	if err := g.backend.AddReviewThread(ctx, string(review), fromPendingComment(c)); err != nil {
-		return "", wrap(err)
+	thread, err := g.backend.AddReviewThread(ctx, string(review), fromPendingComment(c))
+	if err != nil {
+		return "", domain.ReviewThread{}, wrap(err)
 	}
-	return review, nil
+	return review, toReviewThread(thread), nil
 }
 
 // SubmitReview sends the review out. With nothing waiting it creates and
@@ -156,7 +158,9 @@ func toReviewContext(rc gql.ReviewContext) domain.ReviewContext {
 		Pending:     domain.ReviewHandle(rc.PendingID),
 	}
 	for _, t := range rc.Threads {
-		dc.Threads = append(dc.Threads, toReviewThread(t))
+		if rt := toReviewThread(t); len(rt.Comments) > 0 {
+			dc.Threads = append(dc.Threads, rt)
+		}
 	}
 	return dc
 }
@@ -177,6 +181,12 @@ func toReviewThread(t gql.ReviewThread) domain.ReviewThread {
 		rt.Side = domain.SideLeft
 	}
 	for _, c := range t.Comments.Nodes {
+		// A comment with no review belongs to a pending review being
+		// deleted (gql.ThreadComment). It is not there once GitHub settles,
+		// and kept it would be drawn as sent.
+		if c.PullRequestReview == nil {
+			continue
+		}
 		rt.Comments = append(rt.Comments, toThreadComment(c))
 	}
 	return rt

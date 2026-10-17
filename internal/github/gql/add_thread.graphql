@@ -8,6 +8,28 @@ mutation ($reviewId: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: 
   }) {
     thread {
       id
+      isResolved
+      isOutdated
+      path
+      line
+      originalLine
+      diffSide
+      comments(first: 50) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          body
+          createdAt
+          author {
+            login
+          }
+          pullRequestReview {
+            state
+          }
+        }
+      }
     }
   }
 }

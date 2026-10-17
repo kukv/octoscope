@@ -84,7 +84,7 @@ type reviewFetcher interface {
 
 type reviewer interface {
 	StartReview(ctx context.Context, pullRequestID string) (string, error)
-	AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) error
+	AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) (gql.ReviewThread, error)
 	SubmitReview(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error
 	SubmitNewReview(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error
 	DiscardReview(ctx context.Context, reviewID string) error

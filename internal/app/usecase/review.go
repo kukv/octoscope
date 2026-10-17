@@ -13,7 +13,7 @@ type reviewFetcher interface {
 }
 
 type reviewer interface {
-	AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error)
 	SubmitReview(ctx context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error
 	DiscardReview(ctx context.Context, review domain.ReviewHandle) error
 }
@@ -31,14 +31,14 @@ func (u *Usecase) DiscardReview(ctx context.Context, review domain.ReviewHandle)
 }
 
 // PostLineComment attaches one line comment to the pull request's review and
-// answers the review it went onto: which requests that takes is the
-// gateway's knowledge, not the application's.
-func (u *Usecase) PostLineComment(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error) {
-	id, err := u.reviews.AddReviewThread(ctx, t, c)
+// answers the review it went onto and the thread it created: which requests
+// that takes is the gateway's knowledge, not the application's.
+func (u *Usecase) PostLineComment(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
+	id, thread, err := u.reviews.AddReviewThread(ctx, t, c)
 	if err != nil {
-		return "", fmt.Errorf("add review thread: %w", err)
+		return "", domain.ReviewThread{}, fmt.Errorf("add review thread: %w", err)
 	}
-	return id, nil
+	return id, thread, nil
 }
 
 func (u *Usecase) SubmitReview(ctx context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error {

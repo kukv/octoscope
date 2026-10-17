@@ -94,12 +94,17 @@ type ReviewThread struct {
 
 // ThreadComment is one comment inside a review thread, as GraphQL answers it.
 type ThreadComment struct {
-	Body              string    `json:"body"`
-	CreatedAt         time.Time `json:"createdAt"`
-	Author            Author    `json:"author"`
-	PullRequestReview struct {
-		State string `json:"state"`
-	} `json:"pullRequestReview"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"createdAt"`
+	Author    Author    `json:"author"`
+	// PullRequestReview is nil for a comment whose review is being deleted:
+	// for about a second after deletePullRequestReview returns, GitHub still
+	// lists the review's threads, with this field null.
+	PullRequestReview *CommentReview `json:"pullRequestReview"`
+}
+
+type CommentReview struct {
+	State string `json:"state"`
 }
 
 // PRReviewContext fetches everything the diff view needs to draw and change
@@ -239,15 +244,32 @@ const (
 	EventComment        ReviewEvent = "COMMENT"
 )
 
-func (c *Client) AddReviewThread(ctx context.Context, reviewID string, comment PendingComment) error {
-	_, err := c.Write(ctx, addThreadMutation,
+// AddReviewThread answers the thread it created, in the shape
+// PRReviewContext reads one in, so the caller can draw it without fetching
+// every thread again. A new thread holds the one comment it was created with,
+// so its comments need no paging.
+func (c *Client) AddReviewThread(ctx context.Context, reviewID string, comment PendingComment) (ReviewThread, error) {
+	out, err := c.Write(ctx, addThreadMutation,
 		S("reviewId", reviewID),
 		S("path", comment.Path),
 		N("line", comment.Line),
 		S("side", comment.Side),
 		S("body", comment.Body),
 	)
-	return err
+	if err != nil {
+		return ReviewThread{}, err
+	}
+	var resp struct {
+		Data struct {
+			AddPullRequestReviewThread struct {
+				Thread ReviewThread `json:"thread"`
+			} `json:"addPullRequestReviewThread"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return ReviewThread{}, fmt.Errorf("parse added thread: %w", err)
+	}
+	return resp.Data.AddPullRequestReviewThread.Thread, nil
 }
 
 func (c *Client) SubmitReview(ctx context.Context, reviewID string, event ReviewEvent, body string) error {

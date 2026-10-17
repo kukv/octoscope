@@ -5,6 +5,7 @@ package diff
 
 import (
 	"context"
+	"slices"
 	"strconv"
 
 	"charm.land/bubbles/v2/spinner"
@@ -21,7 +22,7 @@ import (
 type Source interface {
 	PRDiff(ctx context.Context, repo string, number int) ([]domain.FileDiff, error)
 	PRReviewContext(ctx context.Context, repo string, number int) (domain.ReviewContext, error)
-	PostLineComment(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, error)
+	PostLineComment(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error)
 	DiscardReview(ctx context.Context, review domain.ReviewHandle) error
 	review.Source
 }
@@ -323,13 +324,18 @@ func (m Model) reviewArrived(msg reviewMsg) Model {
 	if msg.ref != m.ref {
 		return m
 	}
-	m.review = msg.ctx
 	m.reviewErr = nil
 	m.declined = ""
+	return m.withReview(msg.ctx)
+}
+
+// withReview puts a changed review context on screen: its threads are rows
+// of their own, so the rows are rebuilt and the cursor kept inside them.
+func (m Model) withReview(rc domain.ReviewContext) Model {
+	m.review = rc
 	m = m.withRows()
 	m.row = clamp(m.row, len(m.rows)-1)
-	m = m.follow()
-	return m
+	return m.follow()
 }
 
 func (m Model) reviewFailed(msg reviewErrMsg) Model {
@@ -357,8 +363,10 @@ func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
 	m.errText = ""
 	m.textarea.Reset()
 	m.target = domain.PendingComment{}
-	m.review.Pending = msg.review
-	return m, m.fetchReview()
+	rc := m.review
+	rc.Pending = msg.review
+	rc.Threads = append(slices.Clone(rc.Threads), msg.thread)
+	return m.withReview(rc), nil
 }
 
 func (m Model) commentFailed(msg commentErrorMsg) Model {
@@ -388,8 +396,7 @@ func (m Model) submitDone() (Model, tea.Cmd) {
 	}
 	m.mode, m.phase = modeView, phaseIdle
 	m.errText = ""
-	m.review.Pending = ""
-	return m, m.fetchReview()
+	return m.withReview(m.review.Submitted()), nil
 }
 
 func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
@@ -412,8 +419,7 @@ func (m Model) discarded(msg discardedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.mode = modeView
-	m.review.Pending = ""
-	return m, m.fetchReview()
+	return m.withReview(m.review.Discarded()), nil
 }
 
 func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {

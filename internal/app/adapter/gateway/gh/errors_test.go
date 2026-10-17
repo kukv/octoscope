@@ -128,11 +128,13 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 	authErr := github.Classify(github.ErrUnauthenticated, "gh: Bad credentials")
 
 	g := New(fakeBackend{
-		getPR:              func(context.Context, string, int) (gql.PullRequest, error) { return gql.PullRequest{}, authErr },
-		getIssue:           func(context.Context, string, int) (gql.Issue, error) { return gql.Issue{}, authErr },
-		prDiff:             func(context.Context, string, int) (github.Diff, error) { return github.Diff{}, authErr },
-		prReviewContext:    func(context.Context, string, int) (gql.ReviewContext, error) { return gql.ReviewContext{}, authErr },
-		addReviewThread:    func(context.Context, string, gql.PendingComment) error { return authErr },
+		getPR:           func(context.Context, string, int) (gql.PullRequest, error) { return gql.PullRequest{}, authErr },
+		getIssue:        func(context.Context, string, int) (gql.Issue, error) { return gql.Issue{}, authErr },
+		prDiff:          func(context.Context, string, int) (github.Diff, error) { return github.Diff{}, authErr },
+		prReviewContext: func(context.Context, string, int) (gql.ReviewContext, error) { return gql.ReviewContext{}, authErr },
+		addReviewThread: func(context.Context, string, gql.PendingComment) (gql.ReviewThread, error) {
+			return gql.ReviewThread{}, authErr
+		},
 		submitReview:       func(context.Context, string, gql.ReviewEvent, string) error { return authErr },
 		submitNewReview:    func(context.Context, string, gql.ReviewEvent, string) error { return authErr },
 		discardReview:      func(context.Context, string) error { return authErr },
@@ -178,7 +180,7 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		{"PRDiff", func() error { _, err := g.PRDiff(context.Background(), "kukv/octoscope", 1); return err }},
 		{"PRReviewContext", func() error { _, err := g.PRReviewContext(context.Background(), "kukv/octoscope", 1); return err }},
 		{"AddReviewThread", func() error {
-			_, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.PendingComment{})
+			_, _, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "pr-id", Pending: "review-id"}, domain.PendingComment{})
 			return err
 		}},
 		{"SubmitReview", func() error {

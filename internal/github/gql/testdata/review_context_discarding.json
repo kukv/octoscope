@@ -1,0 +1,75 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "id": "PR_kwDOVNscn88AAAABJEI9QA",
+        "title": "Add sample2.txt with three lines of text",
+        "headRefName": "lustersh/test-pr1",
+        "baseRefName": "main",
+        "additions": 3,
+        "deletions": 0,
+        "reviews": {
+          "nodes": []
+        },
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0xN1QxOTozOTozM1rOrY7QdA=="
+          },
+          "nodes": [
+            {
+              "id": "PRRT_kwDOVNscn86tjtBZ",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "sample2.txt",
+              "line": 1,
+              "originalLine": 1,
+              "diffSide": "RIGHT",
+              "comments": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0xN1QxOTozOTozMlrPAAAAAQCMzbs="
+                },
+                "nodes": [
+                  {
+                    "body": "race-a",
+                    "createdAt": "2026-10-17T19:39:32Z",
+                    "author": {
+                      "login": "kukv"
+                    },
+                    "pullRequestReview": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOVNscn86tjtB0",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "sample2.txt",
+              "line": 2,
+              "originalLine": 2,
+              "diffSide": "RIGHT",
+              "comments": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0xN1QxOTozOTozM1rPAAAAAQCMzek="
+                },
+                "nodes": [
+                  {
+                    "body": "race-b",
+                    "createdAt": "2026-10-17T19:39:33Z",
+                    "author": {
+                      "login": "kukv"
+                    },
+                    "pullRequestReview": null
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
