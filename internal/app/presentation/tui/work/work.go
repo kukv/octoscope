@@ -260,13 +260,16 @@ type Summary struct {
 func (m Model) Summary() Summary {
 	s := Summary{FetchedAt: m.oldestFetch(), Ready: m.ready()}
 	s.Attention = len(m.work[domain.SectionReviewRequested])
+	// One pull request can sit in more than one column.
+	failing := map[domain.ItemRef]struct{}{}
 	for _, items := range m.work {
 		for _, it := range items {
 			if it.Checks.State == domain.CheckFailure {
-				s.Failing++
+				failing[it.Ref] = struct{}{}
 			}
 		}
 	}
+	s.Failing = len(failing)
 	return s
 }
 
