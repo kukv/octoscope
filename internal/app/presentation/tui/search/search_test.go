@@ -282,6 +282,55 @@ func TestTheEditedQueryIsWhatIsSearchedFor(t *testing.T) {
 	}
 }
 
+// A query with nothing in it is not one GitHub runs, so committing an empty
+// raw query -- or one of spaces -- means leaving the raw query for what the
+// filters build. Kept as typed, the spaces would go to GitHub as the query
+// and the filter pane would stay dimmed over filters that no longer apply.
+func TestAnEmptyRawQueryGoesBackToTheFilters(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		typed string
+	}{
+		{"cleared", ""},
+		{"spaces only", "   "},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			src := &fakeSource{}
+			m := New(src)
+			m = resolve(t, m, m.Init())
+
+			m, _ = press(m, "e")
+			for _, r := range " draft:false" {
+				m, _ = press(m, string(r))
+			}
+			m, cmd := press(m, "enter")
+			m = resolve(t, m, cmd)
+			if src.query != "is:open draft:false" {
+				t.Fatalf("setup: searched for %q, want the raw query", src.query)
+			}
+
+			m, _ = press(m, "e")
+			m, _ = press(m, "ctrl+u") // clears what is left of the cursor: all of it
+			for _, r := range tt.typed {
+				m, _ = press(m, string(r))
+			}
+			m, cmd = press(m, "enter")
+			m = resolve(t, m, cmd)
+
+			if src.query != "is:open" {
+				t.Errorf("searched for %q, want the filters' query", src.query)
+			}
+			if m.raw != "" {
+				t.Errorf("raw = %q, want none", m.raw)
+			}
+		})
+	}
+}
+
 // enter on a picked filter must drop a raw query the same way space does:
 // otherwise committing "a filter" on top of an edited raw query looks like
 // it applied the filter but silently keeps running the untouched raw text.
