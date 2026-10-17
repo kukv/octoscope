@@ -99,7 +99,9 @@ type Model struct {
 	filters Filters
 	// raw is what the user typed into the raw query editor, and what a
 	// search uses once it is set. Touching a filter clears it, since the
-	// filters are not parsed back out of what was typed.
+	// filters are not parsed back out of what was typed. Empty means unset:
+	// a raw query committed empty goes back to the filters, since an empty
+	// query is not one GitHub runs, so the two never need telling apart.
 	raw string
 	// cursor is the filter pane's own cursor, drawn as its selected row.
 	cursor FilterID
@@ -550,7 +552,12 @@ func (m Model) handleRawKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.mode = modeBrowse
 		return m, nil
 	case "enter":
+		// Spaces alone are no query either: GitHub would be asked for
+		// nothing, so they go back to the filters the way an empty one does.
 		m.raw = m.input.Value()
+		if strings.TrimSpace(m.raw) == "" {
+			m.raw = ""
+		}
 		m.mode = modeBrowse
 		return m.startSearch()
 	}
