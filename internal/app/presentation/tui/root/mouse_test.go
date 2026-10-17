@@ -31,14 +31,16 @@ func loadedApp(t *testing.T, src Source, opts Options) Model {
 func TestTheTabRowReportsOnTheBoard(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
-	failing := domain.WorkItem{
-		Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 1},
-		Title:  "a broken one",
-		Checks: domain.Checks{Total: 1, Failed: 1, State: domain.CheckFailure},
+	failing := func(n int) domain.WorkItem {
+		return domain.WorkItem{
+			Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: n},
+			Title:  "a broken one",
+			Checks: domain.Checks{Total: 1, Failed: 1, State: domain.CheckFailure},
+		}
 	}
 	src := &fakeSource{work: domain.Work{
-		domain.SectionReviewRequested: {failing, failing},
-		domain.SectionYourPRs:         {failing},
+		domain.SectionReviewRequested: {failing(1), failing(2)},
+		domain.SectionYourPRs:         {failing(3)},
 	}}
 
 	m := loadedApp(t, src, Options{})
