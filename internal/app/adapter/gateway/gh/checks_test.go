@@ -247,6 +247,17 @@ func TestToLogLineTranslatesEveryField(t *testing.T) {
 	}
 }
 
+// Both backends name a line whose step is not known UNKNOWN STEP, which is
+// gh's wording. The checks view has to tell such a log from one with steps
+// in it, and it must not do that by comparing against gh's words.
+func TestALineWithNoKnownStepHasNoStep(t *testing.T) {
+	t.Parallel()
+
+	if got := toLogLine(github.LogLine{Step: github.UnknownStep, Text: "ok"}); got.Step != "" {
+		t.Errorf("Step = %q, want none", got.Step)
+	}
+}
+
 func TestJobLogTranslatesEveryLine(t *testing.T) {
 	t.Parallel()
 

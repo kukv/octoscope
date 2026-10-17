@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -45,6 +46,7 @@ func (m Model) logArrived(msg logMsg) Model {
 	}
 	m.log = msg.lines
 	m.logLines = buildLogLines(msg.lines)
+	m.wholeJob = len(msg.lines) > 0 && !slices.ContainsFunc(msg.lines, func(l domain.LogLine) bool { return l.Step != "" })
 	m.logPhase = phaseIdle
 	m.logRow = 0
 	m.hscroll = 0
@@ -107,6 +109,7 @@ func (m Model) maxHscroll() int {
 func (m Model) clearLog() Model {
 	m.log = nil
 	m.logLines = nil
+	m.wholeJob = false
 	m.logJob = ""
 	m.logRow = 0
 	m.hscroll = 0

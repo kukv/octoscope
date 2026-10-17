@@ -14,6 +14,11 @@ type LogLine struct {
 	Text string
 }
 
+// UnknownStep is the step a line is attributed to when the log does not say
+// which step wrote it: the job's whole log, with no boundary between steps.
+// It is the words gh puts there, so both backends show the same thing.
+const UnknownStep = "UNKNOWN STEP"
+
 // ParseLogLine reads one line of a job's log. message is what the runner
 // wrote: the stamp it prefixes most lines with, and on the very first line
 // of a log a byte order mark before that. Neither is part of what the step

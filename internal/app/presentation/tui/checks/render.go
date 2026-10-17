@@ -100,6 +100,9 @@ func (m Model) headingLine() string {
 }
 
 func (m Model) logModeLabel() string {
+	if m.wholeJob {
+		return i18n.T("checks.log_whole_job")
+	}
 	if m.failedOnly {
 		return i18n.T("checks.log_failed_only")
 	}
@@ -338,18 +341,19 @@ func (m Model) logRows() []string {
 }
 
 // buildLogLines draws a job's log as rows: a heading per step and the
-// step's own lines under it. A continuation line has no timestamp of its
-// own (LogLine.Time is zero), so only a stamped line gets one drawn in
+// step's own lines under it. A line with no step named gets no heading:
+// there is nothing to head it with. A continuation line has no timestamp of
+// its own (LogLine.Time is zero), so only a stamped line gets one drawn in
 // front of it.
 func buildLogLines(log []domain.LogLine) []string {
 	var lines []string
 	last := ""
 	first := true
 	for _, l := range log {
-		if first || l.Step != last {
+		if (first || l.Step != last) && l.Step != "" {
 			lines = append(lines, theme.Heading().Render(l.Step))
-			last = l.Step
 		}
+		last = l.Step
 		first = false
 		text := l.Text
 		if !l.Time.IsZero() {

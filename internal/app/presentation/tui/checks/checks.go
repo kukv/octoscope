@@ -83,7 +83,11 @@ type Model struct {
 	// on every draw: View, the cursor clamp and the horizontal bound each
 	// ask for them, and a job log runs to tens of thousands of lines. The
 	// checks list keeps its own order the same way.
-	logLines   []string
+	logLines []string
+	// wholeJob says no line of log names its step: GitHub sent the job's
+	// whole log, whatever failedOnly asked for. Decided when the log arrives,
+	// for the same reason logLines is.
+	wholeJob   bool
 	logJob     domain.JobHandle
 	logRow     int
 	hscroll    int
