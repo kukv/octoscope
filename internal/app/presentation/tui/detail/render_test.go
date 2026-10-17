@@ -142,6 +142,26 @@ func TestTheFooterNeverDropsEsc(t *testing.T) {
 	}
 }
 
+// The widest footer is an open pull request's, and ja is its widest
+// language. At 80 columns it used to drop x and r to make room for m, leaving
+// closing the item and fetching it again with no hint at all.
+func TestTheFooterKeepsCloseAndRefreshInJapaneseAt80(t *testing.T) {
+	i18n.SetLanguage(language.Japanese)
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+	lines := strings.Split(renderEveryScreenSized(t, 80)["detail"], "\n")
+	footer := lines[len(lines)-1]
+	for _, want := range []string{
+		i18n.T("footer.detail.merge"),
+		i18n.T("footer.close"),
+		i18n.T("footer.detail.refresh"),
+	} {
+		if !strings.Contains(footer, want) {
+			t.Errorf("the footer dropped %q at ja/80: %q", want, footer)
+		}
+	}
+}
+
 // TestNoUnresolvedIDsInRenderedViews guards the catalog. It renders each of the
 // view's screens in both languages and fails when a message ID the code asked
 // for is missing from that language's catalog. Walking i18n.IDs() cannot catch
