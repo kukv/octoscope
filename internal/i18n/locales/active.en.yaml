@@ -316,39 +316,39 @@ footer:
       other: "q:quit"
   search:
     field:
-      other: "j/k: field"
+      other: "j/k:field"
     cycle:
-      other: "space: change"
+      other: "space:change"
     edit_field:
-      other: "enter: type"
+      other: "enter:type"
     results:
-      other: "l: results"
+      other: "l:results"
     raw:
-      other: "e: raw query"
+      other: "e:raw query"
     save:
-      other: "s: save"
+      other: "s:save"
     open_saved:
-      other: "ctrl+o: saved"
+      other: "ctrl+o:saved"
     open:
-      other: "enter: detail"
+      other: "enter:detail"
     move:
-      other: "j/k: move"
+      other: "j/k:move"
     back:
-      other: "h: filters"
+      other: "h:filters"
     refresh:
-      other: "r: search again"
+      other: "r:search again"
     diff:
-      other: "d: diff"
+      other: "d:diff"
     web:
-      other: "o: open"
+      other: "o:web"
     quit:
-      other: "q: quit"
+      other: "q:quit"
     cancel:
-      other: "esc: cancel"
+      other: "esc:cancel"
     apply:
-      other: "enter: apply"
+      other: "enter:apply"
     remove:
-      other: "x: remove"
+      other: "x:remove"
   close:
     other: "x:close"
   reopen:
