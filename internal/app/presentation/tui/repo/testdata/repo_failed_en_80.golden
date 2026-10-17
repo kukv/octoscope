@@ -37,4 +37,4 @@
 
 
 [38;2;248;81;73mCould not fetch · gh api: HTTP 502: Bad gateway (https://api.github.com/graphql)[m
-[38;2;139;148;158mj/k:move  enter:detail  h/l:pane  tab:PR/Issue  q:quit  r:refresh  a:add[m
+[38;2;139;148;158mj/k:move  enter:detail  tab:PR/Issue  q:quit  r:refresh  a:add  x:remove[m

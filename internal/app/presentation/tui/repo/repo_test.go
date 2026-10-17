@@ -1168,13 +1168,32 @@ func TestKeyBarKeepsTheEssentialKeysInJapaneseAt80(t *testing.T) {
 	for _, want := range []string{
 		i18n.T("footer.list.move"),
 		i18n.T("footer.list.open"),
-		i18n.T("footer.list.pane"),
 		i18n.T("footer.list.kind"),
 		i18n.T("footer.list.quit"),
 	} {
 		if !strings.Contains(bar, want) {
 			t.Errorf("the key bar dropped %q at ja/80: %q", want, bar)
 		}
+	}
+}
+
+// h does nothing while the sidebar is folded away, so its hint only takes the
+// room of the hints after it. With no repositories, the one it pushed off at
+// ja/80 was g, the way the empty sidebar tells you to fill it.
+func TestKeyBarLeavesOutThePaneKeysWithoutASidebar(t *testing.T) {
+	i18n.SetLanguage(language.Japanese)
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+	for name, m := range map[string]Model{
+		"under 100 columns": sidebarModel(&fakeSource{prs: samplePRs()}, 80),
+		"no repositories":   sized(New(&fakeSource{}, Options{}), 120),
+	} {
+		if bar := m.keyBar(); strings.Contains(bar, i18n.T("footer.list.pane")) {
+			t.Errorf("%s: the key bar offers h/l with no sidebar: %q", name, bar)
+		}
+	}
+	empty := sized(New(&fakeSource{}, Options{}), 80)
+	if bar := empty.keyBar(); !strings.Contains(bar, i18n.T("footer.list.seed")) {
+		t.Errorf("the key bar dropped g at ja/80 with no repositories: %q", bar)
 	}
 }
 
