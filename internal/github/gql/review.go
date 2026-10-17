@@ -97,9 +97,14 @@ type ThreadComment struct {
 	Body              string    `json:"body"`
 	CreatedAt         time.Time `json:"createdAt"`
 	Author            Author    `json:"author"`
-	PullRequestReview struct {
-		State string `json:"state"`
-	} `json:"pullRequestReview"`
+	// PullRequestReview is nil for a comment whose review is being deleted:
+	// for about a second after deletePullRequestReview returns, GitHub still
+	// lists the review's threads, with this field null.
+	PullRequestReview *CommentReview `json:"pullRequestReview"`
+}
+
+type CommentReview struct {
+	State string `json:"state"`
 }
 
 // PRReviewContext fetches everything the diff view needs to draw and change

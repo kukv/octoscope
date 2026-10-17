@@ -283,7 +283,7 @@ func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 		CreatedAt: commentA,
 		Author:    gql.Author{Login: "kukv"},
 	}}
-	threadA.Comments.Nodes[0].PullRequestReview.State = "PENDING"
+	threadA.Comments.Nodes[0].PullRequestReview = &gql.CommentReview{State: "PENDING"}
 
 	threadB := gql.ReviewThread{
 		ID:           "THREAD_B",
@@ -299,7 +299,7 @@ func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 		CreatedAt: commentB,
 		Author:    gql.Author{Login: "other"},
 	}}
-	threadB.Comments.Nodes[0].PullRequestReview.State = "COMMENTED"
+	threadB.Comments.Nodes[0].PullRequestReview = &gql.CommentReview{State: "COMMENTED"}
 
 	rc.Threads = []gql.ReviewThread{threadA, threadB}
 
@@ -345,6 +345,37 @@ func TestPRReviewContextTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("PRReviewContext() = %+v, want %+v", got, want)
+	}
+}
+
+// A comment with no review is one whose pending review is being deleted:
+// GitHub lists it for about a second after the discard, and the refetch the
+// diff view makes right after a discard can land in that second. Kept, it
+// is drawn as sent. Dropping it per comment keeps a published comment that
+// shares its thread.
+func TestACommentWhoseReviewIsGoneIsDropped(t *testing.T) {
+	line := 3
+	gone := gql.ReviewThread{Path: "gone.go", Line: &line, DiffSide: "RIGHT"}
+	gone.Comments.Nodes = []gql.ThreadComment{{Body: "discarded", Author: gql.Author{Login: "kukv"}}}
+
+	mixed := gql.ReviewThread{Path: "mixed.go", Line: &line, DiffSide: "RIGHT"}
+	mixed.Comments.Nodes = []gql.ThreadComment{
+		{Body: "published", Author: gql.Author{Login: "other"}, PullRequestReview: &gql.CommentReview{State: "COMMENTED"}},
+		{Body: "discarded reply", Author: gql.Author{Login: "kukv"}},
+	}
+
+	g := New(fakeBackend{prReviewContext: func(context.Context, string, int) (gql.ReviewContext, error) {
+		return gql.ReviewContext{ID: "PR_1", Threads: []gql.ReviewThread{gone, mixed}}, nil
+	}})
+	got, err := g.PRReviewContext(context.Background(), "kukv/octoscope", 1)
+	if err != nil {
+		t.Fatalf("PRReviewContext: %v", err)
+	}
+	if len(got.Threads) != 1 || got.Threads[0].Path != "mixed.go" {
+		t.Fatalf("threads = %+v, want only mixed.go", got.Threads)
+	}
+	if c := got.Threads[0].Comments; len(c) != 1 || c[0].Body != "published" {
+		t.Errorf("comments = %+v, want only the published one", c)
 	}
 }
 

@@ -337,6 +337,32 @@ func TestPRReviewContextParsesTheRecordedAnswer(t *testing.T) {
 	}
 }
 
+// For about a second after a pending review is deleted, GitHub still lists
+// its threads with pullRequestReview null. Without telling null apart from a
+// review, a discarded comment reads as one whose review was submitted and is
+// drawn as sent (testdata/README.md).
+func TestACommentOfADiscardedReviewHasNoReview(t *testing.T) {
+	recorded, err := os.ReadFile("testdata/review_context_discarding.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := (&fake{body: recorded}).client()
+	rc, err := c.PRReviewContext(context.Background(), "bright-room-sandbox/octoscope-test-repository", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rc.Threads) == 0 {
+		t.Fatal("no threads, but the recording still lists the discarded ones")
+	}
+	for _, th := range rc.Threads {
+		for _, cm := range th.Comments.Nodes {
+			if cm.PullRequestReview != nil {
+				t.Errorf("comment %q has review %+v, want none", cm.Body, *cm.PullRequestReview)
+			}
+		}
+	}
+}
+
 // GitHub caps a reviewThreads connection at 100; without a second request
 // the extra threads vanish with no error.
 func TestPRReviewContextWalksEveryPageOfThreads(t *testing.T) {

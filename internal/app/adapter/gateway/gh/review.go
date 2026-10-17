@@ -156,7 +156,9 @@ func toReviewContext(rc gql.ReviewContext) domain.ReviewContext {
 		Pending:     domain.ReviewHandle(rc.PendingID),
 	}
 	for _, t := range rc.Threads {
-		dc.Threads = append(dc.Threads, toReviewThread(t))
+		if rt := toReviewThread(t); len(rt.Comments) > 0 {
+			dc.Threads = append(dc.Threads, rt)
+		}
 	}
 	return dc
 }
@@ -177,6 +179,12 @@ func toReviewThread(t gql.ReviewThread) domain.ReviewThread {
 		rt.Side = domain.SideLeft
 	}
 	for _, c := range t.Comments.Nodes {
+		// A comment with no review belongs to a pending review being
+		// deleted (gql.ThreadComment). It is not there once GitHub settles,
+		// and kept it would be drawn as sent.
+		if c.PullRequestReview == nil {
+			continue
+		}
 		rt.Comments = append(rt.Comments, toThreadComment(c))
 	}
 	return rt

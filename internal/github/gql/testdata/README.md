@@ -4,7 +4,8 @@
 GitHub の返し方が変わったときに気づけることがこの testdata の目的なので、
 テストを通すために中身を編集すると意味がなくなる。
 
-録る対象は自分の公開リポジトリ（`kukv/octoscope`）に限る。秘密情報を入れない。
+録る対象は自分の公開リポジトリ（`kukv/octoscope`）と、動作確認用の公開リポジトリ
+（`bright-room-sandbox/octoscope-test-repository`）に限る。秘密情報を入れない。
 
 ## `work_section.json`
 
@@ -127,6 +128,33 @@ gh api graphql -f query='mutation($prid:ID!){addPullRequestReview(input:{pullReq
 gh api graphql -f query='mutation($rid:ID!){addPullRequestReviewThread(input:{pullRequestReviewId:$rid,path:"...",line:1,side:RIGHT,body:"..."}){thread{id}}}' -f rid=<review id>
 # 録り終えたら消す
 gh api graphql -f query='mutation($rid:ID!){deletePullRequestReview(input:{pullRequestReviewId:$rid}){pullRequestReview{id}}}' -f rid=<review id>
+```
+
+## `review_context_discarding.json`
+
+`review.graphql` に対する実レスポンスで、**pending レビューを破棄している途中**の応答。
+録った日: 2026-10-18、対象: `bright-room-sandbox/octoscope-test-repository#2`。
+
+`deletePullRequestReview` が返ってからおよそ 1 秒のあいだ、`reviews(states: [PENDING])` は
+もう空なのに、破棄したスレッドが `reviewThreads` に残り、そのコメントの `pullRequestReview` が
+`null` で返る。この応答はその窓に当たったもので、スレッド 2 本のコメントがどちらも
+`pullRequestReview: null` になっている。
+
+窓は 1 秒ほどしかないので、破棄と並行して繰り返し問い合わせ、`reviews.nodes` が空で
+`reviewThreads.nodes` が残っている応答を選ぶ。
+
+```bash
+# pending レビューを作り、スレッドを付ける（review_context.json の手順と同じ）
+# 別のシェルで 0.5 秒おきに問い合わせ続ける
+while :; do
+  gh api graphql -F query=@internal/github/gql/review.graphql \
+    -f owner=bright-room-sandbox -f name=octoscope-test-repository -F number=2 \
+    > /tmp/poll_$(date +%s%N).json
+done
+# その間に破棄する
+gh api graphql -F query=@internal/github/gql/discard_review.graphql -f reviewId=<review id>
+# reviews.nodes が空で reviewThreads.nodes が残っているものを選ぶ
+jq . <選んだファイル> > internal/github/gql/testdata/review_context_discarding.json
 ```
 
 ## `pr_checks.json`
