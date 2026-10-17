@@ -143,10 +143,14 @@ func (m Model) keyBar() string {
 // before the item-specific shortcuts: it is how the user leaves octoscope,
 // and losing it at a narrow width would leave no visible way out.
 func (m Model) footerHints() []string {
-	return []string{
+	hints := []string{
 		i18n.T("footer.list.move"),
 		i18n.T("footer.list.open"),
-		i18n.T("footer.list.pane"),
+	}
+	if m.sidebarCols() > 0 {
+		hints = append(hints, i18n.T("footer.list.pane"))
+	}
+	return append(hints,
 		i18n.T("footer.list.kind"),
 		i18n.T("footer.list.quit"),
 		i18n.T("footer.list.refresh"),
@@ -156,7 +160,7 @@ func (m Model) footerHints() []string {
 		i18n.T("footer.list.diff"),
 		i18n.T("footer.list.checks"),
 		i18n.T("footer.list.web"),
-	}
+	)
 }
 
 // addDialogHints is the dialog's key bar, most important first. esc leads
