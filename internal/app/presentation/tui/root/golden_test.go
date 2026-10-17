@@ -72,6 +72,12 @@ func TestGolden(t *testing.T) {
 				// ja row must not lose the summary to make room for it.
 				badConfigWithSummary := goldenModelReady(t, w, Options{Repo: "kukv/demo", ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
 				golden.Assert(t, fmt.Sprintf("app_config_error_summary_%s_%d", lang.name, w), badConfigWithSummary.View().Content)
+
+				// No --repo, the lookup of the current one timed out, and the
+				// settings file is broken: both warnings on the tab row at once.
+				twoWarnings := goldenModel(w, Options{ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+				twoWarnings.repoLookupTimedOut = true
+				golden.Assert(t, fmt.Sprintf("app_two_warnings_%s_%d", lang.name, w), twoWarnings.View().Content)
 			})
 		}
 	}

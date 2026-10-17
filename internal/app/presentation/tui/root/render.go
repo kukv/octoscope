@@ -64,12 +64,14 @@ func (m Model) tabRow() string {
 		}
 	}
 	row := strings.Join(labels, tabGap)
-	if m.repoLookupTimedOut {
-		row += tabGap + theme.Error().Render(i18n.T("tab.repo_lookup_timeout"))
+	// Both warnings at once do not fit 80 columns. Cutting one off would leave
+	// no telling which it was, so both turn short instead; past that, the row
+	// is cut rather than wrapped onto the board.
+	warnings := m.warnings("")
+	if m.width > 0 && ansi.StringWidth(row+warnings) > m.width {
+		warnings = m.warnings("_short")
 	}
-	if m.opts.ConfigError != "" {
-		row += tabGap + theme.Error().Render(i18n.T("tab.config_unreadable"))
-	}
+	row = layout.ClipLines(row+warnings, m.width)
 
 	summary := m.summary()
 	pad := m.width - ansi.StringWidth(row) - ansi.StringWidth(summary)
@@ -77,6 +79,19 @@ func (m Model) tabRow() string {
 		return row // too narrow to say anything beyond which tab this is
 	}
 	return row + strings.Repeat(" ", pad) + summary
+}
+
+// warnings is what the tab row says is wrong, each led by tabGap. suffix
+// picks the full wording ("") or the short one ("_short").
+func (m Model) warnings(suffix string) string {
+	var s string
+	if m.repoLookupTimedOut {
+		s += tabGap + theme.Error().Render(i18n.T("tab.repo_lookup_timeout"+suffix))
+	}
+	if m.opts.ConfigError != "" {
+		s += tabGap + theme.Error().Render(i18n.T("tab.config_unreadable"+suffix))
+	}
+	return s
 }
 
 // summary is the board's tally, in the order the mockup puts it. A count of

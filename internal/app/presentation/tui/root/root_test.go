@@ -1117,6 +1117,40 @@ func TestTheTabRowSaysTheSettingsFileCouldNotBeRead(t *testing.T) {
 	i18n.AssertNoUnresolvedIDs(t, view)
 }
 
+// Both warnings at once ran the tab row past 80 columns in both languages,
+// and the terminal wrapped it onto the board. Cutting one off would leave the
+// user unable to tell which it was, so both turn short instead, and only when
+// the full wording does not fit.
+func TestTwoWarningsKeepTheTabRowOnOneLine(t *testing.T) {
+	t.Cleanup(func() { i18n.SetLanguage(language.English) })
+
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		i18n.SetLanguage(lang)
+		for _, tc := range []struct {
+			width int
+			ids   []string
+		}{
+			{80, []string{"tab.repo_lookup_timeout_short", "tab.config_unreadable_short"}},
+			{160, []string{"tab.repo_lookup_timeout", "tab.config_unreadable"}},
+		} {
+			m := New(&fakeSource{}, Options{ConfigError: "parse config.yaml: yaml: line 1: did not find expected node content"})
+			next, _ := m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})
+			m = next.(Model)
+			m.repoLookupTimedOut = true
+
+			row := ansi.Strip(m.tabRow())
+			if got := ansi.StringWidth(row); got > tc.width {
+				t.Errorf("%s/%d: the tab row is %d columns wide: %q", lang, tc.width, got, row)
+			}
+			for _, id := range tc.ids {
+				if !strings.Contains(row, i18n.T(id)) {
+					t.Errorf("%s/%d: the tab row is missing %s: %q", lang, tc.width, id, row)
+				}
+			}
+		}
+	}
+}
+
 func TestTheTabRowIsQuietWhenTheSettingsFileIsFine(t *testing.T) {
 	m := New(&fakeSource{}, Options{})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
