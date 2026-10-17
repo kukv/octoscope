@@ -31,7 +31,7 @@ func loadedApp(t *testing.T, src Source, opts Options) Model {
 func TestTheTabRowReportsOnTheBoard(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguage(language.English) })
 
-	failing := func(n int) domain.WorkItem {
+	failingPR := func(n int) domain.WorkItem {
 		return domain.WorkItem{
 			Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: n},
 			Title:  "a broken one",
@@ -39,8 +39,8 @@ func TestTheTabRowReportsOnTheBoard(t *testing.T) {
 		}
 	}
 	src := &fakeSource{work: domain.Work{
-		domain.SectionReviewRequested: {failing(1), failing(2)},
-		domain.SectionYourPRs:         {failing(3)},
+		domain.SectionReviewRequested: {failingPR(1), failingPR(2)},
+		domain.SectionYourPRs:         {failingPR(3)},
 	}}
 
 	m := loadedApp(t, src, Options{})

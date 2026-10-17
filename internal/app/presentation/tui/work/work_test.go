@@ -587,15 +587,15 @@ func TestAFailedColumnStillCountsAsAnAnswer(t *testing.T) {
 // A pull request of your own that is also assigned to you sits in two
 // columns. It is one failing pull request, not two.
 func TestTheSummaryCountsAFailingPROnce(t *testing.T) {
-	failing := func(n int) domain.WorkItem {
+	failingPR := func(n int) domain.WorkItem {
 		return domain.WorkItem{
 			Ref:    domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: n},
 			Checks: domain.Checks{State: domain.CheckFailure},
 		}
 	}
 	w := domain.Work{
-		domain.SectionYourPRs:  {failing(1)},
-		domain.SectionAssigned: {failing(1), failing(2)},
+		domain.SectionYourPRs:  {failingPR(1)},
+		domain.SectionAssigned: {failingPR(1), failingPR(2)},
 	}
 	m := answeredAll(sized(New(&fakeSource{work: w})), w)
 	if got := m.Summary().Failing; got != 2 {
