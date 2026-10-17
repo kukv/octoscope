@@ -32,12 +32,21 @@ func logFileName(jobName string) string {
 	return strings.TrimSpace(name)
 }
 
+// sgr is a colour code: ESC [, parameters, m. The runner puts one around
+// every command it echoes.
+var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
 // sanitizeControls replaces the control characters a log line may carry with
 // caret notation. A log is output from somewhere else that ends up on this
 // terminal, and an escape character in it would be acted on rather than shown.
 // Tab, newline, vertical tab and carriage return are left alone: they are how
 // the runner lays output out, and so is delete, which gh leaves alone too.
+//
+// A colour code goes altogether rather than into caret notation: on every
+// command line the runner echoes, it is only noise. The cli backend drops the
+// caret form gh hands it the same way.
 func sanitizeControls(line string) string {
+	line = sgr.ReplaceAllString(line, "")
 	var b strings.Builder
 	for _, r := range line {
 		if c, ok := caret(r); ok {
