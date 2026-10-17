@@ -157,6 +157,25 @@ gh api graphql -F query=@internal/github/gql/discard_review.graphql -f reviewId=
 jq . <選んだファイル> > internal/github/gql/testdata/review_context_discarding.json
 ```
 
+## `add_thread.json`
+
+`add_thread.graphql`（`addPullRequestReviewThread`）に対する実レスポンス。録った日: 2026-10-18、
+対象: `bright-room-sandbox/octoscope-test-repository#2`。
+
+返事に作ったスレッドの中身を選んでいて、diff ビューはこれを取り直しの代わりに画面に足す。
+作ったばかりのスレッドなので、コメントは 1 件で `pullRequestReview.state` は `PENDING`。
+**録り終えたあと pending レビューは削除済み**。
+
+```bash
+# pending レビューを作る（review_context.json の手順と同じ）
+gh api graphql -F query=@internal/github/gql/add_thread.graphql \
+  -f reviewId=<review id> -f path=sample2.txt -F line=2 -f side=RIGHT \
+  -f body='a pending comment, as the thread mutation answers it' | jq . \
+  > internal/github/gql/testdata/add_thread.json
+# 録り終えたら消す
+gh api graphql -F query=@internal/github/gql/discard_review.graphql -f reviewId=<review id>
+```
+
 ## `pr_checks.json`
 
 `checks.graphql` に対する実レスポンス。録った日: 2026-09-07、対象:

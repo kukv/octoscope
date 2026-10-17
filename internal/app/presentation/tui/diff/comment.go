@@ -10,15 +10,15 @@ import (
 )
 
 type (
-	// commentPostedMsg carries the review handle the post went through, so
-	// Update can set m.review.Pending synchronously, before the refetch it
-	// also triggers comes back. The refetch is asynchronous; without this
-	// field, a second c sent before it lands would still see Pending empty
-	// and start a second review, leaving two pending reviews open on the
-	// pull request.
+	// commentPostedMsg carries the review handle the post went through and
+	// the thread it created. Update draws the thread rather than refetching
+	// every one, and the handle is what a second c reuses: with Pending left
+	// empty it would start a second review, leaving two pending reviews open
+	// on the pull request.
 	commentPostedMsg struct {
 		ref    domain.ItemRef
 		review domain.ReviewHandle
+		thread domain.ReviewThread
 	}
 	commentErrorMsg struct {
 		ref domain.ItemRef
@@ -89,11 +89,11 @@ func (m Model) post() (Model, tea.Cmd) {
 	m.phase = phaseWorking
 	m.errText = ""
 	return m, func() tea.Msg {
-		id, err := src.PostLineComment(context.Background(), target, comment)
+		id, thread, err := src.PostLineComment(context.Background(), target, comment)
 		if err != nil {
 			return commentErrorMsg{ref: ref, err: err}
 		}
-		return commentPostedMsg{ref: ref, review: id}
+		return commentPostedMsg{ref: ref, review: id, thread: thread}
 	}
 }
 

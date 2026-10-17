@@ -201,7 +201,7 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fake{body: []byte(`{"data":{"addPullRequestReviewThread":{"thread":{"id":"T_1"}}}}`)}
 			c := f.client()
-			if err := c.AddReviewThread(t.Context(), "PRR_9", tt.comment); err != nil {
+			if _, err := c.AddReviewThread(t.Context(), "PRR_9", tt.comment); err != nil {
 				t.Fatal(err)
 			}
 			for _, want := range []Var{
@@ -216,6 +216,34 @@ func TestAddReviewThreadSendsTheLineAndTheSide(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The diff view draws the thread a comment created from this answer instead
+// of refetching every thread, so the answer has to carry what a thread in
+// review.graphql carries (testdata/README.md).
+func TestAddReviewThreadAnswersTheThreadItCreated(t *testing.T) {
+	recorded, err := os.ReadFile("testdata/add_thread.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := (&fake{body: recorded}).client()
+	th, err := c.AddReviewThread(t.Context(), "PRR_9", PendingComment{Path: "sample2.txt", Line: 2, Side: "RIGHT", Body: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if th.Path != "sample2.txt" || th.Line == nil || *th.Line != 2 || th.DiffSide != "RIGHT" {
+		t.Errorf("thread = %+v, want sample2.txt line 2 RIGHT", th)
+	}
+	if len(th.Comments.Nodes) != 1 {
+		t.Fatalf("%d comments, want 1", len(th.Comments.Nodes))
+	}
+	cm := th.Comments.Nodes[0]
+	if cm.PullRequestReview == nil || cm.PullRequestReview.State != "PENDING" {
+		t.Errorf("review = %+v, want PENDING", cm.PullRequestReview)
+	}
+	if cm.Author.Login == "" || cm.CreatedAt.IsZero() || cm.Body == "" {
+		t.Errorf("comment = %+v, want its author, time and body", cm)
 	}
 }
 

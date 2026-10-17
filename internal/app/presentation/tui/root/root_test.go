@@ -157,8 +157,8 @@ func (f *fakeSource) PRReviewContext(context.Context, string, int) (domain.Revie
 	return domain.ReviewContext{}, nil
 }
 
-func (f *fakeSource) PostLineComment(context.Context, domain.ReviewTarget, domain.PendingComment) (domain.ReviewHandle, error) {
-	return "", nil
+func (f *fakeSource) PostLineComment(context.Context, domain.ReviewTarget, domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
+	return "", domain.ReviewThread{}, nil
 }
 
 func (f *fakeSource) DiscardReview(context.Context, domain.ReviewHandle) error { return nil }

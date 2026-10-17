@@ -527,7 +527,8 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 		},
 		"DisableAutoMerge": func(c *Client) error { return c.DisableAutoMerge(context.Background(), "id") },
 		"AddReviewThread": func(c *Client) error {
-			return c.AddReviewThread(context.Background(), "id", gql.PendingComment{})
+			_, err := c.AddReviewThread(context.Background(), "id", gql.PendingComment{})
+			return err
 		},
 		"SubmitReview": func(c *Client) error {
 			return c.SubmitReview(context.Background(), "id", gql.EventApprove, "")

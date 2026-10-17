@@ -20,7 +20,7 @@ func (f fakeBackend) PRReviewContext(ctx context.Context, repo string, number in
 	return f.prReviewContext(ctx, repo, number)
 }
 
-func (f fakeBackend) AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) error {
+func (f fakeBackend) AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) (gql.ReviewThread, error) {
 	return f.addReviewThread(ctx, reviewID, c)
 }
 
@@ -55,9 +55,9 @@ func (b *recordingBackend) SubmitNewReview(context.Context, string, gql.ReviewEv
 	return nil
 }
 
-func (b *recordingBackend) AddReviewThread(context.Context, string, gql.PendingComment) error {
+func (b *recordingBackend) AddReviewThread(context.Context, string, gql.PendingComment) (gql.ReviewThread, error) {
 	b.calls = append(b.calls, "AddReviewThread")
-	return nil
+	return gql.ReviewThread{}, nil
 }
 
 func TestSubmitReviewWithNoPendingCreatesAndSubmitsInOneCall(t *testing.T) {
@@ -90,7 +90,7 @@ func TestAddReviewThreadStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 	t.Parallel()
 	b := &recordingBackend{}
 	g := &Gateway{backend: b}
-	id, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
+	id, _, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestAddReviewThreadStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 
 	b2 := &recordingBackend{}
 	g2 := &Gateway{backend: b2}
-	id, err = g2.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
+	id, _, err = g2.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,6 +112,32 @@ func TestAddReviewThreadStartsAReviewOnlyWhenThereIsNone(t *testing.T) {
 	}
 	if want := []string{"AddReviewThread"}; !slices.Equal(b2.calls, want) {
 		t.Errorf("calls = %v, want %v", b2.calls, want)
+	}
+}
+
+// The diff view draws the returned thread in place of refetching every
+// thread, so it has to come back translated, pending mark included.
+func TestAddReviewThreadAnswersTheThreadItCreated(t *testing.T) {
+	t.Parallel()
+	line := 2
+	created := gql.ReviewThread{Path: "a.go", Line: &line, DiffSide: "RIGHT"}
+	created.Comments.Nodes = []gql.ThreadComment{{
+		Body: "hi", Author: gql.Author{Login: "kukv"}, PullRequestReview: &gql.CommentReview{State: "PENDING"},
+	}}
+	g := New(fakeBackend{addReviewThread: func(context.Context, string, gql.PendingComment) (gql.ReviewThread, error) {
+		return created, nil
+	}})
+
+	_, got, err := g.AddReviewThread(t.Context(), domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := domain.ReviewThread{
+		Path: "a.go", Line: 2, Side: domain.SideRight,
+		Comments: []domain.ThreadComment{{Author: domain.Author{Login: "kukv"}, Body: "hi", Pending: true}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("thread = %+v, want %+v", got, want)
 	}
 }
 
@@ -450,14 +476,14 @@ func TestAddReviewThreadConvertsThePendingCommentBeforeCallingTheBackend(t *test
 	t.Parallel()
 
 	var got gql.PendingComment
-	g := New(fakeBackend{addReviewThread: func(_ context.Context, reviewID string, c gql.PendingComment) error {
+	g := New(fakeBackend{addReviewThread: func(_ context.Context, reviewID string, c gql.PendingComment) (gql.ReviewThread, error) {
 		got = c
-		return nil
+		return gql.ReviewThread{}, nil
 	}})
 
 	in := domain.PendingComment{Path: "a.go", Line: 3, Side: domain.SideRight, Body: "hi"}
 	tgt := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}
-	if _, err := g.AddReviewThread(t.Context(), tgt, in); err != nil {
+	if _, _, err := g.AddReviewThread(t.Context(), tgt, in); err != nil {
 		t.Fatalf("AddReviewThread: %v", err)
 	}
 
@@ -527,13 +553,13 @@ func TestTheReviewWritesHandTheirContextToTheBackend(t *testing.T) {
 		{
 			name: "AddReviewThread onto a pending review",
 			call: func(g *Gateway, ctx context.Context) error {
-				_, err := g.AddReviewThread(ctx, domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
+				_, _, err := g.AddReviewThread(ctx, domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_1"}, domain.PendingComment{})
 				return err
 			},
 			fake: func(got *context.Context) fakeBackend {
-				return fakeBackend{addReviewThread: func(ctx context.Context, _ string, _ gql.PendingComment) error {
+				return fakeBackend{addReviewThread: func(ctx context.Context, _ string, _ gql.PendingComment) (gql.ReviewThread, error) {
 					*got = ctx
-					return nil
+					return gql.ReviewThread{}, nil
 				}}
 			},
 		},
@@ -544,7 +570,7 @@ func TestTheReviewWritesHandTheirContextToTheBackend(t *testing.T) {
 			// from the port, so nothing above it names the context.
 			name: "AddReviewThread starting one first",
 			call: func(g *Gateway, ctx context.Context) error {
-				_, err := g.AddReviewThread(ctx, domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
+				_, _, err := g.AddReviewThread(ctx, domain.ReviewTarget{PullRequest: "PR_1"}, domain.PendingComment{})
 				return err
 			},
 			fake: func(got *context.Context) fakeBackend {
@@ -553,7 +579,9 @@ func TestTheReviewWritesHandTheirContextToTheBackend(t *testing.T) {
 						*got = ctx
 						return "PRR_new", nil
 					},
-					addReviewThread: func(context.Context, string, gql.PendingComment) error { return nil },
+					addReviewThread: func(context.Context, string, gql.PendingComment) (gql.ReviewThread, error) {
+						return gql.ReviewThread{}, nil
+					},
 				}
 			},
 		},

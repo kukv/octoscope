@@ -29,7 +29,8 @@ type Target struct {
 	PendingComments int
 }
 
-// SubmittedMsg tells the holder the review went out; it should refetch.
+// SubmittedMsg tells the holder the review went out; it brings what it shows
+// up to date.
 type SubmittedMsg struct{}
 
 type CancelledMsg struct{}
