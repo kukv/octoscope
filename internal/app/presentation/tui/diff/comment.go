@@ -68,7 +68,7 @@ func (m Model) startComposing() Model {
 	m.errText = ""
 	m.textarea.Reset()
 	m.textarea.Focus()
-	return m
+	return m.cancelRefetch()
 }
 
 // post sends the composed comment, against the target startComposing

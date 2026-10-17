@@ -36,8 +36,10 @@ type diffMsg struct {
 	files []domain.FileDiff
 }
 
+// reviewMsg and reviewErrMsg carry the reviewGen their fetch started under.
 type reviewMsg struct {
 	ref domain.ItemRef
+	gen int
 	ctx domain.ReviewContext
 }
 
@@ -53,6 +55,7 @@ type errMsg struct {
 // of escalating (.claude/rules/errors.md's Bubble Tea section).
 type reviewErrMsg struct {
 	ref domain.ItemRef
+	gen int
 	err error
 }
 
@@ -153,6 +156,11 @@ type Model struct {
 	// replacing the whole screen; nil means no failure to show.
 	reviewErr error
 
+	// reviewGen numbers the review fetches: each answer carries the number
+	// its fetch started under, and one that no longer matches is dropped.
+	// Starting a comment, a discard or a submit moves it on (cancelRefetch).
+	reviewGen int
+
 	// expanded is the set of settled threads the user has opened, keyed by
 	// threadKey. It survives a refetch because it is keyed by position, not
 	// by the thread's own id.
@@ -242,14 +250,26 @@ func (m Model) fetchDiff() tea.Cmd {
 }
 
 func (m Model) fetchReview() tea.Cmd {
-	src, ref := m.src, m.ref
+	src, ref, gen := m.src, m.ref, m.reviewGen
 	return func() tea.Msg {
 		ctx, err := src.PRReviewContext(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
-			return reviewErrMsg{ref: ref, err: err}
+			return reviewErrMsg{ref: ref, gen: gen, err: err}
 		}
-		return reviewMsg{ref: ref, ctx: ctx}
+		return reviewMsg{ref: ref, gen: gen, ctx: ctx}
 	}
+}
+
+// cancelRefetch drops the answer of any review fetch already in flight. It
+// is called when a comment, a discard or a submit starts: a fetch started
+// before describes the review as it was before, and landing afterwards it
+// would bring back discarded comments or lose a posted one. A fetch started
+// while a comment is being posted may already hold that comment, and adding
+// the posted thread on top would draw it twice -- which is why the fetch is
+// cancelled when the operation starts, not when it ends.
+func (m Model) cancelRefetch() Model {
+	m.reviewGen++
+	return m
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -320,8 +340,9 @@ func (m Model) filesArrived(msg diffMsg) Model {
 
 func (m Model) reviewArrived(msg reviewMsg) Model {
 	// The review context for the pull request the user just left is
-	// still in flight; its answer must not land here.
-	if msg.ref != m.ref {
+	// still in flight; its answer must not land here. Nor must a cancelled
+	// fetch's (cancelRefetch).
+	if msg.ref != m.ref || msg.gen != m.reviewGen {
 		return m
 	}
 	m.reviewErr = nil
@@ -339,7 +360,7 @@ func (m Model) withReview(rc domain.ReviewContext) Model {
 }
 
 func (m Model) reviewFailed(msg reviewErrMsg) Model {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.reviewGen {
 		return m
 	}
 	m.reviewErr = msg.err
