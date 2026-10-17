@@ -49,6 +49,11 @@ tab:
     other: "現在のリポジトリを特定できませんでした"
   config_unreadable:
     other: "設定を読めません（既定値で動作）"
+  # what the tab row says instead when the two above do not fit side by side
+  repo_lookup_timeout_short:
+    other: "リポジトリ不明"
+  config_unreadable_short:
+    other: "設定を読めません"
 
 list:
   tab_prs:

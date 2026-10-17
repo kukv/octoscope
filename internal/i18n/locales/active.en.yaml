@@ -49,6 +49,11 @@ tab:
     other: "could not tell which repository this is"
   config_unreadable:
     other: "settings file unreadable; using defaults"
+  # what the tab row says instead when the two above do not fit side by side
+  repo_lookup_timeout_short:
+    other: "repo unknown"
+  config_unreadable_short:
+    other: "settings unreadable"
 
 list:
   tab_prs:
