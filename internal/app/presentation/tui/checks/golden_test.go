@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -51,6 +52,15 @@ func goldenModel(width int) Model {
 func checksLogModel(width int) Model {
 	m, cmd := goldenModel(width).Update(keyPress("enter"))
 	m, _ = m.Update(cmd())
+	return m
+}
+
+// checksNoticeModel is checksLogModel after r failed to fetch the list
+// again: the list and the log stay, with the failure one line above the key
+// bar.
+func checksNoticeModel(width int) Model {
+	m := press(checksLogModel(width), "r")
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
 	return m
 }
 
@@ -127,6 +137,7 @@ var goldenStates = []struct {
 }{
 	{"checks", goldenModel},
 	{"checks_log", checksLogModel},
+	{"checks_notice", checksNoticeModel},
 	{"checks_rerun", checksRerunModel},
 	{"checks_loading", checksLoadingModel},
 	{"checks_none", checksNoneModel},

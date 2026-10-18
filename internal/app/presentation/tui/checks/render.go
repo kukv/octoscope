@@ -39,6 +39,9 @@ func (m Model) View() string {
 	if m.errText != "" {
 		lines = append(lines, m.errLine())
 	}
+	if m.notice != "" {
+		lines = append(lines, m.noticeLine())
+	}
 	if m.declined != "" {
 		lines = append(lines, m.declinedLine())
 	}
@@ -121,6 +124,18 @@ func (m Model) errHeight() int {
 	return 0
 }
 
+func (m Model) noticeLine() string {
+	text := i18n.T("notice.fetch_failed") + " · " + singleLine(m.notice)
+	return theme.Error().Render(layout.Notice(text, m.width))
+}
+
+func (m Model) noticeHeight() int {
+	if m.notice != "" {
+		return 1
+	}
+	return 0
+}
+
 func (m Model) declinedLine() string {
 	return clip(theme.Dim().Render(m.declined), m.width)
 }
@@ -179,7 +194,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.errHeight()-m.declinedHeight()-m.rerunHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.errHeight()-m.noticeHeight()-m.declinedHeight()-m.rerunHeight(), 1)
 }
 
 // body lays the check list and the log pane side by side, the way the diff

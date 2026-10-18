@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -17,11 +18,12 @@ import (
 
 type fakeSource struct {
 	checks domain.Checks
+	err    error
 	log    []domain.LogLine
 }
 
 func (f *fakeSource) PRChecks(context.Context, string, int) (domain.Checks, error) {
-	return f.checks, nil
+	return f.checks, f.err
 }
 
 func (f *fakeSource) JobLog(context.Context, string, domain.JobHandle, bool) ([]domain.LogLine, error) {
@@ -133,6 +135,163 @@ func TestEscLeavesTheView(t *testing.T) {
 	}
 	if _, ok := cmd().(ClosedMsg); !ok {
 		t.Errorf("esc sent %T, want ClosedMsg", cmd())
+	}
+}
+
+// fetched is the view once its own fetch from src has answered, which is
+// where a test that changes src's answer afterwards has to start.
+func fetched(t *testing.T, src *fakeSource) (Model, tea.Cmd) {
+	t.Helper()
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	return m.Update(m.fetch()())
+}
+
+// TestAChecksFailureIsANotice pins that GitHub turning the list down leaves
+// the user in the view, where r asks again, rather than on the parent's error
+// screen, whose esc closes the checks along with it.
+func TestAChecksFailureIsANotice(t *testing.T) {
+	t.Parallel()
+
+	m, cmd := fetched(t, &fakeSource{err: errors.New("HTTP 502: Bad Gateway")})
+	if cmd != nil {
+		t.Fatalf("a checks failure produced %T, want nothing sent to the parent", cmd())
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheLog covers the case the notice is for: a job's
+// log was open, r failed to fetch the list again, and the log the user was
+// reading must still be there.
+func TestAFailedRefetchKeepsTheLog(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "Run tests", Text: "FAIL ./internal/gh"}}}
+	m, _ := fetched(t, src)
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	src.err = errors.New("HTTP 502: Bad Gateway")
+
+	m = press(m, "r")
+	m, cmd = m.Update(m.fetch()())
+	if cmd != nil {
+		t.Fatalf("a failed refetch produced %T, want nothing sent to the parent", cmd())
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"sca", "FAIL ./internal/gh", i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestASuccessfulRefetchClearsTheNotice keeps a stale complaint from
+// outliving the failure it described.
+func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture()}
+	m, _ := fetched(t, src)
+	src.err = errors.New("HTTP 502: Bad Gateway")
+	m = press(m, "r")
+	m, _ = m.Update(m.fetch()())
+	if !strings.Contains(ansi.Strip(m.View()), "502") {
+		t.Fatalf("precondition: the failed refetch is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+
+	src.err = nil
+	m = press(m, "r")
+	m, _ = m.Update(m.fetch()())
+	if view := ansi.Strip(m.View()); strings.Contains(view, "502") {
+		t.Errorf("the notice outlived a successful refetch:\n%s", view)
+	}
+}
+
+// TestAFatalChecksFailureStillEscalates covers what the notice must not
+// swallow: a failure the user has to fix outside octoscope belongs on the
+// parent's error screen, which says what to do (see domain.IsFatal).
+func TestAFatalChecksFailureStillEscalates(t *testing.T) {
+	t.Parallel()
+
+	_, cmd := fetched(t, &fakeSource{err: fmt.Errorf("gh pr checks: %w", domain.ErrUnauthenticated)})
+	if cmd == nil {
+		t.Fatal("a fatal checks failure produced no command")
+	}
+	got, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("a fatal checks failure produced %T, want ErrorMsg", cmd())
+	}
+	if !errors.Is(got.Err, domain.ErrUnauthenticated) {
+		t.Errorf("ErrorMsg.Err = %v, want the source's error", got.Err)
+	}
+}
+
+// TestAFailedOpenStillEscalates keeps the browser's failure on the parent's
+// error screen: that is where the address to open by hand is drawn whole,
+// and a one-line notice would cut it short.
+func TestAFailedOpenStillEscalates(t *testing.T) {
+	t.Parallel()
+
+	m := moveTo(t, open(t, 120), "ci/circleci") // the fixture's one check with a URL
+	boom := errors.New("no browser")
+	m.open = func(string) error { return boom }
+
+	m, cmd := m.Update(keyPress("o"))
+	_, cmd = m.Update(cmd())
+	if cmd == nil {
+		t.Fatal("a failed open produced no command")
+	}
+	got, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("a failed open produced %T, want ErrorMsg", cmd())
+	}
+	if !errors.Is(got.Err, boom) {
+		t.Errorf("ErrorMsg.Err = %v, want the browser's error", got.Err)
+	}
+}
+
+// TestANoticeAndALogFailureBothFit is a failed log under a failed refetch:
+// each has its own line, both come out of the panes, and the key bar is still
+// the last line.
+func TestANoticeAndALogFailureBothFit(t *testing.T) {
+	t.Parallel()
+
+	const height = 30
+	m := open(t, 120)
+	before := m.paneHeight()
+	m, _ = m.Update(logErrMsg{ref: m.ref, jobID: m.selectedJob(), err: errors.New("log expired")})
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+
+	if got := m.paneHeight(); got != before-2 {
+		t.Errorf("paneHeight = %d with both failures, want %d", got, before-2)
+	}
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) > height {
+		t.Errorf("the checks drew %d lines into a terminal %d tall", len(lines), height)
+	}
+	if last := lines[len(lines)-1]; last != m.keyBar() {
+		t.Errorf("the last line is %q, want the key bar", ansi.Strip(last))
+	}
+}
+
+// TestAMultiLineNoticeStaysOnOneRow: the budget sets one line aside for the
+// notice, so a wrapped stderr must not take two.
+func TestAMultiLineNoticeStaysOnOneRow(t *testing.T) {
+	t.Parallel()
+
+	single := open(t, 120)
+	single, _ = single.Update(errMsg{ref: single.ref, err: errors.New("HTTP 502: retry later")})
+	want := len(strings.Split(single.View(), "\n"))
+
+	multi := open(t, 120)
+	multi, _ = multi.Update(errMsg{ref: multi.ref, err: errors.New("HTTP 502:\n\nretry later")})
+	if got := len(strings.Split(multi.View(), "\n")); got != want {
+		t.Errorf("a multi-line notice drew %d rows, want %d", got, want)
 	}
 }
 

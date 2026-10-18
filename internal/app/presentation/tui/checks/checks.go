@@ -36,6 +36,13 @@ type errMsg struct {
 	err error
 }
 
+// openFailedMsg is the browser's failure, not GitHub's: it goes to the
+// parent's error screen, where the address to open by hand fits whole.
+type openFailedMsg struct {
+	ref domain.ItemRef
+	err error
+}
+
 // pane is which side of the view the cursor acts on.
 type pane uint8
 
@@ -95,10 +102,16 @@ type Model struct {
 	logPhase   logPhase
 
 	declined string
-	// errText is the last log fetch's failure. The checks list has its own
-	// escalation path (errMsg -> ErrorMsg): the list may still be readable
-	// with no log open, so this stays a footer line instead.
+	// errText is the last log fetch's failure. The list's own failure is
+	// notice, on a line of its own, so a failed refetch of the list does not
+	// hide why the log did not come.
 	errText string
+
+	// notice is what GitHub said when the list could not be fetched. The
+	// last list and the open log stay on screen and r asks again; a
+	// successful fetch clears it, so a stale complaint never outlives what
+	// it described.
+	notice string
 
 	// open shows a URL. It is browser.Open outside tests: opening a page is
 	// not a GitHub call, so it does not go through the backend.
@@ -132,6 +145,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.checksArrived(msg), nil
 	case errMsg:
 		return m.fetchFailed(msg)
+	case openFailedMsg:
+		return m.openFailed(msg)
 	case logMsg:
 		return m.logArrived(msg), nil
 	case logErrMsg:
@@ -160,6 +175,7 @@ func (m Model) checksArrived(msg checksMsg) Model {
 		return m
 	}
 	m.loading = false
+	m.notice = ""
 	m.checks = msg.checks
 	m.order = arrange(msg.checks.Runs)
 	m.row = 0
@@ -174,6 +190,17 @@ func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = false
+	if domain.IsFatal(msg.err) {
+		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	}
+	m.notice = msg.err.Error()
+	return m, nil
+}
+
+func (m Model) openFailed(msg openFailedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
 }
 
@@ -242,9 +269,8 @@ func (m Model) selectedJob() domain.JobHandle {
 
 // openSelected opens the selected check's own page: detailsUrl for a check
 // run, targetUrl for a StatusContext. A check that reports neither is said
-// so at footer level rather than swallowed. A failure to open escalates the
-// same way a failed checks fetch does -- there is nothing sensible left on
-// screen once the browser could not be opened.
+// so at footer level rather than swallowed. A failure to open escalates to
+// the parent's error screen, which can show the address to open by hand.
 func (m Model) openSelected() (Model, tea.Cmd) {
 	if len(m.order) == 0 {
 		m.declined = i18n.T("checks.none")
@@ -259,7 +285,7 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	open, ref := m.open, m.ref
 	return m, func() tea.Msg {
 		if err := open(url); err != nil {
-			return errMsg{ref: ref, err: err}
+			return openFailedMsg{ref: ref, err: err}
 		}
 		return nil
 	}
