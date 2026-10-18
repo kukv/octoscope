@@ -1357,8 +1357,10 @@ func TestASlowLookupSaysSoInsteadOfStayingSilent(t *testing.T) {
 }
 
 // TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered covers the seam
-// the test above cannot: exec reports a killed subprocess as "signal: killed",
-// so a check for context.DeadlineExceeded on the returned error never fires.
+// the test above cannot. exec reports a killed subprocess as "signal: killed",
+// so the error alone misses this lookup's own deadline. The context alone
+// misses the backend's shorter limit, which ends the call while the context
+// is still alive.
 func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 	expired, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -1379,6 +1381,10 @@ func TestALookupThatRanOutOfTimeIsToldApartFromOneThatAnswered(t *testing.T) {
 		},
 		"out of time": {
 			expired, "", errors.New("signal: killed"),
+			repoResolvedMsg{timedOut: true},
+		},
+		"the backend's own limit": {
+			context.Background(), "", fmt.Errorf("gh api: no answer in 16s: %w", context.DeadlineExceeded),
 			repoResolvedMsg{timedOut: true},
 		},
 	}
