@@ -264,6 +264,7 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 		"tab":                        goldenModel,
 		"wide_line_number":           wideLineNumberModel,
 		"review_failure":             reviewFailureModel,
+		"notice":                     noticeModel,
 		"composing":                  composingModel,
 		"posting":                    postingModel,
 		"submitting":                 submittingModel,
