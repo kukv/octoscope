@@ -330,6 +330,21 @@ func TestAFailureSurvivesAShortTerminal(t *testing.T) {
 	}
 }
 
+// TestAMultiLineNoticeStaysOnOneRow keeps the notice the one line it is
+// meant to be: gh and GitHub both return multi-line error text, and every
+// extra row is one the body above it loses.
+func TestAMultiLineNoticeStaysOnOneRow(t *testing.T) {
+	single := goldenModel(120)
+	single, _ = single.Update(errMsg{ref: goldenRef(), err: errors.New("HTTP 502: retry later")})
+	want := len(strings.Split(single.View(), "\n"))
+
+	multi := goldenModel(120)
+	multi, _ = multi.Update(errMsg{ref: goldenRef(), err: errors.New("HTTP 502:\n\nretry later")})
+	if got := len(strings.Split(multi.View(), "\n")); got != want {
+		t.Errorf("a multi-line notice drew %d rows, want %d", got, want)
+	}
+}
+
 // TestANoticeAndAFailureBothSurviveAShortTerminal adds the notice to the same
 // budget: a failed refetch on top of a failed close is two lines below the
 // cut, and the key bar still has to be the last one on the screen.

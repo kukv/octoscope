@@ -90,7 +90,7 @@ func (m Model) View() string {
 }
 
 func (m Model) noticeLine() string {
-	text := i18n.T("notice.fetch_failed") + " · " + m.notice
+	text := i18n.T("notice.fetch_failed") + " · " + strings.Join(strings.Fields(m.notice), " ")
 	return theme.Error().Render(layout.Notice(text, m.width))
 }
 
