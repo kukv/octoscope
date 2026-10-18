@@ -142,6 +142,11 @@ type Model struct {
 	loading bool
 	spin    spinner.Model
 
+	// loaded says the diff has been answered at least once. Until then the
+	// empty files are no answer, and "no files changed" or "0 files" drawn
+	// from them would be a claim about the pull request that nobody made.
+	loaded bool
+
 	files   []domain.FileDiff
 	file    int
 	fileTop int // the first file drawn in the sidebar
@@ -334,7 +339,7 @@ func (m Model) filesArrived(msg diffMsg) Model {
 	if msg.ref != m.ref {
 		return m
 	}
-	m.loading = false
+	m.loading, m.loaded = false, true
 	m.notice = ""
 	m.files = msg.files
 	m.file, m.top, m.fileTop = 0, 0, 0
@@ -383,7 +388,8 @@ func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
 	}
 	m.notice = msg.err.Error()
-	return m, nil
+	// The notice's line comes out of the pane's height.
+	return m.follow(), nil
 }
 
 func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
@@ -539,6 +545,9 @@ func (m Model) toggleCollapsed() Model {
 }
 
 func (m Model) buildRows() []row {
+	if !m.loaded {
+		return nil
+	}
 	if len(m.files) == 0 {
 		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.no_changes")}}
 	}

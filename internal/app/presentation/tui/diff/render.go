@@ -279,12 +279,14 @@ func (m Model) sizeLine() string {
 	if m.review.Head != "" || m.review.Base != "" {
 		parts = append(parts, m.review.Head+" → "+m.review.Base)
 	}
-	size := i18n.Tn("diff.file_count", len(m.files))
-	if adds > 0 || dels > 0 {
-		size += " " + theme.Added().Render("+"+strconv.Itoa(adds)) +
-			" " + theme.Removed().Render("−"+strconv.Itoa(dels))
+	if m.loaded {
+		size := i18n.Tn("diff.file_count", len(m.files))
+		if adds > 0 || dels > 0 {
+			size += " " + theme.Added().Render("+"+strconv.Itoa(adds)) +
+				" " + theme.Removed().Render("−"+strconv.Itoa(dels))
+		}
+		parts = append(parts, size)
 	}
-	parts = append(parts, size)
 	// A pending review with no comments yet is still there to submit into.
 	if n := m.pendingCount(); n > 0 || m.review.Pending != "" {
 		parts = append(parts, i18n.Tn("diff.pending_note", n))

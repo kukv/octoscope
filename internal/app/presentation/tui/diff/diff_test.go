@@ -387,6 +387,39 @@ func TestANoticeAndAReviewFailureBothFit(t *testing.T) {
 	}
 }
 
+// TestAFailedFirstFetchClaimsNothingAboutTheDiff: with no diff at all, "no
+// files changed" and "0 files" would be statements about the pull request
+// that nobody has made. The review context answering is what used to draw
+// the first of them, so it lands here too.
+func TestAFailedFirstFetchClaimsNothingAboutTheDiff(t *testing.T) {
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(reviewMsg{ref: m.ref, gen: m.reviewGen, ctx: domain.ReviewContext{Title: "a title"}})
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+
+	out := ansi.Strip(m.View())
+	for _, claim := range []string{i18n.T("diff.no_changes"), i18n.Tn("diff.file_count", 0)} {
+		if strings.Contains(out, claim) {
+			t.Errorf("the view claims %q about a diff it never got:\n%s", claim, out)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheCursorOnScreen: the notice takes a row from the
+// pane, and a cursor on its last row would otherwise be drawn below it.
+func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {
+	m := loaded(t, 120, 8)
+	for m.row < m.top+m.paneHeight()-1 {
+		m = press(m, "j")
+	}
+	m = press(m, "r")
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+
+	if m.row < m.top || m.row >= m.top+m.paneHeight() {
+		t.Errorf("cursor row %d is outside the window [%d, %d)", m.row, m.top, m.top+m.paneHeight())
+	}
+}
+
 // TestAMultiLineNoticeStaysOnOneRow is the notice's share of the newline
 // problem TestAMultiLineReviewFailureStaysOnOneRow pins: the budget sets one
 // line aside for it, so a wrapped stderr must not take two.
