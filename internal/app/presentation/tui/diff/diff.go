@@ -43,8 +43,8 @@ type reviewMsg struct {
 	ctx domain.ReviewContext
 }
 
-// errMsg is the diff fetch's own failure: with no diff there is nothing to
-// show, so it escalates to the parent's whole-screen error view (ErrorMsg).
+// errMsg is the diff fetch's own failure. Only a fatal one escalates to the
+// parent's whole-screen error view (ErrorMsg); any other is the notice.
 type errMsg struct {
 	ref domain.ItemRef
 	err error
@@ -155,6 +155,11 @@ type Model struct {
 	// still be readable, so this is drawn on its own footer line rather than
 	// replacing the whole screen; nil means no failure to show.
 	reviewErr error
+
+	// notice is what GitHub said when the diff could not be fetched. The
+	// last diff fetched stays on screen and r asks again; a successful fetch
+	// clears it, so a stale complaint never outlives what it described.
+	notice string
 
 	// reviewGen numbers the review fetches: each answer carries the number
 	// its fetch started under, and one that no longer matches is dropped.
@@ -330,6 +335,7 @@ func (m Model) filesArrived(msg diffMsg) Model {
 		return m
 	}
 	m.loading = false
+	m.notice = ""
 	m.files = msg.files
 	m.file, m.top, m.fileTop = 0, 0, 0
 	m = m.withRows()
@@ -373,7 +379,11 @@ func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = false
-	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	if domain.IsFatal(msg.err) {
+		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	}
+	m.notice = msg.err.Error()
+	return m, nil
 }
 
 func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {

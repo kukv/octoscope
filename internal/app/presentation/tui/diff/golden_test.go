@@ -152,6 +152,7 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("diff_discard_%s_%d", lang.name, w), discardingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_loading_%s_%d", lang.name, w), loadingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_added_line_%s_%d", lang.name, w), addedLineModel(t, w).View())
+				golden.Assert(t, fmt.Sprintf("diff_notice_%s_%d", lang.name, w), noticeModel(w).View())
 
 				// The file list's own cursor, reached with h as a user
 				// would. Not recorded below minWidthForSidebar, where the
@@ -189,6 +190,14 @@ func reviewFailureModel(width int) Model {
 		ref: m.ref,
 		err: errors.New("GraphQL: このプルリクエストのレビュー情報を取得できませんでした (fetchReviewContext)"),
 	})
+	return m
+}
+
+// noticeModel is goldenModel after r failed to fetch the diff again: the
+// diff it already had stays, with the failure one line above the key bar.
+func noticeModel(width int) Model {
+	m := press(goldenModel(width), "r")
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
 	return m
 }
 
