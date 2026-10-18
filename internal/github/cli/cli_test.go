@@ -726,6 +726,9 @@ func TestAHungWriteGivesUpOnceItsTimeIsUp(t *testing.T) {
 			if err := write(c); !errors.Is(err, github.ErrTransient) {
 				t.Errorf("err = %v, want ErrTransient", err)
 			}
+			if calls != 1 {
+				t.Errorf("gh ran %d times, want 1", calls)
+			}
 		})
 	}
 }
@@ -748,12 +751,16 @@ func TestAJobLogIsGivenLongerThanAnyOtherCall(t *testing.T) {
 	}
 }
 
+// The caller's deadline sits between the two limits, so only logTimeout can
+// end the call as a timeout.
 func TestAHungJobLogStillGivesUp(t *testing.T) {
-	limitTo(t, 20*time.Millisecond, 40*time.Millisecond)
+	limitTo(t, time.Minute, 40*time.Millisecond)
 	c := New("", "kukv/demo")
 	calls := 0
 	c.run = hangingGh(&calls)
-	if _, err := c.JobLog(context.Background(), "", 1, false); !errors.Is(err, github.ErrTransient) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := c.JobLog(ctx, "", 1, false); !errors.Is(err, github.ErrTransient) {
 		t.Errorf("err = %v, want ErrTransient", err)
 	}
 }
