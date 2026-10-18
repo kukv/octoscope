@@ -17,8 +17,9 @@ import (
 
 // responseTimeout bounds how long GitHub has to start answering: the time to
 // connect, to shake hands, and to send response headers. It does not bound
-// reading the body, because one answer here is a run's whole log archive and
-// cutting that off part way would look like a job that printed half a log.
+// reading the whole body, because one answer here is a run's whole log
+// archive and cutting that off part way would look like a job that printed
+// half a log; stallTimeout bounds the body instead.
 //
 // Eight seconds is the longest answer measured while this backend was built
 // (thirty repository aliases in one GraphQL request, 8.13s including the
@@ -28,6 +29,14 @@ import (
 // A var, not a const: tests shorten it to exercise the deadline without
 // waiting on it.
 var responseTimeout = 16 * time.Second
+
+// stallTimeout bounds how long the body may go without a single byte
+// arriving. It is on the gaps rather than the whole body, so a large archive
+// that keeps coming is never cut off. The value is responseTimeout's, for the
+// same reason: both are how long GitHub may say nothing at all.
+//
+// A var for the same reason responseTimeout is one.
+var stallTimeout = 16 * time.Second
 
 // Token reads the token this backend authenticates with. The order is gh's
 // own: GH_TOKEN wins so that a machine with both can point octoscope at the

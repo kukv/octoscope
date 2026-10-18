@@ -57,17 +57,11 @@ func (c *Client) send(ctx context.Context, method, url string, body any, accept 
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := c.http.Do(req)
+	status, header, out, err := c.exchange(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("reach GitHub: %w", err)
+		return nil, header, err
 	}
-	// Closing a body that was only read has nothing to report.
-	defer func() { _ = resp.Body.Close() }()
-	out, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.Header, fmt.Errorf("read answer: %w", err)
-	}
-	return out, resp.Header, statusError(resp.StatusCode, out)
+	return out, header, statusError(status, out)
 }
 
 // readURL fetches one absolute URL, asking again once when GitHub's front end
@@ -78,7 +72,7 @@ func (c *Client) send(ctx context.Context, method, url string, body any, accept 
 // page too: read alone only ever asked for the first one.
 func (c *Client) readURL(ctx context.Context, url, accept string) ([]byte, http.Header, error) {
 	out, header, err := c.send(ctx, http.MethodGet, url, nil, accept)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, github.ErrTransient) {
+	if err == nil || ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, github.ErrTransient) {
 		return out, header, err
 	}
 	return c.send(ctx, http.MethodGet, url, nil, accept)

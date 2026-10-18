@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
@@ -60,17 +63,78 @@ func (c *Client) post(ctx context.Context, doc string, vars []gql.Var) ([]byte, 
 	// GitHub asks every client to name itself; an unnamed one may be refused.
 	req.Header.Set("User-Agent", "octoscope")
 
+	status, _, out, err := c.exchange(req)
+	if err != nil {
+		return nil, err
+	}
+	return out, classify(status, out)
+}
+
+// timedOut is a request this package gave up on. It reads as transient to the
+// UI, which puts it on the one-line notice like a 502, and as a deadline to
+// the read paths, which must not ask again: a connection that stalled once is
+// not one a second try will rescue, and a retry doubles the wait.
+type timedOut struct{ msg string }
+
+func (e *timedOut) Error() string   { return e.msg }
+func (e *timedOut) Unwrap() []error { return []error{github.ErrTransient, context.DeadlineExceeded} }
+
+// errStalled is the cause exchange gives its own stall limit, so that one can
+// be told apart from a cancellation or deadline the caller set.
+var errStalled = errors.New("the answer stopped arriving")
+
+// exchange sends req and reads the whole answer. It hands back the status and
+// header rather than the response, whose body it has already read and
+// closed; the header comes back even when reading the body failed.
+//
+// A stall is decided by the context's cause rather than by the error: a
+// stopped body read reports "context canceled" whether the caller stopped it
+// or the stall limit did.
+func (c *Client) exchange(req *http.Request) (int, http.Header, []byte, error) {
+	caller := req.Context()
+	ctx, cancel := context.WithCancelCause(caller)
+	defer cancel(nil)
+	req = req.WithContext(ctx)
+
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("reach GitHub: %w", err)
+		// A caller's own deadline is a timeout to net/http too, and is not
+		// GitHub failing to answer.
+		var nerr net.Error
+		if caller.Err() == nil && errors.As(err, &nerr) && nerr.Timeout() {
+			return 0, nil, nil, &timedOut{msg: fmt.Sprintf("reach GitHub: no answer in %s", responseTimeout)}
+		}
+		return 0, nil, nil, fmt.Errorf("reach GitHub: %w", err)
 	}
 	// Closing a body that was only read has nothing to report.
 	defer func() { _ = resp.Body.Close() }()
-	out, err := io.ReadAll(resp.Body)
+
+	limit := stallTimeout
+	timer := time.AfterFunc(limit, func() { cancel(errStalled) })
+	defer timer.Stop()
+	out, err := io.ReadAll(&progress{r: resp.Body, timer: timer, limit: limit})
 	if err != nil {
-		return nil, fmt.Errorf("read answer: %w", err)
+		if errors.Is(context.Cause(ctx), errStalled) {
+			return resp.StatusCode, resp.Header, nil, &timedOut{msg: fmt.Sprintf("read answer: nothing arrived for %s", limit)}
+		}
+		return resp.StatusCode, resp.Header, nil, fmt.Errorf("read answer: %w", err)
 	}
-	return out, classify(resp.StatusCode, out)
+	return resp.StatusCode, resp.Header, out, nil
+}
+
+// progress restarts timer each time part of the body arrives.
+type progress struct {
+	r     io.Reader
+	timer *time.Timer
+	limit time.Duration
+}
+
+func (p *progress) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 {
+		p.timer.Reset(p.limit)
+	}
+	return n, err
 }
 
 // requestBody spells the document and its variables the way GraphQL takes
