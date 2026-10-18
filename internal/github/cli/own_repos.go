@@ -23,7 +23,7 @@ func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]g
 		args = append(args, owner)
 	}
 	args = append(args, "--json", "nameWithOwner,isPrivate", "--limit", strconv.Itoa(limit))
-	out, err := c.read(ctx, c.dir, args...)
+	out, err := c.read(ctx, callTimeout, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *Client) ListOwnRepos(ctx context.Context, owner string, limit int) ([]g
 // --jq expression wraps the logins back into an array: without the brackets
 // gh prints one bare word per line, which is not JSON.
 func (c *Client) ListOrgs(ctx context.Context) ([]string, error) {
-	out, err := c.read(ctx, c.dir, "api", "user/orgs", "--jq", "[.[].login]")
+	out, err := c.read(ctx, callTimeout, "api", "user/orgs", "--jq", "[.[].login]")
 	if err != nil {
 		return nil, err
 	}

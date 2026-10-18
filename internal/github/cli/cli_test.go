@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
@@ -653,5 +654,153 @@ func TestTheRepoStringIsSplitTheSameWayTheApiBackendSplitsIt(t *testing.T) {
 				t.Errorf("the cli backend turned %q into %+v; the api backend refuses it", repo, got)
 			}
 		})
+	}
+}
+
+// limitTo shortens the package's limits for one test. Tests that call it do
+// not run in parallel: the limits are package state.
+func limitTo(t *testing.T, call, log time.Duration) {
+	t.Helper()
+
+	oldCall, oldLog := callTimeout, logTimeout
+	callTimeout, logTimeout = call, log
+	t.Cleanup(func() { callTimeout, logTimeout = oldCall, oldLog })
+}
+
+// hangingGh stands in for a gh that never answers: it returns only once its
+// context ends, and then the way a killed process does, not with ctx.Err().
+func hangingGh(calls *int) runFunc {
+	return func(ctx context.Context, _ string, _ ...string) ([]byte, error) {
+		*calls++
+		<-ctx.Done()
+		return nil, errors.New("signal: killed")
+	}
+}
+
+// Most screens hand the backend context.Background(), so a gh that hangs
+// would leave a loading screen up forever. Running out of time is "GitHub did
+// not answer", which the UI shows on its one-line notice; asking again would
+// only double the wait for a gh that has already hung once.
+func TestAHungReadGivesUpOnceItsTimeIsUp(t *testing.T) {
+	reads := map[string]func(*Client) error{
+		"gql": func(c *Client) error {
+			_, err := c.ListPRs(context.Background(), "")
+			return err
+		},
+		"subcommand": func(c *Client) error {
+			_, err := c.ListLabels(context.Background(), "")
+			return err
+		},
+	}
+	for name, read := range reads {
+		t.Run(name, func(t *testing.T) {
+			limitTo(t, 20*time.Millisecond, time.Minute)
+			c := New("", "kukv/demo")
+			calls := 0
+			c.run = hangingGh(&calls)
+			if err := read(c); !errors.Is(err, github.ErrTransient) {
+				t.Errorf("err = %v, want ErrTransient", err)
+			}
+			if calls != 1 {
+				t.Errorf("gh ran %d times, want 1", calls)
+			}
+		})
+	}
+}
+
+// A hung write must end too. Whether it landed is for the user to check with
+// a refresh.
+func TestAHungWriteGivesUpOnceItsTimeIsUp(t *testing.T) {
+	writes := map[string]func(*Client) error{
+		"subcommand": func(c *Client) error { return c.ClosePR(context.Background(), "kukv/demo", 1) },
+		"gql": func(c *Client) error {
+			return c.MergePR(context.Background(), "id", gql.MergeMethodSquash)
+		},
+	}
+	for name, write := range writes {
+		t.Run(name, func(t *testing.T) {
+			limitTo(t, 20*time.Millisecond, time.Minute)
+			c := New("", "kukv/demo")
+			calls := 0
+			c.run = hangingGh(&calls)
+			if err := write(c); !errors.Is(err, github.ErrTransient) {
+				t.Errorf("err = %v, want ErrTransient", err)
+			}
+		})
+	}
+}
+
+// gh downloads a whole run's log archive to show one job, and ordinary logs
+// have been measured taking longer than the limit every other call gets.
+func TestAJobLogIsGivenLongerThanAnyOtherCall(t *testing.T) {
+	limitTo(t, 20*time.Millisecond, time.Minute)
+	c := New("", "kukv/demo")
+	c.run = func(ctx context.Context, _ string, _ ...string) ([]byte, error) {
+		select {
+		case <-time.After(2 * callTimeout):
+			return []byte("build\tRun tests\t2026-10-18T00:00:00.0000000Z ok\n"), nil
+		case <-ctx.Done():
+			return nil, errors.New("signal: killed")
+		}
+	}
+	if _, err := c.JobLog(context.Background(), "", 1, false); err != nil {
+		t.Fatalf("JobLog: %v", err)
+	}
+}
+
+func TestAHungJobLogStillGivesUp(t *testing.T) {
+	limitTo(t, 20*time.Millisecond, 40*time.Millisecond)
+	c := New("", "kukv/demo")
+	calls := 0
+	c.run = hangingGh(&calls)
+	if _, err := c.JobLog(context.Background(), "", 1, false); !errors.Is(err, github.ErrTransient) {
+		t.Errorf("err = %v, want ErrTransient", err)
+	}
+}
+
+// When the caller ends a call -- the user left the screen, or the caller's
+// own deadline passed -- GitHub did nothing wrong, and the UI must not say
+// that it failed to answer.
+func TestACallTheCallerEndedIsNotATimeout(t *testing.T) {
+	ends := map[string]func() (context.Context, context.CancelFunc){
+		"cancel": func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			time.AfterFunc(10*time.Millisecond, cancel)
+			return ctx, cancel
+		},
+		"deadline": func() (context.Context, context.CancelFunc) {
+			return context.WithTimeout(context.Background(), 10*time.Millisecond)
+		},
+	}
+	for name, end := range ends {
+		t.Run(name, func(t *testing.T) {
+			limitTo(t, time.Minute, time.Minute)
+			c := New("", "kukv/demo")
+			calls := 0
+			c.run = hangingGh(&calls)
+			ctx, cancel := end()
+			defer cancel()
+			if _, err := c.ListLabels(ctx, ""); err == nil || errors.Is(err, github.ErrTransient) {
+				t.Errorf("err = %v, want a failure that is not ErrTransient", err)
+			}
+		})
+	}
+}
+
+// The notice is all the user sees, so it has to say which gh call hung and
+// for how long it was waited on.
+func TestATimeoutNamesTheCallAndTheLimit(t *testing.T) {
+	limitTo(t, 20*time.Millisecond, time.Minute)
+	c := New("", "kukv/demo")
+	calls := 0
+	c.run = hangingGh(&calls)
+	err := c.ClosePR(context.Background(), "kukv/demo", 1)
+	if err == nil {
+		t.Fatal("ClosePR succeeded on a hung gh")
+	}
+	for _, want := range []string{"gh pr", callTimeout.String()} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %q, want it to mention %q", err, want)
+		}
 	}
 }

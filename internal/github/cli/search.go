@@ -27,7 +27,7 @@ func (c *Client) SearchRepos(ctx context.Context, query string, limit int) ([]gi
 		"--limit", strconv.Itoa(limit),
 		"--", query,
 	}
-	out, err := c.read(ctx, c.dir, args...)
+	out, err := c.read(ctx, callTimeout, args...)
 	if err != nil {
 		return nil, err
 	}

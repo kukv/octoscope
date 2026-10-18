@@ -22,7 +22,7 @@ func (c *Client) JobLog(ctx context.Context, repo string, jobID int64, failedOnl
 	} else {
 		args = append(args, "--log")
 	}
-	out, err := c.read(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
+	out, err := c.read(ctx, logTimeout, appendRepo(args, c.effectiveRepo(repo))...)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +62,6 @@ func (c *Client) RerunWorkflow(ctx context.Context, repo string, runID int64, sc
 	if scope == github.RerunFailed {
 		args = append(args, "--failed")
 	}
-	_, err := c.run(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo(args, c.effectiveRepo(repo))...)
 	return err
 }
