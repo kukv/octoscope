@@ -351,6 +351,25 @@ func TestAFailedFirstFetchClaimsNothingAboutTheChecks(t *testing.T) {
 	}
 }
 
+// TestKeysClaimNothingAboutChecksThatNeverArrived: o, enter, L and R on an
+// empty list say the pull request has no checks. After a failed first fetch
+// nothing is known, and the notice already says why the keys do nothing.
+func TestKeysClaimNothingAboutChecksThatNeverArrived(t *testing.T) {
+	t.Parallel()
+
+	for _, k := range []string{"o", "enter", "L", "R"} {
+		t.Run(k, func(t *testing.T) {
+			t.Parallel()
+
+			m, _ := fetched(t, &fakeSource{err: errors.New("HTTP 502: Bad Gateway")})
+			m, cmd := m.Update(keyPress(k))
+			if m.declined != "" || cmd != nil || m.mode != modeView {
+				t.Errorf("%s: declined = %q, cmd = %v, mode = %v; want nothing to happen", k, m.declined, cmd, m.mode)
+			}
+		})
+	}
+}
+
 // TestAFailedRefetchKeepsTheCursorOnScreen: the notice takes a row from the
 // list, and a cursor on its last row would otherwise be drawn below it.
 func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {

@@ -288,6 +288,10 @@ func (m Model) selectedJob() domain.JobHandle {
 // so at footer level rather than swallowed. A failure to open escalates to
 // the parent's error screen, which can show the address to open by hand.
 func (m Model) openSelected() (Model, tea.Cmd) {
+	// Nothing is known about the checks yet, and the notice says why.
+	if !m.loaded {
+		return m, nil
+	}
 	if len(m.order) == 0 {
 		m.declined = i18n.T("checks.none")
 		return m, nil

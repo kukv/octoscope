@@ -127,6 +127,10 @@ func (m Model) startLog(failedOnly bool) (Model, tea.Cmd) {
 		m.declined = i18n.T("checks.decline_loading")
 		return m, nil
 	}
+	// Nothing is known about the checks yet, and the notice says why.
+	if !m.loaded {
+		return m, nil
+	}
 	if len(m.order) == 0 {
 		m.declined = i18n.T("checks.none")
 		return m, nil
