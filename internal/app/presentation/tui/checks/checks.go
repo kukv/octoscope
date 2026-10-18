@@ -60,6 +60,11 @@ type Model struct {
 	loading bool
 	spin    spinner.Model
 
+	// loaded says the list has been answered at least once. Until then the
+	// zero checks are no answer, and "no checks" or "0 failing" drawn from
+	// them would be a claim about the pull request that nobody made.
+	loaded bool
+
 	checks domain.Checks
 	// order is the checks as drawn: failing workflows first, and the checks
 	// of one workflow together. It is rebuilt when the checks arrive rather
@@ -174,7 +179,7 @@ func (m Model) checksArrived(msg checksMsg) Model {
 	if msg.ref != m.ref {
 		return m
 	}
-	m.loading = false
+	m.loading, m.loaded = false, true
 	m.notice = ""
 	m.checks = msg.checks
 	m.order = arrange(msg.checks.Runs)
@@ -194,7 +199,8 @@ func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
 	}
 	m.notice = msg.err.Error()
-	return m, nil
+	// The notice's line comes out of the list's height.
+	return m.follow(), nil
 }
 
 func (m Model) openFailed(msg openFailedMsg) (Model, tea.Cmd) {

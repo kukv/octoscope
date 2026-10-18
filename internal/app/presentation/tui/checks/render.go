@@ -85,6 +85,9 @@ func (m Model) header() []string {
 }
 
 func (m Model) summaryLine() string {
+	if !m.loaded {
+		return ""
+	}
 	return theme.Dim().Render(i18n.Tf("checks.summary", map[string]any{
 		"Failing": m.checks.Failed,
 		"Running": m.checks.Running,
@@ -231,6 +234,9 @@ func (m Model) visibleRows() []string {
 // allRows builds every line the list would draw, ungated by scrolling: the
 // workflow headings and one line per check.
 func (m Model) allRows() []string {
+	if !m.loaded {
+		return nil
+	}
 	if len(m.order) == 0 {
 		return []string{clip(theme.Dim().Render(i18n.T("checks.none")), listWidth)}
 	}

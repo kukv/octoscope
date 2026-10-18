@@ -295,6 +295,41 @@ func TestAMultiLineNoticeStaysOnOneRow(t *testing.T) {
 	}
 }
 
+// TestAFailedFirstFetchClaimsNothingAboutTheChecks: with no answer at all,
+// "no checks" and "0 failing" would be statements about the pull request that
+// nobody has made. The notice is the only thing there is to say.
+func TestAFailedFirstFetchClaimsNothingAboutTheChecks(t *testing.T) {
+	t.Parallel()
+
+	m, _ := fetched(t, &fakeSource{err: errors.New("HTTP 502: Bad Gateway")})
+	view := ansi.Strip(m.View())
+	summary := ansi.Strip(i18n.Tf("checks.summary", map[string]any{"Failing": 0, "Running": 0}))
+	// The list draws "no checks" cut to its own width.
+	none := clip(i18n.T("checks.none"), listWidth)
+	for _, claim := range []string{none, summary} {
+		if strings.Contains(view, claim) {
+			t.Errorf("the view claims %q about checks it never got:\n%s", claim, view)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheCursorOnScreen: the notice takes a row from the
+// list, and a cursor on its last row would otherwise be drawn below it.
+func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {
+	t.Parallel()
+
+	m := openChecks(t, 120, 12, manyChecks())
+	for m.cursorLine() < m.top+m.paneHeight()-1 {
+		m = press(m, "j")
+	}
+	m = press(m, "r")
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+
+	if line := m.cursorLine(); line < m.top || line >= m.top+m.paneHeight() {
+		t.Errorf("cursor line %d is outside the window [%d, %d)", line, m.top, m.top+m.paneHeight())
+	}
+}
+
 // TestJMovesTheCursorDownTheList guards the list's own navigation: j/k are
 // what the design table gives the row.
 func TestJMovesTheCursorDownTheList(t *testing.T) {

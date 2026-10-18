@@ -64,6 +64,14 @@ func checksNoticeModel(width int) Model {
 	return m
 }
 
+// checksNoticeFirstModel is the checks whose first fetch failed: nothing to
+// draw but the notice.
+func checksNoticeFirstModel(width int) Model {
+	m := checksLoadingModel(width)
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	return m
+}
+
 // checksRerunModel is goldenModel with the rerun popup open on the same
 // failing check.
 func checksRerunModel(width int) Model {
@@ -138,6 +146,7 @@ var goldenStates = []struct {
 	{"checks", goldenModel},
 	{"checks_log", checksLogModel},
 	{"checks_notice", checksNoticeModel},
+	{"checks_notice_first", checksNoticeFirstModel},
 	{"checks_rerun", checksRerunModel},
 	{"checks_loading", checksLoadingModel},
 	{"checks_none", checksNoneModel},
