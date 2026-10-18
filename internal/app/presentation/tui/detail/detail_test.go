@@ -246,6 +246,28 @@ func TestAFailedFetchIsANotice(t *testing.T) {
 	}
 }
 
+// TestNothingActsOnAnItemThatNeverArrived covers the state a failed first
+// fetch leaves: the view waits for r, but the zero item reads as an open pull
+// request, and x then y would close one the user never saw.
+func TestNothingActsOnAnItemThatNeverArrived(t *testing.T) {
+	f := &fakeSource{err: errors.New("HTTP 502: Bad Gateway")}
+	m := New(f, prRef())
+	m, _ = m.Update(initFetch(t, m)())
+
+	for _, k := range []string{"x", "m"} {
+		got, cmd := m.Update(key(k))
+		if got.mode != modeView || cmd != nil {
+			t.Errorf("%s on an item that never arrived: mode = %v, cmd = %v", k, got.mode, cmd)
+		}
+	}
+	view := ansi.Strip(m.View())
+	for _, hint := range []string{i18n.T("footer.close"), i18n.T("footer.detail.merge")} {
+		if strings.Contains(view, hint) {
+			t.Errorf("the key bar offers %q on an item that never arrived:\n%s", hint, view)
+		}
+	}
+}
+
 // TestAFailedRefetchKeepsTheItem covers the case the notice is for: the item
 // was on screen, r failed, and what the user was reading must still be there.
 func TestAFailedRefetchKeepsTheItem(t *testing.T) {

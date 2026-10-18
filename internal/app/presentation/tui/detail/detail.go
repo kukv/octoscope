@@ -294,9 +294,10 @@ func (m Model) Init() tea.Cmd {
 }
 
 // stateAction reports whether the shown item can change state, and if so
-// whether the action is a close (true) or a reopen (false).
+// whether the action is a close (true) or a reopen (false). An item that
+// never arrived has none: its zero state reads as open.
 func (m Model) stateAction() (closing bool, ok bool) {
-	if m.phase == phaseLoading {
+	if m.phase == phaseLoading || !m.loaded {
 		return false, false
 	}
 	switch m.state {
