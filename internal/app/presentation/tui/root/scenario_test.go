@@ -366,6 +366,9 @@ func TestAFailedRefetchInTheDetailViewKeepsTheUserThere(t *testing.T) {
 	if m.errText != "" {
 		t.Fatalf("a failed refetch went to the error screen: %q", m.errText)
 	}
+	if !m.has(overlayDetail) {
+		t.Fatalf("a failed refetch closed the detail view:\n%s", content(m))
+	}
 	got := content(m)
 	for _, want := range []string{i18n.T("notice.fetch_failed"), "502", "replace the renderer"} {
 		if !strings.Contains(got, want) {
