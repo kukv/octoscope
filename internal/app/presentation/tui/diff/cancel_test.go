@@ -14,7 +14,7 @@ import (
 // number that half was asked under.
 func refetched(m Model) (Model, int) {
 	m = press(m, "r")
-	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
+	m, _ = m.Update(diffMsg{ref: m.ref, gen: m.diffGen, files: fixture()})
 	return m, m.reviewGen
 }
 

@@ -316,7 +316,7 @@ func TestADiffFailureIsANotice(t *testing.T) {
 func TestAFailedRefetchKeepsTheDiff(t *testing.T) {
 	m := loaded(t, 120, 30)
 	m = press(m, "r")
-	m, cmd := m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, cmd := m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
 	if cmd != nil {
 		t.Fatalf("a failed refetch produced %T, want nothing sent to the parent", cmd())
 	}
@@ -328,18 +328,50 @@ func TestAFailedRefetchKeepsTheDiff(t *testing.T) {
 	}
 }
 
+// TestAnEarlierFetchsLateAnswerIsDropped: r can be pressed while a fetch is
+// still out, and both are for the same pull request. The earlier one's
+// answer, landing after the later one's, must not replace it -- neither a
+// failure put over the newer diff nor an older diff.
+func TestAnEarlierFetchsLateAnswerIsDropped(t *testing.T) {
+	newer := []domain.FileDiff{{Path: "newer.go", Status: domain.FileAdded}}
+	for _, tt := range []struct {
+		name  string
+		stale func(m Model, gen int) tea.Msg
+	}{
+		{"failure", func(m Model, gen int) tea.Msg {
+			return errMsg{ref: m.ref, gen: gen, err: errors.New("gh pr: no answer in 16s")}
+		}},
+		{"diff", func(m Model, gen int) tea.Msg {
+			return diffMsg{ref: m.ref, gen: gen, files: fixture()}
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := press(loaded(t, 120, 30), "r")
+			earlier := m.diffGen
+			m = press(m, "r")
+			m, _ = m.Update(diffMsg{ref: m.ref, gen: m.diffGen, files: newer})
+			m, _ = m.Update(tt.stale(m, earlier))
+
+			out := ansi.Strip(m.View())
+			if strings.Contains(out, "16s") || strings.Contains(out, "func Walk") || !strings.Contains(out, "newer.go") {
+				t.Errorf("the earlier fetch's answer landed over the newer diff:\n%s", out)
+			}
+		})
+	}
+}
+
 // TestASuccessfulRefetchClearsTheNotice keeps a stale complaint from
 // outliving the failure it described.
 func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
 	m := loaded(t, 120, 30)
 	m = press(m, "r")
-	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
 	if !strings.Contains(ansi.Strip(m.View()), "502") {
 		t.Fatalf("precondition: the failed refetch is not on screen:\n%s", ansi.Strip(m.View()))
 	}
 
 	m = press(m, "r")
-	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
+	m, _ = m.Update(diffMsg{ref: m.ref, gen: m.diffGen, files: fixture()})
 	if out := ansi.Strip(m.View()); strings.Contains(out, "502") {
 		t.Errorf("the notice outlived a successful refetch:\n%s", out)
 	}
@@ -372,7 +404,7 @@ func TestANoticeAndAReviewFailureBothFit(t *testing.T) {
 	before := m.paneHeight()
 
 	m = press(m, "r")
-	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
 	m, _ = m.Update(reviewErrMsg{ref: m.ref, gen: m.reviewGen, err: errors.New("boom from github")})
 
 	if got := m.paneHeight(); got != before-2 {
@@ -413,7 +445,7 @@ func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {
 		m = press(m, "j")
 	}
 	m = press(m, "r")
-	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
 
 	if m.row < m.top || m.row >= m.top+m.paneHeight() {
 		t.Errorf("cursor row %d is outside the window [%d, %d)", m.row, m.top, m.top+m.paneHeight())

@@ -14,18 +14,25 @@ import (
 	"github.com/kukv/octoscope/internal/app/domain"
 )
 
-func fetch(src Source, ref domain.ItemRef) tea.Cmd {
+func (m Model) fetch() tea.Cmd {
+	src, ref, gen := m.src, m.ref, m.fetchGen
 	return func() tea.Msg {
 		item, err := src.GetItem(context.Background(), ref)
 		if err != nil {
-			return errMsg{ref, err}
+			return errMsg{ref: ref, gen: gen, err: err}
 		}
-		return itemMsg{ref: ref, item: item}
+		return itemMsg{ref: ref, gen: gen, item: item}
 	}
 }
 
-func fetchAfterFailedEdit(src Source, ref domain.ItemRef, editErr error) tea.Cmd {
-	get := fetch(src, ref)
+// startFetch numbers a new fetch of the item and starts it, so that an
+// answer to any fetch started before it is dropped (see fetchGen).
+func (m Model) startFetch() (Model, tea.Cmd) {
+	m.fetchGen++
+	return m, m.fetch()
+}
+
+func withEditErr(get tea.Cmd, editErr error) tea.Cmd {
 	return func() tea.Msg {
 		msg := get()
 		if it, ok := msg.(itemMsg); ok {

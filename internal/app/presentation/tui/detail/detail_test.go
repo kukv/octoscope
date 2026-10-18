@@ -162,7 +162,7 @@ func issueRef() domain.ItemRef { return domain.ItemRef{Kind: domain.ItemIssue, N
 // covers Init itself.
 func loaded(f *fakeSource, ref domain.ItemRef) Model {
 	m := New(f, ref)
-	m, _ = m.Update(fetch(f, ref)())
+	m, _ = m.Update(m.fetch()())
 	return m
 }
 
@@ -285,6 +285,49 @@ func TestAFailedRefetchKeepsTheItem(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Errorf("the view is missing %q:\n%s", want, view)
 		}
+	}
+}
+
+// TestAnEarlierFetchsLateFailureIsDropped: r can be pressed while a fetch is
+// still out, and both are for the same item. The earlier one timing out after
+// the later one landed must not put its failure over the newer item.
+func TestAnEarlierFetchsLateFailureIsDropped(t *testing.T) {
+	f := &fakeSource{pr: firstPR()}
+	m := loaded(f, prRef())
+
+	m, first := m.Update(key("r"))
+	f.err = errors.New("gh pr: no answer in 16s")
+	stale := first()
+	f.err = nil
+	f.pr.Title = "second pr"
+	m, second := m.Update(key("r"))
+	m, _ = m.Update(second())
+	m, _ = m.Update(stale)
+
+	if m.phase != phaseIdle {
+		t.Errorf("phase = %v, want the newer answer to have ended the wait", m.phase)
+	}
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, "16s") || !strings.Contains(view, "second pr") {
+		t.Errorf("the earlier fetch's failure landed over the newer item:\n%s", view)
+	}
+}
+
+// TestAnEarlierFetchsLateItemIsDropped is the same race answered the other
+// way: the earlier fetch's item is older than the one already on screen.
+func TestAnEarlierFetchsLateItemIsDropped(t *testing.T) {
+	f := &fakeSource{pr: firstPR()}
+	m := loaded(f, prRef())
+
+	m, first := m.Update(key("r"))
+	stale := first()
+	f.pr.Title = "second pr"
+	m, second := m.Update(key("r"))
+	m, _ = m.Update(second())
+	m, _ = m.Update(stale)
+
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "second pr") {
+		t.Errorf("the earlier fetch's item replaced the newer one:\n%s", view)
 	}
 }
 
@@ -1125,7 +1168,7 @@ func TestTheDeclineGoesAwayWithTheWait(t *testing.T) {
 		t.Fatal("precondition: c while loading left no note")
 	}
 
-	m, _ = m.Update(fetch(f, prRef())())
+	m, _ = m.Update(m.fetch()())
 	if m.declined != "" {
 		t.Errorf("declined = %q after the item arrived, want empty", m.declined)
 	}

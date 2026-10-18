@@ -60,7 +60,7 @@ func checksLogModel(width int) Model {
 // bar.
 func checksNoticeModel(width int) Model {
 	m := press(checksLogModel(width), "r")
-	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.fetchGen, err: errors.New("HTTP 502: Bad Gateway")})
 	return m
 }
 

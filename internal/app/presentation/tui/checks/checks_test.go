@@ -190,6 +190,44 @@ func TestAFailedRefetchKeepsTheLog(t *testing.T) {
 	}
 }
 
+// TestAnEarlierFetchsLateAnswerIsDropped: r can be pressed while a fetch is
+// still out, and both are for the same pull request. The earlier one's
+// answer, landing after the later one's, must not replace it -- neither a
+// failure put over the newer list nor an older list.
+func TestAnEarlierFetchsLateAnswerIsDropped(t *testing.T) {
+	t.Parallel()
+
+	newer := domain.Checks{Total: 1, Passed: 1, State: domain.CheckSuccess, Runs: []domain.CheckRun{
+		{Name: "newer", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", Job: "9", WorkflowRun: "90"},
+	}}
+	for _, tt := range []struct {
+		name  string
+		stale func(m Model, gen int) tea.Msg
+	}{
+		{"failure", func(m Model, gen int) tea.Msg {
+			return errMsg{ref: m.ref, gen: gen, err: errors.New("gh pr: no answer in 16s")}
+		}},
+		{"list", func(m Model, gen int) tea.Msg {
+			return checksMsg{ref: m.ref, gen: gen, checks: fixture()}
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := press(open(t, 120), "r")
+			earlier := m.fetchGen
+			m = press(m, "r")
+			m, _ = m.Update(checksMsg{ref: m.ref, gen: m.fetchGen, checks: newer})
+			m, _ = m.Update(tt.stale(m, earlier))
+
+			view := ansi.Strip(m.View())
+			if strings.Contains(view, "16s") || strings.Contains(view, "sca") || !strings.Contains(view, "newer") {
+				t.Errorf("the earlier fetch's answer landed over the newer list:\n%s", view)
+			}
+		})
+	}
+}
+
 // TestASuccessfulRefetchClearsTheNotice keeps a stale complaint from
 // outliving the failure it described.
 func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
@@ -323,7 +361,7 @@ func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {
 		m = press(m, "j")
 	}
 	m = press(m, "r")
-	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.fetchGen, err: errors.New("HTTP 502: Bad Gateway")})
 
 	if line := m.cursorLine(); line < m.top || line >= m.top+m.paneHeight() {
 		t.Errorf("cursor line %d is outside the window [%d, %d)", line, m.top, m.top+m.paneHeight())

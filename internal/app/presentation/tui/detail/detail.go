@@ -71,6 +71,7 @@ type (
 	// just left is still running, and its answer must not land here.
 	itemMsg struct {
 		ref  domain.ItemRef
+		gen  int
 		item domain.Item
 		// editErr is the edit that failed just before this fetch. The
 		// answer would otherwise clear the failure the fetch was sent for.
@@ -78,6 +79,7 @@ type (
 	}
 	errMsg struct {
 		ref domain.ItemRef
+		gen int
 		err error
 	}
 	// openFailedMsg is the browser's failure, not GitHub's: it goes to the
@@ -207,6 +209,12 @@ type Model struct {
 	// clears it, so a stale complaint never outlives what it described.
 	notice string
 
+	// fetchGen numbers the item's fetches: each answer carries the number its
+	// fetch started under, and one that no longer matches is dropped. r can
+	// be pressed while a fetch is still out, and both are for the same item,
+	// so the ref alone cannot tell the earlier answer from the later.
+	fetchGen int
+
 	// declined says why the last key did nothing, in the one case where the
 	// screen cannot show it: while the item is loading there is a spinner
 	// and nothing else, so c, x, v, l and a look broken rather than early.
@@ -290,7 +298,7 @@ func newBody() viewport.Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spin.Tick, fetch(m.src, m.ref))
+	return tea.Batch(m.spin.Tick, m.fetch())
 }
 
 // stateAction reports whether the shown item can change state, and if so

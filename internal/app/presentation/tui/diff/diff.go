@@ -31,8 +31,10 @@ type ClosedMsg struct{}
 
 type ErrorMsg struct{ Err error }
 
+// diffMsg and errMsg carry the diffGen their fetch started under.
 type diffMsg struct {
 	ref   domain.ItemRef
+	gen   int
 	files []domain.FileDiff
 }
 
@@ -47,6 +49,7 @@ type reviewMsg struct {
 // parent's whole-screen error view (ErrorMsg); any other is the notice.
 type errMsg struct {
 	ref domain.ItemRef
+	gen int
 	err error
 }
 
@@ -166,6 +169,12 @@ type Model struct {
 	// clears it, so a stale complaint never outlives what it described.
 	notice string
 
+	// diffGen numbers the diff fetches the way reviewGen numbers the review
+	// fetches. r can be pressed while a fetch is still out, and both are for
+	// the same pull request, so the ref alone cannot tell the earlier answer
+	// from the later.
+	diffGen int
+
 	// reviewGen numbers the review fetches: each answer carries the number
 	// its fetch started under, and one that no longer matches is dropped.
 	// Starting a comment, a discard or a submit moves it on (cancelRefetch).
@@ -249,13 +258,13 @@ func (m Model) fetch() tea.Cmd {
 }
 
 func (m Model) fetchDiff() tea.Cmd {
-	src, ref := m.src, m.ref
+	src, ref, gen := m.src, m.ref, m.diffGen
 	return func() tea.Msg {
 		files, err := src.PRDiff(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
-			return errMsg{ref: ref, err: err}
+			return errMsg{ref: ref, gen: gen, err: err}
 		}
-		return diffMsg{ref: ref, files: files}
+		return diffMsg{ref: ref, gen: gen, files: files}
 	}
 }
 
@@ -336,7 +345,7 @@ func (m Model) resize(msg tea.WindowSizeMsg) Model {
 func (m Model) filesArrived(msg diffMsg) Model {
 	// The request for the pull request the user just left is still in
 	// flight; its answer must not replace this one's.
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.diffGen {
 		return m
 	}
 	m.loading, m.loaded = false, true
@@ -380,7 +389,7 @@ func (m Model) reviewFailed(msg reviewErrMsg) Model {
 }
 
 func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.diffGen {
 		return m, nil
 	}
 	m.loading = false
@@ -480,6 +489,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "r":
 		m.loading = true
+		m.diffGen++
 		m.reviewErr = nil
 		m.declined = ""
 		return m, tea.Batch(m.spin.Tick, m.fetch())

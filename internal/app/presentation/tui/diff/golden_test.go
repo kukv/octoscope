@@ -198,7 +198,7 @@ func reviewFailureModel(width int) Model {
 // diff it already had stays, with the failure one line above the key bar.
 func noticeModel(width int) Model {
 	m := press(goldenModel(width), "r")
-	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
 	return m
 }
 

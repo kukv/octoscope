@@ -26,13 +26,16 @@ type ClosedMsg struct{}
 
 type ErrorMsg struct{ Err error }
 
+// checksMsg and errMsg carry the fetchGen their fetch started under.
 type checksMsg struct {
 	ref    domain.ItemRef
+	gen    int
 	checks domain.Checks
 }
 
 type errMsg struct {
 	ref domain.ItemRef
+	gen int
 	err error
 }
 
@@ -64,6 +67,12 @@ type Model struct {
 	// zero checks are no answer, and "no checks" or "0 failing" drawn from
 	// them would be a claim about the pull request that nobody made.
 	loaded bool
+
+	// fetchGen numbers the list's fetches: each answer carries the number its
+	// fetch started under, and one that no longer matches is dropped. r can
+	// be pressed while a fetch is still out, and both are for the same pull
+	// request, so the ref alone cannot tell the earlier answer from the later.
+	fetchGen int
 
 	checks domain.Checks
 	// order is the checks as drawn: failing workflows first, and the checks
@@ -132,13 +141,13 @@ func New(src Source, ref domain.ItemRef) Model {
 func (m Model) Init() tea.Cmd { return tea.Batch(m.spin.Tick, m.fetch()) }
 
 func (m Model) fetch() tea.Cmd {
-	src, ref := m.src, m.ref
+	src, ref, gen := m.src, m.ref, m.fetchGen
 	return func() tea.Msg {
 		c, err := src.PRChecks(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
-			return errMsg{ref: ref, err: err}
+			return errMsg{ref: ref, gen: gen, err: err}
 		}
-		return checksMsg{ref: ref, checks: c}
+		return checksMsg{ref: ref, gen: gen, checks: c}
 	}
 }
 
@@ -176,7 +185,7 @@ func (m Model) resize(msg tea.WindowSizeMsg) Model {
 func (m Model) checksArrived(msg checksMsg) Model {
 	// The request for the pull request the user just left is still in
 	// flight; its answer must not replace this one's.
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.fetchGen {
 		return m
 	}
 	m.loading, m.loaded = false, true
@@ -191,7 +200,7 @@ func (m Model) checksArrived(msg checksMsg) Model {
 }
 
 func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.fetchGen {
 		return m, nil
 	}
 	m.loading = false
@@ -225,6 +234,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "r":
 		m.loading = true
+		m.fetchGen++
 		m.declined = ""
 		m.errText = ""
 		return m, tea.Batch(m.spin.Tick, m.fetch())

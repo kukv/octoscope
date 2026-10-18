@@ -89,7 +89,7 @@ func goldenModel(width int) Model {
 	}
 	m := New(f, goldenRef())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-	m, _ = m.Update(fetch(f, goldenRef())())
+	m, _ = m.Update(m.fetch()())
 	return m
 }
 
@@ -99,7 +99,7 @@ func goldenMentionModel(width int) Model {
 	f := &fakeSource{pr: goldenMentionPR()}
 	m := New(f, goldenRef()).SetViewer("kukv")
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
-	m, _ = m.Update(fetch(f, goldenRef())())
+	m, _ = m.Update(m.fetch()())
 	return m
 }
 
@@ -144,7 +144,7 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())
 
 				refetching, _ := m.Update(key("r"))
-				noticed, _ := refetching.Update(errMsg{ref: goldenRef(), err: errors.New("HTTP 502: Bad Gateway")})
+				noticed, _ := refetching.Update(errMsg{ref: goldenRef(), gen: refetching.fetchGen, err: errors.New("HTTP 502: Bad Gateway")})
 				golden.Assert(t, fmt.Sprintf("detail_notice_%s_%d", lang.name, w), noticed.View())
 			})
 		}

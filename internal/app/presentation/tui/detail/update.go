@@ -95,7 +95,7 @@ func (m Model) tick(msg spinner.TickMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) itemArrived(msg itemMsg) Model {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.fetchGen {
 		return m
 	}
 	it := msg.item
@@ -128,7 +128,7 @@ func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
 	m.errText = ""
 	m.textarea.Reset()
 	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
+	return m.startFetch()
 }
 
 func (m Model) commentFailed(msg commentErrorMsg) Model {
@@ -146,7 +146,7 @@ func (m Model) stateChanged(msg stateChangedMsg) (Model, tea.Cmd) {
 	}
 	m.errText = ""
 	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
+	return m.startFetch()
 }
 
 func (m Model) stateFailed(msg stateErrorMsg) Model {
@@ -182,7 +182,7 @@ func (m Model) pickApplied(msg pickerAppliedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
+	return m.startFetch()
 }
 
 // pickFailed tells a failed apply from candidates that never arrived by the
@@ -197,7 +197,8 @@ func (m Model) pickFailed(msg pickErrorMsg) (Model, tea.Cmd) {
 	if m.phase == phaseWorking {
 		m.mode, m.phase = modeView, phaseLoading
 		m.errText = i18n.Tf("detail.edit_partial", map[string]any{"Err": msg.err.Error()})
-		return m, fetchAfterFailedEdit(m.src, m.ref, msg.err)
+		m, get := m.startFetch()
+		return m, withEditErr(get, msg.err)
 	}
 	m.mode, m.phase = modeView, phaseIdle
 	m.errText = msg.err.Error()
@@ -244,7 +245,7 @@ func (m Model) submitDone() (Model, tea.Cmd) {
 	}
 	m.errText = ""
 	m.mode, m.phase = modeView, phaseLoading
-	return m, fetch(m.src, m.ref)
+	return m.startFetch()
 }
 
 func (m Model) submitFailed(msg review.ErrorMsg) (Model, tea.Cmd) {
@@ -303,7 +304,7 @@ func (m Model) mergeFailed(msg merge.ErrorMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.fetchGen {
 		return m, nil
 	}
 	m.phase = phaseIdle
