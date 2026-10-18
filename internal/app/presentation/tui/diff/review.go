@@ -42,7 +42,7 @@ func (m Model) openSubmit() Model {
 	m.submit, _ = m.submit.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	m.mode, m.phase = modeSubmit, phaseIdle
 	m.errText = ""
-	return m
+	return m.cancelRefetch()
 }
 
 func (m Model) handleSubmitKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -75,7 +75,7 @@ func (m Model) startDiscard() Model {
 	m.declined = ""
 	m.mode, m.phase = modeDiscard, phaseIdle
 	m.errText = ""
-	return m
+	return m.cancelRefetch()
 }
 
 // handleDiscardKey swallows every key while the discard is in flight, which

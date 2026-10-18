@@ -441,7 +441,9 @@ func TestARefetchMidComposeDoesNotShiftThePostedTarget(t *testing.T) {
 			},
 		},
 	}
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: shifted})
+	// Opening the composer cancels any refetch already in flight, so the
+	// answer is handed over as one asked for since (cancelRefetch).
+	m, _ = m.Update(reviewMsg{ref: m.ref, gen: m.reviewGen, ctx: shifted})
 
 	if got := m.currentRow().kind; got != rowThread {
 		t.Fatalf("the fixture did not shift the cursor onto a thread row (got %v); this test proves nothing", got)
