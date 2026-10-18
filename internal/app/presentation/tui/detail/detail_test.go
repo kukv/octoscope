@@ -224,22 +224,108 @@ func TestEscAndQCloseTheView(t *testing.T) {
 	}
 }
 
-func TestFetchFailureBecomesErrorMsg(t *testing.T) {
-	f := &fakeSource{err: errors.New("gh pr: no git remotes found")}
+// TestAFailedFetchIsANotice pins that GitHub turning the request down leaves
+// the user in the view, where r asks again, rather than on the parent's error
+// screen, whose esc closes the view along with it.
+func TestAFailedFetchIsANotice(t *testing.T) {
+	const boom = "gh pr: no git remotes found"
+	f := &fakeSource{err: errors.New(boom)}
 	m := New(f, prRef())
 	m, cmd := m.Update(initFetch(t, m)())
 	if m.phase != phaseIdle {
 		t.Errorf("phase = %v after a failed fetch, want the wait to be over", m.phase)
 	}
+	if cmd != nil {
+		t.Fatalf("a failed fetch produced %T, want nothing sent to the parent", cmd())
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{i18n.T("notice.fetch_failed"), boom} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheItem covers the case the notice is for: the item
+// was on screen, r failed, and what the user was reading must still be there.
+func TestAFailedRefetchKeepsTheItem(t *testing.T) {
+	f := &fakeSource{pr: firstPR()}
+	m := loaded(f, prRef())
+	f.err = errors.New("HTTP 502: Bad Gateway")
+
+	m, cmd := m.Update(key("r"))
+	m, cmd = m.Update(cmd())
+	if cmd != nil {
+		t.Fatalf("a failed refetch produced %T, want nothing sent to the parent", cmd())
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"first pr", i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestASuccessfulRefetchClearsTheNotice keeps a stale complaint from
+// outliving the failure it described.
+func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
+	f := &fakeSource{pr: firstPR()}
+	m := loaded(f, prRef())
+	f.err = errors.New("HTTP 502: Bad Gateway")
+	m, cmd := m.Update(key("r"))
+	m, _ = m.Update(cmd())
+	if !strings.Contains(ansi.Strip(m.View()), "502") {
+		t.Fatalf("precondition: the failed refetch is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+
+	f.err = nil
+	m, cmd = m.Update(key("r"))
+	m, _ = m.Update(cmd())
+	if got := ansi.Strip(m.View()); strings.Contains(got, "502") {
+		t.Errorf("the notice outlived a successful refetch:\n%s", got)
+	}
+}
+
+// TestAFatalFetchFailureStillEscalates covers what the notice must not
+// swallow: a failure the user has to fix outside octoscope belongs on the
+// parent's error screen, which says what to do (see domain.IsFatal).
+func TestAFatalFetchFailureStillEscalates(t *testing.T) {
+	f := &fakeSource{err: fmt.Errorf("gh pr: %w", domain.ErrUnauthenticated)}
+	m := New(f, prRef())
+	_, cmd := m.Update(initFetch(t, m)())
 	if cmd == nil {
-		t.Fatal("cmd = nil after a failed fetch, want ErrorMsg cmd")
+		t.Fatal("cmd = nil after a fatal failure, want ErrorMsg cmd")
 	}
 	msg, ok := cmd().(ErrorMsg)
 	if !ok {
 		t.Fatalf("msg = %T, want ErrorMsg", cmd())
 	}
-	if !strings.Contains(msg.Err.Error(), "no git remotes found") {
+	if !errors.Is(msg.Err, domain.ErrUnauthenticated) {
 		t.Errorf("Err = %v, want the source's error", msg.Err)
+	}
+}
+
+// TestAFailedOpenStillEscalates keeps the browser's failure on the parent's
+// error screen: that is where the address to open by hand is drawn whole,
+// and a one-line notice would cut it short.
+func TestAFailedOpenStillEscalates(t *testing.T) {
+	f := &fakeSource{pr: firstPR()}
+	f.pr.URL = "https://github.com/kukv/demo/pull/1"
+	m := loaded(f, prRef())
+	boom := errors.New("no browser")
+	m.open = func(string) error { return boom }
+
+	m, cmd := m.Update(key("o"))
+	_, cmd = m.Update(cmd())
+	if cmd == nil {
+		t.Fatal("cmd = nil after a failed open, want ErrorMsg cmd")
+	}
+	msg, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("msg = %T, want ErrorMsg", cmd())
+	}
+	if !errors.Is(msg.Err, boom) {
+		t.Errorf("Err = %v, want the browser's error", msg.Err)
 	}
 }
 

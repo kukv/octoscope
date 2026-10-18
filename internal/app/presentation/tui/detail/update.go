@@ -55,6 +55,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.mergeFailed(msg)
 	case errMsg:
 		return m.fetchFailed(msg)
+	case openFailedMsg:
+		return m.openFailed(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -99,6 +101,7 @@ func (m Model) itemArrived(msg itemMsg) Model {
 	it := msg.item
 	m.phase = phaseIdle
 	m.state = it.State
+	m.notice = ""
 	m.errText = ""
 	if msg.editErr != nil {
 		m.errText = i18n.Tf("detail.edit_partial", map[string]any{"Err": msg.editErr.Error()})
@@ -304,6 +307,18 @@ func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.phase = phaseIdle
+	if domain.IsFatal(msg.err) {
+		err := msg.err
+		return m, func() tea.Msg { return ErrorMsg{err} }
+	}
+	m.notice = msg.err.Error()
+	return m, nil
+}
+
+func (m Model) openFailed(msg openFailedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	err := msg.err
 	return m, func() tea.Msg { return ErrorMsg{err} }
 }

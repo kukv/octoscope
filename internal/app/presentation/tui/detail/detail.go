@@ -80,6 +80,12 @@ type (
 		ref domain.ItemRef
 		err error
 	}
+	// openFailedMsg is the browser's failure, not GitHub's: it goes to the
+	// parent's error screen, where the address to open by hand fits whole.
+	openFailedMsg struct {
+		ref domain.ItemRef
+		err error
+	}
 	// The comment and state answers carry the ref for the same reason
 	// itemMsg does. Both end in a refetch of the item they were sent for,
 	// which on another item would replace what the user is reading.
@@ -195,6 +201,11 @@ type Model struct {
 	// Opening an overlay clears it rather than draw the body's failure
 	// inside it.
 	errText string
+
+	// notice is what GitHub said when the item could not be fetched. The
+	// last item fetched stays on screen and r asks again; a successful fetch
+	// clears it, so a stale complaint never outlives what it described.
+	notice string
 
 	// declined says why the last key did nothing, in the one case where the
 	// screen cannot show it: while the item is loading there is a spinner

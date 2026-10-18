@@ -142,6 +142,10 @@ func TestGolden(t *testing.T) {
 				// No other recording covers the error line.
 				failed, _ := m.Update(stateErrorMsg{ref: goldenRef(), err: errors.New("boom")})
 				golden.Assert(t, fmt.Sprintf("detail_error_%s_%d", lang.name, w), failed.View())
+
+				refetching, _ := m.Update(key("r"))
+				noticed, _ := refetching.Update(errMsg{ref: goldenRef(), err: errors.New("HTTP 502: Bad Gateway")})
+				golden.Assert(t, fmt.Sprintf("detail_notice_%s_%d", lang.name, w), noticed.View())
 			})
 		}
 	}

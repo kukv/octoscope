@@ -329,3 +329,35 @@ func TestAFailureSurvivesAShortTerminal(t *testing.T) {
 		})
 	}
 }
+
+// TestANoticeAndAFailureBothSurviveAShortTerminal adds the notice to the same
+// budget: a failed refetch on top of a failed close is two lines below the
+// cut, and the key bar still has to be the last one on the screen.
+func TestANoticeAndAFailureBothSurviveAShortTerminal(t *testing.T) {
+	const boom = "HTTP 403: Resource not accessible by integration"
+	const gone = "HTTP 502: Bad Gateway"
+
+	for _, h := range []int{8, 12, 16, 24} {
+		t.Run(fmt.Sprintf("height_%d", h), func(t *testing.T) {
+			m := goldenModel(120)
+			m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: h})
+			m, _ = m.Update(stateErrorMsg{ref: goldenRef(), err: errors.New(boom)})
+			m, _ = m.Update(errMsg{ref: goldenRef(), err: errors.New(gone)})
+
+			view := m.View()
+			for _, want := range []string{boom, gone} {
+				if !strings.Contains(ansi.Strip(view), want) {
+					t.Errorf("%q is off the screen at a height of %d:\n%s", want, h, ansi.Strip(view))
+				}
+			}
+			lines := strings.Split(view, "\n")
+			if len(lines) > h {
+				t.Errorf("the view is %d lines at a height of %d", len(lines), h)
+			}
+			last := ansi.Strip(lines[len(lines)-1])
+			if !strings.Contains(last, "esc") {
+				t.Errorf("the last line is %q, want the key bar", last)
+			}
+		})
+	}
+}

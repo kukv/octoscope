@@ -52,7 +52,7 @@ func (m Model) openWeb(ref domain.ItemRef, url string) tea.Cmd {
 	open := m.open
 	return func() tea.Msg {
 		if err := open(url); err != nil {
-			return errMsg{ref, err}
+			return openFailedMsg{ref, err}
 		}
 		return nil
 	}
