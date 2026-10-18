@@ -419,6 +419,19 @@ func TestANoticeAndAReviewFailureBothFit(t *testing.T) {
 	}
 }
 
+// TestTwoJoinedFailuresReadAsTwo: PRDiff tries gh pr diff and then the files
+// API, and when both fail it joins the two. On one line with nothing between
+// them they read as a single sentence.
+func TestTwoJoinedFailuresReadAsTwo(t *testing.T) {
+	m := loaded(t, 160, 30)
+	err := errors.Join(errors.New("gh pr: no answer in 16s"), errors.New("gh api: no answer in 16s"))
+	m, _ = m.Update(errMsg{ref: m.ref, err: err})
+
+	if out := ansi.Strip(m.View()); !strings.Contains(out, "gh pr: no answer in 16s; gh api: no answer in 16s") {
+		t.Errorf("the two failures are not told apart:\n%s", out)
+	}
+}
+
 // TestAFailedFirstFetchClaimsNothingAboutTheDiff: with no diff at all, "no
 // files changed" and "0 files" would be statements about the pull request
 // that nobody has made. The review context answering is what used to draw

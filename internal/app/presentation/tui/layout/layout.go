@@ -29,6 +29,19 @@ func Notice(text string, width int) string {
 	return ClipLines(text, width)
 }
 
+// OneLine puts multi-line text on one line: each line's whitespace folded to
+// single spaces, blank lines dropped, and the rest joined with "; " so that
+// two failures errors.Join put on lines of their own still read as two.
+func OneLine(s string) string {
+	var parts []string
+	for _, line := range strings.Split(s, "\n") {
+		if f := strings.Join(strings.Fields(line), " "); f != "" {
+			parts = append(parts, f)
+		}
+	}
+	return strings.Join(parts, "; ")
+}
+
 // PadLines appends blank lines until the block is n tall, so that whatever is
 // drawn under it lands on the same row however few lines there were to draw.
 // A block already taller than n is returned as it is: n is a budget for what

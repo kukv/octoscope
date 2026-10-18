@@ -35,6 +35,26 @@ func TestClipLines(t *testing.T) {
 	}
 }
 
+// TestOneLine covers what a notice is made of: gh and GitHub return
+// multi-line text, and errors.Join puts each failure on a line of its own.
+// Run together with nothing between them, two failures read as one.
+func TestOneLine(t *testing.T) {
+	cases := map[string]struct{ in, want string }{
+		"one line is untouched":           {"HTTP 502: Bad Gateway", "HTTP 502: Bad Gateway"},
+		"joined failures stay apart":      {"gh pr: no answer in 16s\ngh api: no answer in 16s", "gh pr: no answer in 16s; gh api: no answer in 16s"},
+		"blank lines are dropped":         {"HTTP 502:\n\nretry later\n", "HTTP 502:; retry later"},
+		"runs of spaces fold to one":      {"a  \tb", "a b"},
+		"nothing but whitespace is empty": {" \n\t\n", ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := layout.OneLine(c.in); got != c.want {
+				t.Errorf("OneLine(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 // TestClipLinesCountsColumnsNotBytes is the property the views rely on: after
 // clipping, no line is wider than the terminal, whatever script it is in.
 func TestClipLinesCountsColumnsNotBytes(t *testing.T) {

@@ -218,7 +218,7 @@ func (m Model) reviewErrHeight() int {
 }
 
 func (m Model) noticeLine() string {
-	text := i18n.T("notice.fetch_failed") + " · " + singleLine(m.notice)
+	text := i18n.T("notice.fetch_failed") + " · " + layout.OneLine(m.notice)
 	return theme.Error().Render(layout.Notice(text, m.width))
 }
 
