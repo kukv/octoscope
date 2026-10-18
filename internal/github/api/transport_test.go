@@ -329,16 +329,17 @@ func TestAGraphQLAnswerThatStopsArrivingIsCutOff(t *testing.T) {
 // The stall limit is on the gaps, not on the whole body: a log archive that
 // keeps arriving, however slowly, is not cut off part way.
 func TestABodyThatKeepsArrivingIsNotCutOffHoweverLongItTakes(t *testing.T) {
-	shorten(t, 50*time.Millisecond, 10*time.Second)
+	shorten(t, 200*time.Millisecond, 10*time.Second)
 
-	// 30 bytes 10ms apart take 300ms, six times the stall limit.
-	want := strings.Repeat("x", 30)
+	// 40 bytes 20ms apart take 800ms, four times the stall limit. Each gap is
+	// a tenth of the limit, so a loaded runner does not see one as a stall.
+	want := strings.Repeat("x", 40)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		for _, b := range []byte(want) {
 			_, _ = w.Write([]byte{b})
 			w.(http.Flusher).Flush()
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
 		}
 	}))
 	t.Cleanup(srv.Close)

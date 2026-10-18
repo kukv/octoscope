@@ -70,10 +70,10 @@ func (c *Client) post(ctx context.Context, doc string, vars []gql.Var) ([]byte, 
 	return out, classify(status, out)
 }
 
-// timedOut is a request this package gave up on. It reads as transient to the
-// UI, which puts it on the one-line notice like a 502, and as a deadline to
-// the read paths, which must not ask again: a connection that stalled once is
-// not one a second try will rescue, and a retry doubles the wait.
+// timedOut is a request this package gave up on. It reads as transient, the
+// way a 502 does, and as a deadline to the read paths, which must not ask
+// again: a connection that stalled once is not one a second try will rescue,
+// and a retry doubles the wait.
 type timedOut struct{ msg string }
 
 func (e *timedOut) Error() string   { return e.msg }
