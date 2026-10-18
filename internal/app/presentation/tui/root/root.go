@@ -109,12 +109,14 @@ func resolveRepo(src Source) tea.Cmd {
 	}
 }
 
-// resolved reads one lookup's outcome. exec reports a killed subprocess as
-// "signal: killed" rather than wrapping the deadline, so whether time ran out
-// is a question for the context, not for the error.
+// resolved reads one lookup's outcome. Time can run out in two places. This
+// lookup's own deadline is read from the context: exec reports a killed
+// subprocess as "signal: killed" rather than wrapping the deadline. The
+// backend may also stop the call on its own, shorter limit while this
+// context is still alive, and that one says so in the error.
 func resolved(ctx context.Context, name string, err error) repoResolvedMsg {
 	if err != nil {
-		return repoResolvedMsg{timedOut: ctx.Err() != nil}
+		return repoResolvedMsg{timedOut: ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded)}
 	}
 	return repoResolvedMsg{name: name}
 }

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kukv/octoscope/internal/github"
 	"github.com/kukv/octoscope/internal/github/gql"
@@ -20,6 +21,20 @@ import (
 // than that would lose them without a word. gh names no upper bound; it pages
 // until it has as many as it was asked for.
 const listLimit = "100"
+
+// callTimeout bounds one gh call. Most screens hand this package
+// context.Background(), so without it a gh that hangs leaves a loading screen
+// up for good. The value is the api backend's responseTimeout, for the same
+// reason: the longest answer measured there was 8.13s, rounded up to the next
+// power of two.
+var callTimeout = 16 * time.Second
+
+// logTimeout bounds gh run view --log, which downloads the whole run's log
+// archive to show one job. Uncached, microsoft/vscode's Code OSS runs (38
+// jobs each) took 10.8s to 17.1s for a 9 MB archive and 21.2s at worst for an
+// 18 MB one, so callTimeout would cut ordinary logs off. This is about five
+// times the worst of those.
+var logTimeout = 2 * time.Minute
 
 // runFunc must return stdout even when err is non-nil: gh api graphql exits
 // non-zero when the body carries a top-level "errors" array, and that body
@@ -42,7 +57,7 @@ func New(dir, repo string) *Client {
 	c.Client = &gql.Client{
 		// The closure reads c.run at call time: tests replace it after New.
 		Do: func(ctx context.Context, doc string, vars []gql.Var) ([]byte, error) {
-			return c.run(ctx, c.dir, ghArgs(doc, vars)...)
+			return c.exec(ctx, callTimeout, ghArgs(doc, vars)...)
 		},
 		RepoVars: func(repo string) ([]gql.Var, error) { return repoVars(c.effectiveRepo(repo)) },
 	}
@@ -104,6 +119,9 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	// A child gh leaves behind can hold stdout open after gh itself is
+	// killed, and Run would wait on that copy for as long as the child lives.
+	cmd.WaitDelay = time.Second
 	if err := cmd.Run(); err != nil {
 		if msg := bytes.TrimSpace(stderr.Bytes()); len(msg) > 0 {
 			return stdout.Bytes(), classify(fmt.Errorf("gh %s: %s", args[0], msg))
@@ -113,15 +131,41 @@ func runGh(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// errNoAnswer is the cause exec gives its own deadline, so that one can be
+// told apart from a deadline or cancellation the caller set.
+var errNoAnswer = errors.New("gh did not answer in time")
+
+// timedOut is a gh call this package stopped. It reads as transient to the
+// UI, which puts it on the one-line notice like a 502, and as a deadline to
+// the read paths, which must not ask again: a gh that hung once is not one a
+// second try will rescue, and a retry doubles the wait.
+type timedOut struct{ msg string }
+
+func (e *timedOut) Error() string   { return e.msg }
+func (e *timedOut) Unwrap() []error { return []error{github.ErrTransient, context.DeadlineExceeded} }
+
+// exec runs one gh call for at most limit. The limit is decided by the
+// context's cause rather than by the error: a killed gh reports
+// "signal: killed", not context.DeadlineExceeded.
+func (c *Client) exec(ctx context.Context, limit time.Duration, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeoutCause(ctx, limit, errNoAnswer)
+	defer cancel()
+	out, err := c.run(ctx, c.dir, args...)
+	if err != nil && errors.Is(context.Cause(ctx), errNoAnswer) {
+		return out, &timedOut{msg: fmt.Sprintf("gh %s: no answer in %s", args[0], limit)}
+	}
+	return out, err
+}
+
 // read runs a gh call that only reads, asking again once when GitHub's front
 // end did not answer. Only reads take this path: a 502 says no answer came
 // back, not that nothing arrived, so a repeated write could apply twice.
-func (c *Client) read(ctx context.Context, dir string, args ...string) ([]byte, error) {
-	out, err := c.run(ctx, dir, args...)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, github.ErrTransient) {
+func (c *Client) read(ctx context.Context, limit time.Duration, args ...string) ([]byte, error) {
+	out, err := c.exec(ctx, limit, args...)
+	if err == nil || ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, github.ErrTransient) {
 		return out, err
 	}
-	return c.run(ctx, dir, args...)
+	return c.exec(ctx, limit, args...)
 }
 
 func appendRepo(args []string, repo string) []string {
@@ -138,38 +182,38 @@ func (c *Client) RepoName(ctx context.Context) (string, error) {
 }
 
 func (c *Client) AddPRComment(ctx context.Context, repo string, number int, body string) error {
-	_, err := c.run(ctx, c.dir, appendRepo([]string{"pr", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"pr", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
 	return err
 }
 
 func (c *Client) AddIssueComment(ctx context.Context, repo string, number int, body string) error {
-	_, err := c.run(ctx, c.dir, appendRepo([]string{"issue", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"issue", "comment", strconv.Itoa(number), "--body", body}, c.effectiveRepo(repo))...)
 	return err
 }
 
 func (c *Client) ClosePR(ctx context.Context, repo string, number int) error {
-	_, err := c.run(ctx, c.dir, appendRepo([]string{"pr", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"pr", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
 func (c *Client) ReopenPR(ctx context.Context, repo string, number int) error {
-	_, err := c.run(ctx, c.dir, appendRepo([]string{"pr", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"pr", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
 func (c *Client) CloseIssue(ctx context.Context, repo string, number int) error {
-	_, err := c.run(ctx, c.dir, appendRepo([]string{"issue", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"issue", "close", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
 func (c *Client) ReopenIssue(ctx context.Context, repo string, number int) error {
-	_, err := c.run(ctx, c.dir, appendRepo([]string{"issue", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"issue", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
 }
 
 func (c *Client) ListLabels(ctx context.Context, repo string) ([]gql.Label, error) {
 	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.read(ctx, c.dir, args...)
+	out, err := c.read(ctx, callTimeout, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +236,7 @@ func (c *Client) ListAssignees(ctx context.Context, repo string) ([]string, erro
 	if r := c.effectiveRepo(repo); r != "" {
 		path = "repos/" + r + "/assignees?per_page=100"
 	}
-	out, err := c.read(ctx, c.dir, "api", path)
+	out, err := c.read(ctx, callTimeout, "api", path)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +259,7 @@ func (c *Client) editItems(ctx context.Context, kindCmd, repo string, number int
 	for _, v := range remove {
 		args = append(args, removeFlag, v)
 	}
-	_, err := c.run(ctx, c.dir, appendRepo(args, c.effectiveRepo(repo))...)
+	_, err := c.exec(ctx, callTimeout, appendRepo(args, c.effectiveRepo(repo))...)
 	return err
 }
 

@@ -96,6 +96,24 @@ func TestACancelledReadStops(t *testing.T) {
 	}
 }
 
+// A transport that gave up waiting has already waited its whole limit;
+// asking again would double that for a call that hung once.
+func TestAReadThatRanOutOfTimeIsNotAskedAgain(t *testing.T) {
+	t.Parallel()
+
+	calls := 0
+	c := &Client{Do: func(context.Context, string, []Var) ([]byte, error) {
+		calls++
+		return nil, errors.Join(github.ErrTransient, context.DeadlineExceeded)
+	}}
+	if _, err := c.Read(context.Background(), "query {}"); !errors.Is(err, github.ErrTransient) {
+		t.Fatalf("Read err = %v, want ErrTransient", err)
+	}
+	if calls != 1 {
+		t.Errorf("transport called %d times, want 1", calls)
+	}
+}
+
 // The transport must see the body even when the call failed: a partially
 // resolvable query answers with data and errors at once.
 func TestTheBodyOfAFailedReadIsReturned(t *testing.T) {

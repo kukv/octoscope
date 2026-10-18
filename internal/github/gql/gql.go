@@ -66,9 +66,12 @@ type Client struct {
 // Read sends a query, asking again once when GitHub's front end did not
 // answer. Only reads take this path: a 502 says no answer came back, not
 // that nothing arrived, so a repeated write could apply twice.
+//
+// A transport that ran out of its own time is not asked again: it has
+// already waited its whole limit, and a second try doubles that.
 func (c *Client) Read(ctx context.Context, doc string, vars ...Var) ([]byte, error) {
 	out, err := c.Do(ctx, doc, vars)
-	if err == nil || ctx.Err() != nil || !errors.Is(err, github.ErrTransient) {
+	if err == nil || ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, github.ErrTransient) {
 		return out, err
 	}
 	return c.Do(ctx, doc, vars)
