@@ -2,6 +2,7 @@ package root
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -27,6 +28,11 @@ type scenarioSource struct {
 
 	pendingID domain.ReviewHandle
 	posted    []domain.PendingComment
+
+	// itemCalls counts GetItem, and failItemCall is the one call that fails
+	// (zero for none): a refetch that fails has to follow one that did not.
+	itemCalls    int
+	failItemCall int
 
 	prRepos    []string
 	issueRepos []string
@@ -87,6 +93,10 @@ func (f *scenarioSource) RepoCounts(context.Context, []string) ([]domain.RepoCou
 }
 
 func (f *scenarioSource) GetItem(context.Context, domain.ItemRef) (domain.Item, error) {
+	f.itemCalls++
+	if f.itemCalls == f.failItemCall {
+		return domain.Item{}, errors.New("HTTP 502: Bad Gateway")
+	}
 	return f.pr, nil
 }
 
@@ -337,6 +347,38 @@ func TestCommentingOnADiffLineFromTheWorkBoardShowsTheThread(t *testing.T) {
 	// The author is drawn by the thread row alone.
 	if got := content(m); !strings.Contains(got, "kukv") {
 		t.Errorf("the view does not show the posted thread:\n%s", got)
+	}
+}
+
+// TestAFailedRefetchInTheDetailViewKeepsTheUserThere covers the trip a failed
+// r used to cut short: the error screen replaced the item, and its esc closed
+// the detail view along with it, back to the board.
+func TestAFailedRefetchInTheDetailViewKeepsTheUserThere(t *testing.T) {
+	f := &scenarioSource{pr: scenarioPR(), failItemCall: 2}
+	m := scenarioModel(t, f)
+
+	m = run(t, m, "enter") // the card under the cursor -> the detail view
+	if f.itemCalls != 1 || !containsStateRow(content(m), "open") {
+		t.Fatalf("precondition: the detail view did not open on the first fetch:\n%s", content(m))
+	}
+
+	m = run(t, m, "r")
+	if m.errText != "" {
+		t.Fatalf("a failed refetch went to the error screen: %q", m.errText)
+	}
+	got := content(m)
+	for _, want := range []string{i18n.T("notice.fetch_failed"), "502", "replace the renderer"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the detail view is missing %q after a failed refetch:\n%s", want, got)
+		}
+	}
+
+	m = run(t, m, "esc")
+	if m.has(overlayDetail) {
+		t.Fatalf("esc did not close the detail view:\n%s", content(m))
+	}
+	if m.tab != tabWork {
+		t.Errorf("tab = %d after esc, want the board", m.tab)
 	}
 }
 
