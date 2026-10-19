@@ -39,6 +39,9 @@ func (m Model) View() string {
 	if m.errText != "" {
 		lines = append(lines, m.errLine())
 	}
+	if m.notice != "" {
+		lines = append(lines, m.noticeLine())
+	}
 	if m.declined != "" {
 		lines = append(lines, m.declinedLine())
 	}
@@ -82,6 +85,9 @@ func (m Model) header() []string {
 }
 
 func (m Model) summaryLine() string {
+	if !m.loaded {
+		return ""
+	}
 	return theme.Dim().Render(i18n.Tf("checks.summary", map[string]any{
 		"Failing": m.checks.Failed,
 		"Running": m.checks.Running,
@@ -116,6 +122,18 @@ func (m Model) errLine() string {
 
 func (m Model) errHeight() int {
 	if m.errText != "" {
+		return 1
+	}
+	return 0
+}
+
+func (m Model) noticeLine() string {
+	text := i18n.T("notice.fetch_failed") + " · " + layout.OneLine(m.notice)
+	return theme.Error().Render(layout.Notice(text, m.width))
+}
+
+func (m Model) noticeHeight() int {
+	if m.notice != "" {
 		return 1
 	}
 	return 0
@@ -179,7 +197,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.errHeight()-m.declinedHeight()-m.rerunHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.errHeight()-m.noticeHeight()-m.declinedHeight()-m.rerunHeight(), 1)
 }
 
 // body lays the check list and the log pane side by side, the way the diff
@@ -216,6 +234,9 @@ func (m Model) visibleRows() []string {
 // allRows builds every line the list would draw, ungated by scrolling: the
 // workflow headings and one line per check.
 func (m Model) allRows() []string {
+	if !m.loaded {
+		return nil
+	}
 	if len(m.order) == 0 {
 		return []string{clip(theme.Dim().Render(i18n.T("checks.none")), listWidth)}
 	}

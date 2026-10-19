@@ -26,12 +26,22 @@ type ClosedMsg struct{}
 
 type ErrorMsg struct{ Err error }
 
+// checksMsg and errMsg carry the fetchGen their fetch started under.
 type checksMsg struct {
 	ref    domain.ItemRef
+	gen    int
 	checks domain.Checks
 }
 
 type errMsg struct {
+	ref domain.ItemRef
+	gen int
+	err error
+}
+
+// openFailedMsg is the browser's failure, not GitHub's: it goes to the
+// parent's error screen, where the address to open by hand fits whole.
+type openFailedMsg struct {
 	ref domain.ItemRef
 	err error
 }
@@ -52,6 +62,17 @@ type Model struct {
 
 	loading bool
 	spin    spinner.Model
+
+	// loaded says the list has been answered at least once. Until then the
+	// zero checks are no answer, and "no checks" or "0 failing" drawn from
+	// them would be a claim about the pull request that nobody made.
+	loaded bool
+
+	// fetchGen numbers the list's fetches: each answer carries the number its
+	// fetch started under, and one that no longer matches is dropped. r can
+	// be pressed while a fetch is still out, and both are for the same pull
+	// request, so the ref alone cannot tell the earlier answer from the later.
+	fetchGen int
 
 	checks domain.Checks
 	// order is the checks as drawn: failing workflows first, and the checks
@@ -95,10 +116,16 @@ type Model struct {
 	logPhase   logPhase
 
 	declined string
-	// errText is the last log fetch's failure. The checks list has its own
-	// escalation path (errMsg -> ErrorMsg): the list may still be readable
-	// with no log open, so this stays a footer line instead.
+	// errText is the last log fetch's failure. The list's own failure is
+	// notice, on a line of its own, so a failed refetch of the list does not
+	// hide why the log did not come.
 	errText string
+
+	// notice is what GitHub said when the list could not be fetched. The
+	// last list and the open log stay on screen and r asks again; a
+	// successful fetch clears it, so a stale complaint never outlives what
+	// it described.
+	notice string
 
 	// open shows a URL. It is browser.Open outside tests: opening a page is
 	// not a GitHub call, so it does not go through the backend.
@@ -114,13 +141,13 @@ func New(src Source, ref domain.ItemRef) Model {
 func (m Model) Init() tea.Cmd { return tea.Batch(m.spin.Tick, m.fetch()) }
 
 func (m Model) fetch() tea.Cmd {
-	src, ref := m.src, m.ref
+	src, ref, gen := m.src, m.ref, m.fetchGen
 	return func() tea.Msg {
 		c, err := src.PRChecks(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
-			return errMsg{ref: ref, err: err}
+			return errMsg{ref: ref, gen: gen, err: err}
 		}
-		return checksMsg{ref: ref, checks: c}
+		return checksMsg{ref: ref, gen: gen, checks: c}
 	}
 }
 
@@ -132,6 +159,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.checksArrived(msg), nil
 	case errMsg:
 		return m.fetchFailed(msg)
+	case openFailedMsg:
+		return m.openFailed(msg)
 	case logMsg:
 		return m.logArrived(msg), nil
 	case logErrMsg:
@@ -156,10 +185,11 @@ func (m Model) resize(msg tea.WindowSizeMsg) Model {
 func (m Model) checksArrived(msg checksMsg) Model {
 	// The request for the pull request the user just left is still in
 	// flight; its answer must not replace this one's.
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.fetchGen {
 		return m
 	}
-	m.loading = false
+	m.loading, m.loaded = false, true
+	m.notice = ""
 	m.checks = msg.checks
 	m.order = arrange(msg.checks.Runs)
 	m.row = 0
@@ -170,10 +200,22 @@ func (m Model) checksArrived(msg checksMsg) Model {
 }
 
 func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.fetchGen {
 		return m, nil
 	}
 	m.loading = false
+	if domain.IsFatal(msg.err) {
+		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	}
+	m.notice = msg.err.Error()
+	// The notice's line comes out of the list's height.
+	return m.follow(), nil
+}
+
+func (m Model) openFailed(msg openFailedMsg) (Model, tea.Cmd) {
+	if msg.ref != m.ref {
+		return m, nil
+	}
 	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
 }
 
@@ -192,6 +234,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "r":
 		m.loading = true
+		m.fetchGen++
 		m.declined = ""
 		m.errText = ""
 		return m, tea.Batch(m.spin.Tick, m.fetch())
@@ -242,10 +285,13 @@ func (m Model) selectedJob() domain.JobHandle {
 
 // openSelected opens the selected check's own page: detailsUrl for a check
 // run, targetUrl for a StatusContext. A check that reports neither is said
-// so at footer level rather than swallowed. A failure to open escalates the
-// same way a failed checks fetch does -- there is nothing sensible left on
-// screen once the browser could not be opened.
+// so at footer level rather than swallowed. A failure to open escalates to
+// the parent's error screen, which can show the address to open by hand.
 func (m Model) openSelected() (Model, tea.Cmd) {
+	// Nothing is known about the checks yet, and the notice says why.
+	if !m.loaded {
+		return m, nil
+	}
 	if len(m.order) == 0 {
 		m.declined = i18n.T("checks.none")
 		return m, nil
@@ -259,7 +305,7 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	open, ref := m.open, m.ref
 	return m, func() tea.Msg {
 		if err := open(url); err != nil {
-			return errMsg{ref: ref, err: err}
+			return openFailedMsg{ref: ref, err: err}
 		}
 		return nil
 	}

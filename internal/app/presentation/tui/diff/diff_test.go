@@ -293,21 +293,190 @@ func TestCurrentRowFollowsTheCursor(t *testing.T) {
 	}
 }
 
-// TestADiffFailureGoesToTheParentsErrorScreen is the diff fetch's own
-// failure, which leaves nothing to show: it still becomes ErrorMsg for the
-// parent's whole-screen error view.
-func TestADiffFailureGoesToTheParentsErrorScreen(t *testing.T) {
+// TestADiffFailureIsANotice pins that GitHub turning the diff down leaves the
+// user in the view, where r asks again, rather than on the parent's error
+// screen, whose esc closes the diff along with it.
+func TestADiffFailureIsANotice(t *testing.T) {
 	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
-	m, cmd := m.Update(errMsg{ref: m.ref, err: errors.New("boom")})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, cmd := m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+	if cmd != nil {
+		t.Fatalf("a diff failure produced %T, want nothing sent to the parent", cmd())
+	}
+	out := ansi.Strip(m.View())
+	for _, want := range []string{i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the view is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheDiff covers the case the notice is for: the diff
+// was on screen, r failed, and what the user was reading must still be there.
+func TestAFailedRefetchKeepsTheDiff(t *testing.T) {
+	m := loaded(t, 120, 30)
+	m = press(m, "r")
+	m, cmd := m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
+	if cmd != nil {
+		t.Fatalf("a failed refetch produced %T, want nothing sent to the parent", cmd())
+	}
+	out := ansi.Strip(m.View())
+	for _, want := range []string{"func Walk", i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the view is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestAnEarlierFetchsLateAnswerIsDropped: r can be pressed while a fetch is
+// still out, and both are for the same pull request. The earlier one's
+// answer, landing after the later one's, must not replace it -- neither a
+// failure put over the newer diff nor an older diff.
+func TestAnEarlierFetchsLateAnswerIsDropped(t *testing.T) {
+	newer := []domain.FileDiff{{Path: "newer.go", Status: domain.FileAdded}}
+	for _, tt := range []struct {
+		name  string
+		stale func(m Model, gen int) tea.Msg
+	}{
+		{"failure", func(m Model, gen int) tea.Msg {
+			return errMsg{ref: m.ref, gen: gen, err: errors.New("gh pr: no answer in 16s")}
+		}},
+		{"diff", func(m Model, gen int) tea.Msg {
+			return diffMsg{ref: m.ref, gen: gen, files: fixture()}
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := press(loaded(t, 120, 30), "r")
+			earlier := m.diffGen
+			m = press(m, "r")
+			m, _ = m.Update(diffMsg{ref: m.ref, gen: m.diffGen, files: newer})
+			m, _ = m.Update(tt.stale(m, earlier))
+
+			out := ansi.Strip(m.View())
+			if strings.Contains(out, "16s") || strings.Contains(out, "func Walk") || !strings.Contains(out, "newer.go") {
+				t.Errorf("the earlier fetch's answer landed over the newer diff:\n%s", out)
+			}
+		})
+	}
+}
+
+// TestASuccessfulRefetchClearsTheNotice keeps a stale complaint from
+// outliving the failure it described.
+func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
+	m := loaded(t, 120, 30)
+	m = press(m, "r")
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
+	if !strings.Contains(ansi.Strip(m.View()), "502") {
+		t.Fatalf("precondition: the failed refetch is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+
+	m = press(m, "r")
+	m, _ = m.Update(diffMsg{ref: m.ref, gen: m.diffGen, files: fixture()})
+	if out := ansi.Strip(m.View()); strings.Contains(out, "502") {
+		t.Errorf("the notice outlived a successful refetch:\n%s", out)
+	}
+}
+
+// TestAFatalDiffFailureStillEscalates covers what the notice must not
+// swallow: a failure the user has to fix outside octoscope belongs on the
+// parent's error screen, which says what to do (see domain.IsFatal).
+func TestAFatalDiffFailureStillEscalates(t *testing.T) {
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, cmd := m.Update(errMsg{ref: m.ref, err: fmt.Errorf("gh pr diff: %w", domain.ErrUnauthenticated)})
 	if cmd == nil {
-		t.Fatal("a diff failure produced no command")
+		t.Fatal("a fatal diff failure produced no command")
 	}
 	got, ok := cmd().(ErrorMsg)
 	if !ok {
-		t.Fatalf("a diff failure produced %T, want ErrorMsg", cmd())
+		t.Fatalf("a fatal diff failure produced %T, want ErrorMsg", cmd())
 	}
-	if got.Err.Error() != "boom" {
-		t.Errorf("ErrorMsg.Err = %q, want %q", got.Err, "boom")
+	if !errors.Is(got.Err, domain.ErrUnauthenticated) {
+		t.Errorf("ErrorMsg.Err = %v, want the source's error", got.Err)
+	}
+}
+
+// TestANoticeAndAReviewFailureBothFit is r failing twice over: the diff and
+// the review context are fetched together, and each failure has its own
+// line. Both come out of the pane, so the key bar is still the last line.
+func TestANoticeAndAReviewFailureBothFit(t *testing.T) {
+	const height = 24
+	m := loaded(t, 120, height)
+	before := m.paneHeight()
+
+	m = press(m, "r")
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
+	m, _ = m.Update(reviewErrMsg{ref: m.ref, gen: m.reviewGen, err: errors.New("boom from github")})
+
+	if got := m.paneHeight(); got != before-2 {
+		t.Errorf("paneHeight = %d with both failures, want %d", got, before-2)
+	}
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) > height {
+		t.Errorf("the diff drew %d lines into a terminal %d tall", len(lines), height)
+	}
+	if last := lines[len(lines)-1]; last != m.keyBar() {
+		t.Errorf("the last line is %q, want the key bar", ansi.Strip(last))
+	}
+}
+
+// TestTwoJoinedFailuresReadAsTwo: PRDiff tries gh pr diff and then the files
+// API, and when both fail it joins the two. On one line with nothing between
+// them they read as a single sentence.
+func TestTwoJoinedFailuresReadAsTwo(t *testing.T) {
+	m := loaded(t, 160, 30)
+	err := errors.Join(errors.New("gh pr: no answer in 16s"), errors.New("gh api: no answer in 16s"))
+	m, _ = m.Update(errMsg{ref: m.ref, err: err})
+
+	if out := ansi.Strip(m.View()); !strings.Contains(out, "gh pr: no answer in 16s; gh api: no answer in 16s") {
+		t.Errorf("the two failures are not told apart:\n%s", out)
+	}
+}
+
+// TestAFailedFirstFetchClaimsNothingAboutTheDiff: with no diff at all, "no
+// files changed" and "0 files" would be statements about the pull request
+// that nobody has made. The review context answering is what used to draw
+// the first of them, so it lands here too.
+func TestAFailedFirstFetchClaimsNothingAboutTheDiff(t *testing.T) {
+	m := New(&fakeSource{}, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m, _ = m.Update(reviewMsg{ref: m.ref, gen: m.reviewGen, ctx: domain.ReviewContext{Title: "a title"}})
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+
+	out := ansi.Strip(m.View())
+	for _, claim := range []string{i18n.T("diff.no_changes"), i18n.Tn("diff.file_count", 0)} {
+		if strings.Contains(out, claim) {
+			t.Errorf("the view claims %q about a diff it never got:\n%s", claim, out)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheCursorOnScreen: the notice takes a row from the
+// pane, and a cursor on its last row would otherwise be drawn below it.
+func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {
+	m := loaded(t, 120, 8)
+	for m.row < m.top+m.paneHeight()-1 {
+		m = press(m, "j")
+	}
+	m = press(m, "r")
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
+
+	if m.row < m.top || m.row >= m.top+m.paneHeight() {
+		t.Errorf("cursor row %d is outside the window [%d, %d)", m.row, m.top, m.top+m.paneHeight())
+	}
+}
+
+// TestAMultiLineNoticeStaysOnOneRow is the notice's share of the newline
+// problem TestAMultiLineReviewFailureStaysOnOneRow pins: the budget sets one
+// line aside for it, so a wrapped stderr must not take two.
+func TestAMultiLineNoticeStaysOnOneRow(t *testing.T) {
+	single := loaded(t, 120, 30)
+	single, _ = single.Update(errMsg{ref: single.ref, err: errors.New("HTTP 502: retry later")})
+	want := len(strings.Split(single.View(), "\n"))
+
+	multi := loaded(t, 120, 30)
+	multi, _ = multi.Update(errMsg{ref: multi.ref, err: errors.New("HTTP 502:\n\nretry later")})
+	if got := len(strings.Split(multi.View(), "\n")); got != want {
+		t.Errorf("a multi-line notice drew %d rows, want %d", got, want)
 	}
 }
 

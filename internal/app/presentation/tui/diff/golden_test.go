@@ -152,6 +152,8 @@ func TestGolden(t *testing.T) {
 				golden.Assert(t, fmt.Sprintf("diff_discard_%s_%d", lang.name, w), discardingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_loading_%s_%d", lang.name, w), loadingModel(w).View())
 				golden.Assert(t, fmt.Sprintf("diff_added_line_%s_%d", lang.name, w), addedLineModel(t, w).View())
+				golden.Assert(t, fmt.Sprintf("diff_notice_%s_%d", lang.name, w), noticeModel(w).View())
+				golden.Assert(t, fmt.Sprintf("diff_notice_first_%s_%d", lang.name, w), noticeFirstModel(w).View())
 
 				// The file list's own cursor, reached with h as a user
 				// would. Not recorded below minWidthForSidebar, where the
@@ -189,6 +191,24 @@ func reviewFailureModel(width int) Model {
 		ref: m.ref,
 		err: errors.New("GraphQL: このプルリクエストのレビュー情報を取得できませんでした (fetchReviewContext)"),
 	})
+	return m
+}
+
+// noticeModel is goldenModel after r failed to fetch the diff again: the
+// diff it already had stays, with the failure one line above the key bar.
+func noticeModel(width int) Model {
+	m := press(goldenModel(width), "r")
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.diffGen, err: errors.New("HTTP 502: Bad Gateway")})
+	return m
+}
+
+// noticeFirstModel is the diff whose first fetch failed after the review
+// context answered: the header names the pull request, and the rest is the
+// notice.
+func noticeFirstModel(width int) Model {
+	m := loadingModel(width)
+	m, _ = m.Update(reviewMsg{ref: m.ref, gen: m.reviewGen, ctx: goldenReview()})
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
 	return m
 }
 
@@ -255,6 +275,8 @@ func TestNoLineIsWiderThanTheTerminal(t *testing.T) {
 		"tab":                        goldenModel,
 		"wide_line_number":           wideLineNumberModel,
 		"review_failure":             reviewFailureModel,
+		"notice":                     noticeModel,
+		"notice_first":               noticeFirstModel,
 		"composing":                  composingModel,
 		"posting":                    postingModel,
 		"submitting":                 submittingModel,

@@ -31,8 +31,10 @@ type ClosedMsg struct{}
 
 type ErrorMsg struct{ Err error }
 
+// diffMsg and errMsg carry the diffGen their fetch started under.
 type diffMsg struct {
 	ref   domain.ItemRef
+	gen   int
 	files []domain.FileDiff
 }
 
@@ -43,10 +45,11 @@ type reviewMsg struct {
 	ctx domain.ReviewContext
 }
 
-// errMsg is the diff fetch's own failure: with no diff there is nothing to
-// show, so it escalates to the parent's whole-screen error view (ErrorMsg).
+// errMsg is the diff fetch's own failure. Only a fatal one escalates to the
+// parent's whole-screen error view (ErrorMsg); any other is the notice.
 type errMsg struct {
 	ref domain.ItemRef
+	gen int
 	err error
 }
 
@@ -142,6 +145,11 @@ type Model struct {
 	loading bool
 	spin    spinner.Model
 
+	// loaded says the diff has been answered at least once. Until then the
+	// empty files are no answer, and "no files changed" or "0 files" drawn
+	// from them would be a claim about the pull request that nobody made.
+	loaded bool
+
 	files   []domain.FileDiff
 	file    int
 	fileTop int // the first file drawn in the sidebar
@@ -155,6 +163,17 @@ type Model struct {
 	// still be readable, so this is drawn on its own footer line rather than
 	// replacing the whole screen; nil means no failure to show.
 	reviewErr error
+
+	// notice is what GitHub said when the diff could not be fetched. The
+	// last diff fetched stays on screen and r asks again; a successful fetch
+	// clears it, so a stale complaint never outlives what it described.
+	notice string
+
+	// diffGen numbers the diff fetches the way reviewGen numbers the review
+	// fetches. r can be pressed while a fetch is still out, and both are for
+	// the same pull request, so the ref alone cannot tell the earlier answer
+	// from the later.
+	diffGen int
 
 	// reviewGen numbers the review fetches: each answer carries the number
 	// its fetch started under, and one that no longer matches is dropped.
@@ -239,13 +258,13 @@ func (m Model) fetch() tea.Cmd {
 }
 
 func (m Model) fetchDiff() tea.Cmd {
-	src, ref := m.src, m.ref
+	src, ref, gen := m.src, m.ref, m.diffGen
 	return func() tea.Msg {
 		files, err := src.PRDiff(context.Background(), ref.Repo, ref.Number)
 		if err != nil {
-			return errMsg{ref: ref, err: err}
+			return errMsg{ref: ref, gen: gen, err: err}
 		}
-		return diffMsg{ref: ref, files: files}
+		return diffMsg{ref: ref, gen: gen, files: files}
 	}
 }
 
@@ -326,10 +345,11 @@ func (m Model) resize(msg tea.WindowSizeMsg) Model {
 func (m Model) filesArrived(msg diffMsg) Model {
 	// The request for the pull request the user just left is still in
 	// flight; its answer must not replace this one's.
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.diffGen {
 		return m
 	}
-	m.loading = false
+	m.loading, m.loaded = false, true
+	m.notice = ""
 	m.files = msg.files
 	m.file, m.top, m.fileTop = 0, 0, 0
 	m = m.withRows()
@@ -369,11 +389,16 @@ func (m Model) reviewFailed(msg reviewErrMsg) Model {
 }
 
 func (m Model) fetchFailed(msg errMsg) (Model, tea.Cmd) {
-	if msg.ref != m.ref {
+	if msg.ref != m.ref || msg.gen != m.diffGen {
 		return m, nil
 	}
 	m.loading = false
-	return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	if domain.IsFatal(msg.err) {
+		return m, func() tea.Msg { return ErrorMsg{Err: msg.err} }
+	}
+	m.notice = msg.err.Error()
+	// The notice's line comes out of the pane's height.
+	return m.follow(), nil
 }
 
 func (m Model) commentPosted(msg commentPostedMsg) (Model, tea.Cmd) {
@@ -464,6 +489,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return ClosedMsg{} }
 	case "r":
 		m.loading = true
+		m.diffGen++
 		m.reviewErr = nil
 		m.declined = ""
 		return m, tea.Batch(m.spin.Tick, m.fetch())
@@ -529,6 +555,9 @@ func (m Model) toggleCollapsed() Model {
 }
 
 func (m Model) buildRows() []row {
+	if !m.loaded {
+		return nil
+	}
 	if len(m.files) == 0 {
 		return []row{{kind: rowNote, hunk: -1, text: i18n.T("diff.no_changes")}}
 	}

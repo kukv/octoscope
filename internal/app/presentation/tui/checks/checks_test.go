@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -17,11 +18,12 @@ import (
 
 type fakeSource struct {
 	checks domain.Checks
+	err    error
 	log    []domain.LogLine
 }
 
 func (f *fakeSource) PRChecks(context.Context, string, int) (domain.Checks, error) {
-	return f.checks, nil
+	return f.checks, f.err
 }
 
 func (f *fakeSource) JobLog(context.Context, string, domain.JobHandle, bool) ([]domain.LogLine, error) {
@@ -133,6 +135,255 @@ func TestEscLeavesTheView(t *testing.T) {
 	}
 	if _, ok := cmd().(ClosedMsg); !ok {
 		t.Errorf("esc sent %T, want ClosedMsg", cmd())
+	}
+}
+
+// fetched is the view once its own fetch from src has answered, which is
+// where a test that changes src's answer afterwards has to start.
+func fetched(t *testing.T, src *fakeSource) (Model, tea.Cmd) {
+	t.Helper()
+	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/octoscope", Number: 61})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	return m.Update(m.fetch()())
+}
+
+// TestAChecksFailureIsANotice pins that GitHub turning the list down leaves
+// the user in the view, where r asks again, rather than on the parent's error
+// screen, whose esc closes the checks along with it.
+func TestAChecksFailureIsANotice(t *testing.T) {
+	t.Parallel()
+
+	m, cmd := fetched(t, &fakeSource{err: errors.New("HTTP 502: Bad Gateway")})
+	if cmd != nil {
+		t.Fatalf("a checks failure produced %T, want nothing sent to the parent", cmd())
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestAFailedRefetchKeepsTheLog covers the case the notice is for: a job's
+// log was open, r failed to fetch the list again, and the log the user was
+// reading must still be there.
+func TestAFailedRefetchKeepsTheLog(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture(), log: []domain.LogLine{{Step: "Run tests", Text: "FAIL ./internal/gh"}}}
+	m, _ := fetched(t, src)
+	m, cmd := m.Update(keyPress("enter"))
+	m, _ = m.Update(cmd())
+	src.err = errors.New("HTTP 502: Bad Gateway")
+
+	m = press(m, "r")
+	m, cmd = m.Update(m.fetch()())
+	if cmd != nil {
+		t.Fatalf("a failed refetch produced %T, want nothing sent to the parent", cmd())
+	}
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"sca", "FAIL ./internal/gh", i18n.T("notice.fetch_failed"), "502"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestAnEarlierFetchsLateAnswerIsDropped: r can be pressed while a fetch is
+// still out, and both are for the same pull request. The earlier one's
+// answer, landing after the later one's, must not replace it -- neither a
+// failure put over the newer list nor an older list.
+func TestAnEarlierFetchsLateAnswerIsDropped(t *testing.T) {
+	t.Parallel()
+
+	newer := domain.Checks{Total: 1, Passed: 1, State: domain.CheckSuccess, Runs: []domain.CheckRun{
+		{Name: "newer", State: domain.CheckSuccess, Kind: domain.CheckKindRun, Workflow: "CI", Job: "9", WorkflowRun: "90"},
+	}}
+	for _, tt := range []struct {
+		name  string
+		stale func(m Model, gen int) tea.Msg
+	}{
+		{"failure", func(m Model, gen int) tea.Msg {
+			return errMsg{ref: m.ref, gen: gen, err: errors.New("gh pr: no answer in 16s")}
+		}},
+		{"list", func(m Model, gen int) tea.Msg {
+			return checksMsg{ref: m.ref, gen: gen, checks: fixture()}
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := press(open(t, 120), "r")
+			earlier := m.fetchGen
+			m = press(m, "r")
+			m, _ = m.Update(checksMsg{ref: m.ref, gen: m.fetchGen, checks: newer})
+			m, _ = m.Update(tt.stale(m, earlier))
+
+			view := ansi.Strip(m.View())
+			if strings.Contains(view, "16s") || strings.Contains(view, "sca") || !strings.Contains(view, "newer") {
+				t.Errorf("the earlier fetch's answer landed over the newer list:\n%s", view)
+			}
+		})
+	}
+}
+
+// TestASuccessfulRefetchClearsTheNotice keeps a stale complaint from
+// outliving the failure it described.
+func TestASuccessfulRefetchClearsTheNotice(t *testing.T) {
+	t.Parallel()
+
+	src := &fakeSource{checks: fixture()}
+	m, _ := fetched(t, src)
+	src.err = errors.New("HTTP 502: Bad Gateway")
+	m = press(m, "r")
+	m, _ = m.Update(m.fetch()())
+	if !strings.Contains(ansi.Strip(m.View()), "502") {
+		t.Fatalf("precondition: the failed refetch is not on screen:\n%s", ansi.Strip(m.View()))
+	}
+
+	src.err = nil
+	m = press(m, "r")
+	m, _ = m.Update(m.fetch()())
+	if view := ansi.Strip(m.View()); strings.Contains(view, "502") {
+		t.Errorf("the notice outlived a successful refetch:\n%s", view)
+	}
+}
+
+// TestAFatalChecksFailureStillEscalates covers what the notice must not
+// swallow: a failure the user has to fix outside octoscope belongs on the
+// parent's error screen, which says what to do (see domain.IsFatal).
+func TestAFatalChecksFailureStillEscalates(t *testing.T) {
+	t.Parallel()
+
+	_, cmd := fetched(t, &fakeSource{err: fmt.Errorf("gh pr checks: %w", domain.ErrUnauthenticated)})
+	if cmd == nil {
+		t.Fatal("a fatal checks failure produced no command")
+	}
+	got, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("a fatal checks failure produced %T, want ErrorMsg", cmd())
+	}
+	if !errors.Is(got.Err, domain.ErrUnauthenticated) {
+		t.Errorf("ErrorMsg.Err = %v, want the source's error", got.Err)
+	}
+}
+
+// TestAFailedOpenStillEscalates keeps the browser's failure on the parent's
+// error screen: that is where the address to open by hand is drawn whole,
+// and a one-line notice would cut it short.
+func TestAFailedOpenStillEscalates(t *testing.T) {
+	t.Parallel()
+
+	m := moveTo(t, open(t, 120), "ci/circleci") // the fixture's one check with a URL
+	boom := errors.New("no browser")
+	m.open = func(string) error { return boom }
+
+	m, cmd := m.Update(keyPress("o"))
+	_, cmd = m.Update(cmd())
+	if cmd == nil {
+		t.Fatal("a failed open produced no command")
+	}
+	got, ok := cmd().(ErrorMsg)
+	if !ok {
+		t.Fatalf("a failed open produced %T, want ErrorMsg", cmd())
+	}
+	if !errors.Is(got.Err, boom) {
+		t.Errorf("ErrorMsg.Err = %v, want the browser's error", got.Err)
+	}
+}
+
+// TestANoticeAndALogFailureBothFit is a failed log under a failed refetch:
+// each has its own line, both come out of the panes, and the key bar is still
+// the last line.
+func TestANoticeAndALogFailureBothFit(t *testing.T) {
+	t.Parallel()
+
+	const height = 30
+	m := open(t, 120)
+	before := m.paneHeight()
+	m, _ = m.Update(logErrMsg{ref: m.ref, jobID: m.selectedJob(), err: errors.New("log expired")})
+	m, _ = m.Update(errMsg{ref: m.ref, err: errors.New("HTTP 502: Bad Gateway")})
+
+	if got := m.paneHeight(); got != before-2 {
+		t.Errorf("paneHeight = %d with both failures, want %d", got, before-2)
+	}
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) > height {
+		t.Errorf("the checks drew %d lines into a terminal %d tall", len(lines), height)
+	}
+	if last := lines[len(lines)-1]; last != m.keyBar() {
+		t.Errorf("the last line is %q, want the key bar", ansi.Strip(last))
+	}
+}
+
+// TestAMultiLineNoticeStaysOnOneRow: the budget sets one line aside for the
+// notice, so a wrapped stderr must not take two.
+func TestAMultiLineNoticeStaysOnOneRow(t *testing.T) {
+	t.Parallel()
+
+	single := open(t, 120)
+	single, _ = single.Update(errMsg{ref: single.ref, err: errors.New("HTTP 502: retry later")})
+	want := len(strings.Split(single.View(), "\n"))
+
+	multi := open(t, 120)
+	multi, _ = multi.Update(errMsg{ref: multi.ref, err: errors.New("HTTP 502:\n\nretry later")})
+	if got := len(strings.Split(multi.View(), "\n")); got != want {
+		t.Errorf("a multi-line notice drew %d rows, want %d", got, want)
+	}
+}
+
+// TestAFailedFirstFetchClaimsNothingAboutTheChecks: with no answer at all,
+// "no checks" and "0 failing" would be statements about the pull request that
+// nobody has made. The notice is the only thing there is to say.
+func TestAFailedFirstFetchClaimsNothingAboutTheChecks(t *testing.T) {
+	t.Parallel()
+
+	m, _ := fetched(t, &fakeSource{err: errors.New("HTTP 502: Bad Gateway")})
+	view := ansi.Strip(m.View())
+	summary := ansi.Strip(i18n.Tf("checks.summary", map[string]any{"Failing": 0, "Running": 0}))
+	// The list draws "no checks" cut to its own width.
+	none := clip(i18n.T("checks.none"), listWidth)
+	for _, claim := range []string{none, summary} {
+		if strings.Contains(view, claim) {
+			t.Errorf("the view claims %q about checks it never got:\n%s", claim, view)
+		}
+	}
+}
+
+// TestKeysClaimNothingAboutChecksThatNeverArrived: o, enter, L and R on an
+// empty list say the pull request has no checks. After a failed first fetch
+// nothing is known, and the notice already says why the keys do nothing.
+func TestKeysClaimNothingAboutChecksThatNeverArrived(t *testing.T) {
+	t.Parallel()
+
+	for _, k := range []string{"o", "enter", "L", "R"} {
+		t.Run(k, func(t *testing.T) {
+			t.Parallel()
+
+			m, _ := fetched(t, &fakeSource{err: errors.New("HTTP 502: Bad Gateway")})
+			m, cmd := m.Update(keyPress(k))
+			if m.declined != "" || cmd != nil || m.mode != modeView {
+				t.Errorf("%s: declined = %q, cmd = %v, mode = %v; want nothing to happen", k, m.declined, cmd, m.mode)
+			}
+		})
+	}
+}
+
+// TestAFailedRefetchKeepsTheCursorOnScreen: the notice takes a row from the
+// list, and a cursor on its last row would otherwise be drawn below it.
+func TestAFailedRefetchKeepsTheCursorOnScreen(t *testing.T) {
+	t.Parallel()
+
+	m := openChecks(t, 120, 12, manyChecks())
+	for m.cursorLine() < m.top+m.paneHeight()-1 {
+		m = press(m, "j")
+	}
+	m = press(m, "r")
+	m, _ = m.Update(errMsg{ref: m.ref, gen: m.fetchGen, err: errors.New("HTTP 502: Bad Gateway")})
+
+	if line := m.cursorLine(); line < m.top || line >= m.top+m.paneHeight() {
+		t.Errorf("cursor line %d is outside the window [%d, %d)", line, m.top, m.top+m.paneHeight())
 	}
 }
 

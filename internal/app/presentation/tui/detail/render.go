@@ -76,6 +76,9 @@ func (m Model) View() string {
 	if m.errText != "" {
 		failure = wrapErr(m.errText, m.width) + "\n"
 	}
+	if m.notice != "" {
+		failure += m.noticeLine() + "\n"
+	}
 	height := m.height
 	if height > 0 {
 		// A wrapped failure can be taller than the terminal. Flooring the
@@ -84,6 +87,11 @@ func (m Model) View() string {
 		height = max(height-lineCount(failure), 1)
 	}
 	return fitHeight(b.String(), height) + failure + footer
+}
+
+func (m Model) noticeLine() string {
+	text := i18n.T("notice.fetch_failed") + " · " + layout.OneLine(m.notice)
+	return theme.Error().Render(layout.Notice(text, m.width))
 }
 
 // lineCount counts the lines in a block that ends in a newline, and returns

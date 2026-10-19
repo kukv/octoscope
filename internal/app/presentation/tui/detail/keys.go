@@ -102,7 +102,7 @@ func (m Model) openMerge() (Model, tea.Cmd) {
 func (m Model) refetch() (Model, tea.Cmd) {
 	m.phase = phaseLoading
 	m.declined = ""
-	return m, fetch(m.src, m.ref)
+	return m.startFetch()
 }
 
 func (m Model) openCompose() (Model, tea.Cmd) {

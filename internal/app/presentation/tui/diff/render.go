@@ -63,6 +63,9 @@ func (m Model) View() string {
 	if m.reviewErr != nil {
 		lines = append(lines, m.reviewErrLine())
 	}
+	if m.notice != "" {
+		lines = append(lines, m.noticeLine())
+	}
 	if m.declined != "" {
 		lines = append(lines, m.declinedLine())
 	}
@@ -214,6 +217,20 @@ func (m Model) reviewErrHeight() int {
 	return 0
 }
 
+func (m Model) noticeLine() string {
+	text := i18n.T("notice.fetch_failed") + " · " + layout.OneLine(m.notice)
+	return theme.Error().Render(layout.Notice(text, m.width))
+}
+
+// noticeHeight is the extra line noticeLine takes, out of the pane's height
+// budget the same way reviewErrHeight is.
+func (m Model) noticeHeight() int {
+	if m.notice != "" {
+		return 1
+	}
+	return 0
+}
+
 // declinedLine reports why c, v or X just did nothing: the row has no line,
 // the review context has not arrived yet, or (X) there is no pending review.
 // It is drawn the same way reviewErrLine is -- one line above the key bar,
@@ -262,12 +279,14 @@ func (m Model) sizeLine() string {
 	if m.review.Head != "" || m.review.Base != "" {
 		parts = append(parts, m.review.Head+" → "+m.review.Base)
 	}
-	size := i18n.Tn("diff.file_count", len(m.files))
-	if adds > 0 || dels > 0 {
-		size += " " + theme.Added().Render("+"+strconv.Itoa(adds)) +
-			" " + theme.Removed().Render("−"+strconv.Itoa(dels))
+	if m.loaded {
+		size := i18n.Tn("diff.file_count", len(m.files))
+		if adds > 0 || dels > 0 {
+			size += " " + theme.Added().Render("+"+strconv.Itoa(adds)) +
+				" " + theme.Removed().Render("−"+strconv.Itoa(dels))
+		}
+		parts = append(parts, size)
 	}
-	parts = append(parts, size)
 	// A pending review with no comments yet is still there to submit into.
 	if n := m.pendingCount(); n > 0 || m.review.Pending != "" {
 		parts = append(parts, i18n.Tn("diff.pending_note", n))
@@ -307,7 +326,7 @@ func (m Model) paneHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.declinedHeight()-m.composerHeight()-m.submitHeight()-m.discardHeight(), 1)
+	return max(m.height-headerHeight-keyBarHeight-m.reviewErrHeight()-m.noticeHeight()-m.declinedHeight()-m.composerHeight()-m.submitHeight()-m.discardHeight(), 1)
 }
 
 // body lays the sidebar and the diff pane side by side, the way the Repos
