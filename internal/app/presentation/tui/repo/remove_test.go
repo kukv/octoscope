@@ -1,10 +1,13 @@
 package repo
 
 import (
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestXRemovesTheRowAndSavesTheRest(t *testing.T) {
@@ -112,5 +115,23 @@ func TestRemovedRowsStayRemovedAcrossTheLookup(t *testing.T) {
 	m, _ = m.SetCurrent("kukv/structure")
 	if slices.Contains(m.rowNames(), "kukv/koto") {
 		t.Errorf("rows = %v, want kukv/koto still gone", m.rowNames())
+	}
+}
+
+// With the last row gone no counts fetch goes out, so nothing would ever
+// answer the failure on the line: it would go on describing rows that are
+// no longer there.
+func TestRemovingTheLastRowDropsTheCountsFailure(t *testing.T) {
+	f := &fakeSource{}
+	m := sized(New(f, Options{Repositories: []string{"kukv/octoscope"}}), 120)
+	m, _ = m.Update(countsFailedMsg{gen: m.countsGen, err: errors.New("counts broke")})
+	m, _ = m.Update(key("h"))
+	m, cmd := m.Update(key("x"))
+	drain(t, cmd)
+	if len(m.rows) != 0 {
+		t.Fatalf("setup: rows = %v, want none", m.rowNames())
+	}
+	if view := ansi.Strip(m.View()); strings.Contains(view, "counts broke") {
+		t.Errorf("the counts' failure outlived every row it described:\n%s", view)
 	}
 }

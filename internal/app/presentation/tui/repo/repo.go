@@ -404,9 +404,14 @@ func (m Model) startList(t tabID) (Model, tea.Cmd) {
 	return m, fetchList(ctx, m.src, t, m.selectedRepo(), m.gen)
 }
 
-// startCounts fetches every row's counts under a new generation.
+// startCounts fetches every row's counts under a new generation. With no
+// rows nothing is fetched and so nothing would ever answer the last
+// failure, which by then describes rows that are gone.
 func (m Model) startCounts() (Model, tea.Cmd) {
 	m.countsGen++
+	if len(m.rows) == 0 {
+		m.counts = notice{}
+	}
 	return m, fetchCounts(m.src, m.rowNames(), m.countsGen)
 }
 
