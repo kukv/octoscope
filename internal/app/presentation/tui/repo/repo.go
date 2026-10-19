@@ -84,8 +84,9 @@ type (
 	rowSettledMsg struct{ gen int }
 
 	// A fetch's failure belongs to the row it was asked for and names its
-	// generation; a browser's or a save's belongs to no row and is never
-	// stale (.claude/rules/errors.md: one message type per place it lands).
+	// generation; the counts' belongs to no row but names the fetch it
+	// answers; a browser's or a save's belongs to no row and is never stale
+	// (.claude/rules/errors.md: one message type per place it lands).
 	fetchFailedMsg struct {
 		gen int
 		tab tabID
