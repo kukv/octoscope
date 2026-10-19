@@ -63,7 +63,10 @@ type (
 		gen    int
 		issues []domain.Item
 	}
-	repoCountsMsg []domain.RepoCount
+	repoCountsMsg struct {
+		gen    int
+		counts []domain.RepoCount
+	}
 
 	// searchTickMsg fires once the typing has paused, and candidatesMsg
 	// carries what the search it started found. Both name the generation of
@@ -88,6 +91,10 @@ type (
 		tab tabID
 		err error
 	}
+	countsFailedMsg struct {
+		gen int
+		err error
+	}
 	openFailedMsg struct {
 		tab tabID
 		err error
@@ -105,7 +112,7 @@ type (
 // noticeKind says which failure the line above the key bar is reporting. The
 // words in front of what the environment said differ: a browser that would
 // not start has nothing to do with fetching, and saying it could not fetch
-// would be a lie. The zero value is the fetch, which is where all but one of
+// would be a lie. The zero value is the list's fetch, which is where most of
 // these come from.
 type noticeKind uint8
 
@@ -113,6 +120,7 @@ const (
 	noticeFetch noticeKind = iota
 	noticeOpen
 	noticeSave
+	noticeCounts
 )
 
 // prefixID is the catalog key for the words in front of the notice. What the
@@ -123,6 +131,8 @@ func (k noticeKind) prefixID() string {
 		return "notice.open_failed"
 	case noticeSave:
 		return "notice.save_failed"
+	case noticeCounts:
+		return "notice.counts_failed"
 	default:
 		return "notice.fetch_failed"
 	}
@@ -239,6 +249,17 @@ type Model struct {
 	// user onto a tab that answered.
 	notice [2]notice
 
+	// counts is the failure of the last counts fetch. It is not a tab's: one
+	// fetch counts every row, so neither a tab answering nor the cursor
+	// leaving a row says anything about it.
+	counts notice
+
+	// countsGen counts the counts fetches sent out. r, SetCurrent and adding
+	// or removing a row each send one, so two can be out at once, and an
+	// earlier one answering last must neither raise a failure over a later
+	// success nor clear a later failure.
+	countsGen int
+
 	// gen counts how many times selectRow has run. A fetch or the failure it
 	// can produce carries the generation it started in; Update drops one
 	// whose generation no longer matches, which is what a row the cursor has
@@ -307,7 +328,8 @@ func (m Model) SetCurrent(name string) (Model, tea.Cmd) {
 	rows, selected := buildRows(m.opts.Repositories, name)
 	m = m.setRows(rows)
 	next, cmd := m.selectRow(selected)
-	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()))
+	next, counts := next.startCounts()
+	return next, tea.Batch(cmd, counts)
 }
 
 // Current is the repository the sidebar treats as the user's own, which the
@@ -381,13 +403,19 @@ func (m Model) startList(t tabID) (Model, tea.Cmd) {
 	return m, fetchList(ctx, m.src, t, m.selectedRepo(), m.gen)
 }
 
+// startCounts fetches every row's counts under a new generation.
+func (m Model) startCounts() (Model, tea.Cmd) {
+	m.countsGen++
+	return m, fetchCounts(m.src, m.rowNames(), m.countsGen)
+}
+
 func (m Model) Init() tea.Cmd {
 	if len(m.rows) == 0 {
 		return nil
 	}
 	// A value receiver cannot keep a cancel function, so the first fetch is
 	// the one no later move can stop.
-	return tea.Batch(m.spin.Tick, fetchList(context.Background(), m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames()))
+	return tea.Batch(m.spin.Tick, fetchList(context.Background(), m.src, m.tab, m.selectedRepo(), m.gen), fetchCounts(m.src, m.rowNames(), m.countsGen))
 }
 
 // Refresh re-fetches the current tab. The parent calls it after an event
@@ -403,7 +431,8 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	// request answers.
 	m.answeredFetch(m.tab)
 	m, list := m.startList(m.tab)
-	return m, tea.Batch(list, fetchCounts(m.src, m.rowNames()))
+	m, counts := m.startCounts()
+	return m, tea.Batch(list, counts)
 }
 
 // rowNames is the sidebar's repositories in their current spelling, in the
@@ -439,16 +468,16 @@ func fetchList(ctx context.Context, src Source, t tabID, repo string, gen int) t
 	}
 }
 
-func fetchCounts(src repoCounter, repos []string) tea.Cmd {
+func fetchCounts(src repoCounter, repos []string, gen int) tea.Cmd {
 	if len(repos) == 0 {
 		return nil
 	}
 	return func() tea.Msg {
 		counts, err := src.RepoCounts(context.Background(), repos)
 		if err != nil {
-			return repoCountsMsg(nil) // badges fall back to the dash; the lists still work
+			return countsFailedMsg{gen: gen, err: err}
 		}
-		return repoCountsMsg(counts)
+		return repoCountsMsg{gen: gen, counts: counts}
 	}
 }
 
@@ -496,11 +525,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
 	case repoCountsMsg:
-		if len(msg) != len(m.rows) {
+		if msg.gen != m.countsGen {
+			return m, nil
+		}
+		m.counts = notice{}
+		if len(msg.counts) != len(m.rows) {
 			return m, nil
 		}
 		m.rows = slices.Clone(m.rows)
-		for i, c := range msg {
+		for i, c := range msg.counts {
 			if c.Unavailable {
 				continue
 			}
@@ -554,6 +587,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.loading[msg.tab] = false
 		return m.fail(msg.tab, noticeFetch, msg.err, nil)
+	case countsFailedMsg:
+		if msg.gen != m.countsGen {
+			return m, nil
+		}
+		if domain.IsFatal(msg.err) {
+			return m, func() tea.Msg { return FatalMsg{msg.err} }
+		}
+		// The badges fall back to the dash, which on its own reads the same
+		// as a row not yet counted; the notice says why.
+		m.counts = notice{kind: noticeCounts, text: noticeText(msg.err)}
+		return m, nil
 	case openFailedMsg:
 		// A browser that would not start leaves whatever is in flight in
 		// flight.

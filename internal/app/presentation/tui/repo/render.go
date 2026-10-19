@@ -126,12 +126,22 @@ func (m Model) selectedItem() (domain.WorkItem, bool) {
 // terminal rather than the table's own width: the sidebar is not what
 // failed, and a message cut to the narrower pane would lose what GitHub said.
 func (m Model) noticeLine() string {
-	n := m.notice[m.tab]
+	n := m.shownNotice()
 	if n.text == "" {
 		return ""
 	}
 	return theme.Error().Render(
 		layout.Notice(i18n.T(n.kind.prefixID())+" · "+n.text, m.width))
+}
+
+// shownNotice is the one notice the line has room for. The tab's own comes
+// first: it says why the table is stale, while the counts' only explains
+// the badges.
+func (m Model) shownNotice() notice {
+	if m.notice[m.tab].text != "" {
+		return m.notice[m.tab]
+	}
+	return m.counts
 }
 
 func (m Model) keyBar() string {
@@ -253,7 +263,7 @@ func (m Model) visibleRows() int {
 	if m.drawerShown() {
 		rows -= drawer.Height
 	}
-	if m.notice[m.tab].text != "" {
+	if m.shownNotice().text != "" {
 		rows--
 	}
 	return max(rows, 1)

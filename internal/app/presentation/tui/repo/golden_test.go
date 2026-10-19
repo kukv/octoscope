@@ -104,10 +104,10 @@ func goldenModel(width int) Model {
 		Current:      "kukv/octoscope",
 	}), width)
 	m, _ = m.Update(prListMsg{prs: f.prs})
-	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{
+	m, _ = m.Update(repoCountsMsg{counts: []domain.RepoCount{
 		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
 		{Repo: "kukv/koto", Unavailable: true},
-	}))
+	}})
 	m.fetchedAt = [2]time.Time{goldenFetchedAt, goldenFetchedAt}
 	return m
 }

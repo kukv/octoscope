@@ -29,6 +29,8 @@ error:
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).
 notice:
+  counts_failed:
+    other: "Could not fetch counts"
   fetch_failed:
     other: "Could not fetch"
   open_failed:
