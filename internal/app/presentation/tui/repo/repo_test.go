@@ -1128,6 +1128,25 @@ func TestAnEarlierCountsAnswerIsDropped(t *testing.T) {
 	}
 }
 
+// Init's counts fetch goes out before the lookup that names the current
+// repository answers, and SetCurrent sends another. Init's can answer last;
+// its failure says nothing about the rows SetCurrent counted.
+func TestInitsCountsFailureAfterSetCurrentsAnswerIsDropped(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), counts: []domain.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 1, Issues: 2},
+		{Repo: "kukv/koto", PRs: 3, Issues: 4},
+	}}
+	m := sized(New(f, Options{Repositories: []string{"kukv/octoscope", "kukv/koto"}}), 120)
+	initCmd := m.Init()
+	m, cmd := m.SetCurrent("kukv/octoscope")
+	m = update(t, m, cmd)
+	f.countErr = errors.New("counts broke")
+	m = update(t, m, initCmd)
+	if view := ansi.Strip(m.View()); strings.Contains(view, "counts broke") {
+		t.Errorf("Init's failure overwrote SetCurrent's answer:\n%s", view)
+	}
+}
+
 // The counts' notice takes a line like any other, and it has to come out of
 // the table: otherwise the key bar is pushed off the bottom.
 func TestACountsFailureStillFitsTheTerminal(t *testing.T) {
