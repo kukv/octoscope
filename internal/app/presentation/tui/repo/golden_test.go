@@ -139,6 +139,18 @@ func TestGolden(t *testing.T) {
 				})
 				golden.Assert(t, fmt.Sprintf("repo_no_browser_%s_%d", lang.name, w), noBrowser.View())
 
+				// The first counts failing while the list answered: every
+				// badge is the dash, which alone would read as rows not yet
+				// counted.
+				counts := sized(New(&fakeSource{}, Options{
+					Repositories: []string{"kukv/octoscope", "kukv/koto"},
+					Current:      "kukv/octoscope",
+				}), w)
+				counts, _ = counts.Update(prListMsg{prs: goldenPRs()})
+				counts.fetchedAt = [2]time.Time{goldenFetchedAt, goldenFetchedAt}
+				counts, _ = counts.Update(countsFailedMsg{gen: counts.countsGen, err: domain.Classify(domain.ErrTransient, goldenFailure)})
+				golden.Assert(t, fmt.Sprintf("repo_counts_failed_%s_%d", lang.name, w), counts.View())
+
 				prs := goldenModel(w)
 				issues, cmd := prs.Update(key("tab"))
 				issues, _ = issues.Update(cmd())
