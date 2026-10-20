@@ -947,7 +947,7 @@ func TestBadgesShowTheCounts(t *testing.T) {
 		{Repo: "kukv/koto", Unavailable: true},
 	}}
 	m := sidebarModel(f, 120)
-	m, _ = m.Update(repoCountsMsg(f.counts))
+	m, _ = m.Update(repoCountsMsg{counts: f.counts})
 	view := m.View()
 	if !strings.Contains(view, "12/3") {
 		t.Errorf("the badge is missing:\n%s", view)
@@ -963,7 +963,7 @@ func TestBadgesShowTheCounts(t *testing.T) {
 func TestCountsMatchByPositionAndTakeTheResolvedName(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := sized(New(f, Options{Repositories: []string{"KUKV/Octoscope"}}), 120)
-	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
+	m, _ = m.Update(repoCountsMsg{counts: []domain.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}})
 	if m.rows[0].name != "kukv/octoscope" {
 		t.Errorf("row name = %q, want the spelling GitHub resolved", m.rows[0].name)
 	}
@@ -977,7 +977,7 @@ func TestCountsMatchByPositionAndTakeTheResolvedName(t *testing.T) {
 func TestRenamedRowDoesNotStrandAPendingFetch(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := New(f, Options{Repositories: []string{"KUKV/Octoscope"}})
-	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}))
+	m, _ = m.Update(repoCountsMsg{counts: []domain.RepoCount{{Repo: "kukv/octoscope", PRs: 1, Issues: 2}}})
 	if m.rows[0].name != "kukv/octoscope" {
 		t.Fatalf("setup: row name = %q, want the resolved spelling", m.rows[0].name)
 	}
@@ -992,7 +992,7 @@ func TestCountsOfADifferentLengthAreIgnored(t *testing.T) {
 	f := &fakeSource{prs: samplePRs()}
 	m := sidebarModel(f, 120)
 	before := m.rows
-	m, _ = m.Update(repoCountsMsg([]domain.RepoCount{{Repo: "kukv/octoscope"}}))
+	m, _ = m.Update(repoCountsMsg{counts: []domain.RepoCount{{Repo: "kukv/octoscope"}}})
 	if m.rows[0].counted != before[0].counted {
 		t.Error("a mismatched answer was taken")
 	}
@@ -1009,6 +1009,168 @@ func TestCountsAreFetchedOnRefresh(t *testing.T) {
 	}
 	if got := f.countCalls[0]; len(got) != 2 || got[0] != "kukv/octoscope" {
 		t.Errorf("RepoCounts got %v, want every row's name", got)
+	}
+}
+
+// update feeds every message the command produced back into the model, the
+// way the runtime would.
+func update(t *testing.T, m Model, cmd tea.Cmd) Model {
+	t.Helper()
+	for _, msg := range drain(t, cmd) {
+		m, _ = m.Update(msg)
+	}
+	return m
+}
+
+// A dash on every badge is also what a row not yet counted looks like, so an
+// expired login or a rate limit would read as nothing at all without the
+// reason on the notice line.
+func TestACountsFailureSaysWhyOnTheNoticeLine(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), countErr: errors.New("gh: HTTP 502")}
+	m := sidebarModel(f, 120)
+	if view := ansi.Strip(m.View()); strings.Contains(view, i18n.T("notice.counts_failed")) {
+		t.Fatalf("counts that have not answered yet are reported as failed:\n%s", view)
+	}
+	m, cmd := m.Update(key("r"))
+	m = update(t, m, cmd)
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, i18n.T("notice.counts_failed")) || !strings.Contains(view, "HTTP 502") {
+		t.Errorf("the notice line does not say the counts failed and why:\n%s", view)
+	}
+	if !strings.Contains(view, samplePRs()[0].Title) {
+		t.Errorf("the list was lost:\n%s", view)
+	}
+}
+
+func TestAnUnauthenticatedCountsFetchIsFatal(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), countErr: fmt.Errorf("gh api graphql: %w", domain.ErrUnauthenticated)}
+	m := sidebarModel(f, 120)
+	m, cmd := m.Update(key("r"))
+	for _, msg := range drain(t, cmd) {
+		var next tea.Cmd
+		m, next = m.Update(msg)
+		if next == nil {
+			continue
+		}
+		if _, fatal := next().(FatalMsg); fatal {
+			return
+		}
+	}
+	t.Error("a counts fetch with no credentials did not reach the full-screen error")
+}
+
+// The tab's own failure says why the table is stale, which matters more than
+// the badges; the counts' failure is still true once the tab answers.
+func TestTheTabsFailureTakesTheLineBeforeTheCounts(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(countsFailedMsg{gen: m.countsGen, err: errors.New("counts broke")})
+	m, _ = m.Update(fetchFailedMsg{gen: m.gen, tab: tabPRs, err: errors.New("list broke")})
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "list broke") || strings.Contains(view, "counts broke") {
+		t.Errorf("the tab's failure is not the one on the line:\n%s", view)
+	}
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: f.prs})
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "counts broke") {
+		t.Errorf("the counts' failure did not come back once the tab answered:\n%s", view)
+	}
+}
+
+// The counts cover every row at once, so moving to another row says nothing
+// about them; only the next answer does.
+func TestACountsFailureOutlivesARowMoveButNotTheNextAnswer(t *testing.T) {
+	f := &fakeSource{prs: samplePRs()}
+	m := sidebarModel(f, 120)
+	m, _ = m.Update(countsFailedMsg{gen: m.countsGen, err: errors.New("counts broke")})
+	m, _ = m.Update(key("h"))
+	m, _ = m.Update(key("j"))
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "counts broke") {
+		t.Errorf("moving to another row cleared the counts' failure:\n%s", view)
+	}
+	m, _ = m.Update(repoCountsMsg{gen: m.countsGen, counts: []domain.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 1, Issues: 2},
+		{Repo: "kukv/koto", PRs: 3, Issues: 4},
+	}})
+	if view := ansi.Strip(m.View()); strings.Contains(view, "counts broke") {
+		t.Errorf("the counts' failure outlived the answer that replaced it:\n%s", view)
+	}
+}
+
+// r pressed twice puts two counts fetches out at once, and they can answer in
+// either order. Only the later one's answer says how things stand.
+func TestAnEarlierCountsAnswerIsDropped(t *testing.T) {
+	counts := []domain.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 1, Issues: 2},
+		{Repo: "kukv/koto", PRs: 3, Issues: 4},
+	}
+	for _, tt := range []struct {
+		name                string
+		firstErr, secondErr error
+		wantNotice          bool
+		wrong               string
+	}{
+		{"an earlier failure after a later success", errors.New("counts broke"), nil, false, "an earlier failure overwrote a later success"},
+		{"an earlier success after a later failure", nil, errors.New("counts broke"), true, "an earlier success cleared a later failure"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fakeSource{prs: samplePRs(), counts: counts}
+			m := sidebarModel(f, 120)
+			m, first := m.Update(key("r"))
+			m, second := m.Update(key("r"))
+			f.countErr = tt.secondErr
+			m = update(t, m, second)
+			f.countErr = tt.firstErr
+			m = update(t, m, first)
+			if got := strings.Contains(ansi.Strip(m.View()), "counts broke"); got != tt.wantNotice {
+				t.Errorf("%s:\n%s", tt.wrong, ansi.Strip(m.View()))
+			}
+		})
+	}
+}
+
+// Init's counts fetch goes out before the lookup that names the current
+// repository answers, and SetCurrent sends another. Init's can answer last;
+// its failure says nothing about the rows SetCurrent counted.
+func TestInitsCountsFailureAfterSetCurrentsAnswerIsDropped(t *testing.T) {
+	f := &fakeSource{prs: samplePRs(), counts: []domain.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 1, Issues: 2},
+		{Repo: "kukv/koto", PRs: 3, Issues: 4},
+	}}
+	m := sized(New(f, Options{Repositories: []string{"kukv/octoscope", "kukv/koto"}}), 120)
+	initCmd := m.Init()
+	m, cmd := m.SetCurrent("kukv/octoscope")
+	m = update(t, m, cmd)
+	f.countErr = errors.New("counts broke")
+	m = update(t, m, initCmd)
+	if view := ansi.Strip(m.View()); strings.Contains(view, "counts broke") {
+		t.Errorf("Init's failure overwrote SetCurrent's answer:\n%s", view)
+	}
+}
+
+// The counts' notice takes a line like any other, and it has to come out of
+// the table: otherwise the key bar is pushed off the bottom.
+func TestACountsFailureStillFitsTheTerminal(t *testing.T) {
+	const height = 24
+	prs := make([]domain.Item, 50)
+	for i := range prs {
+		prs[i] = domain.Item{
+			Ref:       domain.ItemRef{Kind: domain.ItemPR, Number: i + 1},
+			Title:     fmt.Sprintf("pr number %d", i),
+			UpdatedAt: time.Now(),
+			Change:    &domain.Change{},
+		}
+	}
+	m := New(&fakeSource{prs: prs}, Options{Current: "kukv/octoscope"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: height})
+	m, _ = m.Update(prListMsg{gen: m.gen, prs: prs})
+	m, _ = m.Update(countsFailedMsg{gen: m.countsGen, err: errors.New("gh: HTTP 502")})
+
+	lines := strings.Split(ansi.Strip(m.View()), "\n")
+	if len(lines) > height {
+		t.Errorf("the list drew %d lines into a terminal %d high", len(lines), height)
+	}
+	if last := lines[min(len(lines), height)-1]; !strings.Contains(last, i18n.T("footer.list.move")) {
+		t.Errorf("the key bar is not on the last line on screen: %q", last)
 	}
 }
 
@@ -1247,11 +1409,13 @@ func renderEveryScreen() map[string]string {
 	issues, cmd := list.Update(key("tab"))
 	issues, _ = issues.Update(cmd())
 	empty := loadedModel(&fakeSource{})
+	counts, _ := list.Update(countsFailedMsg{gen: list.countsGen, err: errors.New("gh: HTTP 502")})
 
 	return map[string]string{
-		"list_prs":    list.View(),
-		"list_issues": issues.View(),
-		"empty":       empty.View(),
-		"loading":     New(f, Options{}).View(),
+		"list_prs":      list.View(),
+		"list_issues":   issues.View(),
+		"empty":         empty.View(),
+		"loading":       New(f, Options{}).View(),
+		"counts_failed": counts.View(),
 	}
 }

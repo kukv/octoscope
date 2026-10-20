@@ -99,8 +99,9 @@ func (m Model) addSelected() (Model, tea.Cmd) {
 	m.mode = modeList
 	m = m.setRows(rows)
 	next, cmd := m.selectRow(indexOf(rows, name))
+	next, counts := next.startCounts()
 	next, save := next.save()
-	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()), save)
+	return next, tea.Batch(cmd, counts, save)
 }
 
 // removeSelected drops the repository under the sidebar's cursor. It is
@@ -119,8 +120,9 @@ func (m Model) removeSelected() (Model, tea.Cmd) {
 	// the new one's; going around it would leave the removed repository's
 	// pull requests on screen.
 	next, cmd := m.selectRow(min(m.selected, len(rows)-1))
+	next, counts := next.startCounts()
 	next, save := next.save()
-	return next, tea.Batch(cmd, fetchCounts(next.src, next.rowNames()), save)
+	return next, tea.Batch(cmd, counts, save)
 }
 
 // setRows keeps Options.Repositories in step with the rows on screen.

@@ -29,6 +29,8 @@ error:
 # The line above the key bar for a failure the view carries on despite. What
 # GitHub said follows it untranslated (.claude/rules/errors.md).
 notice:
+  counts_failed:
+    other: "件数を取得できませんでした"
   fetch_failed:
     other: "取得できませんでした"
   open_failed:
