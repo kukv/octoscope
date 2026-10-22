@@ -73,6 +73,14 @@
       "url": "URI"
     }
   },
+  "CheckRunStateCount": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "count": "Int",
+      "state": "CheckRunState"
+    }
+  },
   "CheckSuite": {
     "kind": "OBJECT",
     "possibleTypes": [],
@@ -198,7 +206,6 @@
       "databaseId": "Int",
       "duplicateOf": "Issue",
       "editor": "Actor",
-      "eventRationales": "IssueEventRationale",
       "fullDatabaseId": "BigInt",
       "hovercard": "Hovercard",
       "id": "ID",
@@ -225,6 +232,7 @@
       "publishedAt": "DateTime",
       "reactionGroups": "ReactionGroup",
       "reactions": "ReactionConnection",
+      "relatesTo": "IssueConnection",
       "repository": "Repository",
       "resourcePath": "URI",
       "state": "IssueState",
@@ -390,6 +398,7 @@
       "addPullRequestReviewThread": "AddPullRequestReviewThreadPayload",
       "addPullRequestReviewThreadReply": "AddPullRequestReviewThreadReplyPayload",
       "addReaction": "AddReactionPayload",
+      "addRelatesTo": "AddRelatesToPayload",
       "addStar": "AddStarPayload",
       "addSubIssue": "AddSubIssuePayload",
       "addUpvote": "AddUpvotePayload",
@@ -527,6 +536,7 @@
       "removeOutsideCollaborator": "RemoveOutsideCollaboratorPayload",
       "removePullRequestCreationCapBypassUsers": "RemovePullRequestCreationCapBypassUsersPayload",
       "removeReaction": "RemoveReactionPayload",
+      "removeRelatesTo": "RemoveRelatesToPayload",
       "removeStar": "RemoveStarPayload",
       "removeSubIssue": "RemoveSubIssuePayload",
       "removeUpvote": "RemoveUpvotePayload",
@@ -539,6 +549,7 @@
       "requestReviews": "RequestReviewsPayload",
       "requestReviewsByLogin": "RequestReviewsByLoginPayload",
       "rerequestCheckSuite": "RerequestCheckSuitePayload",
+      "rerequestReviews": "RerequestReviewsPayload",
       "resolveReviewThread": "ResolveReviewThreadPayload",
       "retireSponsorsTier": "RetireSponsorsTierPayload",
       "revertPullRequest": "RevertPullRequestPayload",
@@ -648,6 +659,7 @@
       "AddedToMergeQueueEvent",
       "AddedToProjectEvent",
       "AddedToProjectV2Event",
+      "AddedToStackEvent",
       "App",
       "AssignedEvent",
       "AutoMergeDisabledEvent",
@@ -802,6 +814,11 @@
       "PackageVersion",
       "ParentIssueAddedEvent",
       "ParentIssueRemovedEvent",
+      "PendingAssigneeSuggestion",
+      "PendingCloseSuggestion",
+      "PendingFieldSuggestion",
+      "PendingLabelSuggestion",
+      "PendingTypeSuggestion",
       "PinnedDiscussion",
       "PinnedEnvironment",
       "PinnedEvent",
@@ -850,6 +867,7 @@
       "RemovedFromMergeQueueEvent",
       "RemovedFromProjectEvent",
       "RemovedFromProjectV2Event",
+      "RemovedFromStackEvent",
       "RenamedTitleEvent",
       "ReopenedEvent",
       "RepoAccessAuditEntry",
@@ -1315,6 +1333,7 @@
       "forkCount": "Int",
       "forkingAllowed": "Boolean",
       "forks": "RepositoryConnection",
+      "fullDatabaseId": "BigInt",
       "fundingLinks": "FundingLink",
       "hasDiscussionsEnabled": "Boolean",
       "hasIssuesEnabled": "Boolean",
@@ -1510,6 +1529,14 @@
       "state": "StatusState",
       "targetUrl": "URI",
       "updatedAt": "DateTime"
+    }
+  },
+  "StatusContextStateCount": {
+    "kind": "OBJECT",
+    "possibleTypes": [],
+    "fields": {
+      "count": "Int",
+      "state": "StatusState"
     }
   },
   "SubmitPullRequestReviewPayload": {

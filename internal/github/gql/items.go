@@ -57,29 +57,11 @@ type PullRequest struct {
 		Nodes []Author `json:"nodes"`
 	} `json:"assignees"`
 	Comments commentPage `json:"comments"`
-	Commits  struct {
-		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup *struct {
-					Contexts struct {
-						Nodes []CheckContext `json:"nodes"`
-					} `json:"contexts"`
-				} `json:"statusCheckRollup"`
-			} `json:"commit"`
-		} `json:"nodes"`
-	} `json:"commits"`
+	Commits  lastCommit  `json:"commits"`
 }
 
-// StatusCheckContexts reads the roll-up off the last commit, which is where
-// GitHub hangs it: a pull request has no roll-up of its own.
-func (n PullRequest) StatusCheckContexts() []CheckContext {
-	var nodes []CheckContext
-	for _, commit := range n.Commits.Nodes {
-		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
-			nodes = append(nodes, rollup.Contexts.Nodes...)
-		}
-	}
-	return nodes
+func (n PullRequest) StatusCheckRollup() CheckRollup {
+	return n.Commits.rollup()
 }
 
 // Issue is one issue as the documents in this package select it. Body and

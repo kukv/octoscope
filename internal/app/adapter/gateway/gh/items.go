@@ -57,7 +57,7 @@ func toItemFromPR(n gql.PullRequest, repo string) domain.Item {
 			Base:      n.BaseRefName,
 			Additions: n.Additions,
 			Deletions: n.Deletions,
-			Checks:    toChecksFromContexts(n.StatusCheckContexts()),
+			Checks:    toChecksFromRollup(n.StatusCheckRollup()),
 		},
 	}
 }

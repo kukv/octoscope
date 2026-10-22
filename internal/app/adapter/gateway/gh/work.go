@@ -79,7 +79,7 @@ func toWorkItem(n gql.SearchItem) domain.WorkItem {
 	item.Base = n.BaseRefName
 	item.Additions = n.Additions
 	item.Deletions = n.Deletions
-	item.Checks = toChecksFromContexts(n.StatusCheckContexts())
+	item.Checks = toChecksFromRollup(n.StatusCheckRollup())
 	return item
 }
 

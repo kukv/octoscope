@@ -43,7 +43,13 @@ fragment WorkItem on SearchResultItem {
       nodes {
         commit {
           statusCheckRollup {
+            # The counts cover every context, the ones past this page too, so
+            # the summary is whole without paging. The nodes name only the
+            # first hundred.
             contexts(first: 100) {
+              totalCount
+              checkRunCountsByState { state count }
+              statusContextCountsByState { state count }
               nodes { ...CheckContext }
             }
           }

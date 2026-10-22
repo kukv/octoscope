@@ -92,7 +92,7 @@ def named: if .name != null then .name else (.ofType | named) end;
 | from_entries
 JQ
 
-jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection","IssueComment","IssueCommentConnection","User","UserConnection"]' \
+jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Actor","Label","LabelConnection","PullRequestReviewConnection","PullRequestReview","PullRequestReviewThreadConnection","PullRequestReviewThread","PullRequestReviewCommentConnection","PullRequestReviewComment","SearchResultItemConnection","SearchResultItem","PullRequestCommitConnection","PullRequestCommit","Commit","StatusCheckRollup","StatusCheckRollupContextConnection","StatusCheckRollupContext","CheckRun","StatusContext","CheckSuite","WorkflowRun","Workflow","AddPullRequestReviewPayload","AddPullRequestReviewThreadPayload","SubmitPullRequestReviewPayload","DeletePullRequestReviewPayload","Node","PageInfo","AutoMergeRequest","MergePullRequestPayload","EnablePullRequestAutoMergePayload","DisablePullRequestAutoMergePayload","PullRequestConnection","IssueConnection","IssueComment","IssueCommentConnection","User","UserConnection","CheckRunStateCount","StatusContextStateCount"]' \
   -f /tmp/trim.jq /tmp/schema-full.json > internal/github/gql/testdata/schema.json
 ```
 
@@ -101,6 +101,10 @@ jq --argjson types '["Query","Mutation","Repository","PullRequest","Issue","Acto
 
 `IssueComment`、`IssueCommentConnection`、`User`、`UserConnection` は 2026-09-12 に
 `pr.graphql` / `issue.graphql`（`comments` と `assignees`）のために追加した。
+
+`CheckRunStateCount` と `StatusContextStateCount` は 2026-10-23 に
+`work.graphql` / `pr.graphql` / `repo_prs.graphql`（`contexts` の状態ごとの件数）のために追加した。
+このとき録り直したので、それ以外の型にも GitHub 側のスキーマの変化（フィールドの増減）が入っている。
 
 同じ 2026-09-12 の録り直しで `Mutation.updateEnterpriseProofOfPresenceRequiredSetting`
 が消えた。このプロジェクトが選ばない enterprise 専用の mutation で、GitHub 側の
@@ -254,10 +258,16 @@ gh api graphql -F query=@internal/github/gql/work.graphql \
 
 ## `repo_prs.json`
 
-`repo_prs.graphql` に対する実レスポンス。録った日: 2026-09-20、対象:
-`kukv/portfolio`。開いている PR は #86 の 1 件で、review decision
-（`REVIEW_REQUIRED`）・ラベル・check roll-up（8 件）・additions/deletions・
-`bodyText` のすべてが埋まっている。
+`repo_prs.graphql` に対する実レスポンス。録った日: 2026-10-23、対象:
+`kukv/koto`。開いている PR は 3 件（#47・#39・#37、renovate）で、どれも review decision
+（`REVIEW_REQUIRED`）・ラベル・check roll-up（11 件、状態ごとの件数つき）・additions/deletions・
+`bodyText` が埋まっている。
+
+**`kukv/portfolio` から対象を変えた理由**: 文書が `contexts` の件数
+（`totalCount`・`checkRunCountsByState`・`statusContextCountsByState`）を選ぶようになったので
+録り直す必要があったが、その時点で portfolio に開いている PR が 1 件も無かった。
+公開リポジトリのうち review decision・ラベル・check roll-up がそろうものを選んだ
+（`gh repo view kukv/koto --json isPrivate` で公開を確認済み）。
 
 **`kukv/octoscope` から対象を変えた理由**: 文書が `bodyText` を選ぶように
 なったので録り直す必要があったが、その時点で octoscope に開いている PR が
@@ -265,13 +275,12 @@ gh api graphql -F query=@internal/github/gql/work.graphql \
 review decision と check roll-up が両方埋まっているものを選んだ
 （`gh repo view kukv/<name> --json isPrivate` で公開を確認済み）。
 
-ファイルが 38 KB あるのは、renovate が書いた PR 本文にリリースノートが
-丸ごと入っているため。GitHub がそう返すものであり、**短くするための編集はしない**。
+renovate が書いた PR 本文が長くても、GitHub がそう返すものであり、**短くするための編集はしない**。
 
 ```bash
 D=internal/github/gql/testdata
 gh api graphql -F query=@internal/github/gql/repo_prs.graphql \
-  -f owner=kukv -f name=portfolio | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
+  -f owner=kukv -f name=koto | jq '.data.repository.pullRequests.nodes |= .[0:5]' > $D/repo_prs.json
 ```
 
 ## `repo_issues.json`
@@ -299,6 +308,7 @@ gh api graphql -F query=@internal/github/gql/repo_issues.graphql \
 詳細画面はこの 2 つをそのまま描くので、空のまま描かれても誰も気づかない状態だった。
 
 2026-09-13 に `comments` の `pageInfo` を選ぶようになったのに合わせて録り直した。
+2026-10-23 に `contexts` の状態ごとの件数を選ぶようになったのに合わせて録り直した（check は 3 件）。
 `kukv/octoscope#59` のコメントは 3 件で 1 ページに収まるため、この録りものが
 確かめるのはフィールドの読み取りだけである。**`pr_comments.graphql` による
 ページングの仕組みは録りものではなく `comments_test.go` 内のインライン JSON で

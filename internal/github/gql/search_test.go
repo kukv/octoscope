@@ -56,7 +56,7 @@ func TestASearchResultParsesIntoSearchItems(t *testing.T) {
 	if item.ReviewDecision != "REVIEW_REQUIRED" {
 		t.Errorf("review decision: got %q, want REVIEW_REQUIRED", item.ReviewDecision)
 	}
-	contexts := item.StatusCheckContexts()
+	contexts := item.StatusCheckRollup().Contexts
 	if len(contexts) != 3 {
 		t.Errorf("checks: got %d contexts, want 3", len(contexts))
 	}
@@ -97,7 +97,7 @@ func TestStatusCheckContextsWithNoRollupIsEmpty(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("the result holds %d items, want 1", len(items))
 	}
-	if got := items[0].StatusCheckContexts(); len(got) != 0 {
+	if got := items[0].StatusCheckRollup().Contexts; len(got) != 0 {
 		t.Errorf("contexts = %+v, want none", got)
 	}
 }
@@ -132,7 +132,7 @@ func TestStatusCheckContextsKeepsEachShapesOwnFields(t *testing.T) {
 		{Typename: "CheckRun", Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS"},
 		{Typename: "StatusContext", Context: "ci/legacy", State: "FAILURE"},
 	}
-	if got := item.StatusCheckContexts(); !reflect.DeepEqual(got, want) {
+	if got := item.StatusCheckRollup().Contexts; !reflect.DeepEqual(got, want) {
 		t.Errorf("contexts = %+v, want %+v", got, want)
 	}
 	if item.BodyText != "the body" {

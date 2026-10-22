@@ -153,12 +153,15 @@ func checksPane(it domain.WorkItem, w int) []string {
 	runs := slices.SortedStableFunc(slices.Values(c.Runs), func(a, b domain.CheckRun) int {
 		return checkOrder(a.State) - checkOrder(b.State)
 	})
+	shown := runs[:min(len(runs), checks)]
 	var lines []string
-	for _, run := range runs[:min(len(runs), checks)] {
+	for _, run := range shown {
 		lines = append(lines, clip(
 			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, w))
 	}
-	if rest := len(runs) - checks; rest > 0 {
+	// Total, not len(runs): the list documents name only a page of the
+	// checks, and the counts cover the ones past it.
+	if rest := c.Total - len(shown); rest > 0 {
 		lines = append(lines, theme.Dim().Render(clip(i18n.Tn("work.checks_more", rest), w)))
 	}
 

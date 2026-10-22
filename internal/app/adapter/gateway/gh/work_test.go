@@ -143,7 +143,11 @@ func TestToWorkItemTranslatesTheWireShapeIntoTheDomain(t *testing.T) {
 	// node.Commits.Nodes is an anonymous struct too deeply nested to build
 	// field by field, so it is filled the way the real client fills it: by
 	// decoding it out of JSON in the shape the roll-up query returns.
-	const commits = `[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+	const commits = `[{"commit":{"statusCheckRollup":{"contexts":{
+		"totalCount":2,
+		"checkRunCountsByState":[{"state":"SUCCESS","count":1}],
+		"statusContextCountsByState":[{"state":"FAILURE","count":1}],
+		"nodes":[
 		{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS"},
 		{"__typename":"StatusContext","context":"ci/deploy","state":"FAILURE"}
 	]}}}}]`
