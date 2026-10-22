@@ -15,6 +15,12 @@ GitHub の返し方が変わったときに気づけることがこの testdata 
 
 2026-09-11 に `state` を選ぶようになったのに合わせて録り直した。
 
+2026-10-23 に `contexts` の状態ごとの件数を選ぶようになったのに合わせて録り直した。
+前回の 4 件のうち `bright-room/br-claude-plugins#17` は assigned 列から外れていたので、
+残りの 3 件（`bright-room/uniso#121`・`kukv/wsl-setup#113`・`kukv/todo-app#63`）だけにした。
+3 件とも公開リポジトリで、本文も読み直した。check を持つ PR は `kukv/todo-app#63`（3 件）だけで、
+件数の読み取りはこのノードで確かめている。
+
 assigned 列を選んだのは、この列だけが PR と Issue の両方を返すため。PR しか
 返さない列を録ると `toWorkItem` の Issue 側の分岐を一度も通さないテストになる。
 

@@ -296,6 +296,38 @@ func TestSearchItemsParsesARecordedResponse(t *testing.T) {
 	}
 }
 
+// The Work board's cards are summed from the counts by state, because the
+// contexts are one page of a hundred. A count that stops decoding leaves
+// every card at zero checks while the drawer still names them.
+func TestTheSearchRollupCountsCoverEveryContext(t *testing.T) {
+	t.Parallel()
+
+	c := fileClient(t, "testdata/work_section.json")
+	items, err := c.SearchItems(context.Background(), "is:open assignee:@me")
+	if err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+	var sawChecks bool
+	for _, item := range items {
+		r := item.StatusCheckRollup()
+		if len(r.Contexts) == 0 {
+			continue
+		}
+		sawChecks = true
+		sum := 0
+		for _, s := range slices.Concat(r.CheckRunCounts, r.StatusContextCounts) {
+			sum += s.Count
+		}
+		if sum != r.TotalCount || sum < len(r.Contexts) {
+			t.Errorf("#%d: counts by state add up to %d of %d contexts (%d named), want all of them",
+				item.Number, sum, r.TotalCount, len(r.Contexts))
+		}
+	}
+	if !sawChecks {
+		t.Error("no pull request in the recording has checks; re-record work_section.json with one that does")
+	}
+}
+
 // The Work board is always is:open, but the same document answers the Search
 // tab, whose results carry closed and merged items.
 func TestTheSearchDocumentSelectsTheState(t *testing.T) {
