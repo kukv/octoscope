@@ -58,22 +58,6 @@ func sanitizeControls(line string) string {
 	return b.String()
 }
 
-// caret is a control character written the way a terminal shows one: ^ and the
-// letter it is made from. C1 characters (0x80-0x9f) show as the C0 characters
-// they mirror. Anything else is returned untouched, delete (0x7f) included:
-// it is a control character Go names as one and gh does not rewrite.
-func caret(r rune) (string, bool) {
-	switch {
-	case r == '\t' || r == '\n' || r == '\v' || r == '\r':
-		return "", false
-	case r >= 0x00 && r <= 0x1f:
-		return "^" + string('@'+r), true
-	case r >= 0x80 && r <= 0x9f:
-		return "^" + string('@'+r-0x80), true
-	}
-	return "", false
-}
-
 // jobLogLines reads the job's log out of the run's archive. GitHub builds one
 // zip per run, so a single job's log is a matter of finding its entries in it.
 //

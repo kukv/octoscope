@@ -34,7 +34,7 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 	body := `{"data":{"repository":{"squashMergeAllowed":true,"mergeCommitAllowed":false,` +
 		`"rebaseMergeAllowed":false,"deleteBranchOnMerge":true,"autoMergeAllowed":true,` +
 		`"viewerPermission":"ADMIN",` +
-		`"pullRequest":{"id":"PR_1","isDraft":false,"mergeable":"MERGEABLE",` +
+		`"pullRequest":{"id":"PR_1","headRefOid":"oidA","isDraft":false,"mergeable":"MERGEABLE",` +
 		`"mergeStateStatus":"CLEAN","reviewDecision":"APPROVED",` +
 		`"viewerCanEnableAutoMerge":true,"autoMergeRequest":null}}}}`
 	f := &fakeSeq{outs: []string{body}}
@@ -46,6 +46,7 @@ func TestPRMergeContextReadsEveryField(t *testing.T) {
 	}
 	want := MergeContext{
 		PullRequestID:            "PR_1",
+		HeadRefOid:               "oidA",
 		IsDraft:                  false,
 		Mergeable:                "MERGEABLE",
 		MergeStateStatus:         "CLEAN",
@@ -101,7 +102,7 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 
 			f := &fakeSeq{outs: []string{`{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}`}}
 			c := &Client{Do: f.do}
-			if err := c.MergePR(t.Context(), "PR_1", tt.method); err != nil {
+			if err := c.MergePR(t.Context(), "PR_1", "oidA", tt.method); err != nil {
 				t.Fatalf("MergePR: %v", err)
 			}
 			if !slices.Contains(f.calls[0], tt.want) {
@@ -109,6 +110,12 @@ func TestMergePRSendsTheMethodTheUserChose(t *testing.T) {
 			}
 			if !slices.Contains(f.calls[0], S("pullRequestId", "PR_1")) {
 				t.Errorf("call = %v, want it to carry pullRequestId=PR_1", f.calls[0])
+			}
+			// Without it GitHub merges whatever the head is when the
+			// request lands, a commit pushed after the popup opened
+			// included.
+			if !slices.Contains(f.calls[0], S("expectedHeadOid", "oidA")) {
+				t.Errorf("call = %v, want it to carry expectedHeadOid=oidA", f.calls[0])
 			}
 		})
 	}
@@ -119,11 +126,14 @@ func TestAutoMergeIsTurnedOnWithAMethodAndOffWithout(t *testing.T) {
 
 	on := &fakeSeq{outs: []string{`{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}`}}
 	c := &Client{Do: on.do}
-	if err := c.EnableAutoMerge(t.Context(), "PR_1", MergeMethodRebase); err != nil {
+	if err := c.EnableAutoMerge(t.Context(), "PR_1", "oidA", MergeMethodRebase); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if !slices.Contains(on.calls[0], S("mergeMethod", "REBASE")) {
 		t.Errorf("call = %v, want it to carry mergeMethod=REBASE", on.calls[0])
+	}
+	if !slices.Contains(on.calls[0], S("expectedHeadOid", "oidA")) {
+		t.Errorf("call = %v, want it to carry expectedHeadOid=oidA", on.calls[0])
 	}
 
 	off := &fakeSeq{outs: []string{`{"data":{"disablePullRequestAutoMerge":{"clientMutationId":null}}}`}}

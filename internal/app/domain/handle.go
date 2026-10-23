@@ -29,6 +29,10 @@ type (
 	PullRequestHandle string
 	// ReviewHandle addresses one review, submitted or not.
 	ReviewHandle string
+	// CommitHandle addresses the commit a pull request's head was at when it
+	// was read. A review or a merge carries the one the user was shown, so a
+	// commit pushed since is not what they approve or merge.
+	CommitHandle string
 	// JobHandle addresses one job's log. Empty for a check that is not a
 	// job, which has no log to read.
 	JobHandle string

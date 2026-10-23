@@ -16,9 +16,10 @@ import (
 )
 
 type fakeSource struct {
-	files  []domain.FileDiff
-	err    error
-	review domain.ReviewContext
+	files     []domain.FileDiff
+	err       error
+	review    domain.ReviewContext
+	submitted []domain.ReviewTarget
 }
 
 func (f *fakeSource) PRDiff(context.Context, string, int) ([]domain.FileDiff, error) {
@@ -35,7 +36,8 @@ func (f *fakeSource) PostLineComment(context.Context, domain.ReviewTarget, domai
 
 func (f *fakeSource) DiscardReview(context.Context, domain.ReviewHandle) error { return nil }
 
-func (f *fakeSource) SubmitReview(context.Context, domain.ReviewTarget, domain.ReviewEvent, string) error {
+func (f *fakeSource) SubmitReview(_ context.Context, t domain.ReviewTarget, _ domain.ReviewEvent, _ string) error {
+	f.submitted = append(f.submitted, t)
 	return nil
 }
 

@@ -24,13 +24,13 @@ func (f *fakeMerges) PRMergeContext(_ context.Context, _ string, _ int) (domain.
 	return f.mergeContext, f.err
 }
 
-func (f *fakeMerges) MergePR(_ context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	f.mergedID, f.mergedMethod = pr, method
+func (f *fakeMerges) MergePR(_ context.Context, t domain.MergeTarget, method domain.MergeMethod) error {
+	f.mergedID, f.mergedMethod = t.PullRequest, method
 	return f.err
 }
 
-func (f *fakeMerges) EnableAutoMerge(_ context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	f.autoMergeID, f.autoMergeMethod = pr, method
+func (f *fakeMerges) EnableAutoMerge(_ context.Context, t domain.MergeTarget, method domain.MergeMethod) error {
+	f.autoMergeID, f.autoMergeMethod = t.PullRequest, method
 	return f.err
 }
 
@@ -44,7 +44,7 @@ func TestMergePRPassesTheMethodThrough(t *testing.T) {
 
 	f := &fakeMerges{}
 	u := &Usecase{merges: f}
-	if err := u.MergePR(t.Context(), "PR_1", domain.MergeRebase); err != nil {
+	if err := u.MergePR(t.Context(), domain.MergeTarget{PullRequest: "PR_1", Commit: "oidA"}, domain.MergeRebase); err != nil {
 		t.Fatalf("MergePR: %v", err)
 	}
 	if f.mergedID != "PR_1" || f.mergedMethod != domain.MergeRebase {

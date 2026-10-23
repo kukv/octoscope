@@ -13,6 +13,7 @@ query ($owner: String!, $name: String!, $number: Int!) {
     viewerPermission
     pullRequest(number: $number) {
       id
+      headRefOid
       isDraft
       mergeable
       mergeStateStatus

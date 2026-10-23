@@ -1,5 +1,5 @@
-mutation ($pullRequestId: ID!) {
-  addPullRequestReview(input: {pullRequestId: $pullRequestId}) {
+mutation ($pullRequestId: ID!, $commitOID: GitObjectID!) {
+  addPullRequestReview(input: {pullRequestId: $pullRequestId, commitOID: $commitOID}) {
     pullRequestReview {
       id
     }

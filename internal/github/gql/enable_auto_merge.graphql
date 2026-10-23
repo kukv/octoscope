@@ -1,5 +1,5 @@
-mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
-  enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId, mergeMethod: $mergeMethod}) {
+mutation ($pullRequestId: ID!, $expectedHeadOid: GitObjectID!, $mergeMethod: PullRequestMergeMethod!) {
+  enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId, expectedHeadOid: $expectedHeadOid, mergeMethod: $mergeMethod}) {
     clientMutationId
   }
 }

@@ -83,10 +83,10 @@ type reviewFetcher interface {
 }
 
 type reviewer interface {
-	StartReview(ctx context.Context, pullRequestID string) (string, error)
+	StartReview(ctx context.Context, pullRequestID, commitOID string) (string, error)
 	AddReviewThread(ctx context.Context, reviewID string, c gql.PendingComment) (gql.ReviewThread, error)
 	SubmitReview(ctx context.Context, reviewID string, event gql.ReviewEvent, body string) error
-	SubmitNewReview(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error
+	SubmitNewReview(ctx context.Context, pullRequestID, commitOID string, event gql.ReviewEvent, body string) error
 	DiscardReview(ctx context.Context, reviewID string) error
 }
 
@@ -98,8 +98,8 @@ type checksFetcher interface {
 
 type merger interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (gql.MergeContext, error)
-	MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
-	EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	MergePR(ctx context.Context, pullRequestID, expectedHeadOid string, method gql.MergeMethod) error
+	EnableAutoMerge(ctx context.Context, pullRequestID, expectedHeadOid string, method gql.MergeMethod) error
 	DisableAutoMerge(ctx context.Context, pullRequestID string) error
 }
 

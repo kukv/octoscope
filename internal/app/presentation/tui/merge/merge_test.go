@@ -23,6 +23,7 @@ type fakeSource struct {
 	err     error
 	merged  []domain.MergeMethod
 	enabled []domain.MergeMethod
+	targets []domain.MergeTarget
 	offCall int
 }
 
@@ -35,12 +36,14 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return f.ctx, f.err
 }
 
-func (f *fakeSource) MergePR(_ context.Context, _ domain.PullRequestHandle, m domain.MergeMethod) error {
+func (f *fakeSource) MergePR(_ context.Context, t domain.MergeTarget, m domain.MergeMethod) error {
+	f.targets = append(f.targets, t)
 	f.merged = append(f.merged, m)
 	return nil
 }
 
-func (f *fakeSource) EnableAutoMerge(_ context.Context, _ domain.PullRequestHandle, m domain.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(_ context.Context, t domain.MergeTarget, m domain.MergeMethod) error {
+	f.targets = append(f.targets, t)
 	f.enabled = append(f.enabled, m)
 	return nil
 }
@@ -91,6 +94,7 @@ func autoMergeable() domain.MergeContext {
 func mergeable() domain.MergeContext {
 	return domain.MergeContext{
 		PullRequest: "PR_1",
+		Commit:      "oidA",
 		Methods:     []domain.MergeMethod{domain.MergeSquash, domain.MergeCommit, domain.MergeRebase},
 	}
 }
@@ -443,6 +447,42 @@ func blocked() domain.MergeContext {
 	c.Block = domain.BlockProtected
 	c.ViewerIsAdmin = true
 	return c
+}
+
+// The popup's state was read at one head, and that is what the user decided
+// on. Every way out of the popup that merges names it, so the service refuses
+// a branch pushed since rather than merging a commit nobody looked at.
+func TestEveryMergeNamesTheHeadThePopupShowed(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		ctx  domain.MergeContext
+		keys func(Model) (Model, tea.Cmd)
+	}{
+		{"merge", mergeable(), enter},
+		{"merge as admin", blocked(), func(m Model) (Model, tea.Cmd) { return press(m, "a") }},
+		{"auto-merge", autoMergeable(), func(m Model) (Model, tea.Cmd) {
+			m, _ = press(m, " ")
+			return enter(m)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := &fakeSource{ctx: tt.ctx}
+			_, cmd := tt.keys(loaded(t, f))
+			if cmd == nil {
+				t.Fatal("nothing was sent")
+			}
+			cmd()
+			want := domain.MergeTarget{PullRequest: "PR_1", Commit: "oidA"}
+			if len(f.targets) != 1 || f.targets[0] != want {
+				t.Errorf("targets = %v, want [%v]", f.targets, want)
+			}
+		})
+	}
 }
 
 func TestAPressedOnABlockedPullRequestMergesIt(t *testing.T) {

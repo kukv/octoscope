@@ -23,8 +23,17 @@ const (
 	BlockDirty
 )
 
+// MergeTarget names the pull request a merge acts on and the head the user
+// was shown. The service refuses the merge once the head has moved on.
+type MergeTarget struct {
+	PullRequest PullRequestHandle
+	Commit      CommitHandle
+}
+
 type MergeContext struct {
 	PullRequest PullRequestHandle
+	// Commit is the head the popup's state was read at.
+	Commit CommitHandle
 
 	// Block is why merging is refused right now, as the gateway read it out
 	// of what the service reported. BlockNone means nothing refuses it.
@@ -54,6 +63,11 @@ type MergeContext struct {
 	// false under a ruleset, so the gateway fills this from the repository
 	// permission instead.
 	ViewerIsAdmin bool
+}
+
+// Target is what a merge offered from this context acts on.
+func (c MergeContext) Target() MergeTarget {
+	return MergeTarget{PullRequest: c.PullRequest, Commit: c.Commit}
 }
 
 // CanAutoMerge reports whether auto-merge can be turned on. GitHub refuses

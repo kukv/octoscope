@@ -15,20 +15,20 @@ import (
 type fakeMerger struct {
 	backend
 	prMergeContext  func(ctx context.Context, repo string, number int) (gql.MergeContext, error)
-	mergePR         func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
-	enableAutoMerge func(ctx context.Context, pullRequestID string, method gql.MergeMethod) error
+	mergePR         func(ctx context.Context, pullRequestID, head string, method gql.MergeMethod) error
+	enableAutoMerge func(ctx context.Context, pullRequestID, head string, method gql.MergeMethod) error
 }
 
 func (f fakeMerger) PRMergeContext(ctx context.Context, repo string, number int) (gql.MergeContext, error) {
 	return f.prMergeContext(ctx, repo, number)
 }
 
-func (f fakeMerger) MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
-	return f.mergePR(ctx, pullRequestID, method)
+func (f fakeMerger) MergePR(ctx context.Context, pullRequestID, head string, method gql.MergeMethod) error {
+	return f.mergePR(ctx, pullRequestID, head, method)
 }
 
-func (f fakeMerger) EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
-	return f.enableAutoMerge(ctx, pullRequestID, method)
+func (f fakeMerger) EnableAutoMerge(ctx context.Context, pullRequestID, head string, method gql.MergeMethod) error {
+	return f.enableAutoMerge(ctx, pullRequestID, head, method)
 }
 
 // TestToMergeContextTranslatesEveryField gives every field of
@@ -42,6 +42,7 @@ func TestToMergeContextTranslatesEveryField(t *testing.T) {
 
 	c := gql.MergeContext{
 		PullRequestID:            "PR_kwDOTVXF-M8AAAABCd9eQA",
+		HeadRefOid:               "oidA",
 		IsDraft:                  true,
 		Mergeable:                "CONFLICTING",
 		MergeStateStatus:         "DIRTY",
@@ -57,6 +58,7 @@ func TestToMergeContextTranslatesEveryField(t *testing.T) {
 	got := toMergeContext(c)
 	want := domain.MergeContext{
 		PullRequest:              "PR_kwDOTVXF-M8AAAABCd9eQA",
+		Commit:                   "oidA",
 		Block:                    domain.BlockDraft,
 		Review:                   domain.ReviewApproved,
 		Methods:                  []domain.MergeMethod{domain.MergeSquash, domain.MergeRebase},
@@ -214,16 +216,22 @@ func TestMergePRPassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
 	var got gql.MergeMethod
-	g := New(fakeMerger{mergePR: func(_ context.Context, _ string, method gql.MergeMethod) error {
-		got = method
+	var gotHead string
+	g := New(fakeMerger{mergePR: func(_ context.Context, _, head string, method gql.MergeMethod) error {
+		got, gotHead = method, head
 		return nil
 	}})
 
-	if err := g.MergePR(t.Context(), "PR_1", domain.MergeRebase); err != nil {
+	if err := g.MergePR(t.Context(), domain.MergeTarget{PullRequest: "PR_1", Commit: "oidA"}, domain.MergeRebase); err != nil {
 		t.Fatalf("MergePR: %v", err)
 	}
 	if got != gql.MergeMethodRebase {
 		t.Errorf("method passed to the backend = %v, want MergeMethodRebase", got)
+	}
+	// The head the popup was read at is what the service compares against;
+	// dropping it here would merge whatever was pushed since.
+	if gotHead != "oidA" {
+		t.Errorf("head passed to the backend = %q, want oidA", gotHead)
 	}
 }
 
@@ -231,16 +239,20 @@ func TestEnableAutoMergePassesTheConvertedMethod(t *testing.T) {
 	t.Parallel()
 
 	var got gql.MergeMethod
-	g := New(fakeMerger{enableAutoMerge: func(_ context.Context, _ string, method gql.MergeMethod) error {
-		got = method
+	var gotHead string
+	g := New(fakeMerger{enableAutoMerge: func(_ context.Context, _, head string, method gql.MergeMethod) error {
+		got, gotHead = method, head
 		return nil
 	}})
 
-	if err := g.EnableAutoMerge(t.Context(), "PR_1", domain.MergeCommit); err != nil {
+	if err := g.EnableAutoMerge(t.Context(), domain.MergeTarget{PullRequest: "PR_1", Commit: "oidA"}, domain.MergeCommit); err != nil {
 		t.Fatalf("EnableAutoMerge: %v", err)
 	}
 	if got != gql.MergeMethodMerge {
 		t.Errorf("method passed to the backend = %v, want MergeMethodMerge", got)
+	}
+	if gotHead != "oidA" {
+		t.Errorf("head passed to the backend = %q, want oidA", gotHead)
 	}
 }
 
@@ -292,7 +304,7 @@ func TestTheMergeWritesHandTheirContextToTheBackend(t *testing.T) {
 		{
 			name: "MergePR",
 			call: func(g *Gateway, ctx context.Context) error {
-				return g.MergePR(ctx, "PR_1", domain.MergeSquash)
+				return g.MergePR(ctx, domain.MergeTarget{PullRequest: "PR_1", Commit: "oidA"}, domain.MergeSquash)
 			},
 			fake: func(got *context.Context) fakeBackend {
 				return fakeBackend{mergePR: func(ctx context.Context, _ string, _ gql.MergeMethod) error {
@@ -304,7 +316,7 @@ func TestTheMergeWritesHandTheirContextToTheBackend(t *testing.T) {
 		{
 			name: "EnableAutoMerge",
 			call: func(g *Gateway, ctx context.Context) error {
-				return g.EnableAutoMerge(ctx, "PR_1", domain.MergeSquash)
+				return g.EnableAutoMerge(ctx, domain.MergeTarget{PullRequest: "PR_1", Commit: "oidA"}, domain.MergeSquash)
 			},
 			fake: func(got *context.Context) fakeBackend {
 				return fakeBackend{enableAutoMerge: func(ctx context.Context, _ string, _ gql.MergeMethod) error {

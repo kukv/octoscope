@@ -86,7 +86,7 @@ func (f fakeBackend) ReopenIssue(ctx context.Context, repo string, number int) e
 	return f.reopenIssue(ctx, repo, number)
 }
 
-func (f fakeBackend) StartReview(ctx context.Context, pullRequestID string) (string, error) {
+func (f fakeBackend) StartReview(ctx context.Context, pullRequestID, _ string) (string, error) {
 	return f.startReview(ctx, pullRequestID)
 }
 

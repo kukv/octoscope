@@ -34,7 +34,7 @@ func (c *Client) PRDiff(ctx context.Context, repo string, number int) (github.Di
 		}
 		return github.Diff{}, errors.Join(derr, ferr)
 	}
-	return github.Diff{Raw: out}, nil
+	return github.Diff{Raw: caretText(out)}, nil
 }
 
 // prFiles is the files-API fallback for PRDiff. It walks every page: the
@@ -44,7 +44,7 @@ func (c *Client) prFiles(ctx context.Context, repo string, number int) ([]github
 	path := fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d", repo, number, pageSize)
 	var files []github.PRFile
 	err := c.walkPages(ctx, path, func(out []byte) error {
-		page, err := github.ParseFilesAPI(out)
+		page, err := github.ParseFilesAPI(caretJSON(out))
 		if err != nil {
 			return err
 		}

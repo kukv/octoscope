@@ -187,11 +187,11 @@ func (f *scenarioSource) PRMergeContext(context.Context, string, int) (domain.Me
 	return domain.MergeContext{}, nil
 }
 
-func (f *scenarioSource) MergePR(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *scenarioSource) MergePR(context.Context, domain.MergeTarget, domain.MergeMethod) error {
 	return nil
 }
 
-func (f *scenarioSource) EnableAutoMerge(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *scenarioSource) EnableAutoMerge(context.Context, domain.MergeTarget, domain.MergeMethod) error {
 	return nil
 }
 

@@ -212,6 +212,7 @@ func (m Model) reviewContextArrived(msg reviewContextMsg) Model {
 	target := review.Target{
 		PullRequest:     msg.ctx.PullRequest,
 		Pending:         msg.ctx.Pending,
+		Commit:          msg.ctx.Commit,
 		PendingComments: msg.ctx.PendingCount(),
 	}
 	m.submit = review.New(m.src, target)

@@ -91,11 +91,11 @@ func (f fakeBackend) PRMergeContext(ctx context.Context, repo string, number int
 	return f.prMergeContext(ctx, repo, number)
 }
 
-func (f fakeBackend) MergePR(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+func (f fakeBackend) MergePR(ctx context.Context, pullRequestID, _ string, method gql.MergeMethod) error {
 	return f.mergePR(ctx, pullRequestID, method)
 }
 
-func (f fakeBackend) EnableAutoMerge(ctx context.Context, pullRequestID string, method gql.MergeMethod) error {
+func (f fakeBackend) EnableAutoMerge(ctx context.Context, pullRequestID, _ string, method gql.MergeMethod) error {
 	return f.enableAutoMerge(ctx, pullRequestID, method)
 }
 
@@ -173,8 +173,12 @@ func TestEveryOverrideKeepsFatalErrorsFatal(t *testing.T) {
 		{"RerunWorkflow", func() error { return g.RerunWorkflow(context.Background(), "kukv/octoscope", "1", domain.RerunAll) }},
 		{"ListLabels", func() error { _, err := g.ListLabels(context.Background(), "kukv/octoscope"); return err }},
 		{"PRMergeContext", func() error { _, err := g.PRMergeContext(context.Background(), "kukv/octoscope", 1); return err }},
-		{"MergePR", func() error { return g.MergePR(t.Context(), "pr-id", domain.MergeSquash) }},
-		{"EnableAutoMerge", func() error { return g.EnableAutoMerge(t.Context(), "pr-id", domain.MergeSquash) }},
+		{"MergePR", func() error {
+			return g.MergePR(t.Context(), domain.MergeTarget{PullRequest: "pr-id", Commit: "oidA"}, domain.MergeSquash)
+		}},
+		{"EnableAutoMerge", func() error {
+			return g.EnableAutoMerge(t.Context(), domain.MergeTarget{PullRequest: "pr-id", Commit: "oidA"}, domain.MergeSquash)
+		}},
 		{"SearchRepos", func() error { _, err := g.SearchRepos(context.Background(), "octoscope", 10); return err }},
 		{"ListOwnRepos", func() error { _, err := g.ListOwnRepos(context.Background(), "kukv", 10); return err }},
 		{"PRDiff", func() error { _, err := g.PRDiff(context.Background(), "kukv/octoscope", 1); return err }},

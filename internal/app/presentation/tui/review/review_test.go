@@ -27,7 +27,7 @@ func (f *fakeSource) SubmitReview(_ context.Context, t domain.ReviewTarget, even
 }
 
 func open(src Source) Model {
-	m := New(src, Target{PullRequest: "PR_1", Pending: "PRR_9", PendingComments: 2})
+	m := New(src, Target{PullRequest: "PR_1", Pending: "PRR_9", Commit: "oidA", PendingComments: 2})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }
@@ -63,7 +63,7 @@ func TestSubmitSendsTheTargetItWasOpenedOn(t *testing.T) {
 	if src.body != "looks good" {
 		t.Errorf("body = %q", src.body)
 	}
-	want := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_9"}
+	want := domain.ReviewTarget{PullRequest: "PR_1", Pending: "PRR_9", Commit: "oidA"}
 	if src.target != want {
 		t.Errorf("target = %+v, want %+v", src.target, want)
 	}

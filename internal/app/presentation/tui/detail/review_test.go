@@ -60,6 +60,29 @@ func TestAFailedSubmitKeepsTheNoteAndTheChosenEvent(t *testing.T) {
 	}
 }
 
+// The popup reads the review context, the head with it, when it opens. The
+// review it sends names that head, so a push while the note is being typed
+// is not what the review lands on.
+func TestAReviewFromTheDetailViewNamesTheHeadItOpenedOn(t *testing.T) {
+	f := &fakeSource{
+		pr:        firstPR(),
+		reviewCtx: domain.ReviewContext{PullRequest: "PR_1", Commit: "oidA"},
+	}
+	m := loaded(f, prRef())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m, cmd := m.Update(key("v"))
+	m, _ = m.Update(cmd())
+	_, cmd = m.Update(key("ctrl+s"))
+	if cmd == nil {
+		t.Fatal("ctrl+s produced no submit command")
+	}
+	cmd()
+
+	if len(f.submitTargets) != 1 || f.submitTargets[0].Commit != "oidA" {
+		t.Errorf("submitted = %+v, want one review on oidA", f.submitTargets)
+	}
+}
+
 // TestAStaleReviewContextIsDropped pins the ref guard on reviewContextMsg
 // and reviewContextErrMsg: a context fetched for an item the user has since
 // left must not open the popup here. If it did, ctrl+s would build a Target

@@ -521,10 +521,10 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			return c.EditIssueAssignees(context.Background(), "kukv/demo", 1, []string{"kukv"}, nil)
 		},
 		"MergePR": func(c *Client) error {
-			return c.MergePR(context.Background(), "id", gql.MergeMethodSquash)
+			return c.MergePR(context.Background(), "id", "oid", gql.MergeMethodSquash)
 		},
 		"EnableAutoMerge": func(c *Client) error {
-			return c.EnableAutoMerge(context.Background(), "id", gql.MergeMethodSquash)
+			return c.EnableAutoMerge(context.Background(), "id", "oid", gql.MergeMethodSquash)
 		},
 		"DisableAutoMerge": func(c *Client) error { return c.DisableAutoMerge(context.Background(), "id") },
 		"AddReviewThread": func(c *Client) error {
@@ -535,7 +535,7 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			return c.SubmitReview(context.Background(), "id", gql.EventApprove, "")
 		},
 		"SubmitNewReview": func(c *Client) error {
-			return c.SubmitNewReview(context.Background(), "id", gql.EventApprove, "")
+			return c.SubmitNewReview(context.Background(), "id", "oid", gql.EventApprove, "")
 		},
 		"DiscardReview": func(c *Client) error { return c.DiscardReview(context.Background(), "id") },
 		"RerunWorkflow": func(c *Client) error {
@@ -563,7 +563,7 @@ func TestWritesAreNeverAskedAgain(t *testing.T) {
 			calls++
 			return nil, fmt.Errorf("%w: gh: HTTP 502", github.ErrTransient)
 		}
-		_, _ = c.StartReview(t.Context(), "id")
+		_, _ = c.StartReview(t.Context(), "id", "oid")
 		if calls != 1 {
 			t.Errorf("StartReview ran gh %d times, want 1: a write must never be retried", calls)
 		}
@@ -714,7 +714,7 @@ func TestAHungWriteGivesUpOnceItsTimeIsUp(t *testing.T) {
 	writes := map[string]func(*Client) error{
 		"subcommand": func(c *Client) error { return c.ClosePR(context.Background(), "kukv/demo", 1) },
 		"gql": func(c *Client) error {
-			return c.MergePR(context.Background(), "id", gql.MergeMethodSquash)
+			return c.MergePR(context.Background(), "id", "oid", gql.MergeMethodSquash)
 		},
 	}
 	for name, write := range writes {

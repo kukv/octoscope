@@ -85,6 +85,7 @@ func (m Model) post() (Model, tea.Cmd) {
 	target := domain.ReviewTarget{
 		PullRequest: m.review.PullRequest,
 		Pending:     m.review.Pending,
+		Commit:      m.review.Commit,
 	}
 	m.phase = phaseWorking
 	m.errText = ""

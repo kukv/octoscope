@@ -28,7 +28,7 @@ func (f fakeBackend) SubmitReview(ctx context.Context, reviewID string, event gq
 	return f.submitReview(ctx, reviewID, event, body)
 }
 
-func (f fakeBackend) SubmitNewReview(ctx context.Context, pullRequestID string, event gql.ReviewEvent, body string) error {
+func (f fakeBackend) SubmitNewReview(ctx context.Context, pullRequestID, _ string, event gql.ReviewEvent, body string) error {
 	return f.submitNewReview(ctx, pullRequestID, event, body)
 }
 
@@ -40,7 +40,7 @@ type recordingBackend struct {
 	calls []string
 }
 
-func (b *recordingBackend) StartReview(context.Context, string) (string, error) {
+func (b *recordingBackend) StartReview(context.Context, string, string) (string, error) {
 	b.calls = append(b.calls, "StartReview")
 	return "PRR_new", nil
 }
@@ -50,7 +50,7 @@ func (b *recordingBackend) SubmitReview(context.Context, string, gql.ReviewEvent
 	return nil
 }
 
-func (b *recordingBackend) SubmitNewReview(context.Context, string, gql.ReviewEvent, string) error {
+func (b *recordingBackend) SubmitNewReview(context.Context, string, string, gql.ReviewEvent, string) error {
 	b.calls = append(b.calls, "SubmitNewReview")
 	return nil
 }
@@ -70,6 +70,52 @@ func TestSubmitReviewWithNoPendingCreatesAndSubmitsInOneCall(t *testing.T) {
 	}
 	if want := []string{"SubmitNewReview"}; !slices.Equal(b.calls, want) {
 		t.Errorf("calls = %v, want %v", b.calls, want)
+	}
+}
+
+// commitBackend records the commit each review-creating call names.
+type commitBackend struct {
+	backend
+	commits []string
+}
+
+func (b *commitBackend) StartReview(_ context.Context, _, commitOID string) (string, error) {
+	b.commits = append(b.commits, commitOID)
+	return "PRR_new", nil
+}
+
+func (b *commitBackend) SubmitNewReview(_ context.Context, _, commitOID string, _ gql.ReviewEvent, _ string) error {
+	b.commits = append(b.commits, commitOID)
+	return nil
+}
+
+func (b *commitBackend) AddReviewThread(context.Context, string, gql.PendingComment) (gql.ReviewThread, error) {
+	return gql.ReviewThread{}, nil
+}
+
+// Both ways a review comes into being -- submitted at once, or started for
+// a line comment -- have to name the commit the diff showed. A review that
+// names none is filed against whatever the head is when it arrives.
+func TestAReviewIsCreatedOnTheCommitTheReviewerWasShown(t *testing.T) {
+	t.Parallel()
+	b := &commitBackend{}
+	g := &Gateway{backend: b}
+	tgt := domain.ReviewTarget{PullRequest: "PR_1", Commit: "oidA"}
+	if err := g.SubmitReview(t.Context(), tgt, domain.EventApprove, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := g.AddReviewThread(t.Context(), tgt, domain.PendingComment{}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"oidA", "oidA"}; !slices.Equal(b.commits, want) {
+		t.Errorf("commits = %v, want %v", b.commits, want)
+	}
+}
+
+func TestTheReviewContextCarriesTheHead(t *testing.T) {
+	t.Parallel()
+	if got := toReviewContext(gql.ReviewContext{HeadRefOid: "oidA"}).Commit; got != "oidA" {
+		t.Errorf("Commit = %q, want oidA", got)
 	}
 }
 

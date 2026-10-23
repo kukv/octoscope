@@ -38,7 +38,7 @@ func (g *Gateway) PRReviewContext(ctx context.Context, repo string, number int) 
 func (g *Gateway) AddReviewThread(ctx context.Context, t domain.ReviewTarget, c domain.PendingComment) (domain.ReviewHandle, domain.ReviewThread, error) {
 	review := t.Pending
 	if review == "" {
-		id, err := g.backend.StartReview(ctx, string(t.PullRequest))
+		id, err := g.backend.StartReview(ctx, string(t.PullRequest), string(t.Commit))
 		if err != nil {
 			return "", domain.ReviewThread{}, wrap(err)
 		}
@@ -57,7 +57,7 @@ func (g *Gateway) AddReviewThread(ctx context.Context, t domain.ReviewTarget, c 
 func (g *Gateway) SubmitReview(ctx context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	var err error
 	if t.Pending == "" {
-		err = g.backend.SubmitNewReview(ctx, string(t.PullRequest), fromReviewEvent(event), body)
+		err = g.backend.SubmitNewReview(ctx, string(t.PullRequest), string(t.Commit), fromReviewEvent(event), body)
 	} else {
 		err = g.backend.SubmitReview(ctx, string(t.Pending), fromReviewEvent(event), body)
 	}
@@ -156,6 +156,7 @@ func toReviewContext(rc gql.ReviewContext) domain.ReviewContext {
 		Additions:   rc.Additions,
 		Deletions:   rc.Deletions,
 		Pending:     domain.ReviewHandle(rc.PendingID),
+		Commit:      domain.CommitHandle(rc.HeadRefOid),
 	}
 	for _, t := range rc.Threads {
 		if rt := toReviewThread(t); len(rt.Comments) > 0 {

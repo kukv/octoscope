@@ -40,7 +40,7 @@ const reviewContextJSON = `{"data":{"repository":{"pullRequest":{
 // draws, which arrive with the same query.
 const reviewContextHeaderJSON = `{"data":{"repository":{"pullRequest":{
   "id":"PR_1","title":"feat: add relation graph traversal",
-  "headRefName":"feat/graph","baseRefName":"main","additions":218,"deletions":31,
+  "headRefName":"feat/graph","headRefOid":"0123456789abcdef0123456789abcdef01234567","baseRefName":"main","additions":218,"deletions":31,
   "reviews":{"nodes":[]},"reviewThreads":{"nodes":[]}}}}}`
 
 func TestPRReviewContextBuildsTheQuery(t *testing.T) {
@@ -120,6 +120,10 @@ func TestPRReviewContextCarriesTheHeader(t *testing.T) {
 	if rc.Additions != 218 || rc.Deletions != 31 {
 		t.Errorf("+%d -%d, want +218 -31", rc.Additions, rc.Deletions)
 	}
+	// The head the diff was drawn from is what a review from it names.
+	if rc.HeadRefOid != "0123456789abcdef0123456789abcdef01234567" {
+		t.Errorf("head oid = %q", rc.HeadRefOid)
+	}
 }
 
 func TestPRReviewContextWithNoPendingReview(t *testing.T) {
@@ -171,7 +175,7 @@ func TestAThreadCarriesEveryCommentsReviewState(t *testing.T) {
 func TestStartReviewReturnsTheNewReviewID(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	id, err := c.StartReview(t.Context(), "PR_kwDO1")
+	id, err := c.StartReview(t.Context(), "PR_kwDO1", "oidA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,6 +184,29 @@ func TestStartReviewReturnsTheNewReviewID(t *testing.T) {
 	}
 	if !slices.Contains(f.vars[0], S("pullRequestId", "PR_kwDO1")) {
 		t.Errorf("vars %v do not carry the pull request id", f.vars[0])
+	}
+}
+
+// Without a commit GitHub files a review against whatever the head is when it
+// arrives -- a commit pushed after the diff was drawn, which the reviewer never
+// saw. Naming the commit keeps the review on the code that was read.
+func TestAReviewNamesTheCommitTheDiffShowed(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		send func(*Client) error
+	}{
+		{"starting one", func(c *Client) error { _, err := c.StartReview(t.Context(), "PR_1", "oidA"); return err }},
+		{"submitting at once", func(c *Client) error { return c.SubmitNewReview(t.Context(), "PR_1", "oidA", EventApprove, "") }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
+			if err := tt.send(f.client()); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Contains(f.vars[0], S("commitOID", "oidA")) {
+				t.Errorf("vars %v do not carry commitOID=oidA", f.vars[0])
+			}
+		})
 	}
 }
 
@@ -281,7 +308,7 @@ func TestSubmitReviewNamesTheEvent(t *testing.T) {
 func TestSubmitNewReviewCreatesAndSubmitsInOneCall(t *testing.T) {
 	f := &fake{body: []byte(`{"data":{"addPullRequestReview":{"pullRequestReview":{"id":"PRR_new"}}}}`)}
 	c := f.client()
-	if err := c.SubmitNewReview(t.Context(), "PR_1", EventApprove, ""); err != nil {
+	if err := c.SubmitNewReview(t.Context(), "PR_1", "oidA", EventApprove, ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []Var{S("pullRequestId", "PR_1"), S("event", "APPROVE"), S("body", "")} {
