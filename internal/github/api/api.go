@@ -38,6 +38,15 @@ var responseTimeout = 16 * time.Second
 // A var for the same reason responseTimeout is one.
 var stallTimeout = 16 * time.Second
 
+// answerLimit bounds how much of one answer, or of one log entry unpacked
+// from an archive, is read into memory. The largest run archive measured was
+// 18 MB (a 38-job matrix); the limit is a little over five times that,
+// rounded up to the next power of two, the same margin the cli backend's job
+// log deadline leaves.
+//
+// A var for the same reason responseTimeout is one.
+var answerLimit int64 = 128 << 20
+
 // Token reads the token this backend authenticates with. The order is gh's
 // own: GH_TOKEN wins so that a machine with both can point octoscope at the
 // same credential gh uses.

@@ -414,3 +414,53 @@ func cancelSoon() (context.Context, context.CancelFunc) {
 func deadlineSoon() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 30*time.Millisecond)
 }
+
+// limitAnswers puts the answer limit at one MiB, small enough to cross in a
+// test and still a whole number of MiB for the error to name.
+func limitAnswers(t *testing.T) int {
+	t.Helper()
+	orig := answerLimit
+	answerLimit = 1 << 20
+	t.Cleanup(func() { answerLimit = orig })
+	return int(answerLimit)
+}
+
+// An answer is read into memory whole, so one without an end would take the
+// machine's memory with it.
+func TestAnAnswerUpToTheLimitIsRead(t *testing.T) {
+	n := limitAnswers(t)
+	body := strings.Repeat("x", n)
+	c, _ := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, body)
+	})
+
+	out, err := c.read(context.Background(), "repos/kukv/octoscope/actions/runs/7/logs", "")
+	if err != nil {
+		t.Fatalf("read: %v, want an answer of exactly the limit to be read", err)
+	}
+	if len(out) != n {
+		t.Errorf("len = %d, want %d", len(out), n)
+	}
+}
+
+func TestAnAnswerPastTheLimitIsRefusedOnce(t *testing.T) {
+	n := limitAnswers(t)
+	body := strings.Repeat("x", n+1)
+	c, got := serveREST(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, body)
+	})
+
+	_, err := c.read(context.Background(), "repos/kukv/octoscope/actions/runs/7/logs", "")
+	if err == nil {
+		t.Fatal("read: want an error for an answer past the limit")
+	}
+	if !strings.Contains(err.Error(), "larger than 1 MiB") {
+		t.Errorf("err = %q, want it to name the limit", err)
+	}
+	if errors.Is(err, github.ErrTransient) {
+		t.Errorf("err = %v, want it not transient: asking again brings the same size", err)
+	}
+	if len(*got) != 1 {
+		t.Errorf("requests = %d, want 1", len(*got))
+	}
+}
