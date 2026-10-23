@@ -354,3 +354,15 @@ D=internal/github/gql/testdata
 gh api graphql -F query=@internal/github/gql/repo_name.graphql \
   -f owner=kukv -f name=octoscope | jq . > $D/repo_name.json
 ```
+
+## `labels.json`
+
+`labels.graphql` に対する実レスポンス。録った日: 2026-10-23、対象:
+`bright-room-sandbox/octoscope-test-repository`（テスト用の公開リポジトリ。ラベル 19 件）。
+並びは同じ日の `gh label list --limit 100` と一致した。
+
+```bash
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/labels.graphql \
+  -f owner=bright-room-sandbox -f name=octoscope-test-repository | jq . > $D/labels.json
+```

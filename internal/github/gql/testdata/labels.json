@@ -1,0 +1,86 @@
+{
+  "data": {
+    "repository": {
+      "labels": {
+        "nodes": [
+          {
+            "name": "Priority: Low",
+            "color": "4169e1"
+          },
+          {
+            "name": "Close: Duplicate",
+            "color": "dcdcdc"
+          },
+          {
+            "name": "Need: Help Wanted",
+            "color": "da70d6"
+          },
+          {
+            "name": "Kind: Dependencies",
+            "color": "ededed"
+          },
+          {
+            "name": "Priority: Medium",
+            "color": "ffd700"
+          },
+          {
+            "name": "Close: WontFix",
+            "color": "dcdcdc"
+          },
+          {
+            "name": "Kind: Bug Fix",
+            "color": "ff0000"
+          },
+          {
+            "name": "Kind: Enhancement",
+            "color": "89058a"
+          },
+          {
+            "name": "Meta: Release note ignored",
+            "color": "859179"
+          },
+          {
+            "name": "Kind: Feature",
+            "color": "00bfff"
+          },
+          {
+            "name": "Kind: Refactoring",
+            "color": "fa8072"
+          },
+          {
+            "name": "Priority: High",
+            "color": "ff4500"
+          },
+          {
+            "name": "Need: Discussion",
+            "color": "da70d6"
+          },
+          {
+            "name": "Kind: Tests",
+            "color": "008000"
+          },
+          {
+            "name": "Close: Invalid",
+            "color": "dcdcdc"
+          },
+          {
+            "name": "Type: Question",
+            "color": "da70d6"
+          },
+          {
+            "name": "Kind: Documentation",
+            "color": "40e0d0"
+          },
+          {
+            "name": "Impact: Breaking",
+            "color": "b60205"
+          },
+          {
+            "name": "Priority: Critical",
+            "color": "b60205"
+          }
+        ]
+      }
+    }
+  }
+}

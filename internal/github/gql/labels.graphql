@@ -1,0 +1,14 @@
+# The repository's labels, oldest first. This is the order gh label list
+# shows; asking for it here, rather than leaving each backend to its own
+# listing, is what keeps the picker the same on both. REST cannot give it:
+# its labels carry no creation time.
+query ($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    labels(first: 100, orderBy: {field: CREATED_AT, direction: ASC}) {
+      nodes {
+        name
+        color
+      }
+    }
+  }
+}

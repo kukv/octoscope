@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -217,18 +216,24 @@ func TestStateChangeError(t *testing.T) {
 	}
 }
 
-func TestListLabels(t *testing.T) {
-	c, f := newTestClient(`[{"name":"bug","color":"d73a4a"},{"name":"wip","color":"ededed"}]`, nil)
-	labels, err := c.ListLabels(t.Context(), "")
-	if err != nil {
+// The api backend cannot run gh label list, and REST has no creation order
+// to give. The picker shows the same labels in the same order on both
+// backends only because both send the one GraphQL document that asks for it.
+func TestLabelsAreAskedOfGraphQLInCreationOrder(t *testing.T) {
+	c, f := newTestClient(`{"data":{"repository":{"labels":{"nodes":[]}}}}`, nil)
+	if _, err := c.ListLabels(t.Context(), "cli/cli"); err != nil {
 		t.Fatalf("ListLabels: %v", err)
 	}
-	wantArgs := []string{"label", "list", "--json", "name,color", "--limit", listLimit}
-	if !reflect.DeepEqual(f.args, wantArgs) {
-		t.Errorf("args = %v, want %v", f.args, wantArgs)
+	if !slices.Equal(f.args[:2], []string{"api", "graphql"}) {
+		t.Fatalf("args = %v, want a GraphQL query", f.args)
 	}
-	if len(labels) != 2 || labels[0].Name != "bug" || labels[0].Color != "d73a4a" || labels[1].Name != "wip" {
-		t.Errorf("unexpected parse result: %+v", labels)
+	if !slices.ContainsFunc(f.args, func(a string) bool {
+		return strings.HasPrefix(a, "query=") && strings.Contains(a, "field: CREATED_AT, direction: ASC")
+	}) {
+		t.Errorf("args = %v, want the document that orders labels by creation", f.args)
+	}
+	if repoVarsArg(f.args) != "cli/cli" {
+		t.Errorf("the document names %q, want cli/cli", repoVarsArg(f.args))
 	}
 }
 
@@ -349,30 +354,6 @@ func TestListAssigneesBuildsAPIPathFromDefaultRepo(t *testing.T) {
 	want := []string{"api", "repos/kukv/octoscope/assignees?per_page=100"}
 	if !slices.Equal(got, want) {
 		t.Errorf("args = %v, want %v", got, want)
-	}
-}
-
-// TestTheLabelListAsksForMoreThanTheDefaultThirty states the requirement
-// rather than the arguments: gh label list stops at 30 labels unless it is
-// told otherwise, and it says nothing when it does. A repository with more
-// labels than that would offer a picker missing the rest.
-func TestTheLabelListAsksForMoreThanTheDefaultThirty(t *testing.T) {
-	const ghDefaultLimit = 30
-
-	c, f := newTestClient(`[]`, nil)
-	if _, err := c.ListLabels(t.Context(), ""); err != nil {
-		t.Fatal(err)
-	}
-	i := slices.Index(f.args, "--limit")
-	if i < 0 || i+1 >= len(f.args) {
-		t.Fatalf("args %v carry no --limit, so gh stops at %d", f.args, ghDefaultLimit)
-	}
-	limit, err := strconv.Atoi(f.args[i+1])
-	if err != nil {
-		t.Fatalf("--limit %q is not a number", f.args[i+1])
-	}
-	if limit <= ghDefaultLimit {
-		t.Errorf("--limit %d asks for no more than the default %d", limit, ghDefaultLimit)
 	}
 }
 
@@ -688,7 +669,7 @@ func TestAHungReadGivesUpOnceItsTimeIsUp(t *testing.T) {
 			return err
 		},
 		"subcommand": func(c *Client) error {
-			_, err := c.ListLabels(context.Background(), "")
+			_, err := c.ListOwnRepos(context.Background(), "", 30)
 			return err
 		},
 	}
@@ -787,7 +768,7 @@ func TestACallTheCallerEndedIsNotATimeout(t *testing.T) {
 			c.run = hangingGh(&calls)
 			ctx, cancel := end()
 			defer cancel()
-			if _, err := c.ListLabels(ctx, ""); err == nil || errors.Is(err, github.ErrTransient) {
+			if _, err := c.ListOwnRepos(ctx, "", 30); err == nil || errors.Is(err, github.ErrTransient) {
 				t.Errorf("err = %v, want a failure that is not ErrTransient", err)
 			}
 		})
