@@ -2,11 +2,15 @@
 package browser
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"unicode/utf16"
 )
 
 // The whole of the environment this package reads. The first two name the
@@ -35,21 +39,23 @@ func (e *NoneError) Error() string {
 	return fmt.Sprintf("no browser to open %s", e.URL)
 }
 
-func Open(url string) error {
+func Open(rawURL string) error {
+	if err := validate(rawURL); err != nil {
+		return err
+	}
 	argv, ok := command(environment{
 		goos:    runtime.GOOS,
 		wsl:     isWSL(),
 		browser: browserEnv(),
-	})
+	}, rawURL)
 	if !ok {
-		return &NoneError{URL: url}
+		return &NoneError{URL: rawURL}
 	}
-	argv = append(argv, url)
 	// LookPath separates "this machine has no such program" from "the program
 	// ran and failed". Only the first is the environment's doing, and only the
 	// first is worth telling the user how to work around.
 	if _, err := exec.LookPath(argv[0]); err != nil {
-		return &NoneError{URL: url}
+		return &NoneError{URL: rawURL}
 	}
 	// Start, not Run: a browser started from a terminal keeps running until
 	// its window closes, and octoscope has a screen to draw in the meantime.
@@ -64,6 +70,18 @@ func Open(url string) error {
 	return nil
 }
 
+// validate lets through only a web page. Not every URL comes from GitHub: the
+// checks view opens whatever a check's author wrote as its details URL, and
+// anything but http(s) would be a file, a handler on the user's machine, or a
+// flag to the opener. %q keeps control characters in it off the screen.
+func validate(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("refuse to open %q: not an http or https URL", rawURL)
+	}
+	return nil
+}
+
 // environment is what the machine says about itself, reduced to the three
 // things that decide which program can open a URL.
 type environment struct {
@@ -73,10 +91,10 @@ type environment struct {
 }
 
 // opener is one way of opening a URL. command returns the program to run and
-// the arguments that go before the URL, or nil when the environment is not
-// one this opener handles.
+// its arguments, the URL among them, or nil when the environment is not one
+// this opener handles.
 type opener interface {
-	command(env environment) []string
+	command(env environment, url string) []string
 }
 
 // openers are tried in order, and the order is part of the specification: a
@@ -91,11 +109,11 @@ var openers = []opener{
 	xdgOpen{},
 }
 
-// command names the program to run and the arguments before the URL. ok is
-// false when this machine has nothing to try.
-func command(env environment) ([]string, bool) {
+// command names the program to run and its arguments. ok is false when this
+// machine has nothing to try.
+func command(env environment, url string) ([]string, bool) {
 	for _, o := range openers {
-		if argv := o.command(env); argv != nil {
+		if argv := o.command(env, url); argv != nil {
 			return argv, true
 		}
 	}
@@ -106,29 +124,29 @@ func command(env environment) ([]string, bool) {
 // is never handed to a shell (.claude/rules/go-style.md).
 type userNamed struct{}
 
-func (userNamed) command(env environment) []string {
+func (userNamed) command(env environment, url string) []string {
 	if env.browser == "" {
 		return nil
 	}
-	return []string{env.browser}
+	return []string{env.browser, url}
 }
 
 type windowsHandler struct{}
 
-func (windowsHandler) command(env environment) []string {
+func (windowsHandler) command(env environment, url string) []string {
 	if env.goos != osWindows {
 		return nil
 	}
-	return []string{"rundll32", "url.dll,FileProtocolHandler"}
+	return []string{"rundll32", "url.dll,FileProtocolHandler", url}
 }
 
 type macOpen struct{}
 
-func (macOpen) command(env environment) []string {
+func (macOpen) command(env environment, url string) []string {
 	if env.goos != osDarwin {
 		return nil
 	}
-	return []string{"open"}
+	return []string{"open", url}
 }
 
 // wslBridge reaches Windows from WSL. explorer.exe would do it too, but it
@@ -136,24 +154,54 @@ func (macOpen) command(env environment) []string {
 // from a success. wslview is not an option: wslu is no longer packaged for
 // Ubuntu 26.04.
 //
-// Start-Process re-parses what follows it, so a URL with & in it would be cut
-// short. GitHub item URLs carry no query string.
+// -Command would read the URL as script: ; would start a second statement and
+// $(...) would run. -EncodedCommand takes the script as base64, which no
+// quoting between WSL and Windows can alter, and the URL sits in it as a
+// single-quoted literal, where nothing but a quote means anything.
 type wslBridge struct{}
 
-func (wslBridge) command(env environment) []string {
+func (wslBridge) command(env environment, url string) []string {
 	if !env.wsl {
 		return nil
 	}
-	return []string{"powershell.exe", "-NoProfile", "-Command", "Start-Process"}
+	script := "Start-Process " + singleQuote(url)
+	return []string{"powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(script)}
+}
+
+// singleQuote makes s a PowerShell single-quoted string. PowerShell takes
+// the typographic single quotes (U+2018 to U+201B) for ' too, and in each
+// case two in a row stand for one.
+func singleQuote(s string) string {
+	var b strings.Builder
+	b.WriteByte('\'')
+	for _, r := range s {
+		switch r {
+		case '\'', '‘', '’', '‚', '‛':
+			b.WriteRune(r)
+		}
+		b.WriteRune(r)
+	}
+	b.WriteByte('\'')
+	return b.String()
+}
+
+// encodePowerShell is what -EncodedCommand reads: base64 of UTF-16LE.
+func encodePowerShell(script string) string {
+	u := utf16.Encode([]rune(script))
+	b := make([]byte, 2*len(u))
+	for i, c := range u {
+		binary.LittleEndian.PutUint16(b[2*i:], c)
+	}
+	return base64.StdEncoding.EncodeToString(b)
 }
 
 type xdgOpen struct{}
 
-func (xdgOpen) command(env environment) []string {
+func (xdgOpen) command(env environment, url string) []string {
 	if env.goos != osLinux {
 		return nil
 	}
-	return []string{"xdg-open"}
+	return []string{"xdg-open", url}
 }
 
 // browserEnv reads the variables gh honours, in gh's own order of precedence
