@@ -209,8 +209,8 @@ func TestWalkPagesStopsAtMaxPagesWhenNextKeepsPointingAtItself(t *testing.T) {
 }
 
 // A transient failure on a later page must be retried the same way the first
-// page is: prFiles and ListLabels build on walkPages precisely so paging
-// callers get this for free.
+// page is: prFiles builds on walkPages precisely so paging callers get this
+// for free.
 func TestWalkPagesRetriesATransientFailureOnALaterPage(t *testing.T) {
 	t.Parallel()
 

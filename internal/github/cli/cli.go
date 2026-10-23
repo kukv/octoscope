@@ -16,12 +16,6 @@ import (
 	"github.com/kukv/octoscope/internal/github/gql"
 )
 
-// listLimit is how many items gh label list is asked for. It fetches 30 by
-// default and says nothing about the rest, so a repository with more labels
-// than that would lose them without a word. gh names no upper bound; it pages
-// until it has as many as it was asked for.
-const listLimit = "100"
-
 // callTimeout bounds one gh call. Most screens hand this package
 // context.Background(), so without it a gh that hangs leaves a loading screen
 // up for good. The value is the api backend's responseTimeout, for the same
@@ -209,19 +203,6 @@ func (c *Client) CloseIssue(ctx context.Context, repo string, number int) error 
 func (c *Client) ReopenIssue(ctx context.Context, repo string, number int) error {
 	_, err := c.exec(ctx, callTimeout, appendRepo([]string{"issue", "reopen", strconv.Itoa(number)}, c.effectiveRepo(repo))...)
 	return err
-}
-
-func (c *Client) ListLabels(ctx context.Context, repo string) ([]gql.Label, error) {
-	args := appendRepo([]string{"label", "list", "--json", "name,color", "--limit", listLimit}, c.effectiveRepo(repo))
-	out, err := c.read(ctx, callTimeout, args...)
-	if err != nil {
-		return nil, err
-	}
-	var labels []gql.Label
-	if err := json.Unmarshal(out, &labels); err != nil {
-		return nil, fmt.Errorf("parse label list: %w", err)
-	}
-	return labels, nil
 }
 
 // ListAssignees returns the logins of users assignable on the repository.
