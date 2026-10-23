@@ -599,3 +599,24 @@ func TestAWholeJobEntryForACompositeNameIsFoundWithoutAThirdRequest(t *testing.T
 		t.Errorf("requests = %d, want 2: the whole-job entry must be found without asking the job's own log", len(*got))
 	}
 }
+
+// The archive is compressed, so an entry can unpack past the limit the
+// archive itself stayed under.
+func TestALogEntryPastTheLimitIsRefused(t *testing.T) {
+	n := limitAnswers(t)
+	archive := zipOf(t, map[string]string{
+		"build/1_Set up job.txt": strings.Repeat("x", n+1),
+	})
+	if len(archive) > n {
+		t.Fatalf("archive = %d bytes, want it under the limit so only the entry crosses it", len(archive))
+	}
+	c, _ := serveJobLog(t, twoStepJob, archive)
+
+	_, err := c.JobLog(context.Background(), "kukv/octoscope", 61, false)
+	if err == nil {
+		t.Fatal("JobLog: want an error for an entry past the limit")
+	}
+	if !strings.Contains(err.Error(), "larger than 1 MiB") {
+		t.Errorf("err = %q, want it to name the limit", err)
+	}
+}

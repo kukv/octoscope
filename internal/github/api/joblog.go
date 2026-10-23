@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"regexp"
 	"slices"
 	"strings"
@@ -135,7 +134,7 @@ func readEntry(f *zip.File, step string) ([]github.LogLine, error) {
 		return nil, fmt.Errorf("read log entry %s: %w", f.Name, err)
 	}
 	defer func() { _ = rc.Close() }()
-	body, err := io.ReadAll(rc)
+	body, err := readLimited(rc)
 	if err != nil {
 		return nil, fmt.Errorf("read log entry %s: %w", f.Name, err)
 	}

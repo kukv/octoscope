@@ -113,7 +113,7 @@ func (c *Client) exchange(req *http.Request) (int, http.Header, []byte, error) {
 	limit := stallTimeout
 	timer := time.AfterFunc(limit, func() { cancel(errStalled) })
 	defer timer.Stop()
-	out, err := io.ReadAll(&progress{r: resp.Body, timer: timer, limit: limit})
+	out, err := readLimited(&progress{r: resp.Body, timer: timer, limit: limit})
 	if err != nil {
 		if errors.Is(context.Cause(ctx), errStalled) {
 			return resp.StatusCode, resp.Header, nil, &timedOut{msg: fmt.Sprintf("read answer: nothing arrived for %s", limit)}
@@ -121,6 +121,19 @@ func (c *Client) exchange(req *http.Request) (int, http.Header, []byte, error) {
 		return resp.StatusCode, resp.Header, nil, fmt.Errorf("read answer: %w", err)
 	}
 	return resp.StatusCode, resp.Header, out, nil
+}
+
+// readLimited reads r whole unless it runs past answerLimit. The error is not
+// transient: asking again brings back the same size.
+func readLimited(r io.Reader) ([]byte, error) {
+	out, err := io.ReadAll(io.LimitReader(r, answerLimit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(out)) > answerLimit {
+		return nil, fmt.Errorf("larger than %d MiB", answerLimit>>20)
+	}
+	return out, nil
 }
 
 // progress restarts timer each time part of the body arrives.
