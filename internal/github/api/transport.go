@@ -67,6 +67,7 @@ func (c *Client) post(ctx context.Context, doc string, vars []gql.Var) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
+	out = caretJSON(out)
 	return out, classify(status, out)
 }
 
