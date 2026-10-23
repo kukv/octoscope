@@ -55,7 +55,7 @@ func loadedWithAt(t *testing.T, src Source, width, height int) Model {
 	m := New(src, domain.ItemRef{Kind: domain.ItemPR, Repo: "kukv/koto", Number: 128})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	m, _ = m.Update(diffMsg{ref: m.ref, files: fixture()})
-	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequest: "PR_1"}})
+	m, _ = m.Update(reviewMsg{ref: m.ref, ctx: domain.ReviewContext{PullRequest: "PR_1", Commit: "oidA"}})
 	return m
 }
 
@@ -123,6 +123,25 @@ func TestCommentingOnAnAddedLineQuotesTheRightSide(t *testing.T) {
 	want := domain.PendingComment{Path: "graph/walk.go", Line: 13, Side: domain.SideRight, Body: "why not 2?"}
 	if got != want {
 		t.Errorf("sent %+v, want %+v", got, want)
+	}
+	// A line comment with no review yet starts one, and that review has to
+	// be on the commit this diff was drawn from.
+	if len(src.targets) != 1 || src.targets[0].Commit != "oidA" {
+		t.Errorf("targets = %+v, want the one commit the diff showed", src.targets)
+	}
+}
+
+// v submits from the diff the user has been reading. The review it sends has
+// to name that diff's commit, or a push since would be what gets approved.
+func TestAReviewFromTheDiffNamesItsCommit(t *testing.T) {
+	src := &fakeSource{files: fixture()}
+	m := loadedWith(t, src)
+	m = press(m, "v")
+	_, cmd := m.Update(keyPress("ctrl+s"))
+	runCmd(t, cmd)
+
+	if len(src.submitted) != 1 || src.submitted[0].Commit != "oidA" {
+		t.Errorf("submitted = %+v, want one review on oidA", src.submitted)
 	}
 }
 

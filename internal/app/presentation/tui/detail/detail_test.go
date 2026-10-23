@@ -36,8 +36,9 @@ type fakeSource struct {
 	reviewCtx domain.ReviewContext
 	reviewErr error
 
-	submitCalls []string // "<pending id>:<body>"
-	submitErr   error
+	submitCalls   []string // "<pending id>:<body>"
+	submitTargets []domain.ReviewTarget
+	submitErr     error
 
 	mergeCtx domain.MergeContext
 	mergeErr error
@@ -113,6 +114,7 @@ func (f *fakeSource) PRReviewContext(ctx context.Context, repo string, n int) (d
 
 func (f *fakeSource) SubmitReview(_ context.Context, t domain.ReviewTarget, event domain.ReviewEvent, body string) error {
 	f.submitCalls = append(f.submitCalls, string(t.Pending)+":"+body)
+	f.submitTargets = append(f.submitTargets, t)
 	return f.submitErr
 }
 
@@ -120,11 +122,11 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return f.mergeCtx, f.mergeErr
 }
 
-func (f *fakeSource) MergePR(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *fakeSource) MergePR(context.Context, domain.MergeTarget, domain.MergeMethod) error {
 	return nil
 }
 
-func (f *fakeSource) EnableAutoMerge(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(context.Context, domain.MergeTarget, domain.MergeMethod) error {
 	return nil
 }
 

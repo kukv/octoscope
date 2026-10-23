@@ -15,15 +15,15 @@ func (g *Gateway) PRMergeContext(ctx context.Context, repo string, number int) (
 	return toMergeContext(c), nil
 }
 
-func (g *Gateway) MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	if err := g.backend.MergePR(ctx, string(pr), fromMergeMethod(method)); err != nil {
+func (g *Gateway) MergePR(ctx context.Context, t domain.MergeTarget, method domain.MergeMethod) error {
+	if err := g.backend.MergePR(ctx, string(t.PullRequest), string(t.Commit), fromMergeMethod(method)); err != nil {
 		return wrap(err)
 	}
 	return nil
 }
 
-func (g *Gateway) EnableAutoMerge(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error {
-	if err := g.backend.EnableAutoMerge(ctx, string(pr), fromMergeMethod(method)); err != nil {
+func (g *Gateway) EnableAutoMerge(ctx context.Context, t domain.MergeTarget, method domain.MergeMethod) error {
+	if err := g.backend.EnableAutoMerge(ctx, string(t.PullRequest), string(t.Commit), fromMergeMethod(method)); err != nil {
 		return wrap(err)
 	}
 	return nil
@@ -39,6 +39,7 @@ func (g *Gateway) DisableAutoMerge(ctx context.Context, pr domain.PullRequestHan
 func toMergeContext(c gql.MergeContext) domain.MergeContext {
 	return domain.MergeContext{
 		PullRequest:              domain.PullRequestHandle(c.PullRequestID),
+		Commit:                   domain.CommitHandle(c.HeadRefOid),
 		Block:                    toMergeBlock(c.IsDraft, c.Mergeable, c.MergeStateStatus),
 		Clean:                    c.MergeStateStatus == "CLEAN",
 		Review:                   parseReviewDecision(c.ReviewDecision),

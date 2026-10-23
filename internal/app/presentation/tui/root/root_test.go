@@ -183,11 +183,11 @@ func (f *fakeSource) PRMergeContext(context.Context, string, int) (domain.MergeC
 	return domain.MergeContext{}, nil
 }
 
-func (f *fakeSource) MergePR(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *fakeSource) MergePR(context.Context, domain.MergeTarget, domain.MergeMethod) error {
 	return nil
 }
 
-func (f *fakeSource) EnableAutoMerge(context.Context, domain.PullRequestHandle, domain.MergeMethod) error {
+func (f *fakeSource) EnableAutoMerge(context.Context, domain.MergeTarget, domain.MergeMethod) error {
 	return nil
 }
 

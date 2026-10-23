@@ -35,6 +35,8 @@ type ReviewContext struct {
 	ID          string
 	Title       string
 	HeadRefName string
+	// HeadRefOid is the commit at the head of the branch when this was read.
+	HeadRefOid  string
 	BaseRefName string
 	Additions   int
 	Deletions   int
@@ -52,6 +54,7 @@ type reviewContextResponse struct {
 				ID          string `json:"id"`
 				Title       string `json:"title"`
 				HeadRefName string `json:"headRefName"`
+				HeadRefOid  string `json:"headRefOid"`
 				BaseRefName string `json:"baseRefName"`
 				Additions   int    `json:"additions"`
 				Deletions   int    `json:"deletions"`
@@ -141,6 +144,7 @@ func (c *Client) PRReviewContext(ctx context.Context, repo string, number int) (
 		rc.ID = pr.ID
 		rc.Title = pr.Title
 		rc.HeadRefName = pr.HeadRefName
+		rc.HeadRefOid = pr.HeadRefOid
 		rc.BaseRefName = pr.BaseRefName
 		rc.Additions = pr.Additions
 		rc.Deletions = pr.Deletions
@@ -205,8 +209,11 @@ func (c *Client) threadComments(ctx context.Context, threadID, after string) ([]
 // StartReview opens an unsubmitted review on the pull request and returns its
 // node id. A pending review is visible only to its author, so this is the id
 // the rest of the session adds comments to.
-func (c *Client) StartReview(ctx context.Context, pullRequestID string) (string, error) {
-	out, err := c.Write(ctx, startReviewMutation, S("pullRequestId", pullRequestID))
+//
+// commitOID is the commit the review is about. Without it GitHub takes
+// whatever the head is when the request arrives.
+func (c *Client) StartReview(ctx context.Context, pullRequestID, commitOID string) (string, error) {
+	out, err := c.Write(ctx, startReviewMutation, S("pullRequestId", pullRequestID), S("commitOID", commitOID))
 	if err != nil {
 		return "", err
 	}
@@ -285,9 +292,10 @@ func (c *Client) SubmitReview(ctx context.Context, reviewID string, event Review
 // addPullRequestReview takes an event, so creating and submitting is one
 // call. Approving a diff you had nothing to say about is the commonest review
 // there is, and it should not have to leave a pending review behind first.
-func (c *Client) SubmitNewReview(ctx context.Context, pullRequestID string, event ReviewEvent, body string) error {
+func (c *Client) SubmitNewReview(ctx context.Context, pullRequestID, commitOID string, event ReviewEvent, body string) error {
 	_, err := c.Write(ctx, reviewAtOnceMutation,
 		S("pullRequestId", pullRequestID),
+		S("commitOID", commitOID),
 		S("event", string(event)),
 		S("body", body),
 	)

@@ -14,6 +14,7 @@ var mergeContextQuery string
 // MergeContext is what the merge popup needs, as GraphQL answers it.
 type MergeContext struct {
 	PullRequestID            string
+	HeadRefOid               string
 	IsDraft                  bool
 	Mergeable                string
 	MergeStateStatus         string
@@ -39,6 +40,7 @@ type mergeContextResponse struct {
 			ViewerPermission    string `json:"viewerPermission"`
 			PullRequest         struct {
 				ID                       string `json:"id"`
+				HeadRefOid               string `json:"headRefOid"`
 				IsDraft                  bool   `json:"isDraft"`
 				Mergeable                string `json:"mergeable"`
 				MergeStateStatus         string `json:"mergeStateStatus"`
@@ -70,6 +72,7 @@ func (c *Client) PRMergeContext(ctx context.Context, repo string, number int) (M
 	pr := r.PullRequest
 	return MergeContext{
 		PullRequestID:            pr.ID,
+		HeadRefOid:               pr.HeadRefOid,
 		IsDraft:                  pr.IsDraft,
 		Mergeable:                pr.Mergeable,
 		MergeStateStatus:         pr.MergeStateStatus,
@@ -104,17 +107,22 @@ const (
 	MergeMethodRebase MergeMethod = "REBASE"
 )
 
-func (c *Client) MergePR(ctx context.Context, pullRequestID string, method MergeMethod) error {
+// MergePR and EnableAutoMerge take the head the user was shown: GitHub
+// refuses either once the branch has moved past it, rather than merging a
+// commit nobody looked at.
+func (c *Client) MergePR(ctx context.Context, pullRequestID, expectedHeadOid string, method MergeMethod) error {
 	_, err := c.Write(ctx, mergePRMutation,
 		S("pullRequestId", pullRequestID),
+		S("expectedHeadOid", expectedHeadOid),
 		S("mergeMethod", string(method)),
 	)
 	return err
 }
 
-func (c *Client) EnableAutoMerge(ctx context.Context, pullRequestID string, method MergeMethod) error {
+func (c *Client) EnableAutoMerge(ctx context.Context, pullRequestID, expectedHeadOid string, method MergeMethod) error {
 	_, err := c.Write(ctx, enableAutoMergeMutation,
 		S("pullRequestId", pullRequestID),
+		S("expectedHeadOid", expectedHeadOid),
 		S("mergeMethod", string(method)),
 	)
 	return err

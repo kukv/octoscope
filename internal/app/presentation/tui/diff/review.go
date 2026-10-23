@@ -36,6 +36,7 @@ func (m Model) openSubmit() Model {
 	target := review.Target{
 		PullRequest:     m.review.PullRequest,
 		Pending:         m.review.Pending,
+		Commit:          m.review.Commit,
 		PendingComments: m.pendingCount(),
 	}
 	m.submit = review.New(m.src, target)

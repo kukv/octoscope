@@ -75,16 +75,19 @@ type ReviewContext struct {
 	// pending review is visible only to its author, so anything that comes
 	// back here belongs to the viewer.
 	Pending ReviewHandle
+	// Commit is the head the diff was drawn from.
+	Commit  CommitHandle
 	Threads []ReviewThread
 }
 
 // ReviewTarget names the pull request a review acts on, and the unsubmitted
 // review already open on it if there is one. GitHub allows one unsubmitted
 // review per user per pull request, so Pending is a single handle, not a
-// list.
+// list. Commit is the head the reviewer was shown.
 type ReviewTarget struct {
 	PullRequest PullRequestHandle
 	Pending     ReviewHandle
+	Commit      CommitHandle
 }
 
 // Discarded is the context once the unsubmitted review is deleted: its

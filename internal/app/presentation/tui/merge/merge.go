@@ -25,8 +25,8 @@ var nextGen atomic.Int64
 
 type Source interface {
 	PRMergeContext(ctx context.Context, repo string, number int) (domain.MergeContext, error)
-	MergePR(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error
-	EnableAutoMerge(ctx context.Context, pr domain.PullRequestHandle, method domain.MergeMethod) error
+	MergePR(ctx context.Context, t domain.MergeTarget, method domain.MergeMethod) error
+	EnableAutoMerge(ctx context.Context, t domain.MergeTarget, method domain.MergeMethod) error
 	DisableAutoMerge(ctx context.Context, pr domain.PullRequestHandle) error
 }
 
@@ -180,7 +180,7 @@ func (m Model) mergeAsAdmin() (Model, tea.Cmd) {
 		return m, nil
 	}
 	method := m.method()
-	return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.PullRequest, method) })
+	return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.Target(), method) })
 }
 
 // send does the one thing the popup is for. Leaving the auto-merge queue is
@@ -193,12 +193,12 @@ func (m Model) send() (Model, tea.Cmd) {
 		return m.sendCmd(false, func(ctx context.Context) error { return m.src.DisableAutoMerge(ctx, m.ctx.PullRequest) })
 	case m.auto:
 		method := m.method()
-		return m.sendCmd(false, func(ctx context.Context) error { return m.src.EnableAutoMerge(ctx, m.ctx.PullRequest, method) })
+		return m.sendCmd(false, func(ctx context.Context) error { return m.src.EnableAutoMerge(ctx, m.ctx.Target(), method) })
 	case m.ctx.Block != domain.BlockNone:
 		return m, nil
 	default:
 		method := m.method()
-		return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.PullRequest, method) })
+		return m.sendCmd(true, func(ctx context.Context) error { return m.src.MergePR(ctx, m.ctx.Target(), method) })
 	}
 }
 

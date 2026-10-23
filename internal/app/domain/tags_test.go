@@ -39,6 +39,7 @@ var exported = []any{
 	domain.PendingComment{},
 	domain.ReviewContext{},
 	domain.ReviewTarget{},
+	domain.MergeTarget{},
 }
 
 // TestNoDomainTypeCarriesASerialisationTag is the wall this package's

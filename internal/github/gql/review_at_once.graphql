@@ -1,6 +1,7 @@
-mutation ($pullRequestId: ID!, $event: PullRequestReviewEvent!, $body: String!) {
+mutation ($pullRequestId: ID!, $commitOID: GitObjectID!, $event: PullRequestReviewEvent!, $body: String!) {
   addPullRequestReview(input: {
     pullRequestId: $pullRequestId
+    commitOID: $commitOID
     event: $event
     body: $body
   }) {

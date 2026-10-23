@@ -26,6 +26,7 @@ type Source interface {
 type Target struct {
 	PullRequest     domain.PullRequestHandle
 	Pending         domain.ReviewHandle
+	Commit          domain.CommitHandle
 	PendingComments int
 }
 
@@ -131,6 +132,7 @@ func (m Model) submit() (Model, tea.Cmd) {
 	target := domain.ReviewTarget{
 		PullRequest: m.target.PullRequest,
 		Pending:     m.target.Pending,
+		Commit:      m.target.Commit,
 	}
 	event, body := m.event, m.textarea.Value()
 	m.sending = true
