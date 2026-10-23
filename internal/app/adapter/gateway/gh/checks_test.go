@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -174,21 +175,28 @@ func TestToCheckStateCoversEveryOutcome(t *testing.T) {
 	}
 }
 
-// TestToChecksFromContextsRollsUpTheRawRollup covers the conversion a search
+// TestToChecksFromRollupRollsUpTheRawRollup covers the conversion a search
 // or item document's embedded rollup goes through: unlike toChecks, it
 // starts from the plainer gql.CheckContext shape a search or single-item
 // document selects, and rolls up the same way.
-func TestToChecksFromContextsRollsUpTheRawRollup(t *testing.T) {
+func TestToChecksFromRollupRollsUpTheRawRollup(t *testing.T) {
 	t.Parallel()
 
-	contexts := []gql.CheckContext{
-		{Typename: "CheckRun", Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS"},
-		{Typename: "CheckRun", Name: "test", Status: "COMPLETED", Conclusion: "FAILURE"},
-		{Typename: "CheckRun", Name: "deploy", Status: "IN_PROGRESS"},
-		{Typename: "StatusContext", Context: "ci/legacy", State: "SUCCESS"},
+	rollup := gql.CheckRollup{
+		Contexts: []gql.CheckContext{
+			{Typename: "CheckRun", Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS"},
+			{Typename: "CheckRun", Name: "test", Status: "COMPLETED", Conclusion: "FAILURE"},
+			{Typename: "CheckRun", Name: "deploy", Status: "IN_PROGRESS"},
+			{Typename: "StatusContext", Context: "ci/legacy", State: "SUCCESS"},
+		},
+		CheckRunCounts: []gql.StateCount{
+			{State: "SUCCESS", Count: 1}, {State: "FAILURE", Count: 1}, {State: "IN_PROGRESS", Count: 1},
+		},
+		StatusContextCounts: []gql.StateCount{{State: "SUCCESS", Count: 1}},
+		TotalCount:          4,
 	}
 
-	got := toChecksFromContexts(contexts)
+	got := toChecksFromRollup(rollup)
 	want := domain.Checks{
 		Total:   4,
 		Passed:  2,
@@ -203,7 +211,101 @@ func TestToChecksFromContextsRollsUpTheRawRollup(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("toChecksFromContexts() = %+v, want %+v", got, want)
+		t.Errorf("toChecksFromRollup() = %+v, want %+v", got, want)
+	}
+}
+
+// TestToChecksFromRollupCountsPastThePage covers a pull request with more
+// contexts than the documents' first page of a hundred. Counting the page
+// would leave a failure past it out and paint the card green.
+func TestToChecksFromRollupCountsPastThePage(t *testing.T) {
+	t.Parallel()
+
+	page := make([]gql.CheckContext, 100)
+	for i := range page {
+		page[i] = gql.CheckContext{Typename: "CheckRun", Name: fmt.Sprintf("job %d", i), Status: "COMPLETED", Conclusion: "SUCCESS"}
+	}
+	rollup := gql.CheckRollup{
+		Contexts:       page,
+		CheckRunCounts: []gql.StateCount{{State: "SUCCESS", Count: 136}, {State: "FAILURE", Count: 1}},
+		TotalCount:     137,
+	}
+
+	got := toChecksFromRollup(rollup)
+
+	if got.Total != 137 || got.Passed != 136 || got.Failed != 1 || got.Running != 0 {
+		t.Errorf("counts = %d total, %d passed, %d failed, %d running; want 137, 136, 1, 0",
+			got.Total, got.Passed, got.Failed, got.Running)
+	}
+	if got.State != domain.CheckFailure {
+		t.Errorf("state = %v, want a failure: the failing context is past the page", got.State)
+	}
+	if len(got.Runs) != 100 {
+		t.Errorf("runs = %d, want the 100 the page named", len(got.Runs))
+	}
+}
+
+// TestToChecksFromRollupCountsEachStateWhereItsContextWouldGo covers every
+// state GitHub counts by. A CheckRun's state is its conclusion once it has
+// completed and its status until then, so one list mixes the two; each has
+// to land where toCheckState puts a single context in that state, or the
+// card and the drawer's names disagree.
+func TestToChecksFromRollupCountsEachStateWhereItsContextWouldGo(t *testing.T) {
+	t.Parallel()
+
+	const passed, failed, running = "passed", "failed", "running"
+	tests := []struct {
+		kind  string
+		state string
+		want  string
+	}{
+		{"CheckRun", "SUCCESS", passed},
+		{"CheckRun", "NEUTRAL", passed},
+		{"CheckRun", "SKIPPED", passed},
+		{"CheckRun", "FAILURE", failed},
+		{"CheckRun", "TIMED_OUT", failed},
+		{"CheckRun", "CANCELLED", failed},
+		{"CheckRun", "ACTION_REQUIRED", failed},
+		{"CheckRun", "STARTUP_FAILURE", failed},
+		{"CheckRun", "STALE", running},
+		{"CheckRun", "COMPLETED", running},
+		{"CheckRun", "QUEUED", running},
+		{"CheckRun", "IN_PROGRESS", running},
+		{"CheckRun", "WAITING", running},
+		{"CheckRun", "PENDING", running},
+		{"StatusContext", "SUCCESS", passed},
+		{"StatusContext", "FAILURE", failed},
+		{"StatusContext", "ERROR", failed},
+		{"StatusContext", "PENDING", running},
+		{"StatusContext", "EXPECTED", running},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind+"/"+tt.state, func(t *testing.T) {
+			t.Parallel()
+
+			counts := []gql.StateCount{{State: tt.state, Count: 1}}
+			var rollup gql.CheckRollup
+			if tt.kind == "StatusContext" {
+				rollup.StatusContextCounts = counts
+			} else {
+				rollup.CheckRunCounts = counts
+			}
+
+			got := toChecksFromRollup(rollup)
+
+			var bucket string
+			switch {
+			case got.Passed == 1:
+				bucket = passed
+			case got.Failed == 1:
+				bucket = failed
+			case got.Running == 1:
+				bucket = running
+			}
+			if bucket != tt.want || got.Total != 1 {
+				t.Errorf("%s %s: counted as %q of %d, want %q of 1", tt.kind, tt.state, bucket, got.Total, tt.want)
+			}
+		})
 	}
 }
 

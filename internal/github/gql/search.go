@@ -41,17 +41,53 @@ type SearchItem struct {
 	Labels struct {
 		Nodes []Label `json:"nodes"`
 	} `json:"labels"`
-	Commits struct {
-		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup *struct {
-					Contexts struct {
-						Nodes []CheckContext `json:"nodes"`
-					} `json:"contexts"`
-				} `json:"statusCheckRollup"`
-			} `json:"commit"`
-		} `json:"nodes"`
-	} `json:"commits"`
+	Commits lastCommit `json:"commits"`
+}
+
+// lastCommit is the commits(last: 1) the list and item documents select:
+// GitHub hangs the roll-up off the head commit, not the pull request.
+type lastCommit struct {
+	Nodes []struct {
+		Commit struct {
+			StatusCheckRollup *struct {
+				Contexts struct {
+					TotalCount                 int            `json:"totalCount"`
+					CheckRunCountsByState      []StateCount   `json:"checkRunCountsByState"`
+					StatusContextCountsByState []StateCount   `json:"statusContextCountsByState"`
+					Nodes                      []CheckContext `json:"nodes"`
+				} `json:"contexts"`
+			} `json:"statusCheckRollup"`
+		} `json:"commit"`
+	} `json:"nodes"`
+}
+
+// CheckRollup is a commit's roll-up. Contexts holds only the first page; the
+// counts and TotalCount cover every context, the ones past that page too.
+type CheckRollup struct {
+	Contexts            []CheckContext
+	CheckRunCounts      []StateCount
+	StatusContextCounts []StateCount
+	TotalCount          int
+}
+
+// StateCount is how many contexts are in one state. A CheckRun's state is
+// its conclusion once it has completed and its status until then.
+type StateCount struct {
+	State string `json:"state"`
+	Count int    `json:"count"`
+}
+
+func (c lastCommit) rollup() CheckRollup {
+	var r CheckRollup
+	for _, commit := range c.Nodes {
+		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
+			r.Contexts = append(r.Contexts, rollup.Contexts.Nodes...)
+			r.CheckRunCounts = append(r.CheckRunCounts, rollup.Contexts.CheckRunCountsByState...)
+			r.StatusContextCounts = append(r.StatusContextCounts, rollup.Contexts.StatusContextCountsByState...)
+			r.TotalCount += rollup.Contexts.TotalCount
+		}
+	}
+	return r
 }
 
 type CheckContext struct {
@@ -82,14 +118,6 @@ func (c *Client) SearchItems(ctx context.Context, search string) ([]SearchItem, 
 	return resp.Data.Results.Nodes, nil
 }
 
-// StatusCheckContexts reads the roll-up out of the commit the search
-// returned.
-func (n SearchItem) StatusCheckContexts() []CheckContext {
-	var nodes []CheckContext
-	for _, commit := range n.Commits.Nodes {
-		if rollup := commit.Commit.StatusCheckRollup; rollup != nil {
-			nodes = append(nodes, rollup.Contexts.Nodes...)
-		}
-	}
-	return nodes
+func (n SearchItem) StatusCheckRollup() CheckRollup {
+	return n.Commits.rollup()
 }

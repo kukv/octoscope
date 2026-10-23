@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -71,7 +72,7 @@ func TestListPRsFillsTheFieldsRESTCannotAnswer(t *testing.T) {
 		if pr.ReviewDecision != "" {
 			sawReview = true
 		}
-		if len(pr.StatusCheckContexts()) > 0 {
+		if len(pr.StatusCheckRollup().Contexts) > 0 {
 			sawChecks = true
 		}
 		if pr.Additions > 0 || pr.Deletions > 0 {
@@ -86,6 +87,35 @@ func TestListPRsFillsTheFieldsRESTCannotAnswer(t *testing.T) {
 	}
 	if !sawSize {
 		t.Error("no additions/deletions in the whole answer")
+	}
+}
+
+// The check summary is built from the counts by state, because the contexts
+// are one page of a hundred. A count that stops decoding leaves every card
+// at zero checks while the names still show.
+func TestTheRollupCountsCoverEveryContext(t *testing.T) {
+	t.Parallel()
+
+	list, _ := fixedTransport(t, "testdata/repo_prs.json")
+	prs, err := list.ListPRs(context.Background(), "kukv/koto")
+	if err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+	item, _ := fixedTransport(t, "testdata/pr.json")
+	pr, err := item.GetPR(context.Background(), "kukv/octoscope", 59)
+	if err != nil {
+		t.Fatalf("GetPR: %v", err)
+	}
+	for _, n := range append(prs, pr) {
+		r := n.StatusCheckRollup()
+		sum := 0
+		for _, s := range slices.Concat(r.CheckRunCounts, r.StatusContextCounts) {
+			sum += s.Count
+		}
+		if r.TotalCount == 0 || sum != r.TotalCount {
+			t.Errorf("#%d: counts by state add up to %d of %d contexts, want all of them and more than none",
+				n.Number, sum, r.TotalCount)
+		}
 	}
 }
 

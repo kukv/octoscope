@@ -1,6 +1,7 @@
 package drawer_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -115,5 +116,21 @@ func TestTheRuleSpansTheWholeWidth(t *testing.T) {
 	rule := ansi.Strip(drawer.Render(item(), 120)[0])
 	if got := ansi.StringWidth(rule); got != 120 {
 		t.Errorf("the rule is %d columns, want 120: %q", got, rule)
+	}
+}
+
+// TestTheOverflowCountsTheChecksPastThePage covers a pull request with more
+// checks than the list documents name: the counts cover them all, and an
+// overflow line counted from the names alone would say 97 more of 137.
+func TestTheOverflowCountsTheChecksPastThePage(t *testing.T) {
+	it := item()
+	it.Checks = domain.Checks{Total: 137, Passed: 137, State: domain.CheckSuccess}
+	for i := range 100 {
+		it.Checks.Runs = append(it.Checks.Runs, domain.CheckRun{Name: fmt.Sprintf("job %d", i)})
+	}
+
+	got := ansi.Strip(strings.Join(drawer.Render(it, 120), "\n"))
+	if !strings.Contains(got, "and 134 more") {
+		t.Errorf("the drawer does not count the checks past the page:\n%s", got)
 	}
 }

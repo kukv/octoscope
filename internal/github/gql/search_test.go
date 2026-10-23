@@ -56,7 +56,7 @@ func TestASearchResultParsesIntoSearchItems(t *testing.T) {
 	if item.ReviewDecision != "REVIEW_REQUIRED" {
 		t.Errorf("review decision: got %q, want REVIEW_REQUIRED", item.ReviewDecision)
 	}
-	contexts := item.StatusCheckContexts()
+	contexts := item.StatusCheckRollup().Contexts
 	if len(contexts) != 3 {
 		t.Errorf("checks: got %d contexts, want 3", len(contexts))
 	}
@@ -97,7 +97,7 @@ func TestStatusCheckContextsWithNoRollupIsEmpty(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("the result holds %d items, want 1", len(items))
 	}
-	if got := items[0].StatusCheckContexts(); len(got) != 0 {
+	if got := items[0].StatusCheckRollup().Contexts; len(got) != 0 {
 		t.Errorf("contexts = %+v, want none", got)
 	}
 }
@@ -132,7 +132,7 @@ func TestStatusCheckContextsKeepsEachShapesOwnFields(t *testing.T) {
 		{Typename: "CheckRun", Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS"},
 		{Typename: "StatusContext", Context: "ci/legacy", State: "FAILURE"},
 	}
-	if got := item.StatusCheckContexts(); !reflect.DeepEqual(got, want) {
+	if got := item.StatusCheckRollup().Contexts; !reflect.DeepEqual(got, want) {
 		t.Errorf("contexts = %+v, want %+v", got, want)
 	}
 	if item.BodyText != "the body" {
@@ -293,6 +293,38 @@ func TestSearchItemsParsesARecordedResponse(t *testing.T) {
 	// shapes: a recording of pull requests alone never runs the Issue branch.
 	if !typenames["PullRequest"] || !typenames["Issue"] {
 		t.Errorf("the recording holds only %v; it must exercise both branches", typenames)
+	}
+}
+
+// The Work board's cards are summed from the counts by state, because the
+// contexts are one page of a hundred. A count that stops decoding leaves
+// every card at zero checks while the drawer still names them.
+func TestTheSearchRollupCountsCoverEveryContext(t *testing.T) {
+	t.Parallel()
+
+	c := fileClient(t, "testdata/work_section.json")
+	items, err := c.SearchItems(context.Background(), "is:open assignee:@me")
+	if err != nil {
+		t.Fatalf("SearchItems: %v", err)
+	}
+	var sawChecks bool
+	for _, item := range items {
+		r := item.StatusCheckRollup()
+		if len(r.Contexts) == 0 {
+			continue
+		}
+		sawChecks = true
+		sum := 0
+		for _, s := range slices.Concat(r.CheckRunCounts, r.StatusContextCounts) {
+			sum += s.Count
+		}
+		if sum != r.TotalCount || sum < len(r.Contexts) {
+			t.Errorf("#%d: counts by state add up to %d of %d contexts (%d named), want all of them",
+				item.Number, sum, r.TotalCount, len(r.Contexts))
+		}
+	}
+	if !sawChecks {
+		t.Error("no pull request in the recording has checks; re-record work_section.json with one that does")
 	}
 }
 

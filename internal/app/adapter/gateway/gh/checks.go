@@ -83,31 +83,44 @@ func toChecks(runs []gql.CheckRun) domain.Checks {
 	return c
 }
 
-// toChecksFromContexts rolls up the check contexts a search or item
-// document embeds under a commit -- a different query from the
-// per-pull-request one toChecks reads, so it counts the same way but starts
-// from the plainer gql.CheckContext shape. Only Name, State and Kind are
-// filled on each run: the rollup carries nothing else (domain.CheckRun's own
-// comment says why).
-func toChecksFromContexts(nodes []gql.CheckContext) domain.Checks {
+// toChecksFromRollup rolls up the check contexts a search or item document
+// embeds under a commit -- a different query from the per-pull-request one
+// toChecks reads, so it starts from the plainer gql.CheckContext shape. Only
+// Name, State and Kind are filled on each run: the rollup carries nothing
+// else (domain.CheckRun's own comment says why).
+//
+// The counts come from GitHub's counts by state, not from the contexts: those
+// are one page, and a pull request can have more. Runs can therefore be
+// shorter than Total. Total is the sum of the counts rather than totalCount so
+// that Passed+Failed+Running always equals it, as toChecks guarantees.
+func toChecksFromRollup(r gql.CheckRollup) domain.Checks {
 	var c domain.Checks
-	for _, n := range nodes {
+	for _, n := range r.Contexts {
 		kind := domain.CheckKindRun
 		if n.Typename == "StatusContext" {
 			kind = domain.CheckKindStatus
 		}
-		run := domain.CheckRun{Name: checkContextName(n), State: toCheckState(n), Kind: kind}
-		c.Total++
-		c.Runs = append(c.Runs, run)
-		switch run.State {
-		case domain.CheckSuccess:
-			c.Passed++
-		case domain.CheckFailure:
-			c.Failed++
-		default:
-			c.Running++
+		c.Runs = append(c.Runs, domain.CheckRun{Name: checkContextName(n), State: toCheckState(n), Kind: kind})
+	}
+	// A CheckRun counted by state is counted by its conclusion once it has
+	// completed and by its status until then. conclusionState sends every
+	// status to its default, which is counted with the running ones, just as
+	// toCheckState counts a run that has not completed.
+	tally := func(counts []gql.StateCount, state func(string) domain.CheckState) {
+		for _, n := range counts {
+			switch state(n.State) {
+			case domain.CheckSuccess:
+				c.Passed += n.Count
+			case domain.CheckFailure:
+				c.Failed += n.Count
+			default:
+				c.Running += n.Count
+			}
 		}
 	}
+	tally(r.CheckRunCounts, conclusionState)
+	tally(r.StatusContextCounts, statusContextState)
+	c.Total = c.Passed + c.Failed + c.Running
 	switch {
 	case c.Total == 0:
 		c.State = domain.CheckNone
@@ -168,19 +181,27 @@ func checkContextName(n gql.CheckContext) string {
 // shapes have to be read differently.
 func toCheckState(n gql.CheckContext) domain.CheckState {
 	if n.Typename == "StatusContext" {
-		switch n.State {
-		case "SUCCESS":
-			return domain.CheckSuccess
-		case "FAILURE", "ERROR":
-			return domain.CheckFailure
-		default:
-			return domain.CheckPending
-		}
+		return statusContextState(n.State)
 	}
 	if n.Status != "COMPLETED" {
 		return domain.CheckRunning
 	}
-	switch n.Conclusion {
+	return conclusionState(n.Conclusion)
+}
+
+func statusContextState(s string) domain.CheckState {
+	switch s {
+	case "SUCCESS":
+		return domain.CheckSuccess
+	case "FAILURE", "ERROR":
+		return domain.CheckFailure
+	default:
+		return domain.CheckPending
+	}
+}
+
+func conclusionState(s string) domain.CheckState {
+	switch s {
 	case "SUCCESS", "NEUTRAL", "SKIPPED":
 		return domain.CheckSuccess
 	case "FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE":

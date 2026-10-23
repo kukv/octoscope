@@ -21,39 +21,6 @@
           }
         },
         {
-          "__typename": "PullRequest",
-          "number": 17,
-          "title": "feat: implement-plan スキルにサブエージェント並列実装を導入",
-          "state": "OPEN",
-          "url": "https://github.com/bright-room/br-claude-plugins/pull/17",
-          "isDraft": false,
-          "updatedAt": "2026-03-30T02:50:42Z",
-          "bodyText": "概要\nimplement-plan スキルの Step 4（コード実装）を、Haiku サブエージェントによる並列実装方式に変更。メインエージェントのトークン消費を削減し、5時間の利用制限内での実行効率を向上させる。\n変更内容\n\nStep 4.1 タスク分解: メインエージェントがプランを分析し、依存関係を考慮した実行バッチとワークパッケージ（サブエージェントへの自己完結的な指示書）を生成\nStep 4.2 並列実装: Haiku サブエージェントがバッチ単位で並列にコードを実装\nStep 4.3 検証・統合: メインエージェントがサブエージェントの出力を検証・統合（衝突チェック、整合性確認）\nStep 4.4 繰り返し: 全 Phase を順に処理\n小規模プラン最適化: Step が3つ以下の場合はサブエージェント分解をスキップし直接実装（オーバーヘッド回避）\nStep 5 追記: ビルドエラーの機械的修正もサブエージェントにディスパッチ可能に\n\n設計方針\n\nサブエージェントには定量的（機械的・明確な仕様がある）な作業のみを委譲\n設計判断が必要な作業はメインエージェントが実施\nワークパッケージは自己完結的に作成し、サブエージェントがコードベース探索を行わなくて済むようにする\n同一ファイルを同一バッチ内の複数サブエージェントに割り当てない制約で競合を防止\n\n期待される効果\nコスト削減（推定: 6ファイル×150行の実装タスク）\n\n\n\nメインモデル\nコスト削減率\nメインモデルの入力トークン削減\nメインモデルの出力トークン削減\n\n\n\n\nSonnet\n~34%\n~51%\n~58%\n\n\nOpus\n~77%\n~51%\n~58%\n\n\n\nファイル数別の削減率（Sonnet メイン）\n\n\n\nファイル数\n削減率\n備考\n\n\n\n\n2-3\n+7%（増加）\nオーバーヘッドが上回る → スキップ閾値で直接実装\n\n\n4\n-18%\n効果出始め\n\n\n6\n-34%\n標準的な効果\n\n\n10\n-46%\n大規模タスクで最大効果\n\n\n\n実装速度の向上\n依存関係のないファイルを並列実装できるため、ファイル数が多いほど速度向上の恩恵が大きい。\n変更前: [file1] → [file2] → [file3] → [file4] → [file5] → [file6]\n\n変更後: [file1] [file2] [file3]  →  [file4] [file5] [file6]\n        ~~~~~ 並列 ~~~~~            ~~~~~ 並列 ~~~~~\n\nただし、タスク分解（Step 4.1）と検証・統合（Step 4.3）のオーバーヘッドがあるため、小規模タスクでは効果が限定的。\n\n\n\nファイル数\n速度向上の目安\n\n\n\n\n2-3\n変わらないか微増\n\n\n4-6\n30-50%短縮\n\n\n8-10\n50-60%短縮\n\n\n\n🤖 Generated with Claude Code\nhttps://claude.ai/code/session_01Eiz6GELCc73Z7ECWsBzAK3",
-          "reviewDecision": null,
-          "headRefName": "claude/parallel-code-generation-0gQM4",
-          "baseRefName": "main",
-          "additions": 58,
-          "deletions": 12,
-          "author": {
-            "login": "kukv"
-          },
-          "labels": {
-            "nodes": []
-          },
-          "repository": {
-            "nameWithOwner": "bright-room/br-claude-plugins"
-          },
-          "commits": {
-            "nodes": [
-              {
-                "commit": {
-                  "statusCheckRollup": null
-                }
-              }
-            ]
-          }
-        },
-        {
           "__typename": "Issue",
           "number": 113,
           "title": "Ansible 2.24に向けた ansible_facts 参照形式への修正",
@@ -100,6 +67,87 @@
                 "commit": {
                   "statusCheckRollup": {
                     "contexts": {
+                      "totalCount": 3,
+                      "checkRunCountsByState": [
+                        {
+                          "state": "ACTION_REQUIRED",
+                          "count": 0
+                        },
+                        {
+                          "state": "CANCELLED",
+                          "count": 0
+                        },
+                        {
+                          "state": "COMPLETED",
+                          "count": 0
+                        },
+                        {
+                          "state": "FAILURE",
+                          "count": 0
+                        },
+                        {
+                          "state": "IN_PROGRESS",
+                          "count": 0
+                        },
+                        {
+                          "state": "NEUTRAL",
+                          "count": 0
+                        },
+                        {
+                          "state": "PENDING",
+                          "count": 0
+                        },
+                        {
+                          "state": "QUEUED",
+                          "count": 0
+                        },
+                        {
+                          "state": "SKIPPED",
+                          "count": 0
+                        },
+                        {
+                          "state": "STALE",
+                          "count": 0
+                        },
+                        {
+                          "state": "STARTUP_FAILURE",
+                          "count": 0
+                        },
+                        {
+                          "state": "SUCCESS",
+                          "count": 3
+                        },
+                        {
+                          "state": "TIMED_OUT",
+                          "count": 0
+                        },
+                        {
+                          "state": "WAITING",
+                          "count": 0
+                        }
+                      ],
+                      "statusContextCountsByState": [
+                        {
+                          "state": "EXPECTED",
+                          "count": 0
+                        },
+                        {
+                          "state": "ERROR",
+                          "count": 0
+                        },
+                        {
+                          "state": "FAILURE",
+                          "count": 0
+                        },
+                        {
+                          "state": "PENDING",
+                          "count": 0
+                        },
+                        {
+                          "state": "SUCCESS",
+                          "count": 0
+                        }
+                      ],
                       "nodes": [
                         {
                           "__typename": "CheckRun",
