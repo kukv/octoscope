@@ -55,8 +55,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Install gotestsum
-        run: go install gotest.tools/gotestsum@v1.13.0
+      # Installs the tools pinned in mise.toml (gotestsum), so Renovate's
+      # mise manager keeps their versions up to date.
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
       # bash rather than the Windows default of pwsh: PowerShell splits
       # -coverprofile=coverage.out at the dot and hands go a bare ".out",
       # which it then looks for as a package. Git Bash is on the Windows

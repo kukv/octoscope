@@ -1,0 +1,2 @@
+[tools]
+"github:gotestyourself/gotestsum" = "1.13.0"
