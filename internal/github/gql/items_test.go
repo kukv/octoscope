@@ -247,6 +247,38 @@ func TestListIssuesReadsTheRecordedAnswer(t *testing.T) {
 	}
 }
 
+// A repository with nothing open answers with an empty nodes array. Every
+// other fixture has at least one node, so without these a change that turned
+// an empty answer into an error would put the Repos tab into its failure
+// state for every quiet repository, and no test would notice. Whether the
+// result is nil or an empty slice is not pinned: the gateway copies it by
+// length either way.
+func TestListPRsReadsAnEmptyAnswer(t *testing.T) {
+	t.Parallel()
+
+	c, _ := fixedTransport(t, "testdata/repo_prs_empty.json")
+	prs, err := c.ListPRs(context.Background(), "kukv/test-repo")
+	if err != nil {
+		t.Fatalf("ListPRs: %v", err)
+	}
+	if len(prs) != 0 {
+		t.Errorf("decoded %d pull requests from an empty answer", len(prs))
+	}
+}
+
+func TestListIssuesReadsAnEmptyAnswer(t *testing.T) {
+	t.Parallel()
+
+	c, _ := fixedTransport(t, "testdata/repo_issues_empty.json")
+	issues, err := c.ListIssues(context.Background(), "kukv/test-repo")
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	if len(issues) != 0 {
+		t.Errorf("decoded %d issues from an empty answer", len(issues))
+	}
+}
+
 // The repository is named by two variables, not by one "owner/name" string:
 // GraphQL's repository() takes the halves separately. The two halves of the
 // test repository differ, so a swapped pair does not read as a pass.
