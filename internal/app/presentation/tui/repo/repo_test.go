@@ -426,7 +426,7 @@ func TestANoticeDoesNotFollowTheUserToTheOtherTab(t *testing.T) {
 
 	m, cmd := m.Update(key("tab"))
 	if cmd != nil {
-		t.Fatalf("setup: the move refetched, which would clear the notice by itself: %T", cmd())
+		t.Fatalf("setup: the move started a fetch, which would clear the notice by itself")
 	}
 
 	view := ansi.Strip(m.View())
