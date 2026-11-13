@@ -180,32 +180,35 @@ func requestBody(doc string, vars []gql.Var) ([]byte, error) {
 // asking again for, and one only the user can fix. Everything else keeps what
 // GitHub said and no type at all.
 func statusError(status int, body []byte) error {
+	// A success's body is the whole answer, and nothing below reads it then:
+	// parsing it here would be a second pass over it for GraphQL (classify
+	// reads it once more) and a wasted one for REST.
+	if status < http.StatusBadRequest {
+		return nil
+	}
 	var b errorsBody
 	// A body that is not JSON leaves b zero, which reads as "no words from
 	// GitHub" -- the status alone then describes the failure.
 	_ = json.Unmarshal(body, &b)
 	msg := b.text()
 
-	switch {
-	case status == http.StatusBadGateway,
-		status == http.StatusServiceUnavailable,
-		status == http.StatusGatewayTimeout:
+	switch status {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		if msg == "" {
 			msg = fmt.Sprintf("HTTP %d", status)
 		}
 		return github.Classify(github.ErrTransient, msg)
-	case status == http.StatusUnauthorized:
+	case http.StatusUnauthorized:
 		if msg == "" {
 			msg = "HTTP 401"
 		}
 		return github.Classify(github.ErrUnauthenticated, msg)
-	case status >= 400:
+	default:
 		if msg == "" {
 			msg = fmt.Sprintf("HTTP %d", status)
 		}
 		return github.Classify(nil, msg)
 	}
-	return nil
 }
 
 // classify is statusError plus the one shape only GraphQL has: HTTP 200 with
