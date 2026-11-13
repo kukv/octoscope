@@ -957,6 +957,41 @@ func TestBadgesShowTheCounts(t *testing.T) {
 	}
 }
 
+// The sidebar is a fixed column, and every other fixture's names are short
+// enough never to reach its edge. A name past it that is not cut overruns the
+// column, pushes its own badge out of view, and shoves the table to the right.
+func TestALongRepositoryNameStaysOnOneSidebarLine(t *testing.T) {
+	const long = "kukv/a-repository-with-a-name-nobody-would-type-twice"
+	f := &fakeSource{prs: samplePRs()}
+	m := sized(New(f, Options{Repositories: []string{"kukv/octoscope", long}}), 120)
+	m, _ = m.Update(repoCountsMsg{counts: []domain.RepoCount{
+		{Repo: "kukv/octoscope", PRs: 12, Issues: 3},
+		{Repo: long, PRs: 1, Issues: 2},
+	}})
+
+	sawLong := false
+	for i, line := range m.sidebar() {
+		plain := ansi.Strip(line)
+		if w := ansi.StringWidth(plain); w > sidebarWidth {
+			t.Errorf("sidebar line %d is %d columns, over the %d it has: %q", i, w, sidebarWidth, plain)
+		}
+		if strings.HasPrefix(plain, "kukv/a-repository") {
+			sawLong = true
+			if !strings.Contains(plain, "1/2") {
+				t.Errorf("the long name pushed its badge off the line: %q", plain)
+			}
+		}
+	}
+	if !sawLong {
+		t.Fatalf("setup: the long name has no row in the sidebar:\n%s", strings.Join(m.sidebar(), "\n"))
+	}
+	for i, line := range strings.Split(m.View(), "\n") {
+		if w := ansi.StringWidth(line); w > 120 {
+			t.Errorf("line %d is %d columns at width 120: %q", i, w, ansi.Strip(line))
+		}
+	}
+}
+
 // RepoCounts answers positionally and rewrites each name to the spelling
 // GitHub resolved. Matching by name would drop the answer for a row the user
 // spelled differently.
