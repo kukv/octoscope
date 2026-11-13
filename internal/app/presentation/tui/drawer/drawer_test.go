@@ -6,10 +6,44 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/drawer"
+	"github.com/kukv/octoscope/internal/i18n"
 )
+
+// The drawer has no golden, so nothing else would catch an ID missing from a
+// catalog. The width is wide on purpose: the drawer clips its lines, and a
+// "!id" cut short can slip past the pattern.
+func TestNoUnresolvedIDsInTheDrawer(t *testing.T) {
+	noChecks := item()
+	noChecks.Checks = domain.Checks{}
+	many := item()
+	many.Checks = domain.Checks{Total: 9, Passed: 8, Failed: 1, State: domain.CheckFailure}
+	for i := range 9 {
+		many.Checks.Runs = append(many.Checks.Runs, domain.CheckRun{Name: fmt.Sprintf("job %d", i)})
+	}
+	issue := item()
+	issue.Ref.Kind = domain.ItemIssue
+	issue.Checks = domain.Checks{}
+
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		t.Run(lang.String(), func(t *testing.T) {
+			i18n.SetLanguage(lang)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			for name, it := range map[string]domain.WorkItem{
+				"no_checks":   noChecks,
+				"many_checks": many,
+				"issue":       issue,
+			} {
+				t.Run(name, func(t *testing.T) {
+					i18n.AssertNoUnresolvedIDs(t, strings.Join(drawer.Render(it, 120), "\n"))
+				})
+			}
+		})
+	}
+}
 
 // item is a pull request with something to say in every part of the drawer.
 func item() domain.WorkItem {

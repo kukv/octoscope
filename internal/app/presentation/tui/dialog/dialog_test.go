@@ -7,10 +7,33 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"golang.org/x/text/language"
 
 	"github.com/kukv/octoscope/internal/app/domain"
 	"github.com/kukv/octoscope/internal/app/presentation/tui/dialog"
+	"github.com/kukv/octoscope/internal/i18n"
 )
+
+// The dialog has no golden, so nothing else would catch an ID missing from a
+// catalog: the view would just show "!dialog.searching" to the user.
+func TestNoUnresolvedIDsInTheDialog(t *testing.T) {
+	for _, lang := range []language.Tag{language.English, language.Japanese} {
+		t.Run(lang.String(), func(t *testing.T) {
+			i18n.SetLanguage(lang)
+			t.Cleanup(func() { i18n.SetLanguage(language.English) })
+			m := dialog.New("title", "hint").SetWidth(60)
+			for name, view := range map[string]string{
+				"searching":     m.Searching().View(),
+				"no_candidates": m.SetCandidates(nil).View(),
+				"candidates":    m.SetCandidates([]domain.RepoCandidate{{Name: "kukv/koto", Stars: 12}}).View(),
+			} {
+				t.Run(name, func(t *testing.T) {
+					i18n.AssertNoUnresolvedIDs(t, view)
+				})
+			}
+		})
+	}
+}
 
 func key(s string) tea.KeyPressMsg {
 	switch s {
