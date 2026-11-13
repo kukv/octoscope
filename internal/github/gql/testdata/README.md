@@ -303,6 +303,22 @@ gh api graphql -F query=@internal/github/gql/repo_issues.graphql \
   -f owner=kukv -f name=octoscope | jq '.data.repository.issues.nodes |= .[0:5]' > $D/repo_issues.json
 ```
 
+## `repo_prs_empty.json` / `repo_issues_empty.json`
+
+`repo_prs.graphql` / `repo_issues.graphql` に対する実レスポンス。録った日: 2026-11-13、対象:
+`kukv/test-repo`（公開）。開いている PR も Issue も 0 件で、`nodes` が空の配列になる。
+
+**0 件であることがこの fixture の意味である。** 録り直すときに対象が 0 件でなくなっていたら、
+件数を削って 0 件にするのではなく、開いている PR / Issue が 0 件の別の公開リポジトリを探して録る。
+
+```bash
+D=internal/github/gql/testdata
+gh api graphql -F query=@internal/github/gql/repo_prs.graphql \
+  -f owner=kukv -f name=test-repo > $D/repo_prs_empty.json
+gh api graphql -F query=@internal/github/gql/repo_issues.graphql \
+  -f owner=kukv -f name=test-repo > $D/repo_issues_empty.json
+```
+
 ## `pr.json`
 
 `pr.graphql` に対する実レスポンス。録った日: 2026-09-13、対象:
