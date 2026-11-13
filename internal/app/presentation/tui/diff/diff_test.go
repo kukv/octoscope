@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -892,7 +893,7 @@ func TestSidebarStillReachesTheSelectedFile(t *testing.T) {
 	m.sidebar = true
 
 	lines := m.sidebarLines()
-	want := clip(m.files[m.file].Path, sidebarWidth)
+	want := layout.Clip(m.files[m.file].Path, sidebarWidth)
 
 	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, want) }) {
 		t.Fatalf("the selected file %q is not in the %d lines drawn", want, len(lines))

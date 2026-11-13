@@ -56,7 +56,7 @@ func (m Model) View() string {
 		return ""
 	}
 	if m.loading {
-		return clip(m.spin.View()+" "+i18n.T("diff.loading"), m.width)
+		return layout.Clip(m.spin.View()+" "+i18n.T("diff.loading"), m.width)
 	}
 
 	lines := append(m.header(), m.body()...)
@@ -84,11 +84,11 @@ func (m Model) View() string {
 func (m Model) keyBar() string {
 	switch m.mode {
 	case modeCompose:
-		return theme.Dim().Render(clip(i18n.T("footer.diff_comment"), m.width))
+		return theme.Dim().Render(layout.Clip(i18n.T("footer.diff_comment"), m.width))
 	case modeSubmit:
-		return theme.Dim().Render(clip(i18n.T("footer.submit"), m.width))
+		return theme.Dim().Render(layout.Clip(i18n.T("footer.submit"), m.width))
 	case modeDiscard:
-		return theme.Dim().Render(clip(i18n.T("footer.discard"), m.width))
+		return theme.Dim().Render(layout.Clip(i18n.T("footer.discard"), m.width))
 	default:
 		return theme.Dim().Render(layout.FitKeyBar(diffHints(), m.width))
 	}
@@ -122,7 +122,7 @@ func diffHints() []string {
 func (m Model) submitLines() []string {
 	lines := append([]string{""}, strings.Split(m.submit.View(), "\n")...)
 	if m.errText != "" {
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+		lines = append(lines, layout.Clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
 	}
 	return lines
 }
@@ -144,12 +144,12 @@ func (m Model) submitHeight() int {
 // discardLines draws the discard confirmation: the question, and either the
 // spinner while DiscardReview is running or a failure underneath it.
 func (m Model) discardLines() []string {
-	lines := []string{"", clip(theme.Error().Render(i18n.T("submit.discard_confirm")), m.width)}
+	lines := []string{"", layout.Clip(theme.Error().Render(i18n.T("submit.discard_confirm")), m.width)}
 	switch {
 	case m.errText != "":
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+		lines = append(lines, layout.Clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
 	case m.phase == phaseWorking:
-		lines = append(lines, clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
+		lines = append(lines, layout.Clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
 	}
 	return lines
 }
@@ -176,9 +176,9 @@ func (m Model) composerLines() []string {
 	lines := append([]string{""}, strings.Split(m.textarea.View(), "\n")...)
 	switch {
 	case m.errText != "":
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+		lines = append(lines, layout.Clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
 	case m.phase == phaseWorking:
-		lines = append(lines, clip(m.spin.View()+" "+i18n.T("diff.posting"), m.width))
+		lines = append(lines, layout.Clip(m.spin.View()+" "+i18n.T("diff.posting"), m.width))
 	}
 	return lines
 }
@@ -204,7 +204,7 @@ func (m Model) composerHeight() int {
 // translated.
 func (m Model) reviewErrLine() string {
 	text := theme.Error().Render(i18n.T("common.error_prefix")) + singleLine(m.reviewErr.Error())
-	return clip(text, m.width)
+	return layout.Clip(text, m.width)
 }
 
 // reviewErrHeight is the extra line reviewErrLine takes, taken out of the
@@ -238,7 +238,7 @@ func (m Model) noticeHeight() int {
 // screen unchanged the way the silent guards used to (.claude/rules/errors.md
 // applies the same "say why" rule to a declined key as to a failed one).
 func (m Model) declinedLine() string {
-	return clip(theme.Dim().Render(m.declined), m.width)
+	return layout.Clip(theme.Dim().Render(m.declined), m.width)
 }
 
 // declinedHeight is the extra line declinedLine takes, out of the pane's
@@ -261,8 +261,8 @@ func (m Model) header() []string {
 		first += " " + m.review.Title
 	}
 	return []string{
-		clip(theme.Title().Render(first), m.width),
-		clip(m.sizeLine(), m.width),
+		layout.Clip(theme.Title().Render(first), m.width),
+		layout.Clip(m.sizeLine(), m.width),
 		m.filesHeadingLine(),
 	}
 }
@@ -379,7 +379,7 @@ func (m Model) sidebarLines() []string {
 	lines := make([]string, 0, h+1)
 	for i := m.fileTop; i < len(m.files) && len(lines) < h; i++ {
 		f := m.files[i]
-		path := clip(f.Path, sidebarWidth)
+		path := layout.Clip(f.Path, sidebarWidth)
 		plainSize := fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)
 		count, pending := m.threadCount(f.Path)
 		badge := ""
@@ -465,13 +465,13 @@ func (m Model) diffLine(r row, selected bool, width int) string {
 func (m Model) styledLine(r row, width int) string {
 	switch r.kind {
 	case rowHunkHeader:
-		return theme.HunkHeader().Render(clip(r.text, width))
+		return theme.HunkHeader().Render(layout.Clip(r.text, width))
 	case rowNote:
-		return theme.Dim().Render(clip(r.text, width))
+		return theme.Dim().Render(layout.Clip(r.text, width))
 	case rowThread:
 		return m.threadLine(r, width)
 	case rowCollapsed:
-		return theme.Dim().Render(clip(icon.Collapsed()+" "+r.text, width))
+		return theme.Dim().Render(layout.Clip(icon.Collapsed()+" "+r.text, width))
 	default:
 		return m.diffTextLine(r.line, width)
 	}
@@ -481,7 +481,7 @@ func (m Model) styledLine(r row, width int) string {
 // apart from the code, the author, and the body, coloured by whether it has
 // been sent yet.
 func (m Model) threadLine(r row, width int) string {
-	return theme.Thread(r.comment.Pending).Render(clip(m.threadText(r), width))
+	return theme.Thread(r.comment.Pending).Render(layout.Clip(m.threadText(r), width))
 }
 
 func (m Model) threadText(r row) string {
@@ -497,7 +497,7 @@ func (m Model) threadText(r row) string {
 func (m Model) diffTextLine(l domain.DiffLine, width int) string {
 	old, num := lineNumbers(l)
 	fw := m.lineNumberWidth()
-	body := theme.Highlight(m.currentPath(), clip(l.Text, max(width-m.gutter(), 0)))
+	body := theme.Highlight(m.currentPath(), layout.Clip(l.Text, max(width-m.gutter(), 0)))
 	gutter := theme.LineNumber().Render(fmt.Sprintf("%*s %*s", fw, old, fw, num)) +
 		markerStyle(l.Kind) + " "
 	return gutter + body
@@ -567,7 +567,3 @@ func expandTabs(s string) string { return strings.ReplaceAll(s, "\t", strings.Re
 // left unexpanded. Folding every run of whitespace to a single space keeps as
 // much of the text visible as fits, rather than showing only its first line.
 func singleLine(s string) string { return strings.Join(strings.Fields(s), " ") }
-
-// clip cuts s to w display columns. Japanese takes two columns per
-// character, so the count is never a byte or a rune count.
-func clip(s string, w int) string { return ansi.Truncate(s, w, "…") }

@@ -58,7 +58,7 @@ func (m Model) View() string {
 			"Index": m.col + 1,
 			"Total": m.columns(),
 		})
-		lines = append(lines, theme.Dim().Render(clip(position, m.width)), "")
+		lines = append(lines, theme.Dim().Render(layout.Clip(position, m.width)), "")
 	}
 	lines = append(lines, m.board(m.boardHeight())...)
 	if m.drawerShown() {
@@ -95,7 +95,7 @@ func (m Model) hasNotice() bool {
 }
 
 func (m Model) keyBar() string {
-	return theme.Dim().Render(clip(i18n.T("footer.work"), m.width))
+	return theme.Dim().Render(layout.Clip(i18n.T("footer.work"), m.width))
 }
 
 func (m Model) drawerShown() bool { return m.width >= drawer.MinColumns }
@@ -233,7 +233,7 @@ func (m Model) heading(s domain.WorkSection, n, w int) string {
 		count = strconv.Itoa(n)
 	}
 	room := w - len(gutter) - ansi.StringWidth(count) - 1
-	name = theme.Heading().Render(clip(name, max(room, 0)))
+	name = theme.Heading().Render(layout.Clip(name, max(room, 0)))
 	pad := w - len(gutter) - ansi.StringWidth(name) - ansi.StringWidth(count)
 	return gutter + name + strings.Repeat(" ", max(pad, 0)) +
 		theme.Count(s == domain.SectionReviewRequested && n > 0).Render(count)
@@ -290,7 +290,7 @@ func (m Model) card(it domain.WorkItem, at time.Time, w int, selected bool) []st
 func cardHead(it domain.WorkItem, w int) string {
 	head := stateMarker(it) + " "
 	number := fmt.Sprintf(" #%d", it.Ref.Number)
-	repo := clip(it.Ref.Repo, max(w-ansi.StringWidth(head)-ansi.StringWidth(number), 0))
+	repo := layout.Clip(it.Ref.Repo, max(w-ansi.StringWidth(head)-ansi.StringWidth(number), 0))
 	return head + theme.Dim().Render(repo) + number
 }
 
@@ -311,7 +311,7 @@ func cardTitle(it domain.WorkItem, w int, selected bool) []string {
 // in the title that the author never wrote.
 func wrapTitle(title string, w int) (string, string) {
 	head := strings.Split(ansi.Wrap(title, max(w, 1), ""), "\n")[0]
-	return head, clip(strings.TrimSpace(strings.TrimPrefix(title, head)), w)
+	return head, layout.Clip(strings.TrimSpace(strings.TrimPrefix(title, head)), w)
 }
 
 // cardMeta is the last line: how the item's checks are doing, how long it has
@@ -333,7 +333,7 @@ func (m Model) cardMeta(it domain.WorkItem, at time.Time, w int) string {
 	if b := theme.Badges(it.Labels, w-spent); b != "" {
 		parts = append(parts, strings.TrimSpace(b))
 	}
-	return clip(strings.Join(parts, " "), w)
+	return layout.Clip(strings.Join(parts, " "), w)
 }
 
 // reviewWord is what a pull request with no checks says instead of a bar.
@@ -397,10 +397,4 @@ func (m Model) visibleSections() []domain.WorkSection {
 
 func (m Model) columnWidth(n int) int {
 	return (m.width - columnGap*(n-1)) / n
-}
-
-// clip cuts s to w display columns. Japanese takes two columns per character,
-// so the count is never a byte or a rune count.
-func clip(s string, w int) string {
-	return ansi.Truncate(s, w, "…")
 }
