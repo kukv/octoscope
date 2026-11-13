@@ -158,7 +158,11 @@ func TestGolden(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
 				for _, state := range goldenStates {
-					golden.Assert(t, fmt.Sprintf("%s_%s_%d", state.name, lang.name, w), state.build(t, w).View())
+					view := state.build(t, w).View()
+					golden.Assert(t, fmt.Sprintf("%s_%s_%d", state.name, lang.name, w), view)
+					// A golden records a missing ID as "!id", so re-recording
+					// would accept a typo; this is what refuses it.
+					i18n.AssertNoUnresolvedIDs(t, view)
 				}
 			})
 		}

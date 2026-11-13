@@ -88,17 +88,23 @@ func TestGolden(t *testing.T) {
 			t.Run(fmt.Sprintf("%s_%d", lang.name, w), func(t *testing.T) {
 				i18n.SetLanguage(lang.tag)
 				t.Cleanup(func() { i18n.SetLanguage(language.English) })
+				// A golden records a missing ID as "!id", so re-recording would
+				// accept a typo; the guard is what refuses it.
+				record := func(name, view string) {
+					golden.Assert(t, fmt.Sprintf("%s_%s_%d", name, lang.name, w), view)
+					i18n.AssertNoUnresolvedIDs(t, view)
+				}
 
 				loaded := goldenModel(t, w, goldenItems())
-				golden.Assert(t, fmt.Sprintf("search_%s_%d", lang.name, w), loaded.View())
+				record("search", loaded.View())
 
 				editing := loaded
 				editing, _ = press(editing, "e")
 				editing = typeInto(editing, " author:kukv")
-				golden.Assert(t, fmt.Sprintf("search_editing_%s_%d", lang.name, w), editing.View())
+				record("search_editing", editing.View())
 
 				empty := goldenModel(t, w, nil)
-				golden.Assert(t, fmt.Sprintf("search_empty_%s_%d", lang.name, w), empty.View())
+				record("search_empty", empty.View())
 
 				// The cursor is moved to FilterLabel and the fetch resolved
 				// before the window is sized, since a narrow width would
@@ -110,17 +116,17 @@ func TestGolden(t *testing.T) {
 				candidates = resolveCandidates(t, candidates, FilterLabel)
 				candidates, _ = candidates.Update(windowSize(w))
 				candidates.fetchedAt = goldenFetchedAt
-				golden.Assert(t, fmt.Sprintf("search_candidates_%s_%d", lang.name, w), candidates.View())
+				record("search_candidates", candidates.View())
 
 				picker := saveQuery(t, loaded, "urgent", "is:open label:urgent")
 				picker = saveQuery(t, picker, "自分のPR", "author:kukv")
 				picker, _ = press(picker, "ctrl+o")
-				golden.Assert(t, fmt.Sprintf("search_picker_%s_%d", lang.name, w), picker.View())
+				record("search_picker", picker.View())
 
 				naming := loaded
 				naming, _ = press(naming, "s")
 				naming = typeInto(naming, "自分")
-				golden.Assert(t, fmt.Sprintf("search_naming_%s_%d", lang.name, w), naming.View())
+				record("search_naming", naming.View())
 			})
 		}
 	}
