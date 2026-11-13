@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kukv/octoscope/internal/app/domain"
+	"github.com/kukv/octoscope/internal/app/presentation/tui/layout"
 	"github.com/kukv/octoscope/internal/i18n"
 )
 
@@ -343,7 +344,7 @@ func TestAFailedFirstFetchClaimsNothingAboutTheChecks(t *testing.T) {
 	view := ansi.Strip(m.View())
 	summary := ansi.Strip(i18n.Tf("checks.summary", map[string]any{"Failing": 0, "Running": 0}))
 	// The list draws "no checks" cut to its own width.
-	none := clip(i18n.T("checks.none"), listWidth)
+	none := layout.Clip(i18n.T("checks.none"), listWidth)
 	for _, claim := range []string{none, summary} {
 		if strings.Contains(view, claim) {
 			t.Errorf("the view claims %q about checks it never got:\n%s", claim, view)

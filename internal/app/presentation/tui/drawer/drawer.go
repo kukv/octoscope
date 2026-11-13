@@ -76,8 +76,8 @@ func rule(width int) string {
 // from and what it changes, and the beginning of its body.
 func summaryPane(it domain.WorkItem, w int) []string {
 	lines := []string{
-		clip(theme.Title().Render(it.Title), w),
-		clip(metaLine(it, w), w),
+		layout.Clip(theme.Title().Render(it.Title), w),
+		layout.Clip(metaLine(it, w), w),
 	}
 	return append(lines, bodyLines(it.Body, w, rows-len(lines))...)
 }
@@ -131,7 +131,7 @@ func bodyLines(body string, w, budget int) []string {
 	}
 	if len(wrapped) > budget {
 		wrapped = wrapped[:budget]
-		wrapped[budget-1] = clip(wrapped[budget-1]+theme.Dim().Render(" …"), w)
+		wrapped[budget-1] = layout.Clip(wrapped[budget-1]+theme.Dim().Render(" …"), w)
 	}
 	return wrapped
 }
@@ -146,7 +146,7 @@ func checksPane(it domain.WorkItem, w int) []string {
 	}
 	c := it.Checks
 	if c.Total == 0 {
-		return []string{theme.Dim().Render(clip(i18n.T("work.no_checks"), w))}
+		return []string{theme.Dim().Render(layout.Clip(i18n.T("work.no_checks"), w))}
 	}
 
 	// A failure is the reason to look at this list, so failures come first.
@@ -156,19 +156,19 @@ func checksPane(it domain.WorkItem, w int) []string {
 	shown := runs[:min(len(runs), checks)]
 	var lines []string
 	for _, run := range shown {
-		lines = append(lines, clip(
+		lines = append(lines, layout.Clip(
 			theme.Check(run.State).Render(icon.Check(run.State))+" "+run.Name, w))
 	}
 	// Total, not len(runs): the list documents name only a page of the
 	// checks, and the counts cover the ones past it.
 	if rest := c.Total - len(shown); rest > 0 {
-		lines = append(lines, theme.Dim().Render(clip(i18n.Tn("work.checks_more", rest), w)))
+		lines = append(lines, theme.Dim().Render(layout.Clip(i18n.Tn("work.checks_more", rest), w)))
 	}
 
 	summary := i18n.Tf("work.checks_summary", map[string]any{
 		"Passed": c.Passed, "Total": c.Total, "Failed": c.Failed, "Running": c.Running,
 	})
-	return append(lines, theme.Dim().Render(clip(summary, w)))
+	return append(lines, theme.Dim().Render(layout.Clip(summary, w)))
 }
 
 // checkOrder ranks a check by how much it wants attention.
@@ -181,11 +181,4 @@ func checkOrder(s domain.CheckState) int {
 	default:
 		return 2
 	}
-}
-
-// clip cuts s to w display columns. layout.Clip is a different thing: it
-// reserves a column of margin, which a pane already fitted to its own width
-// does not want.
-func clip(s string, w int) string {
-	return ansi.Truncate(s, w, "…")
 }

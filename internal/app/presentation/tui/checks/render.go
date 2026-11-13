@@ -32,7 +32,7 @@ func (m Model) View() string {
 		return ""
 	}
 	if m.loading {
-		return clip(m.spin.View()+" "+i18n.T("checks.loading"), m.width)
+		return layout.Clip(m.spin.View()+" "+i18n.T("checks.loading"), m.width)
 	}
 
 	lines := append(m.header(), m.body()...)
@@ -78,8 +78,8 @@ func checksHints() []string {
 func (m Model) header() []string {
 	title := fmt.Sprintf("%s #%d", m.ref.Repo, m.ref.Number)
 	return []string{
-		clip(theme.Title().Render(title), m.width),
-		clip(m.summaryLine(), m.width),
+		layout.Clip(theme.Title().Render(title), m.width),
+		layout.Clip(m.summaryLine(), m.width),
 		m.headingLine(),
 	}
 }
@@ -102,7 +102,7 @@ func (m Model) headingLine() string {
 	div := theme.Rule().Render("│")
 	label := theme.Heading().Render(m.logModeLabel())
 	rest := max(m.width-listWidth-ansi.StringWidth(div)-ansi.StringWidth(label), 0)
-	return clip(left+div+label+theme.Rule().Render(strings.Repeat("─", rest)), m.width)
+	return layout.Clip(left+div+label+theme.Rule().Render(strings.Repeat("─", rest)), m.width)
 }
 
 func (m Model) logModeLabel() string {
@@ -117,7 +117,7 @@ func (m Model) logModeLabel() string {
 
 func (m Model) errLine() string {
 	text := theme.Error().Render(i18n.T("common.error_prefix")) + singleLine(m.errText)
-	return clip(text, m.width)
+	return layout.Clip(text, m.width)
 }
 
 func (m Model) errHeight() int {
@@ -140,7 +140,7 @@ func (m Model) noticeHeight() int {
 }
 
 func (m Model) declinedLine() string {
-	return clip(theme.Dim().Render(m.declined), m.width)
+	return layout.Clip(theme.Dim().Render(m.declined), m.width)
 }
 
 func (m Model) declinedHeight() int {
@@ -157,15 +157,15 @@ func (m Model) rerunLines() []string {
 	title := i18n.Tf("checks.rerun_title", map[string]any{"Workflow": m.rerunWorkflow})
 	lines := []string{
 		"",
-		clip(theme.Title().Render(title), m.width),
-		clip(m.rerunOption(domain.RerunFailed, i18n.T("checks.rerun_failed_only")), m.width),
-		clip(m.rerunOption(domain.RerunAll, i18n.T("checks.rerun_all")), m.width),
+		layout.Clip(theme.Title().Render(title), m.width),
+		layout.Clip(m.rerunOption(domain.RerunFailed, i18n.T("checks.rerun_failed_only")), m.width),
+		layout.Clip(m.rerunOption(domain.RerunAll, i18n.T("checks.rerun_all")), m.width),
 	}
 	switch {
 	case m.errText != "":
-		lines = append(lines, clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
+		lines = append(lines, layout.Clip(theme.Error().Render(i18n.T("common.error_prefix"))+singleLine(m.errText), m.width))
 	case m.rerunPhase == rerunWorking:
-		lines = append(lines, clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
+		lines = append(lines, layout.Clip(m.spin.View()+" "+i18n.T("confirm.working"), m.width))
 	}
 	return lines
 }
@@ -238,12 +238,12 @@ func (m Model) allRows() []string {
 		return nil
 	}
 	if len(m.order) == 0 {
-		return []string{clip(theme.Dim().Render(i18n.T("checks.none")), listWidth)}
+		return []string{layout.Clip(theme.Dim().Render(i18n.T("checks.none")), listWidth)}
 	}
 	var lines []string
 	for i, r := range m.order {
 		if m.hasHeading(i) {
-			lines = append(lines, clip(theme.Heading().Render(m.workflowTitle(r)), listWidth))
+			lines = append(lines, layout.Clip(theme.Heading().Render(m.workflowTitle(r)), listWidth))
 		}
 		lines = append(lines, m.checkLine(r, i == m.row))
 	}
@@ -306,7 +306,7 @@ func (m Model) checkLine(r domain.CheckRun, cursor bool) string {
 	if cursor && m.pane == paneList {
 		return theme.SelectedLine(layout.Fill(text, listWidth))
 	}
-	return theme.Check(r.State).Render(clip(text, listWidth))
+	return theme.Check(r.State).Render(layout.Clip(text, listWidth))
 }
 
 // minSec formats a duration as m:ss, the same shape the design's mockup
@@ -393,10 +393,6 @@ const tabWidth = 4
 // columns wide, so a log line laid out with tabs (go test's results) would
 // draw its words run together.
 func expandTabs(s string) string { return strings.ReplaceAll(s, "\t", strings.Repeat(" ", tabWidth)) }
-
-// clip cuts s to w display columns. Japanese takes two columns per
-// character, so the count is never a byte or a rune count.
-func clip(s string, w int) string { return ansi.Truncate(s, w, "…") }
 
 // singleLine folds an error's body onto one row, the same way the diff
 // view's does: a multi-line message would draw as extra visual rows and
