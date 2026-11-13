@@ -40,8 +40,7 @@ const (
 
 	// minWidthForSidebar is where the file list stops earning its columns.
 	// Below it the body would be 46 columns, which is 23 Japanese
-	// characters. It matches the width at which the Work board drops its
-	// card borders.
+	// characters.
 	minWidthForSidebar = 100
 )
 
